@@ -26,6 +26,23 @@
         "--strictPort"
       ],
       "port": 4173
+    },
+    {
+      "name": "worker-mock",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "worker",
+        "run",
+        "dev:mock",
+        "--",
+        "--port",
+        "8799"
+      ],
+      "env": {
+        "WRANGLER_SEND_METRICS": "false"
+      },
+      "port": 8799
     }
   ]
 }

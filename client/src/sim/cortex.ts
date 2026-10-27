@@ -31,9 +31,11 @@ export const SYSTEM_PROMPT = [
   `  {\"k\":\"size\",\"is\":${SIZES.map((a) => `\"${a}\"`).join("|")}}   (enemy size relative to the pet)`,
   `  {\"k\":\"last\",\"is\":Action}   (the pet's previous move)`,
   "  {\"k\":\"myHp\"|\"enemyHp\"|\"turn\",\"op\":\"<\"|\">=\",\"n\":number}   (HP in percent)",
-  "Facts: guard cuts damage taken to 40%. Attacking a guarding enemy does 40% damage. Emote calms an enemy so befriend works.",
-  "Befriend ends the fight as a win and works far better on hurt (<40% HP) or calm enemies. Flee ends the fight without a win.",
+  "Facts: guard cuts damage taken to 40%. Attacking a guarding enemy does 40% damage. Attacking is how an enemy gets hurt.",
+  "Befriend ends the fight as a win. On a hurt enemy (<40% HP, it usually shows intent \"scared\") befriend almost always works at once: befriend it, never emote at it.",
+  "Emote never wins by itself; it only makes a later befriend likelier on a healthy enemy, and the enemy may hit you meanwhile. Flee ends the fight without a win.",
   "Keep rules that still work, fix or drop ones the replays show are hurting, and obey the player's instruction.",
+  "Keep your reasoning brief; the JSON is all that matters.",
 ].join("\n");
 
 export function compactReplay(r: Replay): string {
@@ -47,10 +49,12 @@ export function compactReplay(r: Replay): string {
 const memoJson = (m: Memo) => JSON.stringify({ summary: m.summary, rules: m.rules });
 
 export function buildReflectPrompt(memo: Memo, replays: Replay[]): { system: string; prompt: string } {
-  const picked = [...replays].sort((a, b) => Number(a.outcome === "win") - Number(b.outcome === "win")).slice(0, 4); // losses first
+  const picked = [...replays].sort((a, b) => Number(a.outcome === "win") - Number(b.outcome === "win")).slice(0, 2); // losses first; two keep the reasoning (and the reply) inside the token budget
   return {
     system: SYSTEM_PROMPT,
-    prompt: `Current memo:\n${memoJson(memo)}\n\nRecent fights:\n${picked.map(compactReplay).join("\n\n")}\n\nReturn the updated memo JSON.`,
+    prompt:
+      `Current memo:\n${memoJson(memo)}\n\nRecent fights:\n${picked.map(compactReplay).join("\n\n")}\n\n` +
+      "Change at most two rules, only where these fights show a rule failing or missing; otherwise return the memo unchanged. Return the updated memo JSON.",
   };
 }
 
@@ -88,7 +92,9 @@ export class LlmCortex implements Cortex {
   }
 
   private async run(kind: "memo" | "teach", before: Memo, p: { system: string; prompt: string }): Promise<CortexResult> {
-    const reply = await this.llm.complete({ kind, ...p, maxTokens: 1500, provider: this.provider });
+    const reply = await this.llm.complete({ kind, ...p, maxTokens: 4000, provider: this.provider });
+    // A mock server (LLM_MOCK=1) never coaches; let the caller fall back to the scripted coach instead.
+    if (reply.model === "mock") throw new CortexUnavailable("server is in mock mode");
     const parsed = extractJson(reply.text);
     if (parsed === null) throw new CortexUnavailable(reply.truncated ? "reply cut off (token budget)" : "reply was not JSON");
     const { memo, dropped } = validateMemo(parsed);

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Action, ArchetypeId, EnemyAct } from "../sim/types";
+import { slotPosition, type DecorKind, type Slot } from "./home";
 
 // The arena: a procedural pet (left) and enemy (right) on a low-poly plot, plus short tweened animations
 // for each move. Everything is built from primitives so there are no asset files to load.
@@ -56,6 +57,48 @@ export function makeGhostPet(hue: number): THREE.Group {
       m.opacity = 0.72;
     }
   });
+  return g;
+}
+
+export function makeDecor(kind: DecorKind): THREE.Group {
+  const g = new THREE.Group();
+  const add = (geo: THREE.BufferGeometry, color: number, x: number, y: number, z = 0) => {
+    const m = new THREE.Mesh(geo, mat(color));
+    m.position.set(x, y, z);
+    g.add(m);
+    return m;
+  };
+  switch (kind) {
+    case "tree":
+      add(new THREE.CylinderGeometry(0.08, 0.11, 0.6, 6), 0x8b5a2b, 0, 0.3);
+      add(new THREE.IcosahedronGeometry(0.42, 0), 0x3d8b37, 0, 0.85);
+      add(new THREE.IcosahedronGeometry(0.3, 0), 0x4fa046, 0.12, 1.15);
+      break;
+    case "flower":
+      for (const [x, z, c] of [[0, 0, 0xff8fa3], [0.2, 0.1, 0xffd966], [-0.16, 0.14, 0xb4a7d6]] as const) {
+        add(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4), 0x4fa046, x, 0.15, z);
+        add(new THREE.IcosahedronGeometry(0.09, 0), c, x, 0.33, z);
+      }
+      break;
+    case "rock":
+      add(new THREE.DodecahedronGeometry(0.32, 0), 0x8e8e9a, 0, 0.2).scale.set(1.2, 0.7, 1);
+      add(new THREE.DodecahedronGeometry(0.17, 0), 0xa2a2ae, 0.3, 0.1, 0.1);
+      break;
+    case "lamp":
+      add(new THREE.CylinderGeometry(0.04, 0.05, 0.9, 6), 0x3a3f4f, 0, 0.45);
+      add(new THREE.OctahedronGeometry(0.14, 0), 0xffe08a, 0, 0.98).material = new THREE.MeshStandardMaterial({
+        color: 0xffe08a,
+        emissive: 0xffc94d,
+        emissiveIntensity: 0.8,
+        flatShading: true,
+      });
+      break;
+    case "fence":
+      for (const x of [-0.35, 0, 0.35]) add(new THREE.BoxGeometry(0.08, 0.45, 0.08), 0xc19a6b, x, 0.22);
+      add(new THREE.BoxGeometry(0.85, 0.07, 0.05), 0xa67c52, 0, 0.32);
+      add(new THREE.BoxGeometry(0.85, 0.07, 0.05), 0xa67c52, 0, 0.14);
+      break;
+  }
   return g;
 }
 
@@ -135,6 +178,7 @@ interface Tween {
   dur: number;
   fn: (k: number) => void; // k in 0..1
   done: () => void;
+  over: boolean;
 }
 
 export class Arena {
@@ -144,6 +188,7 @@ export class Arena {
   pet: THREE.Group;
   enemy: THREE.Group | null = null;
   private readonly fx = new THREE.Group();
+  private readonly decor = new THREE.Group();
   private tweens: Tween[] = [];
   private readonly petHome = new THREE.Vector3(-1.4, 0, 0);
   private readonly enemyHome = new THREE.Vector3(1.4, 0, 0);
@@ -166,7 +211,7 @@ export class Arena {
     this.pet = makePet();
     this.pet.position.copy(this.petHome);
     this.pet.rotation.y = 0.6;
-    this.scene.add(this.pet, this.fx);
+    this.scene.add(this.pet, this.fx, this.decor);
     window.addEventListener("resize", () => this.resize());
     this.resize();
     this.renderer.setAnimationLoop((t) => this.frame(t));
@@ -183,6 +228,19 @@ export class Arena {
     this.camera.top = half;
     this.camera.bottom = -half;
     this.camera.updateProjectionMatrix();
+  }
+
+  // Home-plot decor around the platform edge (yours, or a ghost owner's during a ghost fight).
+  setDecor(slots: readonly Slot[]) {
+    this.decor.clear();
+    slots.forEach((kind, i) => {
+      if (!kind) return;
+      const d = makeDecor(kind);
+      const p = slotPosition(i);
+      d.position.set(p.x, 0, p.z);
+      d.rotation.y = ((90 - p.deg) * Math.PI) / 180; // fences follow the rim
+      this.decor.add(d);
+    });
   }
 
   // An archetype builds its creature; a ready-made group (a ghost pet) is used as is.
@@ -208,8 +266,21 @@ export class Arena {
     return { x: ((v.x + 1) / 2) * el.clientWidth, y: ((1 - v.y) / 2) * el.clientHeight };
   }
 
+  // Driven by animation frames; a timer finishes it anyway when frames stop (background tab, hidden
+  // pane), so a fight never stalls waiting for an animation nobody can see.
   private tween(dur: number, fn: (k: number) => void): Promise<void> {
-    return new Promise((done) => this.tweens.push({ t0: -1, dur: dur / this.speed, fn, done }));
+    return new Promise((resolve) => {
+      const tw: Tween = { t0: -1, dur: dur / this.speed, fn, over: false, done: () => {} };
+      const timer = setTimeout(() => tw.done(), tw.dur + 250);
+      tw.done = () => {
+        if (tw.over) return;
+        tw.over = true;
+        clearTimeout(timer);
+        tw.fn(1);
+        resolve();
+      };
+      this.tweens.push(tw);
+    });
   }
 
   private burst(at: THREE.Vector3, color: number, count = 6) {
@@ -312,11 +383,14 @@ export class Arena {
     const live = this.tweens;
     this.tweens = [];
     for (const tw of live) {
+      if (tw.over) continue;
       if (tw.t0 < 0) tw.t0 = t;
       const k = Math.min(1, (t - tw.t0) / tw.dur);
-      tw.fn(k);
       if (k >= 1) tw.done();
-      else this.tweens.push(tw);
+      else {
+        tw.fn(k);
+        this.tweens.push(tw);
+      }
     }
     // Idle breathing.
     this.pet.children[0]!.scale.y = 0.85 + Math.sin(t / 400) * 0.03;

@@ -61,10 +61,20 @@ describe("ghost API", () => {
     ["unknown action", { ...ghost, memo: { summary: "", rules: [{ ...rule, do: "nuke" }] } }],
     ["unknown cond", { ...ghost, memo: { summary: "", rules: [{ ...rule, if: [{ k: "mood", is: "x" }] }] } }],
     ["array body", [ghost]],
+    ["unknown decor", { ...ghost, decor: ["castle"] }],
+    ["too much decor", { ...ghost, decor: Array(9).fill("tree") }],
+    ["decor not a list", { ...ghost, decor: "tree" }],
   ])("rejects an invalid ghost: %s", async (_n, body) => {
     const h = harness();
     expect((await h.call("/api/ghosts", postJson(body))).status).toBe(400);
     expect([...h.ghosts.data.keys()].filter((k) => k.startsWith(GHOST_PREFIX))).toHaveLength(0);
+  });
+
+  it("stores the owner's home decor with the ghost", async () => {
+    const h = harness();
+    const decor = ["tree", "", "lamp", "fence"];
+    const { id } = (await (await h.call("/api/ghosts", postJson({ ...ghost, decor }))).json()) as { id: string };
+    expect(await (await h.call(`/api/ghosts/${id}`)).json()).toMatchObject({ decor });
   });
 
   it("rejects malformed JSON", async () => {
@@ -102,6 +112,7 @@ describe("ghost sanitizing", () => {
 
   it("only stores name, genes and memo", () => {
     const g = parseGhost({ ...ghost, email: "a@b.co", stats: { atk: 999 } });
-    expect(Object.keys(g!).sort()).toEqual(["genes", "memo", "name"]);
+    expect(Object.keys(g!).sort()).toEqual(["decor", "genes", "memo", "name"]);
+    expect(g!.decor).toEqual([]);
   });
 });

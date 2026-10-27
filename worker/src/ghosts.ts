@@ -14,6 +14,7 @@ export interface GhostInput {
   name: string;
   genes: Record<string, number>;
   memo: GhostMemo;
+  decor: string[]; // home-plot slots: a decor kind or "" (empty)
 }
 
 export interface GhostRecord extends GhostInput {
@@ -29,6 +30,15 @@ export const GHOST_POSTS_PER_HOUR = 10;
 const RATE_PREFIX = "rl:ghost:";
 const MAX_GENES = 12;
 const MAX_NAME = 16;
+export const DECOR_KINDS = ["tree", "flower", "rock", "lamp", "fence"] as const; // client/src/game/home.ts
+const MAX_DECOR = 8;
+
+// Optional; a missing list is an empty plot.
+function parseDecor(v: unknown): string[] | null {
+  if (v === undefined) return [];
+  if (!Array.isArray(v) || v.length > MAX_DECOR) return null;
+  return v.every((d) => d === "" || (DECOR_KINDS as readonly string[]).includes(d)) ? [...(v as string[])] : null;
+}
 
 // Letters, digits, spaces and a little punctuation; everything else (markup, dots, slashes, @) is dropped,
 // so a name can never form a URL, an address or HTML.
@@ -59,8 +69,9 @@ export function parseGhost(body: unknown): GhostInput | null {
   const name = cleanName(b.name);
   if (!name || !isGenes(b.genes)) return null;
   const memo = parseGhostMemo(b.memo);
-  if (!memo) return null;
-  return { name, genes: { ...b.genes }, memo };
+  const decor = parseDecor(b.decor);
+  if (!memo || !decor) return null;
+  return { name, genes: { ...b.genes }, memo, decor };
 }
 
 // Records read back from KV are re-validated, so an old-format or tampered entry is never served.
@@ -85,6 +96,7 @@ export const SEED_GHOST: GhostRecord = {
   seed: true,
   name: "Pip",
   genes: { hue: 0.55, build: 0.4, ears: 0.7, tail: 0.3 },
+  decor: ["tree", "flower", "", "lamp", "", "flower", "tree", ""],
   memo: {
     summary: "Guards heavy hits, finishes hurt foes, runs when nearly out.",
     rules: [

@@ -1,5 +1,6 @@
 import { Instinct, type Choice } from "./game/instinct";
 import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
+import { cycleSlot, DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, parseHome, type Slot } from "./game/home";
 import { Arena, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
 import { NativeVoice, WebLlmVoice } from "./game/voices";
@@ -22,6 +23,8 @@ interface Save {
   memo: Memo;
   recent: Replay[];
   shared?: string; // the memo rules last uploaded as a ghost, so the same pet is not re-shared every fight
+  mine?: string[]; // ids of ghosts this browser uploaded, to label your own ghost when you meet it
+  home: Slot[]; // decor on the pet's home plot
 }
 
 function load(): Save {
@@ -31,13 +34,15 @@ function load(): Save {
       return {
         memo: validateMemo(raw.memo).memo,
         recent: Array.isArray(raw.recent) ? raw.recent.slice(-8) : [],
+        home: parseHome(raw.home),
         ...(typeof raw.shared === "string" ? { shared: raw.shared } : {}),
+        ...(Array.isArray(raw.mine) ? { mine: raw.mine.filter((x): x is string => typeof x === "string").slice(-20) } : {}),
       };
     }
   } catch {
     /* private mode or corrupt save: start fresh */
   }
-  return { memo: EMPTY_MEMO, recent: [] };
+  return { memo: EMPTY_MEMO, recent: [], home: emptyHome() };
 }
 
 const state = load();
@@ -51,6 +56,7 @@ const save = () => {
 
 const pet = DEFAULT_PET;
 const arena = new Arena($<HTMLCanvasElement>("stage"));
+arena.setDecor(state.home);
 const instinct = new Instinct(null);
 let busy = false;
 
@@ -155,13 +161,15 @@ async function fight() {
   const opp: Opponent = ghost ? { label: `${ghost.name} (ghost)`, maxHp: def.maxHp } : archetypeOpp(enemy);
   const battle = new Battle({ enemy, seed: Math.floor(Math.random() * 1e9), ...(ghost ? { enemyDef: def } : {}) });
   arena.setEnemy(ghost ? makeGhostPet(ghostHue(ghost.genes)) : enemy);
+  arena.setDecor(ghost ? ghost.decor : state.home); // a ghost fight happens on its owner's plot
+  showGhostCard(ghost);
   log.innerHTML = "";
   if (ghost) {
-    const who = ghost.seed ? "a built-in ghost" : "another player's ghost";
+    const who = ghost.seed ? "a built-in ghost" : state.mine?.includes(ghost.id) ? "your own ghost" : "another player's ghost";
     logLine(
       `<b>${pet.name}</b> vs <b>${esc(ghost.name)}</b>, ${who}` +
         `${ghostOnline ? "" : " <span class=\"dim\">(offline: local ghost)</span>"}. ` +
-        `<span class="dim">It follows its owner's ${ghost.memo.rules.length} memo rules.</span>`,
+        `<span class="dim">It follows ${ghost.seed ? "its" : "its owner's"} ${ghost.memo.rules.length} memo rules.</span>`,
     );
   } else logLine(`<b>${pet.name}</b> vs <b>${enemy}</b>`);
   setHp(pet.maxHp, opp, def.maxHp);
@@ -195,7 +203,42 @@ async function fight() {
 
 // ---------------- ghosts (share + fight other players' pets) ----------------
 
-const memoKey = () => JSON.stringify(state.memo.rules.map((r) => [r.if, r.do]));
+function showGhostCard(g: Ghost | null) {
+  const card = $("ghostCard");
+  card.hidden = !g;
+  if (!g) return;
+  const build = g.genes.build ?? 0.5;
+  card.innerHTML =
+    `<b>${esc(g.name)}</b> <span class="dim">${g.seed ? "built-in ghost" : "player ghost"}</span><br>` +
+    `<span class="dim">Build:</span> ${build < 0.35 ? "small and quick" : build > 0.65 ? "big and sturdy" : "balanced"} · ` +
+    `<span class="dim">Memo:</span> ${g.memo.rules.length} rules<br>` +
+    `<span class="dim">Home plot:</span> ${decorSummary(g.decor)}`;
+}
+
+function renderHome() {
+  const box = $("homeSlots");
+  box.innerHTML = "";
+  state.home.forEach((s, i) => {
+    const b = document.createElement("button");
+    b.textContent = s ? DECOR_ICON[s] : "·";
+    b.title = s ? `${DECOR_LABEL[s]} (click to change)` : "Empty spot (click to place decor)";
+    b.setAttribute("aria-label", `Spot ${i + 1}: ${s ? DECOR_LABEL[s] : "empty"}`);
+    b.disabled = busy;
+    b.onclick = () => {
+      if (busy) return;
+      state.home = cycleSlot(state.home, i);
+      save();
+      arena.setDecor(state.home);
+      showGhostCard(null);
+      renderHome();
+    };
+    box.appendChild(b);
+  });
+  $("homeInfo").textContent = `${decorCount(state.home)}/${HOME_SLOTS} spots decorated. Click a spot to place or change decor; your shared ghost carries your plot.`;
+}
+
+// What a shared ghost carries: its rules and its plot. A change to either makes the pet worth re-sharing.
+const memoKey = () => JSON.stringify([state.memo.rules.map((r) => [r.if, r.do]), state.home]);
 
 async function share(auto = false) {
   const status = $("ghostStatus");
@@ -205,9 +248,10 @@ async function share(auto = false) {
   }
   $<HTMLButtonElement>("shareGhost").disabled = true;
   status.textContent = auto ? "Sharing your pet as a ghost…" : "Sharing…";
-  const res = await shareGhost(pet.name, PET_GENES, state.memo);
+  const res = await shareGhost(pet.name, PET_GENES, state.memo, state.home);
   if (res.ok) {
     state.shared = memoKey();
+    state.mine = [...(state.mine ?? []), res.id].slice(-20);
     save();
     status.textContent = `${pet.name}'s ghost is out there: other players can now fight its memo (rules only, kept 30 days).`;
   } else {
@@ -370,6 +414,7 @@ function setButtons() {
   for (const id of ["go", "teach", "reflect", "reset", "watchProof", "shareGhost"]) $<HTMLButtonElement>(id).disabled = busy;
   if (!busy && !lastProof?.showcase) $<HTMLButtonElement>("watchProof").disabled = true;
   if (!busy) $<HTMLButtonElement>("reflect").disabled = state.recent.length === 0;
+  for (const b of $("homeSlots").querySelectorAll("button")) b.disabled = busy;
 }
 
 $("go").onclick = () => void fight();
@@ -399,6 +444,7 @@ $("probeNative").onclick = () => void probeNative();
 $("petName").textContent = pet.name;
 
 renderMemo();
+renderHome();
 setHp(pet.maxHp, null, null);
 setButtons();
 void probeNative(true);

@@ -22,6 +22,7 @@ const guardHeavy: Ghost = {
   name: "Tester",
   seed: false,
   genes: { build: 0.5 },
+  decor: [],
   memo: {
     summary: "",
     rules: [
@@ -128,9 +129,9 @@ describe("ghost API client", () => {
 
   it("reports share outcomes", async () => {
     const memo = guardHeavy.memo;
-    expect(await shareGhost("Mochi", PET_GENES, memo, "", ok({ id: "x" }, 201))).toEqual({ ok: true, id: "x" });
-    expect(await shareGhost("Mochi", PET_GENES, memo, "", ok({}, 429))).toEqual({ ok: false, reason: "rate_limited" });
-    expect(await shareGhost("Mochi", PET_GENES, memo, "", ok({}, 400))).toEqual({ ok: false, reason: "rejected" });
-    expect(await shareGhost("Mochi", PET_GENES, memo, "", async () => { throw new Error("x"); })).toEqual({ ok: false, reason: "offline" });
+    expect(await shareGhost("Mochi", PET_GENES, memo, [], "", ok({ id: "x" }, 201))).toEqual({ ok: true, id: "x" });
+    expect(await shareGhost("Mochi", PET_GENES, memo, [], "", ok({}, 429))).toEqual({ ok: false, reason: "rate_limited" });
+    expect(await shareGhost("Mochi", PET_GENES, memo, [], "", ok({}, 400))).toEqual({ ok: false, reason: "rejected" });
+    expect(await shareGhost("Mochi", PET_GENES, memo, [], "", async () => { throw new Error("x"); })).toEqual({ ok: false, reason: "offline" });
   });
 });

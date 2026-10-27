@@ -259,6 +259,8 @@ describe("cortex", () => {
     await expect(new LlmCortex(fakeLlm("I think you should guard more!")).teach(EMPTY_MEMO, "x")).rejects.toThrow(CortexUnavailable);
     await expect(new LlmCortex(fakeLlm('{"summary":"cut', true)).teach(EMPTY_MEMO, "x")).rejects.toThrow(/cut off/);
     await expect(new LlmCortex(fakeLlm('{"summary":"x","rules":[{"do":"nope"}]}')).teach(GOOD, "x")).rejects.toThrow(/no valid rules/);
+    const mock: LlmClient = { complete: async () => ({ text: '{"summary":"","rules":[]}', truncated: false, model: "mock", provider: "baseten", costUsd: 0, latencyMs: 1 }) };
+    await expect(new LlmCortex(mock).teach(EMPTY_MEMO, "x")).rejects.toThrow(/mock mode/);
   });
 });
 

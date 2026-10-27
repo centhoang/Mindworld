@@ -1,5 +1,6 @@
 import { ghostPayload, localSeedGhost, parseGhostRecord, type Genes, type Ghost } from "../sim/ghost";
 import type { Memo } from "../sim/memo";
+import type { Slot } from "./home";
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -35,12 +36,19 @@ export async function fetchRandomGhost(
 
 export type ShareResult = { ok: true; id: string } | { ok: false; reason: "rate_limited" | "rejected" | "offline" };
 
-export async function shareGhost(name: string, genes: Genes, memo: Memo, base = "", fetchFn: FetchFn = (i, o) => fetch(i, o)): Promise<ShareResult> {
+export async function shareGhost(
+  name: string,
+  genes: Genes,
+  memo: Memo,
+  decor: readonly Slot[] = [],
+  base = "",
+  fetchFn: FetchFn = (i, o) => fetch(i, o),
+): Promise<ShareResult> {
   try {
     const res = await timed(fetchFn, `${base}/api/ghosts`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(ghostPayload(name, genes, memo)),
+      body: JSON.stringify(ghostPayload(name, genes, memo, decor)),
     });
     if (res.status === 429) return { ok: false, reason: "rate_limited" };
     if (!res.ok) return { ok: false, reason: "rejected" };

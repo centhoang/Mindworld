@@ -55,3 +55,15 @@ Same 32 scenarios and scoring via `client/src/spike/native.ts` against `llama-se
 Voice-line check (3B, `buildVoicePrompt` in `client/src/game/instinct.ts`, grammar `move: line`, temp 0.7, 20 turns of real fights): 20/20 valid, p50 0.54 s, p95 0.77 s, lines in character ("guard: Protect my coach, not myself").
 
 **Verdict**: native 3B passes the decision rule (valid 100%, memo >= 70%, p95 <= 1.5 s); 1B native is 8x faster than WebGPU but just as weak (quality = weights, not runtime). So: browser stays the default (no install; 1B or rules-only), and **power mode = the same browser game talking to a local `llama-server` with Llama 3.2 3B** on 127.0.0.1:8080. No Unity port needed to get native inference. llama-server answers CORS preflight for any origin; it does not send `Access-Control-Allow-Private-Network`, so an https page calling 127.0.0.1 must be verified in Chrome at deploy (Local Network Access prompt).
+
+## Live eval (2026-10-28, Baseten `muse-spark-open-1026` via `wrangler dev`, ledger cap forced to $0.50/day)
+`npm run eval -- --live`: one Teach ("Be gentle with hurt enemies and guard when they wind up a heavy hit.") from an empty memo, then Reflect on the taught pet's own fights. Paired seeded fights; heldout = 1000 fights on seeds the coach never saw. Scripted coach (free double) for reference: heldout 60.5% -> 88.0% (+27.5 pts).
+
+| run | change | Teach result | Reflect |
+|---|---|---|---|
+| 0 | original prompt, max 1500 tokens | cut off (reasoning used the budget). Same prompt at 2000: 1633 output tokens; memo = guard heavy, emote when enemy <40%: **heldout 60.5% -> 20.0%** (emote never wins) | not reached |
+| 1 | prompt: plain befriend/emote facts ("befriend a hurt/scared enemy, never emote at it"), "keep reasoning brief"; max 4000 (worker cap raised from 2000) | 3 rules, **60.5% -> 88.0% (+27.5 pts, 95% CI 24.7..30.4, p=6e-73)**, $0.0078 | cut off at 4000 |
+| 2 | Reflect prompt: 2 replays instead of 4, "change at most two rules, else return unchanged" | **60.5% -> 88.9% (+28.4 pts, CI 25.5..31.4, p=1.5e-75)**; brute 21->98, bully 6->54; $0.0084 | still cut off at 4000 |
+
+Spend for this eval: $0.075 (ledger 0.0066 -> 0.0814). Cost per Teach ~ $0.008 (~530 in incl. 512 cached, ~1600-1900 out, mostly reasoning), 7-10 s.
+Open: Reflect ("Learn from my fights") still exceeds 4000 output tokens, so the game falls back to the offline coach there. Next ideas (untested): Meta `muse-spark-1.3` for Reflect, a reasoning-effort parameter if Baseten exposes one, or summarize replays to per-enemy outcome lines instead of turn logs.

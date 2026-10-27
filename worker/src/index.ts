@@ -15,7 +15,7 @@ function buildDeps(env: Env): Deps {
   const cfg: AppConfig = {
     mock: flag(env.LLM_MOCK),
     defaultProvider: "baseten",
-    maxOutputTokens: 2000,
+    maxOutputTokens: 4000, // reasoning models spend most of this thinking; 2000 cut memo replies off
     providers: {
       baseten: {
         apiKey: env.BASETEN_API_KEY,

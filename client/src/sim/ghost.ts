@@ -1,3 +1,4 @@
+import { homeToWire, parseHome, type Slot } from "../game/home";
 import { sizeOf } from "./battle";
 import type { EnemyCtx, EnemyDef } from "./enemies";
 import { validateMemo, type Memo } from "./memo";
@@ -14,6 +15,7 @@ export interface Ghost {
   name: string;
   genes: Genes;
   memo: Memo;
+  decor: Slot[]; // the owner's home plot, where the ghost fight takes place
   seed: boolean; // a built-in ghost, not a real player's
 }
 
@@ -119,17 +121,24 @@ export function parseGhostRecord(raw: unknown): Ghost | null {
     name,
     genes,
     memo: validateMemo(o.memo).memo,
+    decor: parseHome(o.decor),
     seed: o.seed === true,
   };
 }
 
 // What gets uploaded: the rules only. Summary and "why" notes are free text the coach wrote from what
 // the player typed, so they stay on this device (no personal data in ghosts).
-export function ghostPayload(name: string, genes: Genes, memo: Memo): { name: string; genes: Genes; memo: Memo } {
+export function ghostPayload(
+  name: string,
+  genes: Genes,
+  memo: Memo,
+  decor: readonly Slot[] = [],
+): { name: string; genes: Genes; memo: Memo; decor: string[] } {
   return {
     name: safeGhostName(name) || "Pet",
     genes: { ...genes },
     memo: { summary: "", rules: memo.rules.map((r) => ({ if: r.if, do: r.do, why: "" })) },
+    decor: homeToWire(decor),
   };
 }
 
@@ -140,6 +149,7 @@ export const LOCAL_SEED_GHOSTS: Ghost[] = [
     name: "Pip",
     seed: true,
     genes: { hue: 0.55, build: 0.4, ears: 0.7, tail: 0.3 },
+    decor: parseHome(["tree", "flower", null, "lamp", null, "flower", "tree", null]),
     memo: {
       summary: "",
       rules: [
@@ -154,6 +164,7 @@ export const LOCAL_SEED_GHOSTS: Ghost[] = [
     name: "Bramble",
     seed: true,
     genes: { hue: 0.3, build: 0.8, ears: 0.2, tail: 0.9 },
+    decor: parseHome(["rock", "fence", "fence", "rock", "fence", "fence", "rock", null]),
     memo: {
       summary: "",
       rules: [
@@ -168,6 +179,7 @@ export const LOCAL_SEED_GHOSTS: Ghost[] = [
     name: "Zuzu",
     seed: true,
     genes: { hue: 0.85, build: 0.15, ears: 0.9, tail: 0.6 },
+    decor: parseHome(["flower", "flower", "lamp", "flower", "flower", "lamp", "flower", "flower"]),
     memo: {
       summary: "",
       rules: [

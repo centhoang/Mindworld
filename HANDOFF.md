@@ -7,8 +7,8 @@ SLEEP MODE ACTIVE since 2026-10-29 00:40 (UTC+7)
 ## Sleep queue (director = the session the user said "sleep" in; workers do the work)
 1. [done] A. Thinking animation + WebLLM grammar fallback (client UI; code + tests, no GPU run). Done: tests/tsc/build green.
 2. [done] B. Power-mode script `scripts/power-mode.ps1` + README section (scripts/ + README only). Done: script runs with `-SkipDownload` against `.scratch/native`, doc written.
-3. [running] C. Ghost loop T1: post memo+genes after a fight, fetch random ghost as opponent (client + worker ghosts). Done: tests green, mock-mode check via wrangler dev.
-4. [pending] D. Next batch, sent to the same session as C (user rule 2026-10-29: batch tasks, one worker at a time, reuse a worker that has context left): (a) eyeball thinking state + ghost fight in the browser pane with `vite preview` + `wrangler dev LLM_MOCK=1`, fix what's broken; (b) home plot/decor MVP (T1, from PLAN.md); (c) small `npm run eval -- --live` tuning run, hard cap $0.50 logged here; (d) verification pass: tests, tsc, build, secrets scan; director commits.
+3. [done 8792234, 68+72 tests, wrangler mock curl OK; in-browser fight not hand-tested] C. Ghost loop T1: post memo+genes after a fight, fetch random ghost as opponent (client + worker ghosts). Done: tests green, mock-mode check via wrangler dev.
+4. [running in sleep-c-ghosts] D. Next batch, sent to the same session as C (user rule 2026-10-29: batch tasks, one worker at a time, reuse a worker that has context left): (a) eyeball thinking state + ghost fight in the browser pane with `vite preview` + `wrangler dev LLM_MOCK=1`, fix what's broken; (b) home plot/decor MVP (T1, from PLAN.md); (c) small `npm run eval -- --live` tuning run, hard cap $0.50 logged here; (d) verification pass: tests, tsc, build, secrets scan; director commits.
 Spend overnight: $0.00 of $3 cap.
 Decisions needing review: (none yet)
 
