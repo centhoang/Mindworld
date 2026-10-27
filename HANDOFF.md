@@ -1,27 +1,20 @@
-SLEEP MODE ACTIVE since 2026-10-29 00:40 (UTC+7)
+SLEEP MODE ended for the night 2026-10-29 ~01:15 (UTC+7): the queue is empty, and the items left need the user or a GPU/download run.
 
 ## Morning report
-- (in progress) Checkpoint commit 9e4acc8 (T0 UI playable; 42+58 tests green, secrets scan clean).
-- A+B committed 9615d96 (49+58 tests, build OK). Power-mode download path untested (only `-SkipDownload` vs `.scratch/native`). Thinking state not yet eyeballed in the browser.
-
-## Sleep queue (director = the session the user said "sleep" in; workers do the work)
-1. [done] A. Thinking animation + WebLLM grammar fallback (client UI; code + tests, no GPU run). Done: tests/tsc/build green.
-2. [done] B. Power-mode script `scripts/power-mode.ps1` + README section (scripts/ + README only). Done: script runs with `-SkipDownload` against `.scratch/native`, doc written.
-3. [done 8792234, 68+72 tests, wrangler mock curl OK; in-browser fight not hand-tested] C. Ghost loop T1: post memo+genes after a fight, fetch random ghost as opponent (client + worker ghosts). Done: tests green, mock-mode check via wrangler dev.
-4. [done 31872f2, 78+76 tests; browser flows OK; home plot; live Teach +28.4 pts held-out for $0.075, worker maxOutputTokens 2000->4000] D. Next batch, sent to the same session as C (user rule 2026-10-29: batch tasks, one worker at a time, reuse a worker that has context left): (a) eyeball thinking state + ghost fight in the browser pane with `vite preview` + `wrangler dev LLM_MOCK=1`, fix what's broken; (b) home plot/decor MVP (T1, from PLAN.md); (c) small `npm run eval -- --live` tuning run, hard cap $0.50 logged here; (d) verification pass: tests, tsc, build, secrets scan; director commits.
-5. [running in sleep-c-ghosts] E. Fix live Reflect ("Learn from my fights" exceeds 4000 output tokens -> offline fallback): per-enemy outcome summaries instead of turn logs, shorter prompt, try Meta `muse-spark-1.3` for Reflect if needed. Cap $0.30. Done: live Reflect returns a valid memo, eval numbers in SPIKES.md, tests green.
-Spend overnight: $0.075 of $3 cap.
-Decisions needing review: (none yet)
-
+- Done and committed locally (no remote): 9e4acc8 T0 UI · 9615d96 thinking state, WebLLM grammar fallback, `scripts/power-mode.ps1` + README · 8792234 ghost loop (validated KV store, share + fight a random ghost, offline seed ghost) · 31872f2 home plot + decor, browser fixes, live eval · 89b5111 live Reflect fix. Tests 81 client / 76 worker, tsc + build green, secrets scan clean.
+- Live Meta numbers (`docs/SPIKES.md` "Live eval"): Teach on Baseten Muse Spark Open, held-out 60.5% -> 88.9% (+28.4 pts, CI 25.5..31.4), ~$0.008 and 7-10 s per Teach. Reflect now runs on Meta `muse-spark-1.3` with effort low (valid memo 3/3).
+- Spend overnight: $0.208 of the $3 cap (ledger 0.0066 -> 0.2148).
+- Unverified: power-mode download path (only `-SkipDownload`); WebLLM 1B in the UI on the GPU Chrome; https -> 127.0.0.1 at deploy.
+- Decisions needing review: (1) Worker `maxOutputTokens` 2000 -> 4000 (reasoning ate the budget). (2) Reflect goes to Meta `muse-spark-1.3` (low effort), Teach stays on Baseten. (3) **Reflect gate**: a revised memo is adopted only if it doesn't lose on the 40 train seeds (held-out never seen by the gate); the UI says when a revision is rejected. Reflect often adds nothing over a strong taught memo.
 # HANDOFF (update at every milestone; keep under ~80 lines)
 
-Last updated: 2026-10-27 night (day 1). Phase: **2 = T0 slice (core + UI playable)**. Deadline Nov 4 9 PM ET (user is UTC+7). Nothing committed yet: the user commits (or asks Claude).
+Last updated: 2026-10-29 01:15 (overnight sleep run). Phase: **T1 (ghosts + home plot) in progress**. Deadline Nov 4 9 PM ET (user is UTC+7). 6 local commits, no remote.
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions. Follow CLAUDE.md. Tell me when the context gets long and I will start a new session."
 Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Sleep mode = unattended overnight chain.
 
 ## State
-- Local git repo, 2 commits + much uncommitted (rules, docs, scripts, `worker/`, `client/`). No remote. `.env` has both keys (gitignored; secrets scan of all new files clean). Smoke test `python -I scripts/smoke_llm.py` passes both. Reasoning always on.
+- Local git repo, 6 commits (HEAD 89b5111), clean tree. No remote. `.env` has both keys (gitignored). Smoke test `python -I scripts/smoke_llm.py` passes both. Tests: client 81, worker 76. Ghosts, home plot and live Teach/Reflect: see the Morning report and `docs/SPIKES.md`.
 - **`worker/` done (58 tests, `npm run build` dry-run OK)**: one Cloudflare Worker serves the client (`[assets]`, run_worker_first) + API. `POST /api/llm` (Baseten `muse-spark-open-1026` default; Meta `muse-spark-1.3` via `provider`), `SpendCounter` Durable Object ledger (atomic worst-case reserve, settle, books worst case when the outcome is unknown), per-client limits, geo-block 451 (restricted list, fail-closed on XX/T1/UA without region), ghost KV stub (`/api/ghosts`, `/random`), mock mode `LLM_MOCK=1`. Live check through `wrangler dev` with real keys: 2 calls, $0.002. Codex review: 5 issues fixed. Deploy steps: `docs/DEPLOY.md`.
 - **`client/` builds, 42 tests**: Vite 8 + TS + three.js. **T0 UI playable** (`index.html` + `src/main.ts` + `src/game/{instinct,voices,scene}.ts`): procedural pet + 5 enemy meshes, tweened moves, speech bubbles, HP bars, battle log with source tags (memo #n / model / instinct), Teach + "Learn from my fights" (live Muse via Worker, falls back to ScriptedCortex labelled "offline coach"), Proof panel (held-out bars, per-enemy, CI, watch before/after replay), memo+recent fights in localStorage, privacy footer, stacked layout <=1100px. Verified in the pane: live Muse Spark Open teach took 19 s, valid 2-rule memo, +27.7 pts held-out; power mode fight used 3B picks + memo rule. WebLLM 1B path NOT yet verified in the UI (needs the GPU Chrome). `spike-b.html` = local-model benchmark (WebLLM). `npm run eval` prints paired-seed numbers (scripted coach, offline); `-- --live http://127.0.0.1:8787` uses the real Meta model via the Worker.
 - **T0 core done, no UI**: `sim/battle.ts` (turn-based, 5 actions, 5 enemy archetypes with learnable patterns, stateless seeded luck so paired seeds are fair), `memo.ts` (rule DSL: validate/render/extract JSON), `policy.ts` (`baselinePolicy` = uncoached; `memoPolicy` = deterministic proxy of the Instinct), `cortex.ts` (prompts, `LlmCortex` over `/api/llm`, `ScriptedCortex` offline double, `CortexUnavailable`), `evaluate.ts` (paired arms, bootstrap CI, exact sign test), `proof.ts` (Teach -> Prove: 40 train seeds + 200 held-out seeds x 5 enemies). Scripted numbers (after Codex review #2 fixes: per-enemy luck, log-space sign test, one-line `why`, no threshold rounding): held-out win 60.5% -> 88.0% (95% CI +24.7..+30.4 pts, 1000 paired fights); brute 21->100, bully 6->47, pal/skitter near ceiling.
@@ -45,9 +38,9 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 4. (resolved) Unity: no; native 3B = browser power mode. Details docs/SPIKES.md.
 
 ## Next actions
-1. Verify the WebLLM 1B path in the UI on the GPU Chrome (grammar `move: line` with `{1,60}` repetition may not compile in xgrammar; fall back to `[a-zA-Z ,.!?']+` and max_tokens). Add a "thinking" animation for the ~19 s Muse call; keep prompts short.
-2. Power-mode setup doc + script (`scripts/power-mode.ps1`: download llama.cpp CUDA/Vulkan + 3B GGUF, run llama-server) and README section; verify https page -> 127.0.0.1 (Chrome Local Network Access) at deploy.
-3. Ghost loop: store memo+genes after a fight (`/api/ghosts`), fetch a random ghost as opponent (T1); then home plot/decor. Then commit (secrets scan) and the eval `--live` tuning run.
+1. User: create the private GitHub repo `pet-mind` and push the 6 local commits (secrets scan done), so the commits count as evidence.
+2. Verify the WebLLM 1B path in the UI on the GPU Chrome (grammar fallback is in `client/src/game/grammar.ts`), and run the power-mode download path once.
+3. Deploy to `pets.uryto.dev` (`docs/DEPLOY.md`, user approves DNS): check https -> 127.0.0.1 power mode, then neighborhood/ghost arena polish and the demo script.
 
 ## Gotchas
 - GPU browser tests: Claude can launch a separate Chrome (`--force_high_performance_gpu --remote-debugging-port=9222 --user-data-dir=.scratch/chrome-gpu`) and drive it with `scripts/cdp-eval.mjs`; stop it and delete `.scratch/chrome-gpu` (~5 GB of weights cache) afterwards. A lost WebGPU device needs a Chrome restart.
