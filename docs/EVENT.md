@@ -36,5 +36,11 @@ Stage 1 pass/fail: fits theme and reasonably uses Meta Model API and/or open wei
 - Baseten: apply for $100 + 2M TPM (≤ 2,000 people, reviewed by use case). Use model ID `meta-models/muse-spark-open-1026`.
 - Modal: $100 for the first 1,000 participants (Endpoints for Meta open-weight models, serverless GPUs, sandboxes, training). Fireworks: $25 for shortlisted teams.
 
+## Price snapshot (2026-10-26; verify before relying on it)
+- Meta Model API / Muse Spark: $1.25 in / $0.15 cached in / $4.25 out per 1M tokens (1.1 confirmed by press, 1.3 single source). Press also says new accounts get $20 free credits (unverified).
+- Fireworks: Muse Spark Open serverless $1.25 / $0.15 / $4.25 per 1M. Muse Glimmer 30B serverless price not listed. Glimmer 30B SFT free via UI and Serverless Training API until 11/30, no card. Otherwise LoRA SFT ~$3/1M training tokens (16-80B tier).
+- Modal: Starter $30/month free compute. Per second: L4 $0.000222, L40S $0.000542, A100-80 $0.000694, H100 $0.001097.
+- Baseten: Model APIs per token (Muse prices not checked); dedicated GPU per minute: L4 $0.014, A100 $0.067, H100 $0.108. New accounts get free credits (amount not listed).
+
 ## Channels
 Website cerebralvalley.ai/e/meta-ai-developer-hackathon (/details, /discord, /live). Discord: #announcements, #questions, #intros, #team-search, #office-hours, Baseten channel. Announcements keep arriving; the saved snapshot is from Oct 26 ~noon.

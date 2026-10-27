@@ -23,6 +23,10 @@ Deadline: **Nov 4, 9 PM ET** (submission via CV platform). Event facts: `docs/EV
 - Claude asks first (one question, recommendation first, at most 3 options): concept or scope pivots, track/team, anything spending money or using a card, anything outward-facing (posting on Discord/X, sending messages, submitting), demo storyline, choices that lock in a costly dependency.
 - The user alone does: claim credits (forms, card), accept rules/terms, post on X, final submission. Claude prepares the text/files; the user clicks send.
 
+## Money
+- Assume only Meta's $150 exists; partner credits are a bonus. Every paid call goes through one wrapper that logs tokens and estimated cost and enforces a `MAX_DAILY_USD` cap with a free fallback (reflex policy or cached decision). Mock the LLM in tests.
+- Never loop an API call without a hard iteration/cost limit. Ask the user before any plan that could exceed the cap or needs a new paid service.
+
 ## Hackathon compliance (judges check; violations = disqualification)
 - Meta models must be used meaningfully: Meta Model API (Muse Spark etc.) and/or open weights (Muse Glimmer, Muse Spark Open). Baseten model ID for the event: `meta-models/muse-spark-open-1026`.
 - Repo must be PUBLIC, fresh, and contain ONLY work done during the event (Oct 27 – Nov 4). Never copy code from the user's pre-existing private game into it. The 3-min demo opens with one line: what pre-existed vs what was built this week.

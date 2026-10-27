@@ -25,6 +25,14 @@ No Meta model runs on a phone: smallest is Muse Glimmer 30B (single GPU/Mac), th
 4. Solo vs team (teammates must already be approved participants; find in #team-search). Default: solo, Indie Developer track.
 5. User confirmed what "Meta's network" meant? Assumed = Meta models/API; if a Meta networking SDK was meant, tell Claude.
 
+## Budget plan (cost-capped; partner credits are NOT guaranteed, so assume only Meta $150)
+- Meta's $150 is promised to every accepted participant (claim form); partner credits are discretionary. Prices in docs/EVENT.md.
+- A pet decision (~600 in / 80 out tokens) on Spark-class pricing ≈ $0.001, so $150 ≈ 130k decisions. Split: $50 dev/test, $10 demo recording, $60 live public demo (hard-capped), $30 reserve.
+- Free paths that don't depend on credits: Fireworks Muse Glimmer 30B SFT is free until 11/30 (no card); Modal Starter gives $30/month free compute; Baseten new accounts get some free credits (amount unverified).
+- Local run is not viable: user PC = GTX 1050 4 GB, 32 GB RAM, i5-8300H (Glimmer 30B would be CPU-only, ~1-3 tok/s). Local only for tests with mocked LLM.
+- Design rules: LLM called only at decision points (not per frame); on-device reflex policy for the rest; decision cache + replay mode; every call logs tokens/cost; env `MAX_DAILY_USD` kill switch that falls back to the reflex policy; per-session rate limits on the public demo.
+- Consider a virtual/prepaid card with a low limit for the Meta billing page (Spend Limit notification does not stop billing).
+
 ## User-only actions (Claude cannot do: card, forms, rules)
 - Claim Meta $150 credits (form via CV; needs card; deadline Nov 4 9 PM ET). Modal $100 is first-1,000: apply now. Baseten $100 + 2M TPM: apply (done?). Accept official rules if prompted.
 

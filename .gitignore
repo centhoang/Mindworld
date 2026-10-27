@@ -8,7 +8,6 @@
 # raw event snapshots (not part of the submission repo)
 EventDetails/
 EventFrontPage/
-Event_CURRENT_F&Qs.txt
 
 # build output / deps
 node_modules/
