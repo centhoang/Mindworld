@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { Battle, MAX_TURNS, runBattle, runBattleAsync } from "./battle";
-import { CortexUnavailable, LlmCortex, ScriptedCortex, buildReflectPrompt, buildTeachPrompt, type LlmClient } from "./cortex";
+import { CortexUnavailable, LlmCortex, ScriptedCortex, buildReflectPrompt, buildTeachPrompt, summarizeFights, type LlmClient } from "./cortex";
 import { bootstrapMeanCi, comparePaired, makeScenarios, runArm, seedRange, signTestP } from "./evaluate";
 import { EMPTY_MEMO, extractJson, renderMemo, validateMemo, type Memo } from "./memo";
 import { baselinePolicy, memoPolicy } from "./policy";
-import { prove } from "./proof";
+import { passesGate, prove } from "./proof";
 import { roll } from "./rng";
 import { ACTIONS, ARCHETYPES, type Observation, type Policy } from "./types";
 
@@ -213,9 +213,26 @@ describe("cortex", () => {
     const replays = runArm(baselinePolicy, makeScenarios(["brute", "pal"], [1, 2])).replays;
     const p = buildReflectPrompt(GOOD, replays);
     expect(p.prompt).toContain("Current memo:");
-    expect(p.prompt).toContain("vs brute");
+    expect(p.prompt).toMatch(/^brute: won \d+\/2 /m);
+    expect(p.prompt).toMatch(/^pal: won \d+\/2 /m);
+    expect(p.prompt).not.toContain("T1 "); // per-enemy summary, no turn logs
     expect(p.system).toContain("ONLY one JSON object");
     expect(buildTeachPrompt(GOOD, "never flee").prompt).toContain("never flee");
+  });
+
+  it("the Reflect gate keeps a revision that does not lose on practice seeds and rejects a stalling one", () => {
+    expect(passesGate(GOOD, GOOD)).toBe(true);
+    const stall: Memo = { summary: "", rules: [{ if: [{ k: "turn", op: ">=", n: 1 }], do: "guard", why: "" }] };
+    expect(passesGate(GOOD, stall)).toBe(false);
+  });
+
+  it("summarizes fights per enemy with the costliest situations and the rule that chose them", () => {
+    const replays = runArm(memoPolicy(GOOD), makeScenarios(ARCHETYPES, seedRange(1, 20))).replays;
+    const text = summarizeFights(GOOD, replays);
+    expect(text.split("\n")).toHaveLength(ARCHETYPES.length);
+    expect(text).toMatch(/won \d+\/20/);
+    if (/in non-wins/.test(text)) expect(text).toMatch(/\[(rule \d|instinct)\]/);
+    expect(text.length).toBeLessThan(2000);
   });
 
   it("scripted coach learns from losses and from teaching, and does not duplicate rules", async () => {
@@ -261,6 +278,20 @@ describe("cortex", () => {
     await expect(new LlmCortex(fakeLlm('{"summary":"x","rules":[{"do":"nope"}]}')).teach(GOOD, "x")).rejects.toThrow(/no valid rules/);
     const mock: LlmClient = { complete: async () => ({ text: '{"summary":"","rules":[]}', truncated: false, model: "mock", provider: "baseten", costUsd: 0, latencyMs: 1 }) };
     await expect(new LlmCortex(mock).teach(EMPTY_MEMO, "x")).rejects.toThrow(/mock mode/);
+  });
+
+  it("LlmCortex sends Teach to the open-weights model and Reflect to Muse Spark", async () => {
+    const seen: string[] = [];
+    const llm: LlmClient = {
+      complete: async (req) => {
+        seen.push(`${req.provider}${req.effort ? `/${req.effort}` : ""}`);
+        return { text: '{"summary":"","rules":[]}', truncated: false, model: "m", provider: req.provider ?? "baseten", costUsd: 0, latencyMs: 1 };
+      },
+    };
+    const c = new LlmCortex(llm);
+    expect((await c.teach(EMPTY_MEMO, "x")).source).toBe("muse-spark-open");
+    expect((await c.reflect(EMPTY_MEMO, [])).source).toBe("muse-spark");
+    expect(seen).toEqual(["baseten", "meta/low"]);
   });
 });
 

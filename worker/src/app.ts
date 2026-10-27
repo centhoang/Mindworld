@@ -87,7 +87,10 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
 
 // ---------- LLM proxy ----------
 
+const EFFORTS = ["low", "medium", "high"] as const;
+
 interface LlmRequest {
+  effort: (typeof EFFORTS)[number] | undefined;
   provider: Provider;
   kind: LlmKind;
   system: string | undefined;
@@ -104,6 +107,7 @@ function parseLlmRequest(body: unknown, cfg: AppConfig): LlmRequest | string {
   if (typeof b.prompt !== "string" || b.prompt.length === 0 || b.prompt.length > MAX_PROMPT_CHARS) return "bad prompt";
   if (b.system !== undefined && (typeof b.system !== "string" || b.system.length > MAX_SYSTEM_CHARS)) return "bad system";
   let maxTokens = DEFAULT_OUTPUT_TOKENS;
+  if (b.effort !== undefined && !EFFORTS.includes(b.effort as never)) return "bad effort";
   if (b.maxTokens !== undefined) {
     if (typeof b.maxTokens !== "number" || !Number.isInteger(b.maxTokens) || b.maxTokens < MIN_OUTPUT_TOKENS) {
       return "bad maxTokens";
@@ -116,6 +120,7 @@ function parseLlmRequest(body: unknown, cfg: AppConfig): LlmRequest | string {
     system: b.system as string | undefined,
     prompt: b.prompt,
     maxTokens: Math.min(maxTokens, cfg.maxOutputTokens),
+    effort: b.effort as LlmRequest["effort"],
   };
 }
 
@@ -163,7 +168,7 @@ async function handleLlm(request: Request, deps: Deps): Promise<Response> {
   try {
     completion = cfg.mock
       ? mockCompletion(req.kind, req.system, req.prompt)
-      : await complete(req.provider, cfg.providers, { system: req.system, prompt: req.prompt, maxTokens: req.maxTokens }, deps.fetch);
+      : await complete(req.provider, cfg.providers, { system: req.system, prompt: req.prompt, maxTokens: req.maxTokens, ...(req.effort ? { effort: req.effort } : {}) }, deps.fetch);
   } catch (e) {
     if (e instanceof UpstreamError) {
       await deps.spend.release(id); // nothing was generated

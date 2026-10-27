@@ -4,7 +4,7 @@ import { CortexUnavailable, FetchLlmClient, LlmCortex, ScriptedCortex, describeM
 import { makeScenarios, pct, runArm, type PairedResult } from "../sim/evaluate";
 import { EMPTY_MEMO, type Memo } from "../sim/memo";
 import { baselinePolicy, memoPolicy } from "../sim/policy";
-import { HELDOUT_SEEDS, TRAIN_SEEDS, prove } from "../sim/proof";
+import { HELDOUT_SEEDS, TRAIN_SEEDS, passesGate, prove } from "../sim/proof";
 import { ARCHETYPES } from "../sim/types";
 
 const liveIdx = process.argv.indexOf("--live");
@@ -45,10 +45,12 @@ async function main() {
   console.log(`
 [reflect] source=${reflected.source} cost=$${reflected.costUsd.toFixed(4)} rules=${reflected.memo.rules.length} dropped=${reflected.dropped.length}`);
   describeMemo(reflected.memo).forEach((l) => console.log("  - " + l));
-  const r2 = prove(taught.memo, reflected.memo);
+  const adopted = passesGate(taught.memo, reflected.memo);
+  console.log(`gate (train seeds only): ${adopted ? "adopted" : "rejected, the pet keeps the taught memo"}`);
+  const r2 = prove(taught.memo, adopted ? reflected.memo : taught.memo);
   console.log(line("train", r2.train));
   console.log(line("heldout", r2.heldout));
-  perEnemy(reflected.memo);
+  perEnemy(adopted ? reflected.memo : taught.memo);
 }
 
 main().catch((e) => {

@@ -66,4 +66,16 @@ Voice-line check (3B, `buildVoicePrompt` in `client/src/game/instinct.ts`, gramm
 | 2 | Reflect prompt: 2 replays instead of 4, "change at most two rules, else return unchanged" | **60.5% -> 88.9% (+28.4 pts, CI 25.5..31.4, p=1.5e-75)**; brute 21->98, bully 6->54; $0.0084 | still cut off at 4000 |
 
 Spend for this eval: $0.075 (ledger 0.0066 -> 0.0814). Cost per Teach ~ $0.008 (~530 in incl. 512 cached, ~1600-1900 out, mostly reasoning), 7-10 s.
-Open: Reflect ("Learn from my fights") still exceeds 4000 output tokens, so the game falls back to the offline coach there. Next ideas (untested): Meta `muse-spark-1.3` for Reflect, a reasoning-effort parameter if Baseten exposes one, or summarize replays to per-enemy outcome lines instead of turn logs.
+Reflect fix (task E, same day, ledger 0.0814 -> 0.2148, **$0.133**):
+
+| run | change | Reflect result |
+|---|---|---|
+| 3 | Reflect prompt = one summary line per enemy (record, how fights ended, costliest intent -> move situations in non-wins, tagged with the memo rule that chose them) instead of turn logs; "keep rules unless failing, change at most two, do not simulate" | Baseten still cut off at 4000 ($0.018 wasted per try) |
+| probe | same prompt on Meta `muse-spark-1.3` | valid: 2496 out tokens, $0.0116, 13 s; vs taught memo **88.9% -> 91.7% heldout (+2.8 pts, CI 1.2..4.4)**, bully 54 -> 68 |
+| 4 | Reflect on Meta (Teach stays on Baseten) | valid, $0.0166, but it added "guard vs bully when HP < 50%" (a stall): **88.9% -> 83.6% (-5.3)**. Run-to-run variance is real |
+| 5 | prompt fact "guard/emote only buy time"; **gate**: a reflected memo is adopted only if it does not lose on the train seeds (free sim; heldout never seen by the gate); Teach not gated | Meta cut off at 4000 |
+| probe | Meta with `reasoning.effort: "low"` (accepted by the API) | valid: 1974 out tokens, $0.0095, same +2.8 pts memo |
+| 6, 7 | Reflect = Meta + effort low + gate | both valid ($0.0147, $0.0075); both revisions lost on train seeds, gate rejected them, heldout stays **89.8% -> 89.8%** (never lowered) |
+
+Teach (Baseten, unchanged) across runs 3-7: heldout 60.5% -> 88.9..89.8% (+28.4..+29.3 pts), $0.006-0.010.
+State: Reflect reliably returns a valid memo (3/3 with effort low) and can no longer make the pet worse; whether it improves depends on how strong the taught memo already is (+2.8 pts on a 3-rule memo, nothing over a 4-rule memo with an attack rule). In the game, a rejected revision shows "did worse in practice fights, your pet keeps its memo".

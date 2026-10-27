@@ -16,6 +16,7 @@ export interface CompletionRequest {
   system?: string;
   prompt: string;
   maxTokens: number;
+  effort?: "low" | "medium" | "high"; // reasoning effort, sent only when set
 }
 
 // Upstream answered with an explicit error status, so nothing was generated and the caller may release the
@@ -82,6 +83,7 @@ export async function completeBaseten(cfg: ProviderConfig["baseten"], req: Compl
       model: cfg.model,
       messages,
       max_tokens: req.maxTokens,
+      ...(req.effort ? { reasoning_effort: req.effort } : {}),
     }),
   );
   const choice = obj((Array.isArray(json.choices) ? json.choices[0] : undefined));
@@ -101,6 +103,7 @@ export async function completeMeta(cfg: ProviderConfig["meta"], req: CompletionR
       ...(req.system ? { instructions: req.system } : {}),
       input: req.prompt,
       max_output_tokens: req.maxTokens,
+      ...(req.effort ? { reasoning: { effort: req.effort } } : {}),
     }),
   );
   return {

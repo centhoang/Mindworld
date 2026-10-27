@@ -11,7 +11,7 @@ import { comparePaired, makeScenarios, pct } from "./sim/evaluate";
 import { ghostEnemyDef, ghostHue, PET_GENES, type Ghost } from "./sim/ghost";
 import { EMPTY_MEMO, validateMemo, type Memo } from "./sim/memo";
 import { baselinePolicy, memoPolicy } from "./sim/policy";
-import { HELDOUT_SEEDS, prove, type ProofReport } from "./sim/proof";
+import { HELDOUT_SEEDS, passesGate, prove, type ProofReport } from "./sim/proof";
 import { ARCHETYPES, DEFAULT_PET, type ArchetypeId, type Intent, type Replay } from "./sim/types";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -287,7 +287,7 @@ const liveCortex = new LlmCortex(new FetchLlmClient(""));
 const offlineCortex = new ScriptedCortex();
 let lastProof: ProofReport | null = null;
 
-async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string) {
+async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string, gated = false) {
   if (busy) return;
   busy = true;
   setButtons();
@@ -325,6 +325,11 @@ async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string) {
   status.textContent = note;
   if (!res) return;
   const before = state.memo;
+  if (gated && !passesGate(before, res.memo)) {
+    status.textContent = `${note ? note + " " : ""}The coach's revision did worse in practice fights, so your pet keeps its current memo.`;
+    say("pet", "I'll stick with what works.", 1600);
+    return;
+  }
   state.memo = res.memo;
   save();
   renderMemo();
@@ -426,7 +431,7 @@ $("teach").onclick = () => {
   const text = $<HTMLTextAreaElement>("teachText").value.trim();
   if (text) void coach((c) => c.teach(state.memo, text), "Teaching");
 };
-$("reflect").onclick = () => void coach((c) => c.reflect(state.memo, state.recent), "Reviewing your fights");
+$("reflect").onclick = () => void coach((c) => c.reflect(state.memo, state.recent), "Reviewing your fights", true);
 $("reset").onclick = () => {
   if (busy || !confirm("Forget everything your pet learned?")) return;
   state.memo = EMPTY_MEMO;

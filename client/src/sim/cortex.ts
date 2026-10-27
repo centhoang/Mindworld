@@ -1,4 +1,4 @@
-import { describeRule, extractJson, validateMemo, type Memo, type Rule } from "./memo";
+import { describeRule, extractJson, ruleMatches, validateMemo, type Memo, type Rule } from "./memo";
 import { ACTIONS, ARCHETYPES, INTENTS, SIZES, type Replay } from "./types";
 
 // The Cortex turns replays (and the player's plain-language teaching) into a memo. The live implementation
@@ -34,6 +34,7 @@ export const SYSTEM_PROMPT = [
   "Facts: guard cuts damage taken to 40%. Attacking a guarding enemy does 40% damage. Attacking is how an enemy gets hurt.",
   "Befriend ends the fight as a win. On a hurt enemy (<40% HP, it usually shows intent \"scared\") befriend almost always works at once: befriend it, never emote at it.",
   "Emote never wins by itself; it only makes a later befriend likelier on a healthy enemy, and the enemy may hit you meanwhile. Flee ends the fight without a win.",
+  "Guard and emote only buy time: a rule that guards or emotes turn after turn stalls the fight into a loss or draw. Every enemy needs a path to a win (attack it down, then befriend).",
   "Keep rules that still work, fix or drop ones the replays show are hurting, and obey the player's instruction.",
   "Keep your reasoning brief; the JSON is all that matters.",
 ].join("\n");
@@ -48,13 +49,45 @@ export function compactReplay(r: Replay): string {
 
 const memoJson = (m: Memo) => JSON.stringify({ summary: m.summary, rules: m.rules });
 
+// One line per enemy instead of turn logs: turn logs made the reasoning model re-simulate every fight and
+// run past its output budget. Each line has the record, how fights ended, and in the fights it did not win,
+// the (enemy intent -> pet move) situations that cost the most HP, tagged with the memo rule that chose it.
+export function summarizeFights(memo: Memo, replays: Replay[]): string {
+  const lines: string[] = [];
+  for (const enemy of ARCHETYPES) {
+    const rs = replays.filter((r) => r.enemy === enemy);
+    if (rs.length === 0) continue;
+    const ends = new Map<string, number>();
+    for (const r of rs) ends.set(`${r.outcome}/${r.how}`, (ends.get(`${r.outcome}/${r.how}`) ?? 0) + 1);
+    const hurt = new Map<string, { n: number; took: number }>();
+    for (const r of rs) {
+      if (r.outcome === "win") continue;
+      for (const t of r.turns) {
+        const i = memo.rules.findIndex((rule) => ruleMatches(rule, t.obs));
+        const key = `intent=${t.obs.intent} -> ${t.action} [${i >= 0 ? `rule ${i + 1}` : "instinct"}]`;
+        const h = hurt.get(key) ?? { n: 0, took: 0 };
+        h.n += 1;
+        h.took += t.taken;
+        hurt.set(key, h);
+      }
+    }
+    const wins = rs.filter((r) => r.outcome === "win").length;
+    const worst = [...hurt].sort((a, b) => b[1].took - a[1].took).slice(0, 3);
+    lines.push(
+      `${enemy}: won ${wins}/${rs.length} (${[...ends].map(([k, n]) => `${k} ${n}`).join(", ")})` +
+        (worst.length ? `; in non-wins, most HP lost on: ${worst.map(([k, h]) => `${k} ${h.n}x took ${h.took}`).join("; ")}` : ""),
+    );
+  }
+  return lines.join("\n");
+}
+
 export function buildReflectPrompt(memo: Memo, replays: Replay[]): { system: string; prompt: string } {
-  const picked = [...replays].sort((a, b) => Number(a.outcome === "win") - Number(b.outcome === "win")).slice(0, 2); // losses first; two keep the reasoning (and the reply) inside the token budget
   return {
     system: SYSTEM_PROMPT,
     prompt:
-      `Current memo:\n${memoJson(memo)}\n\nRecent fights:\n${picked.map(compactReplay).join("\n\n")}\n\n` +
-      "Change at most two rules, only where these fights show a rule failing or missing; otherwise return the memo unchanged. Return the updated memo JSON.",
+      `Current memo:\n${memoJson(memo)}\n\nResults of the pet's recent fights with this memo, per enemy:\n${summarizeFights(memo, replays)}\n\n` +
+      "Keep every rule unless these results show it failing. Add or change at most two rules, aimed at the enemy with the fewest wins. " +
+      "Do not simulate fights in detail. Return the updated memo JSON.",
   };
 }
 
@@ -75,24 +108,31 @@ export interface LlmReply {
 }
 
 export interface LlmClient {
-  complete(req: { kind: "memo" | "teach"; system: string; prompt: string; maxTokens: number; provider?: "baseten" | "meta" }): Promise<LlmReply>;
+  complete(req: { kind: "memo" | "teach"; system: string; prompt: string; maxTokens: number; provider?: "baseten" | "meta"; effort?: "low" }): Promise<LlmReply>;
 }
 
 export class CortexUnavailable extends Error {}
 
 export class LlmCortex implements Cortex {
-  constructor(private readonly llm: LlmClient, private readonly provider: "baseten" | "meta" = "baseten") {}
+  // Reflect goes to Meta's Muse Spark: on the open-weights model its reasoning ran past 4000 output tokens
+  // (docs/SPIKES.md "Live eval"); Teach stays on the open-weights model, which handles it well and cheaper.
+  constructor(
+    private readonly llm: LlmClient,
+    private readonly provider: "baseten" | "meta" = "baseten",
+    private readonly reflectProvider: "baseten" | "meta" = "meta",
+  ) {}
 
   reflect(memo: Memo, replays: Replay[]): Promise<CortexResult> {
-    return this.run("memo", memo, buildReflectPrompt(memo, replays));
+    return this.run("memo", memo, buildReflectPrompt(memo, replays), this.reflectProvider, "low");
   }
 
   teach(memo: Memo, instruction: string): Promise<CortexResult> {
-    return this.run("teach", memo, buildTeachPrompt(memo, instruction));
+    return this.run("teach", memo, buildTeachPrompt(memo, instruction), this.provider);
   }
 
-  private async run(kind: "memo" | "teach", before: Memo, p: { system: string; prompt: string }): Promise<CortexResult> {
-    const reply = await this.llm.complete({ kind, ...p, maxTokens: 4000, provider: this.provider });
+  private async run(kind: "memo" | "teach", before: Memo, p: { system: string; prompt: string }, provider: "baseten" | "meta", effort?: "low"): Promise<CortexResult> {
+    // Low reasoning effort keeps Reflect inside the budget (Muse Spark accepts reasoning.effort).
+    const reply = await this.llm.complete({ kind, ...p, maxTokens: 4000, provider, ...(effort ? { effort } : {}) });
     // A mock server (LLM_MOCK=1) never coaches; let the caller fall back to the scripted coach instead.
     if (reply.model === "mock") throw new CortexUnavailable("server is in mock mode");
     const parsed = extractJson(reply.text);

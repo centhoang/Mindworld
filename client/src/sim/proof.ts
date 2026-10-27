@@ -28,3 +28,11 @@ export function prove(memoBefore: Memo | null, memoAfter: Memo, enemies: readonl
     showcase: flip ? { enemy: flip.scenario.enemy, seed: flip.scenario.seed, before: flip.before, after: flip.after } : null,
   };
 }
+
+// A coach's revision (Reflect) is adopted only if it does not lose on the practice seeds: model replies vary
+// from run to run, and a free simulation catches a bad one before the pet uses it. Held-out seeds stay
+// untouched, so the reported proof is still on fights the gate never looked at. Teach is not gated: it
+// carries out what the player asked for.
+export function passesGate(before: Memo, after: Memo): boolean {
+  return comparePaired(memoPolicy(before), memoPolicy(after), makeScenarios(ARCHETYPES, TRAIN_SEEDS)).winRateDelta >= 0;
+}
