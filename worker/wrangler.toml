@@ -1,0 +1,37 @@
+name = "pet-mind"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# One Worker serves the built client AND the API, so the geo-block covers every request.
+# Build the client first (`npm run build` in ../client). Routes/custom domain (pets.uryto.dev) are
+# added at deploy time by the user; nothing here touches DNS.
+[assets]
+directory = "../client/dist"
+binding = "ASSETS"
+run_worker_first = true
+
+[[durable_objects.bindings]]
+name = "SPEND"
+class_name = "SpendCounter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SpendCounter"]
+
+# Ghost snapshots (traits + memo). `wrangler deploy` provisions this namespace automatically;
+# local dev uses a local simulation. Eventual consistency is fine for ghosts.
+[[kv_namespaces]]
+binding = "GHOSTS"
+
+# Non-secret defaults. Secrets (BASETEN_API_KEY, META_API_KEY) come from `.env` in local dev
+# (`npm run dev` passes --env-file ../.env) and from `wrangler secret put` in production.
+[vars]
+LLM_MOCK = "0"
+MAX_DAILY_USD = "5"
+MAX_TOTAL_USD_BASETEN = "50"
+MAX_TOTAL_USD_META = "100"
+CLIENT_DAILY_USD = "0.4"
+CLIENT_PER_MINUTE = "10"
+BASETEN_BASE_URL = "https://inference.baseten.co/v1"
+BASETEN_MODEL = "meta-models/muse-spark-open-1026"
+META_MODEL = "muse-spark-1.3"

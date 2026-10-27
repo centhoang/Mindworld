@@ -8,6 +8,12 @@
 # raw event snapshots (not part of the submission repo)
 EventDetails/
 EventFrontPage/
+Event_CURRENT_F&Qs.txt
+
+# Cloudflare local state and dev secrets
+.wrangler/
+.dev.vars
+.dev.vars.*
 
 # build output / deps
 node_modules/
@@ -17,3 +23,6 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
+
+# credential-adjacent mail from partners
+BasetenAPIKeyMail.txt

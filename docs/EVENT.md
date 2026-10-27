@@ -16,7 +16,7 @@ Meta Global AI Developer Hackathon, hosted by Meta + Cerebral Valley (CV). Virtu
 ## Models
 - Meta Model API (hosted): muse-spark-1.3 (recommended), 1.2, 1.1, muse-wonder-1.0 (preview), muse-image-1.0, muse-voice-transcribe-1.0, sam-3.1. Spark/Wonder: text+image+video+audio+PDF in, text out, 1M context, tool calling + structured output. Fine-tuning not stated.
 - Open weights: **Muse Glimmer** = 30B multimodal (text+image), Apache 2.0, "always-on local agents", reliable tool calling, persistent state, self-managed memory, fits a single consumer GPU/Mac (HF `meta-models/Muse-Glimmer-30B`; llama.cpp, vLLM, Ollama, ExecuTorch guide listed). **Muse Spark Open** = 816B MoE, 42B active, text/image/video/audio in; has a "commentary" channel where it states intent before acting; hosted on Baseten, Modal, Fireworks, etc. Both support SFT + RL fine-tuning.
-- **No Meta model is phone-sized** (smallest = 30B). On-device phone inference of a Meta model is not realistic.
+- **No Muse model is phone-sized** (smallest = Glimmer 30B). Older Meta open weights Llama 3.2 1B/3B are small enough for browser/phone, but they DO count as Meta models for Stage 1 and the tooling score (Discord ruling 2026-10-27) but not for the Open Weight bonus (Glimmer/Spark Open only).
 - Muse Code = Meta's coding agent. Docs: dev.meta.ai/docs/models, github.com/meta-models/meta-model-cookbook, github.com/meta-models/meta-oss-cookbook.
 
 ## Rules
@@ -41,6 +41,14 @@ Stage 1 pass/fail: fits theme and reasonably uses Meta Model API and/or open wei
 - Fireworks: Muse Spark Open serverless $1.25 / $0.15 / $4.25 per 1M. Muse Glimmer 30B serverless price not listed. Glimmer 30B SFT free via UI and Serverless Training API until 11/30, no card. Otherwise LoRA SFT ~$3/1M training tokens (16-80B tier).
 - Modal: Starter $30/month free compute. Per second: L4 $0.000222, L40S $0.000542, A100-80 $0.000694, H100 $0.001097.
 - Baseten: Model APIs per token (Muse prices not checked); dedicated GPU per minute: L4 $0.014, A100 $0.067, H100 $0.108. New accounts get free credits (amount not listed).
+
+## Verified legal points (read 2026-10-27)
+- Official Rules (cerebralvalley.ai/e/meta-ai-developer-hackathon/waiver): build with "Meta AI products, including Muse Spark, Glimmer, SAM 3"; one track only; open source allowed with licenses followed; submission must be own work (IP-clean); Organizers get a perpetual non-exclusive license to the Submission, entrant keeps ownership; winners need W-9/W-8BEN, paid via Tremendous within 30 days of verification. Rules say bonus prizes announced ~Nov 10.
+- Credit Terms (Meta): one account per person (no duplicates, or credits revoked); $150 doesn't expire and can be used after the event; credits are consumed before the card is charged; credits optional, spending beyond them never affects judging (§3.7, §3.8). Dashboard note: while on free credits Meta may use content for product improvement.
+- Geographic Use Policy: Restricted Territories (Afghanistan, Belarus, Cambodia, China incl. HK/Macau, Cuba, Eritrea, Ethiopia, Haiti, Iran, Iraq, Libya, Myanmar, Nicaragua, North Korea, Pakistan, Russia, Somalia, Syria, Crimea/Donetsk/Luhansk, Venezuela, Western Sahara): don't serve end users there. Muse Image unavailable in India.
+- API endpoints: Meta `https://api.meta.ai/v1/responses` (model `muse-spark-1.3`, Bearer key); Baseten `https://inference.baseten.co/v1/chat/completions` (model `meta-models/muse-spark-open-1026`, has `reasoning_content`). Both verified working 2026-10-27 (~1.5-1.8 s trivial call, ~120 reasoning tokens).
+- Discord rulings (2026-10-27, #questions, automated reply citing organizers): (1) non-Meta models may be used alongside Meta's as long as Meta's models are a real part of what the project runs (Stage 1 + Use of Meta AI Tooling are scored on it); Muse Spark Open on Baseten counts; whether a specific setup meets the bar is the organizers' call. (2) Open-source Meta models anyone can access (Llama, SAM, Demucs) count as Meta models for Stage 1 and the tooling score; the Open Weight bonus ($10k) names only Muse Glimmer and Muse Spark Open. Post 3 (#office-hours: small on-device model / ExecuTorch) asked, answer pending.
+- Submission form: cerebralvalley.ai/e/meta-ai-developer-hackathon/hackathon/submit (user clicks).
 
 ## Channels
 Website cerebralvalley.ai/e/meta-ai-developer-hackathon (/details, /discord, /live). Discord: #announcements, #questions, #intros, #team-search, #office-hours, Baseten channel. Announcements keep arriving; the saved snapshot is from Oct 26 ~noon.

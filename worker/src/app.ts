@@ -1,0 +1,205 @@
+import { geoOf, isRestricted } from "./geo";
+import {
+  GHOST_MAX_BODY,
+  isGhostId,
+  loadGhost,
+  parseGhost,
+  randomGhost,
+  saveGhost,
+  type GhostStore,
+} from "./ghosts";
+import type { ReserveResult, SpendSnapshot, RejectReason } from "./ledger";
+import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
+import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
+import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
+
+export interface SpendClient {
+  reserve(req: { id: string; provider: Provider; worstCaseUsd: number; clientKey: string }): Promise<ReserveResult>;
+  settle(id: string, actualUsd: number): Promise<boolean>;
+  release(id: string): Promise<boolean>;
+  snapshot(): Promise<SpendSnapshot>;
+}
+
+export interface AppConfig {
+  mock: boolean;
+  defaultProvider: Provider;
+  providers: ProviderConfig;
+  maxOutputTokens: number;
+}
+
+export interface Deps {
+  cfg: AppConfig;
+  spend: SpendClient;
+  ghosts: GhostStore;
+  assets?: { fetch(request: Request): Promise<Response> };
+  fetch(input: string, init: RequestInit): Promise<Response>;
+  newId(): string;
+  random(): number;
+  now(): number;
+  hashClient(raw: string): Promise<string>;
+}
+
+const MAX_SYSTEM_CHARS = 4000;
+const MAX_PROMPT_CHARS = 8000;
+const MAX_BODY_CHARS = 20_000;
+const MIN_OUTPUT_TOKENS = 64;
+const DEFAULT_OUTPUT_TOKENS = 800;
+
+const json = (data: unknown, status = 200): Response =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+
+const fail = (status: number, error: string, extra: Record<string, unknown> = {}): Response =>
+  json({ error, ...extra }, status);
+
+export async function handleRequest(request: Request, deps: Deps): Promise<Response> {
+  if (isRestricted(geoOf(request))) {
+    return fail(451, "region_restricted", {
+      message: "This game is not available in your region (Meta Geographic Use Policy).",
+    });
+  }
+
+  const url = new URL(request.url);
+  const path = url.pathname;
+  const method = request.method;
+
+  if (path.startsWith("/api/")) {
+    if (path === "/api/health" && method === "GET") {
+      const { providers, mock } = deps.cfg;
+      return json({ ok: true, mock, providers: { baseten: !!providers.baseten.apiKey, meta: !!providers.meta.apiKey } });
+    }
+    if (path === "/api/spend" && method === "GET") return json(await deps.spend.snapshot());
+    if (path === "/api/llm" && method === "POST") return handleLlm(request, deps);
+    if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);
+    if (path === "/api/ghosts/random" && method === "GET") return handleGhostGet(await randomGhost(deps.ghosts, deps.random));
+    const ghostId = /^\/api\/ghosts\/([^/]+)$/.exec(path)?.[1];
+    if (ghostId && method === "GET") {
+      return isGhostId(ghostId) ? handleGhostGet(await loadGhost(deps.ghosts, ghostId)) : fail(400, "bad_id");
+    }
+    return fail(404, "not_found");
+  }
+
+  return deps.assets ? deps.assets.fetch(request) : fail(404, "not_found");
+}
+
+// ---------- LLM proxy ----------
+
+interface LlmRequest {
+  provider: Provider;
+  kind: LlmKind;
+  system: string | undefined;
+  prompt: string;
+  maxTokens: number;
+}
+
+function parseLlmRequest(body: unknown, cfg: AppConfig): LlmRequest | string {
+  if (!body || typeof body !== "object") return "body must be a JSON object";
+  const b = body as Record<string, unknown>;
+  const provider = (b.provider ?? cfg.defaultProvider) as Provider;
+  if (!PROVIDERS.includes(provider)) return "unknown provider";
+  if (!LLM_KINDS.includes(b.kind as LlmKind)) return "unknown kind";
+  if (typeof b.prompt !== "string" || b.prompt.length === 0 || b.prompt.length > MAX_PROMPT_CHARS) return "bad prompt";
+  if (b.system !== undefined && (typeof b.system !== "string" || b.system.length > MAX_SYSTEM_CHARS)) return "bad system";
+  let maxTokens = DEFAULT_OUTPUT_TOKENS;
+  if (b.maxTokens !== undefined) {
+    if (typeof b.maxTokens !== "number" || !Number.isInteger(b.maxTokens) || b.maxTokens < MIN_OUTPUT_TOKENS) {
+      return "bad maxTokens";
+    }
+    maxTokens = b.maxTokens;
+  }
+  return {
+    provider,
+    kind: b.kind as LlmKind,
+    system: b.system as string | undefined,
+    prompt: b.prompt,
+    maxTokens: Math.min(maxTokens, cfg.maxOutputTokens),
+  };
+}
+
+async function readJson(request: Request, maxChars: number): Promise<unknown | undefined> {
+  const text = await request.text();
+  if (text.length > maxChars) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+const REJECT_STATUS: Record<RejectReason, number> = {
+  rate_limit: 429,
+  client_cap: 429,
+  duplicate: 409,
+  daily_cap: 503,
+  total_cap: 503,
+};
+
+async function handleLlm(request: Request, deps: Deps): Promise<Response> {
+  const body = await readJson(request, MAX_BODY_CHARS);
+  if (body === undefined) return fail(400, "bad_json");
+  const req = parseLlmRequest(body, deps.cfg);
+  if (typeof req === "string") return fail(400, "bad_request", { message: req });
+
+  const { cfg } = deps;
+  if (!cfg.mock && !cfg.providers[req.provider].apiKey) return fail(503, "provider_unconfigured", { fallback: "reflex" });
+
+  const worst = worstCaseCostUsd(req.provider, estimateInputTokens((req.system ?? "") + req.prompt), req.maxTokens);
+  const id = deps.newId();
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  // Mock calls cost nothing but still pass through the ledger so rate limits behave the same.
+  const reserved = await deps.spend.reserve({ id, provider: req.provider, worstCaseUsd: cfg.mock ? 0 : worst, clientKey });
+  if (!reserved.ok) {
+    return fail(REJECT_STATUS[reserved.reason], reserved.reason === "rate_limit" ? "rate_limited" : "budget_exhausted", {
+      reason: reserved.reason,
+      fallback: "reflex",
+    });
+  }
+
+  const started = deps.now();
+  let completion: Completion;
+  try {
+    completion = cfg.mock
+      ? mockCompletion(req.kind, req.system, req.prompt)
+      : await complete(req.provider, cfg.providers, { system: req.system, prompt: req.prompt, maxTokens: req.maxTokens }, deps.fetch);
+  } catch (e) {
+    if (e instanceof UpstreamError) {
+      await deps.spend.release(id); // nothing was generated
+      return fail(502, "upstream_error", { upstreamStatus: e.status, fallback: "reflex" });
+    }
+    // Timeout or unreadable 2xx: it may have been billed, so book the worst case instead of releasing.
+    await deps.spend.settle(id, worst);
+    const message = e instanceof UnreadableResponse ? e.message : "unexpected error";
+    return fail(502, "upstream_unreadable", { message, fallback: "reflex" });
+  }
+
+  const costUsd = cfg.mock ? 0 : actualCostUsd(req.provider, completion.usage);
+  await deps.spend.settle(id, costUsd);
+  return json({
+    text: completion.text,
+    truncated: completion.truncated,
+    provider: req.provider,
+    model: completion.model,
+    mock: cfg.mock,
+    usage: completion.usage,
+    costUsd,
+    latencyMs: deps.now() - started,
+  });
+}
+
+// ---------- ghosts ----------
+
+async function handleGhostCreate(request: Request, deps: Deps): Promise<Response> {
+  const body = await readJson(request, GHOST_MAX_BODY);
+  if (body === undefined) return fail(400, "bad_json");
+  const ghost = parseGhost(body);
+  if (!ghost) return fail(400, "bad_ghost");
+  const id = deps.newId().replaceAll("-", "").slice(0, 20);
+  await saveGhost(deps.ghosts, id, ghost, deps.now());
+  return json({ id }, 201);
+}
+
+function handleGhostGet(ghost: unknown | null): Response {
+  return ghost ? json(ghost) : fail(404, "no_ghost");
+}

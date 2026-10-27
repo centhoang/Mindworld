@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spike B: local model benchmark</title>
+    <style>
+      body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; max-width: 1100px; color: #222; }
+      label { display: block; margin: 2px 0; }
+      table { border-collapse: collapse; margin: 12px 0; }
+      th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+      pre { background: #f4f4f4; padding: 8px; max-height: 260px; overflow: auto; font-size: 12px; }
+      button { padding: 6px 14px; }
+    </style>
+  </head>
+  <body>
+    <h1>Spike B: Instinct model benchmark (WebGPU)</h1>
+    <p>Loads each selected model in this tab and runs 20 plain + 12 memo pet-action prompts. Weights download from Hugging Face on first load.</p>
+    <div id="models"></div>
+    <label><input type="checkbox" id="grammar" /> also run grammar-constrained decoding</label>
+    <p><button id="run">Run</button> <span id="progress"></span></p>
+    <table>
+      <thead>
+        <tr><th>Model</th><th>Mode</th><th>VRAM MB</th><th>Cold load</th><th>Warm load</th><th>Latency p50 / p95 ms</th><th>Valid</th><th>Sane (plain)</th><th>Follows memo</th><th>Decode tok/s</th></tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <pre id="log"></pre>
+    <pre id="results"></pre>
+    <script type="module" src="/src/spike/spike-b.ts"></script>
+  </body>
+</html>
