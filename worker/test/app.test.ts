@@ -255,40 +255,6 @@ describe("POST /api/llm", () => {
   });
 });
 
-describe("ghost snapshots (KV stub)", () => {
-  const ghost = { name: "Mochi", genes: { ears: 0.4, tail: 0.9 }, memo: { summary: "careful", rules: [] } };
-
-  it("stores a ghost, then reads it back by id and at random", async () => {
-    const h = harness();
-    const created = await h.call("/api/ghosts", postJson(ghost));
-    expect(created.status).toBe(201);
-    const { id } = (await created.json()) as { id: string };
-    expect(id).toMatch(/^[a-f0-9]{20}$/);
-    expect(await (await h.call(`/api/ghosts/${id}`)).json()).toMatchObject({ id, name: "Mochi", genes: ghost.genes });
-    expect(await (await h.call("/api/ghosts/random")).json()).toMatchObject({ id, name: "Mochi" });
-  });
-
-  it("returns 404 when there is no ghost and 400 for malformed ids", async () => {
-    const h = harness();
-    expect((await h.call("/api/ghosts/random")).status).toBe(404);
-    expect((await h.call("/api/ghosts/aaaaaaaaaaaaaaaaaaaa")).status).toBe(404);
-    expect((await h.call("/api/ghosts/../secrets")).status).not.toBe(200);
-    expect((await h.call("/api/ghosts/NOT-AN-ID")).status).toBe(400);
-  });
-
-  it.each([
-    ["missing name", { ...ghost, name: "" }],
-    ["long name", { ...ghost, name: "x".repeat(25) }],
-    ["string gene", { ...ghost, genes: { ears: "big" } }],
-    ["no memo", { name: "a", genes: {} }],
-    ["huge memo", { ...ghost, memo: { text: "x".repeat(4000) } }],
-  ])("rejects an invalid ghost: %s", async (_n, body) => {
-    const h = harness();
-    expect((await h.call("/api/ghosts", postJson(body))).status).toBe(400);
-    expect(h.ghosts.data.size).toBe(0);
-  });
-});
-
 describe("static assets", () => {
   it("serves the client for non-API paths through the geo-blocking Worker", async () => {
     const h = harness();

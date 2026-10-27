@@ -1,6 +1,7 @@
 import { geoOf, isRestricted } from "./geo";
 import {
-  GHOST_MAX_BODY,
+  allowGhostPost,
+  GHOST_MAX_BYTES,
   isGhostId,
   loadGhost,
   parseGhost,
@@ -191,10 +192,19 @@ async function handleLlm(request: Request, deps: Deps): Promise<Response> {
 // ---------- ghosts ----------
 
 async function handleGhostCreate(request: Request, deps: Deps): Promise<Response> {
-  const body = await readJson(request, GHOST_MAX_BODY);
-  if (body === undefined) return fail(400, "bad_json");
+  if (Number(request.headers.get("content-length") ?? 0) > GHOST_MAX_BYTES) return fail(413, "too_large");
+  const text = await request.text();
+  if (new TextEncoder().encode(text).length > GHOST_MAX_BYTES) return fail(413, "too_large");
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return fail(400, "bad_json");
+  }
   const ghost = parseGhost(body);
   if (!ghost) return fail(400, "bad_ghost");
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  if (!(await allowGhostPost(deps.ghosts, clientKey, deps.now()))) return fail(429, "rate_limited");
   const id = deps.newId().replaceAll("-", "").slice(0, 20);
   await saveGhost(deps.ghosts, id, ghost, deps.now());
   return json({ id }, 201);

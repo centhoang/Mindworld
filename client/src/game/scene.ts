@@ -46,6 +46,19 @@ export function makePet(color = 0xf4b183): THREE.Group {
   return g;
 }
 
+// Another player's pet: the same body as ours in its own colour, a little see-through so it reads as a ghost.
+export function makeGhostPet(hue: number): THREE.Group {
+  const g = makePet(new THREE.Color().setHSL(hue, 0.55, 0.68).getHex());
+  g.traverse((o) => {
+    const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+    if (m) {
+      m.transparent = true;
+      m.opacity = 0.72;
+    }
+  });
+  return g;
+}
+
 export function makeEnemy(id: ArchetypeId): THREE.Group {
   const g = new THREE.Group();
   switch (id) {
@@ -172,9 +185,10 @@ export class Arena {
     this.camera.updateProjectionMatrix();
   }
 
-  setEnemy(id: ArchetypeId | null) {
+  // An archetype builds its creature; a ready-made group (a ghost pet) is used as is.
+  setEnemy(id: ArchetypeId | THREE.Group | null) {
     if (this.enemy) this.scene.remove(this.enemy);
-    this.enemy = id ? makeEnemy(id) : null;
+    this.enemy = id === null ? null : typeof id === "string" ? makeEnemy(id) : id;
     if (this.enemy) {
       this.enemy.position.copy(this.enemyHome);
       this.enemy.rotation.y = -0.6;

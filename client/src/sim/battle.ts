@@ -20,6 +20,7 @@ export interface BattleConfig {
   seed: number;
   pet?: PetSpec;
   maxTurns?: number;
+  enemyDef?: EnemyDef; // overrides ENEMIES[enemy], e.g. a ghost built from another player's memo
 }
 
 export const MAX_TURNS = 12;
@@ -27,7 +28,7 @@ const GUARD_FACTOR = 0.4;
 const ENEMY_GUARD_FACTOR = 0.4;
 const HURT_PCT = 40; // below this an enemy counts as hurt: it looks scared and befriend works far better
 
-const sizeOf = (enemy: number, pet: number): Size => (enemy >= pet + 2 ? "bigger" : enemy <= pet - 2 ? "smaller" : "similar");
+export const sizeOf = (enemy: number, pet: number): Size => (enemy >= pet + 2 ? "bigger" : enemy <= pet - 2 ? "smaller" : "similar");
 
 const intentOf = (act: EnemyAct, def: EnemyDef, hpPct: number): Intent => {
   if (act === "heavy") return "heavy";
@@ -57,7 +58,7 @@ export class Battle {
 
   constructor(cfg: BattleConfig) {
     this.pet = cfg.pet ?? DEFAULT_PET;
-    this.def = ENEMIES[cfg.enemy];
+    this.def = cfg.enemyDef ?? ENEMIES[cfg.enemy];
     this.seedLabel = cfg.seed;
     this.seed = (cfg.seed ^ Math.imul(ARCHETYPES.indexOf(cfg.enemy) + 1, 0x9e3779b1)) | 0;
     this.maxTurns = cfg.maxTurns ?? MAX_TURNS;

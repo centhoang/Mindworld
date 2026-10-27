@@ -1,11 +1,13 @@
 import { Instinct, type Choice } from "./game/instinct";
-import { Arena } from "./game/scene";
+import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
+import { Arena, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
 import { NativeVoice, WebLlmVoice } from "./game/voices";
 import { Battle } from "./sim/battle";
 import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, ScriptedCortex, type Cortex, type CortexResult } from "./sim/cortex";
-import { ENEMIES } from "./sim/enemies";
+import { ENEMIES, type EnemyDef } from "./sim/enemies";
 import { comparePaired, makeScenarios, pct } from "./sim/evaluate";
+import { ghostEnemyDef, ghostHue, PET_GENES, type Ghost } from "./sim/ghost";
 import { EMPTY_MEMO, validateMemo, type Memo } from "./sim/memo";
 import { baselinePolicy, memoPolicy } from "./sim/policy";
 import { HELDOUT_SEEDS, prove, type ProofReport } from "./sim/proof";
@@ -19,12 +21,19 @@ const SAVE_KEY = "petmind.v1";
 interface Save {
   memo: Memo;
   recent: Replay[];
+  shared?: string; // the memo rules last uploaded as a ghost, so the same pet is not re-shared every fight
 }
 
 function load(): Save {
   try {
     const raw = JSON.parse(localStorage.getItem(SAVE_KEY) ?? "null") as Partial<Save> | null;
-    if (raw) return { memo: validateMemo(raw.memo).memo, recent: Array.isArray(raw.recent) ? raw.recent.slice(-8) : [] };
+    if (raw) {
+      return {
+        memo: validateMemo(raw.memo).memo,
+        recent: Array.isArray(raw.recent) ? raw.recent.slice(-8) : [],
+        ...(typeof raw.shared === "string" ? { shared: raw.shared } : {}),
+      };
+    }
   } catch {
     /* private mode or corrupt save: start fresh */
   }
@@ -92,7 +101,13 @@ const TELL: Record<Intent, string> = {
   scared: "*looks hurt and scared*",
 };
 
-function setHp(myHp: number, enemy: ArchetypeId | null, enemyHp: number | null) {
+interface Opponent {
+  label: string;
+  maxHp: number;
+}
+const archetypeOpp = (id: ArchetypeId): Opponent => ({ label: id, maxHp: ENEMIES[id].maxHp });
+
+function setHp(myHp: number, enemy: Opponent | null, enemyHp: number | null) {
   $("petHp").style.width = `${(100 * myHp) / pet.maxHp}%`;
   $("petHpTxt").textContent = String(myHp);
   if (!enemy || enemyHp === null) {
@@ -101,8 +116,8 @@ function setHp(myHp: number, enemy: ArchetypeId | null, enemyHp: number | null) 
     $("enemyHp").style.width = "100%";
     return;
   }
-  $("enemyName").textContent = enemy;
-  $("enemyHp").style.width = `${(100 * enemyHp) / ENEMIES[enemy].maxHp}%`;
+  $("enemyName").textContent = enemy.label;
+  $("enemyHp").style.width = `${(100 * enemyHp) / enemy.maxHp}%`;
   $("enemyHpTxt").textContent = String(enemyHp);
 }
 
@@ -128,13 +143,29 @@ async function fight() {
   busy = true;
   setButtons();
   const pick = $<HTMLSelectElement>("enemy").value;
-  const enemy: ArchetypeId = pick === "random" ? ARCHETYPES[Math.floor(Math.random() * ARCHETYPES.length)]! : (pick as ArchetypeId);
-  const battle = new Battle({ enemy, seed: Math.floor(Math.random() * 1e9) });
-  arena.setEnemy(enemy);
+  let ghost: Ghost | null = null;
+  let ghostOnline = false;
+  if (pick === "ghost") ({ ghost, online: ghostOnline } = await fetchRandomGhost());
+  const enemy: ArchetypeId = ghost
+    ? "bully"
+    : pick === "random"
+      ? ARCHETYPES[Math.floor(Math.random() * ARCHETYPES.length)]!
+      : (pick as ArchetypeId);
+  const def: EnemyDef = ghost ? ghostEnemyDef(ghost, pet) : ENEMIES[enemy];
+  const opp: Opponent = ghost ? { label: `${ghost.name} (ghost)`, maxHp: def.maxHp } : archetypeOpp(enemy);
+  const battle = new Battle({ enemy, seed: Math.floor(Math.random() * 1e9), ...(ghost ? { enemyDef: def } : {}) });
+  arena.setEnemy(ghost ? makeGhostPet(ghostHue(ghost.genes)) : enemy);
   log.innerHTML = "";
-  logLine(`<b>${pet.name}</b> vs <b>${enemy}</b>`);
-  setHp(pet.maxHp, enemy, ENEMIES[enemy].maxHp);
-  await banner(`vs ${enemy}`, 900);
+  if (ghost) {
+    const who = ghost.seed ? "a built-in ghost" : "another player's ghost";
+    logLine(
+      `<b>${pet.name}</b> vs <b>${esc(ghost.name)}</b>, ${who}` +
+        `${ghostOnline ? "" : " <span class=\"dim\">(offline: local ghost)</span>"}. ` +
+        `<span class="dim">It follows its owner's ${ghost.memo.rules.length} memo rules.</span>`,
+    );
+  } else logLine(`<b>${pet.name}</b> vs <b>${enemy}</b>`);
+  setHp(pet.maxHp, opp, def.maxHp);
+  await banner(ghost ? `vs ${ghost.name}'s ghost` : `vs ${enemy}`, 900);
   while (!battle.done) {
     const obs = battle.observe();
     say("enemy", TELL[obs.intent]);
@@ -147,29 +178,60 @@ async function fight() {
         `<span class="dim">${rec.dealt ? `hit ${rec.dealt}` : ""}${rec.taken ? ` took ${rec.taken}` : ""}</span>`,
     );
     await arena.playTurn(choice.action, rec.enemyAct, rec.dealt, rec.taken, outcome);
-    setHp(rec.myHp, enemy, rec.enemyHp);
+    setHp(rec.myHp, opp, rec.enemyHp);
   }
   const replay = battle.replay();
   await arena.playEnd(replay.outcome);
   logLine(`<b>${OUTCOME[replay.outcome]}</b> <span class="dim">(${replay.how})</span>`);
   await banner(OUTCOME[replay.outcome]);
-  state.recent = [...state.recent, replay].slice(-8);
+  // Ghost fights are not archetype fights, so they stay out of what the coach reviews.
+  if (!ghost) state.recent = [...state.recent, replay].slice(-8);
   save();
   busy = false;
   setButtons();
+  // After a win with a coached memo the pet joins the ghost pool (once per memo version).
+  if (!ghost && replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== memoKey()) void share(true);
+}
+
+// ---------------- ghosts (share + fight other players' pets) ----------------
+
+const memoKey = () => JSON.stringify(state.memo.rules.map((r) => [r.if, r.do]));
+
+async function share(auto = false) {
+  const status = $("ghostStatus");
+  if (state.memo.rules.length === 0) {
+    status.textContent = "Teach your pet something first; a ghost with no memo is just instinct.";
+    return;
+  }
+  $<HTMLButtonElement>("shareGhost").disabled = true;
+  status.textContent = auto ? "Sharing your pet as a ghost…" : "Sharing…";
+  const res = await shareGhost(pet.name, PET_GENES, state.memo);
+  if (res.ok) {
+    state.shared = memoKey();
+    save();
+    status.textContent = `${pet.name}'s ghost is out there: other players can now fight its memo (rules only, kept 30 days).`;
+  } else {
+    status.textContent =
+      res.reason === "rate_limited"
+        ? "Shared enough for now; try again later."
+        : res.reason === "offline"
+          ? "Offline: could not share the ghost."
+          : "The server did not accept this ghost.";
+  }
+  $<HTMLButtonElement>("shareGhost").disabled = busy;
 }
 
 // Replays a recorded fight (used by the proof panel). No model calls: the moves are already decided.
 async function playReplay(r: Replay, title: string) {
   arena.setEnemy(r.enemy);
-  setHp(pet.maxHp, r.enemy, ENEMIES[r.enemy].maxHp);
+  setHp(pet.maxHp, archetypeOpp(r.enemy), ENEMIES[r.enemy].maxHp);
   await banner(title, 1200);
   for (const [i, t] of r.turns.entries()) {
     say("enemy", TELL[t.obs.intent]);
     say("pet", t.action);
     const outcome = i === r.turns.length - 1 ? r.outcome : null;
     await arena.playTurn(t.action, t.enemyAct, t.dealt, t.taken, outcome);
-    setHp(t.myHp, r.enemy, t.enemyHp);
+    setHp(t.myHp, archetypeOpp(r.enemy), t.enemyHp);
   }
   await arena.playEnd(r.outcome);
   await banner(OUTCOME[r.outcome], 1100);
@@ -305,7 +367,7 @@ async function probeNative(quiet = false) {
 // ---------------- wiring ----------------
 
 function setButtons() {
-  for (const id of ["go", "teach", "reflect", "reset", "watchProof"]) $<HTMLButtonElement>(id).disabled = busy;
+  for (const id of ["go", "teach", "reflect", "reset", "watchProof", "shareGhost"]) $<HTMLButtonElement>(id).disabled = busy;
   if (!busy && !lastProof?.showcase) $<HTMLButtonElement>("watchProof").disabled = true;
   if (!busy) $<HTMLButtonElement>("reflect").disabled = state.recent.length === 0;
 }
@@ -331,6 +393,7 @@ $("reset").onclick = () => {
   setButtons();
 };
 $("watchProof").onclick = () => void watchProof();
+$("shareGhost").onclick = () => void share();
 $("loadWeb").onclick = () => void loadWeb();
 $("probeNative").onclick = () => void probeNative();
 $("petName").textContent = pet.name;
