@@ -135,6 +135,7 @@ export class Arena {
   private readonly petHome = new THREE.Vector3(-1.4, 0, 0);
   private readonly enemyHome = new THREE.Vector3(1.4, 0, 0);
   speed = 1;
+  thinking = false; // pet sways its head while the coach (Cortex) call runs
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -305,6 +306,7 @@ export class Arena {
     }
     // Idle breathing.
     this.pet.children[0]!.scale.y = 0.85 + Math.sin(t / 400) * 0.03;
+    this.pet.rotation.z = this.thinking ? Math.sin(t / 260) * 0.12 : 0;
     if (this.enemy) this.enemy.children[0]!.scale.y = 1 + Math.sin(t / 470 + 1) * 0.03;
     this.renderer.render(this.scene, this.camera);
   }

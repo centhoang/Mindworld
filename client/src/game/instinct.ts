@@ -1,6 +1,7 @@
 import { describeRule, ruleMatches, type Memo } from "../sim/memo";
 import { baselinePolicy } from "../sim/policy";
 import { ACTIONS, type Action, type Observation } from "../sim/types";
+import { grammarFor } from "./grammar";
 
 // The live Instinct = guarded chooser. The memo rules (and a few reflex sanity checks) compute the set of
 // allowed moves; an optional local model picks among them by personality and writes a one-line voice.
@@ -33,7 +34,14 @@ export interface VoiceReply {
 export interface VoiceBackend {
   readonly label: string;
   ready(): boolean;
-  pick(prompt: { system: string; user: string; grammar: string }, signal: AbortSignal): Promise<VoiceReply>;
+  pick(prompt: VoicePrompt, signal: AbortSignal): Promise<VoiceReply>;
+}
+
+export interface VoicePrompt {
+  system: string;
+  user: string;
+  grammar: string;
+  moves: Action[];
 }
 
 export interface Choice {
@@ -47,7 +55,7 @@ export interface Choice {
 
 export const PERSONALITY = "curious, a little cheeky, loyal to its coach";
 
-export function buildVoicePrompt(petName: string, memo: Memo, o: Observation, a: Allowed): { system: string; user: string; grammar: string } {
+export function buildVoicePrompt(petName: string, memo: Memo, o: Observation, a: Allowed): VoicePrompt {
   const system =
     `You are ${petName}, a small pet in a turn-based duel (${PERSONALITY}). ` +
     `Pick one of the allowed moves and say a short line (max 8 words) in character. Format: move: line`;
@@ -55,8 +63,7 @@ export function buildVoicePrompt(petName: string, memo: Memo, o: Observation, a:
   const user =
     `${coached}Your HP ${o.myHpPct}%. Enemy ${o.enemy} (${o.size}), HP ${o.enemyHpPct}%, ${o.intent}. ` +
     `Allowed: ${a.moves.join(", ")}.`;
-  const grammar = `root ::= move ": " line\nmove ::= ${a.moves.map((m) => `"${m}"`).join(" | ")}\nline ::= [a-zA-Z ,.!?']{1,60}`;
-  return { system, user, grammar };
+  return { system, user, grammar: grammarFor("strict", a.moves)!, moves: a.moves };
 }
 
 const CANNED: Record<Action, string[]> = {

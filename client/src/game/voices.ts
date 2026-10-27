@@ -1,4 +1,5 @@
-import { splitReply, type VoiceBackend, type VoiceReply } from "./instinct";
+import { completeTiered, type GrammarTier } from "./grammar";
+import { splitReply, type VoiceBackend, type VoicePrompt, type VoiceReply } from "./instinct";
 
 // Two Instinct backends, both Meta Llama 3.2 on the player's own machine:
 // - NativeVoice ("power mode"): a llama.cpp `llama-server` on localhost running Llama 3.2 3B (spike B-native:
@@ -29,7 +30,7 @@ export class NativeVoice implements VoiceBackend {
     return this.ok;
   }
 
-  async pick(p: { system: string; user: string; grammar: string }, signal: AbortSignal): Promise<VoiceReply> {
+  async pick(p: VoicePrompt, signal: AbortSignal): Promise<VoiceReply> {
     const res = await fetch(`${this.base}/v1/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -57,6 +58,7 @@ export class WebLlmVoice implements VoiceBackend {
   private engine: Engine | null = null;
   private busy = false;
   private loading: Promise<void> | null = null;
+  tier: GrammarTier = "strict"; // drops to "simple"/"none" if xgrammar rejects the grammar
 
   ready(): boolean {
     return this.engine !== null && !this.busy;
@@ -79,24 +81,28 @@ export class WebLlmVoice implements VoiceBackend {
     return this.loading;
   }
 
-  async pick(p: { system: string; user: string; grammar: string }, signal: AbortSignal): Promise<VoiceReply> {
+  async pick(p: VoicePrompt, signal: AbortSignal): Promise<VoiceReply> {
     const engine = this.engine;
     if (!engine) throw new Error("model not loaded");
     this.busy = true;
     const onAbort = () => engine.interruptGenerate();
     signal.addEventListener("abort", onAbort);
     try {
-      const reply = await engine.chat.completions.create({
-        messages: [
-          { role: "system", content: p.system },
-          { role: "user", content: p.user },
-        ],
-        temperature: 0.7,
-        max_tokens: 24,
-        response_format: { type: "grammar", grammar: p.grammar },
+      const { reply, tier } = await completeTiered(this.tier, p.moves, async (grammar, tier) => {
+        const r = await engine.chat.completions.create({
+          messages: [
+            { role: "system", content: p.system },
+            { role: "user", content: p.user },
+          ],
+          temperature: 0.7,
+          max_tokens: tier === "strict" ? 24 : 20,
+          ...(grammar ? { response_format: { type: "grammar" as const, grammar } } : {}),
+        });
+        if (signal.aborted) throw new Error("aborted");
+        return r.choices[0]?.message.content ?? "";
       });
-      if (signal.aborted) throw new Error("aborted");
-      return splitReply(reply.choices[0]?.message.content ?? "");
+      this.tier = tier;
+      return reply;
     } finally {
       signal.removeEventListener("abort", onAbort);
       this.busy = false;

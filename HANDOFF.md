@@ -1,3 +1,16 @@
+SLEEP MODE ACTIVE since 2026-10-29 00:40 (UTC+7)
+
+## Morning report
+- (in progress) Checkpoint commit 9e4acc8 (T0 UI playable; 42+58 tests green, secrets scan clean).
+
+## Sleep queue (director = the session the user said "sleep" in; workers do the work)
+1. [running] A. Thinking animation + WebLLM grammar fallback (client UI; code + tests, no GPU run). Done: tests/tsc/build green.
+2. [running] B. Power-mode script `scripts/power-mode.ps1` + README section (scripts/ + README only). Done: script runs with `-SkipDownload` against `.scratch/native`, doc written.
+3. [pending] C. Ghost loop T1: post memo+genes after a fight, fetch random ghost as opponent (client + worker ghosts). Done: tests green, mock-mode check via wrangler dev.
+4. [pending] D. Verification pass: client+worker tests, tsc, build, secrets scan, commit.
+Spend overnight: $0.00 of $3 cap.
+Decisions needing review: (none yet)
+
 # HANDOFF (update at every milestone; keep under ~80 lines)
 
 Last updated: 2026-10-27 night (day 1). Phase: **2 = T0 slice (core + UI playable)**. Deadline Nov 4 9 PM ET (user is UTC+7). Nothing committed yet: the user commits (or asks Claude).

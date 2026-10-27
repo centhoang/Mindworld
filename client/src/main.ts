@@ -1,5 +1,6 @@
 import { Instinct, type Choice } from "./game/instinct";
 import { Arena } from "./game/scene";
+import { thinkingLabel } from "./game/thinking";
 import { NativeVoice, WebLlmVoice } from "./game/voices";
 import { Battle } from "./sim/battle";
 import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, ScriptedCortex, type Cortex, type CortexResult } from "./sim/cortex";
@@ -185,26 +186,45 @@ async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string) {
   busy = true;
   setButtons();
   const status = $("coachStatus");
-  status.textContent = `${what}… (Muse Spark is thinking)`;
-  let res: CortexResult;
+  const t0 = performance.now();
+  const tick = () => {
+    const label = thinkingLabel(performance.now() - t0);
+    status.textContent = `${what}… Muse Spark is ${label}`;
+    say("pet", label, 1000);
+  };
+  tick();
+  const timer = window.setInterval(tick, 400);
+  arena.thinking = true;
+  let note = "";
+  let res: CortexResult | null = null;
   try {
-    res = await run(liveCortex);
-    $("coachSrc").textContent = res.source === "muse-spark" ? "Muse Spark" : "Muse Spark (open weights)";
+    try {
+      res = await run(liveCortex);
+      $("coachSrc").textContent = res.source === "muse-spark" ? "Muse Spark" : "Muse Spark (open weights)";
+    } catch (e) {
+      // Budget refusal, network down, or a reply we could not validate: the scripted coach keeps the game going.
+      res = await run(offlineCortex);
+      $("coachSrc").textContent = "offline coach";
+      note = `Live coach unavailable (${e instanceof CortexUnavailable ? e.message : "offline"}); used the offline coach.`;
+    }
   } catch (e) {
-    // Budget refusal, network down, or a reply we could not validate: the scripted coach keeps the game going.
-    res = await run(offlineCortex);
-    $("coachSrc").textContent = "offline coach";
-    status.textContent = `Live coach unavailable (${e instanceof CortexUnavailable ? e.message : "offline"}); used the offline coach.`;
+    note = `Coach failed (${(e as Error).message}). Memo unchanged.`;
+  } finally {
+    clearInterval(timer);
+    arena.thinking = false;
+    bubbles.pet.classList.remove("show");
+    busy = false;
+    setButtons();
   }
+  status.textContent = note;
+  if (!res) return;
   const before = state.memo;
   state.memo = res.memo;
   save();
   renderMemo();
-  if (!status.textContent?.startsWith("Live coach unavailable"))
-    status.textContent = `Memo updated by ${res.source}${res.dropped.length ? ` (${res.dropped.length} invalid parts dropped)` : ""}.`;
+  if (!note) status.textContent = `Memo updated by ${res.source}${res.dropped.length ? ` (${res.dropped.length} invalid parts dropped)` : ""}.`;
+  say("pet", "Got it!", 1400);
   showProof(before, res.memo);
-  busy = false;
-  setButtons();
 }
 
 function showProof(before: Memo, after: Memo) {
