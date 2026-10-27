@@ -43,3 +43,15 @@ and open `http://localhost:4173/spike-b.html?auto=1&models=llama1b,gemma3-1b,lla
 
 ## Spike A: Worker proxy and spend guard. Status: DONE
 Live check on 2026-10-27 through `wrangler dev` with the real keys: Baseten `muse-spark-open-1026` one-word reply 2.7 s, $0.0007 (155 in / 156 out incl. reasoning); Meta `muse-spark-1.3` 3.5 s, $0.0013 (22 in / 289 out). Reasoning tokens dominate small calls, so Cortex calls need `max_tokens` >= 400, and a typical memo call is on the order of $0.003 to $0.01. Ghost KV and static assets verified locally. Unit tests: `worker/test` (58). Codex review fixed five issues (token bound by UTF-8 bytes, release only on explicit HTTP errors, usage required, body-read timeout, fail-closed geo for XX/T1/UA).
+
+## Spike B-native (2026-10-27, GTX 1050 4 GB, llama.cpp b11934 CUDA 12.4, `-ngl 99`)
+Same 32 scenarios and scoring via `client/src/spike/native.ts` against `llama-server` (temperature 0, max 8 tokens, no prompt cache). Models: bartowski Llama-3.2-{1B,3B}-Instruct Q4_K_M GGUF.
+
+| model | valid | sane (plain) | follows memo | p50 / p95 | prefill / decode tok/s | VRAM |
+|---|---|---|---|---|---|---|
+| 1B free / grammar | 100 / 100% | 30 / 30% | 50 / 50% | 0.19 / 0.21-0.22 s | ~1080 / 56 | <1 GB |
+| 3B free / grammar | 100 / 100% | 70 / 70% | **100 / 91.7%** | **0.49 / 0.57-0.59 s** | ~380 / 24 | ~2.3 GB |
+
+Voice-line check (3B, `buildVoicePrompt` in `client/src/game/instinct.ts`, grammar `move: line`, temp 0.7, 20 turns of real fights): 20/20 valid, p50 0.54 s, p95 0.77 s, lines in character ("guard: Protect my coach, not myself").
+
+**Verdict**: native 3B passes the decision rule (valid 100%, memo >= 70%, p95 <= 1.5 s); 1B native is 8x faster than WebGPU but just as weak (quality = weights, not runtime). So: browser stays the default (no install; 1B or rules-only), and **power mode = the same browser game talking to a local `llama-server` with Llama 3.2 3B** on 127.0.0.1:8080. No Unity port needed to get native inference. llama-server answers CORS preflight for any origin; it does not send `Access-Control-Allow-Private-Network`, so an https page calling 127.0.0.1 must be verified in Chrome at deploy (Local Network Access prompt).

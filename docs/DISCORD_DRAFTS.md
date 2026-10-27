@@ -6,7 +6,7 @@ Keep questions generic. Never reveal the game idea, genre, mechanics, names or t
 ## Status
 - Post 1 (#questions, "Rules & eligibility"): non-Meta local model allowed? ANSWERED yes, if Meta's models are a real part of the project. Details in docs/EVENT.md.
 - Post 2 (#questions): do Llama-class models count? ANSWERED yes for Stage 1 and tooling score; not for the Open Weight bonus.
-- Post 3 (#office-hours, forum, needs title + tag + one question): recommended small Meta model / ExecuTorch counts as tooling? ASKED, answer pending.
+- Post 3 (#office-hours, forum, needs title + tag + one question): recommended small Meta model / ExecuTorch counts as tooling? ANSWERED 2026-10-27: no guidance on a smaller on-device model or recipe; the event models are the ones on the resources page (cerebralvalley.ai/e/meta-ai-developer-hackathon/details). So: our own choice (Llama 3.2 1B, already ruled OK in post 2); don't count on ExecuTorch for tooling points.
 
 ## Forum format reminder
 Both channels are forums: a title, at least one tag, one question per post, say what you tried or are building (generically). Office hours: weekdays 10-11 AM ET = 9-10 PM Vietnam.
