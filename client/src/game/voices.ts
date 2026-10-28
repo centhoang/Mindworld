@@ -89,10 +89,11 @@ export class NativeVoice implements VoiceBackend {
     return this.ok;
   }
 
-  // True if a llama-server answers on this machine.
-  async probe(): Promise<boolean> {
+  // True if a llama-server answers on this machine. From an https page Chrome holds the request until
+  // the player answers its local-network prompt, so a probe the player started waits much longer.
+  async probe(timeoutMs = 800): Promise<boolean> {
     try {
-      const res = await fetch(`${this.base}/health`, { signal: AbortSignal.timeout(800) });
+      const res = await fetch(`${this.base}/health`, { signal: AbortSignal.timeout(timeoutMs) });
       this.ok = res.ok;
     } catch {
       this.ok = false;
@@ -119,6 +120,24 @@ export class NativeVoice implements VoiceBackend {
     const body = (await res.json()) as { choices: { message: { content: string } }[] };
     return splitReply(body.choices[0]?.message.content ?? "");
   }
+}
+
+// Chrome's Local Network Access: an https page must ask the player before it may reach 127.0.0.1.
+// "prompt" means a request would pop that question, so the game never probes silently in that state.
+export type LocalAccess = "granted" | "prompt" | "denied";
+export async function localAccessState(
+  protocol = location.protocol,
+  query = (name: string) => navigator.permissions.query({ name: name as PermissionName }),
+): Promise<LocalAccess> {
+  if (protocol !== "https:") return "granted"; // dev on http://localhost: same address space, no prompt
+  for (const name of ["loopback-network", "local-network-access"]) {
+    try {
+      return (await query(name)).state;
+    } catch {
+      // older or newer Chrome names the permission differently; try the next one
+    }
+  }
+  return "granted"; // no such permission in this browser: requests are not gated
 }
 
 type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;

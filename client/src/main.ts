@@ -4,7 +4,7 @@ import { cycleSlot, DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome
 import { Arena, makeBossMesh, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
-import { CloudVoice, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
+import { CloudVoice, localAccessState, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
 import { Battle } from "./sim/battle";
 import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult, type CortexSource } from "./sim/cortex";
 import { ENEMIES, type EnemyDef } from "./sim/enemies";
@@ -213,7 +213,7 @@ async function fight() {
   logLine(`<b>${OUTCOME[replay.outcome]}</b> <span class="dim">(${replay.how})</span>`);
   await banner(OUTCOME[replay.outcome]);
   if (boss && replay.outcome !== "win") {
-    logLine(`<span class="dim">Tip: it only reads your memo rules. Rules it counters cost it focus; when it runs out it looks calm, and a dazed boss is open to friendship. Teach your pet a plan for that.</span>`);
+    logLine(`<span class="dim">Tip: it only reads your memo rules. Rules it counters cost it focus; when it runs out it looks calm, and a dazed boss is open to friendship (a chance, better after a couple of emotes). Teach your pet a plan for that.</span>`);
   }
   // Ghost and boss fights are not archetype fights, so they stay out of what the coach reviews.
   if (!ghost && !boss) state.recent = [...state.recent, replay].slice(-8);
@@ -232,7 +232,7 @@ function logBossTurn(boss: Boss, turn: number) {
       `<span class="tag boss" title="${esc(rule)}">read memo #${read.rule + 1}</span> ` +
         `<span class="dim">${read.did === "idle" ? "it faked the tell and held back" : read.feint === "heavy" ? "it knew your answer and hit hard anyway" : `it looked "${read.feint}" but did a heavy hit`}</span>`,
     );
-  } else if (boss.dazedTurns.includes(turn)) logLine(`<span class="tag boss">dazed</span> <span class="dim">out of focus: it could not read this turn</span>`);
+  } else if (boss.dazedTurns.includes(turn)) logLine(`<span class="tag boss">dazed</span> <span class="dim">out of focus: it could not read this turn. Befriending works about half the time now, more after emotes or once it is badly hurt.</span>`);
 }
 
 // ---------------- ghosts (share + fight other players' pets) ----------------
@@ -464,13 +464,18 @@ async function loadWeb() {
 
 async function probeNative(quiet = false) {
   const status = $("brainStatus");
-  if (await native.probe()) {
+  if (quiet && (await localAccessState()) !== "granted") return; // never pop Chrome's local-network prompt on page load
+  if (!quiet) status.textContent = "Looking for power mode on this computer… If Chrome asks to let this site reach apps on your device, click Allow.";
+  if (await native.probe(quiet ? 800 : 60_000)) {
     instinct.voice = native;
     $("brain").textContent = "Llama 3.2 3B (power mode)";
     $("freeCoachRow").hidden = false;
     status.textContent = "Power mode: Llama 3.2 3B on this computer (llama.cpp). Faster and smarter than the in-browser model.";
   } else if (!quiet) {
-    status.textContent = "No local llama.cpp server found on 127.0.0.1:8080. See the README for the one-line power-mode setup.";
+    status.textContent =
+      (await localAccessState()) === "denied"
+        ? "Chrome is blocking this site from reaching your computer. Allow local network access in the site settings (the icon left of the address), then press Power mode again."
+        : "No local llama.cpp server found on 127.0.0.1:8080. See the README for the one-line power-mode setup.";
   }
 }
 
