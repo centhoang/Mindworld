@@ -8,9 +8,9 @@ SLEEP MODE ended for the night 2026-10-29 ~01:15 (UTC+7): the queue is empty, an
 - Decisions needing review: (1) Worker `maxOutputTokens` 2000 -> 4000 (reasoning ate the budget). (2) Reflect goes to Meta `muse-spark-1.3` (low effort), Teach stays on Baseten. (3) **Reflect gate**: a revised memo is adopted only if it doesn't lose on the 40 train seeds (held-out never seen by the gate); the UI says when a revision is rejected. Reflect often adds nothing over a strong taught memo.
 # HANDOFF (update at every milestone; keep under ~80 lines)
 
-Last updated: 2026-10-28 (fine-tune step 0 session). Phase: **fine-tune a free local coach (docs/FINETUNE.md): step 0 done, step 1 next**. Deadline Nov 4 9 PM ET (user is UTC+7). 8 local commits (HEAD 46b1067), no remote.
+Last updated: 2026-10-28 (fine-tune session). Phase: **free local coach done (tuned Llama 3.2 3B/1B, power mode, HF private); next: voice teaching**. Deadline Nov 4 9 PM ET (user is UTC+7). Local commits only (HEAD 4810d34), no remote. Modal spend today ~$20 (ledger `.scratch/finetune/ledger.jsonl` $16.4 + ~$3 GPU).
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions. Follow CLAUDE.md. Tell me when the context gets long and I will start a new session."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions (voice teaching is next). Follow CLAUDE.md (Normal mode, 35% context limit)."
 Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Normal mode (dayshift) runs to the 35% context limit then hands off; Director mode (nightshift) runs workers one at a time.
 
 ## State
