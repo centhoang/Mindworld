@@ -3,8 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
 # One Worker serves the built client AND the API, so the geo-block covers every request.
-# Build the client first (`npm run build` in ../client). Routes/custom domain (pets.uryto.dev) are
-# added at deploy time by the user; nothing here touches DNS.
+# Build the client first (`npm run build` in ../client). The custom domain below makes Cloudflare create
+# the DNS record for pets.uryto.dev on deploy (approved by the user 2026-10-28).
+routes = [{ pattern = "pets.uryto.dev", custom_domain = true }]
+
 [assets]
 directory = "../client/dist"
 binding = "ASSETS"

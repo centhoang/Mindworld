@@ -1,4 +1,6 @@
-# Deploy notes (user does these; Claude prepared the config)
+# Deploy notes
+
+**Live since 2026-10-28: https://pets.uryto.dev** (Cloudflare Worker `pet-mind`, custom domain in `wrangler.toml`, workers.dev disabled). Redeploy: `cd client && npm run build`, then `cd ../worker && npx wrangler deploy`. Wrangler is logged in via the TEMP Chrome profile (`wrangler login --browser=false`, open the URL there). Secrets set with `wrangler secret bulk` from a temp JSON in `.scratch/` (deleted after): BASETEN_API_KEY, META_API_KEY, MODAL_PROXY_TOKEN, MODAL_BASE_URL. Glimmer URL not set (too slow/cold for players).
 
 One Cloudflare Worker (`worker/`) serves the built client (`client/dist`) and the API, so the geo-block covers every request.
 

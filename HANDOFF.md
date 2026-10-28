@@ -8,9 +8,9 @@ SLEEP MODE ended for the night 2026-10-29 ~01:15 (UTC+7): the queue is empty, an
 - Decisions needing review: (1) Worker `maxOutputTokens` 2000 -> 4000 (reasoning ate the budget). (2) Reflect goes to Meta `muse-spark-1.3` (low effort), Teach stays on Baseten. (3) **Reflect gate**: a revised memo is adopted only if it doesn't lose on the 40 train seeds (held-out never seen by the gate); the UI says when a revision is rejected. Reflect often adds nothing over a strong taught memo.
 # HANDOFF (update at every milestone; keep under ~80 lines)
 
-Last updated: 2026-10-28 (fine-tune session). Phase: **free local coach, voice teaching and the memo-reading boss done; next: GitHub repo + deploy (user)**. Deadline Nov 4 9 PM ET (user is UTC+7). Local commits only (HEAD 4810d34), no remote. Modal spend today ~$20 (ledger `.scratch/finetune/ledger.jsonl` $16.4 + ~$3 GPU).
+Last updated: 2026-10-28 (fine-tune session). Phase: **free local coach, voice teaching and the memo-reading boss done; **LIVE at https://pets.uryto.dev** (deployed 2026-10-28, live Teach verified: $0.005, +27.5 pts). GitHub: private repo `centhoang/MetaGlobalAIDeveloperHackathonProject_PetMind` (user pushed). Deadline Nov 4 9 PM ET (user is UTC+7). Local commits only (HEAD 4810d34), no remote. Modal spend today ~$20 (ledger `.scratch/finetune/ledger.jsonl` $16.4 + ~$3 GPU).
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions (boss done; next is repo/deploy prep and polish). Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions (boss + deploy done; next: verify WebLLM/power mode on the live site, demo prep). Follow CLAUDE.md (Normal mode, 35% context limit)."
 Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Normal mode (dayshift) runs to the 35% context limit then hands off; Director mode (nightshift) runs workers one at a time.
 
 ## State
@@ -45,8 +45,9 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 
 ## Next actions
 0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` steps 1-4 done; tuned GGUFs hosted on HF (private: `kysupo/Llama-3.2-{3B,1B}-PetMind-Coach-GGUF`), power mode defaults to `coach3b`; browser 1B via MLC is blocked (nightly converter crashes, see FINETUNE.md), optional retry later; then (b) voice teaching DONE (needs a real-mic play-test by the user), then (c) boss DONE: `sim/boss.ts` "The Reader" (opponent picker "Boss"): each turn it checks which memo rule its tell would trigger, keeps the tell but does the counter (feint); 2 reads then a dazed turn (calm, befriend 50%). 16 turns, HP 50, atk 5. Rules-only win rate: no memo 0%, "guard on heavy" 1%, seed ghost Pip 10%, "guard on idle + befriend on calm" 97% (tests in `boss.test.ts`). Kept out of eval, coach review and ghost sharing. Verified in the pane. Needs a user play-test (teach it by voice/text). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
-1. User: create the private GitHub repo `pet-mind` and push the local commits (secrets scan done each time), so the commits count as evidence.
-2. Deploy to `pets.uryto.dev` (`docs/DEPLOY.md`, user approves DNS; set Worker secrets MODAL_PROXY_TOKEN + MODAL_BASE_URL too). Verify the WebLLM 1B path and power mode on the GPU Chrome.
+1. DONE: private GitHub repo pushed by the user; push later commits only with the user's OK.
+2. DONE: deployed (`docs/DEPLOY.md`). Left: verify the WebLLM 1B path and power mode (https page -> http://127.0.0.1:8080) on the live site with the GPU Chrome.
+2b. Boss play-tested by the user: befriend on a dazed boss is a chance (50% + 30%/emote + 60% if <40% HP); consider a log hint showing the odds.
 3. Idea parked by the user (play-test 2026-10-28): a pet "heavy attack" move (strong vs idle, weak vs guard). Not now: a new action changes the sim, the DSL, every bench number and the tuned models' training data; revisit only after submission or as a separate post-event version.
 4. User: decide when to make the HF coach repos public (power-mode download needs it; Nov 3 with the GitHub repo is the default). User play-test of the free coach pending.
 
