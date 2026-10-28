@@ -401,6 +401,8 @@ function renderMemo() {
   const lines = describeMemo(state.memo);
   $("memo").innerHTML = lines.map((l) => `<li>${esc(l)}</li>`).join("");
   $("memoEmpty").hidden = lines.length > 0;
+  // The coach's own one-line take on the memo (model-written; the rule lines are rendered from the DSL).
+  $("memoSummary").textContent = lines.length && state.memo.summary ? `Coach: "${state.memo.summary}"` : "";
 }
 
 // ---------------- pet brain (local model) ----------------
