@@ -57,6 +57,8 @@
       footer { position: fixed; bottom: 6px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--dim); pointer-events: none; padding: 0 12px; }
       #banner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; font-weight: 800; text-shadow: 0 2px 8px #000; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
       #banner.show { opacity: 1; }
+      .hint { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(20, 24, 36, 0.88); border: 1px solid var(--line);
+        border-radius: 999px; padding: 5px 14px; font-size: 13px; pointer-events: none; white-space: nowrap; }
       @media (max-width: 1100px) {
         #stage { position: relative; height: 46vh; }
         header { position: absolute; }
@@ -76,6 +78,7 @@
     <div id="bubblePet" class="bubble"></div>
     <div id="bubbleEnemy" class="bubble"></div>
     <div id="banner"></div>
+    <div id="hint" class="hint" hidden></div>
 
     <section id="fight" class="panel">
       <h2>Fight</h2>

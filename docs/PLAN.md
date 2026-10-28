@@ -1,4 +1,15 @@
-# Game plan: "Pet Mind" (working title). v2, 2026-10-27. Browser-first approved by user
+# Mindworld (v3, 2026-10-29, approved by the user): a world of pets that think
+
+Track: **Build for Your World** (user, 2026-10-29). Name: **Mindworld** (no trademark/app collision found).
+- Each player has a cozy low-poly corner and a random modular pet. Corners link by bridges into one world map with shared platforms: wild meadow (fight or tame wild pets), boss room (The Reader), market, NPC house, event ground (ghost arena). The world grows as players' corners join.
+- The player walks an avatar (WASD / click-to-move); the pet follows and reacts on its own. Every creature has a mind: wild pets, NPCs and the boss get memo rules + voice lines (local Llama when present, canned otherwise, browser speech for audio); NPC conversations via Muse Spark through the Worker (capped, cached); a scheduled Worker job re-teaches world creatures from players' fights.
+- Who runs a creature's moves: the device of the player who meets it (rules + local model). In live rooms, the room picks one player's device to run each shared creature.
+- Order: (1) world map + avatar + following pet, single player with ghost corners; (2) live layer: WebSocket rooms on Durable Objects (presence, movement ~10 Hz while moving, chat, emotes, live pet-vs-pet with a shared seed), free plan first, falls back to ghosts over the limit; WebRTC only for later voice/video; (3) if time: pet-to-pet chat, breeding (gene crossover + memo merge). Soccer/mating animations after the event.
+- Rule (organizers 2026-10-28): every model called at runtime is a Meta model.
+
+---
+
+# v2 (2026-10-27, superseded where v3 above differs): "Pet Mind"
 
 ## One-line pitch
 Raise a pet that thinks for itself, on a floating home you decorate and can link to other players' homes. A small model on your device plays the pet's moment-to-moment choices; a Meta model (Muse Spark Open) coaches it between rounds, so the pet visibly learns and develops a personality.

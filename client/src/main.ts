@@ -9,7 +9,9 @@ import { Battle } from "./sim/battle";
 import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult, type CortexSource } from "./sim/cortex";
 import { ENEMIES, type EnemyDef } from "./sim/enemies";
 import { comparePaired, makeScenarios, pct } from "./sim/evaluate";
-import { ghostEnemyDef, ghostHue, PET_GENES, type Ghost } from "./sim/ghost";
+import { ghostEnemyDef, ghostHue, LOCAL_SEED_GHOSTS, PET_GENES, type Ghost } from "./sim/ghost";
+import { generateWorld } from "./world/layout";
+import { WorldView, type Entity } from "./world/view";
 import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "./sim/boss";
 import { EMPTY_MEMO, validateMemo, type Memo } from "./sim/memo";
 import { baselinePolicy, memoPolicy } from "./sim/policy";
@@ -21,6 +23,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 // ---------------- state (memo + recent fights persist in this browser only) ----------------
 
 const SAVE_KEY = "petmind.v1";
+const MAX_TAMED = 6;
 interface Save {
   memo: Memo;
   recent: Replay[];
@@ -28,6 +31,7 @@ interface Save {
   mine?: string[]; // ids of ghosts this browser uploaded, to label your own ghost when you meet it
   home: Slot[]; // decor on the pet's home plot
   steps?: { fought?: boolean; proved?: boolean; boss?: boolean }; // first-steps guide progress
+  tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
 }
 
 function load(): Save {
@@ -40,6 +44,9 @@ function load(): Save {
         home: parseHome(raw.home),
         ...(typeof raw.shared === "string" ? { shared: raw.shared } : {}),
         ...(Array.isArray(raw.mine) ? { mine: raw.mine.filter((x): x is string => typeof x === "string").slice(-20) } : {}),
+        ...(Array.isArray(raw.tamed)
+          ? { tamed: raw.tamed.filter((a): a is ArchetypeId => (ARCHETYPES as readonly string[]).includes(a as string)).slice(-MAX_TAMED) }
+          : {}),
         ...(raw.steps && typeof raw.steps === "object"
           ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true } }
           : {}),
@@ -63,6 +70,65 @@ const save = () => {
 const pet = DEFAULT_PET;
 const arena = new Arena($<HTMLCanvasElement>("stage"));
 arena.setDecor(state.home);
+
+// ---------------- the world (walk around; creatures start fights) ----------------
+
+const world = new WorldView(arena.renderer.domElement);
+arena.world = world;
+const cornerOwners = (gs: readonly Ghost[]) => gs.map((g) => ({ id: g.id, name: g.name }));
+function buildWorld(corners: readonly Ghost[]) {
+  world.build(generateWorld(cornerOwners(corners)), { home: state.home, tamed: state.tamed ?? [], corners });
+}
+buildWorld(LOCAL_SEED_GHOSTS);
+arena.mode = "world";
+arena.resize();
+if (import.meta.env.DEV) Object.assign(window, { __world: world }); // for browser checks in dev only
+
+// Other players' pets move into the corner plots when the server has some (the built-in ghosts otherwise).
+async function loadCorners() {
+  const found: Ghost[] = [];
+  for (let i = 0; i < 6 && found.length < 3; i++) {
+    const { ghost, online } = await fetchRandomGhost();
+    if (!online) break;
+    if (!found.some((g) => g.id === ghost.id)) found.push(ghost);
+  }
+  if (found.length === 0 || busy) return;
+  const corners = [...found, ...LOCAL_SEED_GHOSTS.filter((g) => !found.some((f) => f.id === g.id))].slice(0, 3);
+  buildWorld(corners);
+}
+
+const VERB: Record<Entity["kind"], string> = { wild: "Fight or tame", boss: "Challenge", npc: "Talk to", market: "Visit", arena: "Fight a random ghost at", ghost: "Fight", tamed: "" };
+world.onNear = (e) => {
+  const hint = $("hint");
+  hint.hidden = !e;
+  if (e) hint.innerHTML = `<b>E</b> or click: ${VERB[e.kind]} <b>${esc(e.label)}</b>`;
+};
+
+const ELDER_TIPS = [
+  "Teach your pet in plain words, or press Speak and say it.",
+  "Every lesson is tested on fights it never saw. Watch the Proof panel.",
+  "Befriend a hurt wild pet and it will move into your corner.",
+  "The Reader in the boss room reads your pet's memo. Surprise it.",
+  "Other players' pets live in the corners. Their minds are their owners' lessons.",
+];
+let tip = 0;
+world.onInteract = (e) => {
+  if (busy) return;
+  switch (e.kind) {
+    case "wild": return void fight({ pick: e.archetype!, entity: e });
+    case "boss": return void fight({ pick: "boss" });
+    case "ghost": return void fight({ pick: "ghost", ghost: e.ghost! });
+    case "arena": return void fight({ pick: "ghost" });
+    case "npc": return say("enemy", ELDER_TIPS[tip++ % ELDER_TIPS.length]!, 3200);
+    case "market": return say("enemy", "The stall opens soon. Bring coins from your wins!", 2400);
+  }
+};
+
+function toWorld() {
+  arena.mode = "world";
+  world.paused = false;
+  showGhostCard(null);
+}
 const instinct = new Instinct(null);
 let busy = false;
 
@@ -150,14 +216,15 @@ function sourceTag(c: Choice): string {
 
 const OUTCOME: Record<Replay["outcome"], string> = { win: "WIN!", loss: "Defeated...", fled: "Ran away", escaped: "It ran off", timeout: "Draw" };
 
-async function fight() {
+async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {}) {
   if (busy) return;
   busy = true;
   setButtons();
-  const pick = $<HTMLSelectElement>("enemy").value;
-  let ghost: Ghost | null = null;
-  let ghostOnline = false;
-  if (pick === "ghost") ({ ghost, online: ghostOnline } = await fetchRandomGhost());
+  world.paused = true;
+  const pick = from.pick ?? $<HTMLSelectElement>("enemy").value;
+  let ghost: Ghost | null = from.ghost ?? null;
+  let ghostOnline = !!from.ghost && !from.ghost.seed;
+  if (pick === "ghost" && !ghost) ({ ghost, online: ghostOnline } = await fetchRandomGhost());
   const boss: Boss | null = pick === "boss" ? makeBoss(state.memo, pet) : null;
   const enemy: ArchetypeId = ghost
     ? "bully"
@@ -178,6 +245,7 @@ async function fight() {
     ...(ghost || boss ? { enemyDef: def } : {}),
     ...(boss ? { maxTurns: BOSS_TURNS } : {}),
   });
+  arena.mode = "battle";
   arena.setEnemy(ghost ? makeGhostPet(ghostHue(ghost.genes)) : boss ? makeBossMesh() : enemy);
   arena.setDecor(ghost ? ghost.decor : state.home); // a ghost fight happens on its owner's plot
   showGhostCard(ghost);
@@ -216,6 +284,15 @@ async function fight() {
   await arena.playEnd(replay.outcome);
   logLine(`<b>${OUTCOME[replay.outcome]}</b> <span class="dim">(${replay.how})</span>`);
   await banner(OUTCOME[replay.outcome]);
+  if (from.entity?.kind === "wild" && replay.outcome === "win") {
+    world.removeEntity(from.entity.id);
+    if (replay.how === "befriended") {
+      state.tamed = [...(state.tamed ?? []), enemy].slice(-MAX_TAMED);
+      world.addTamed(enemy, state.tamed.length);
+      logLine(`<b>The ${enemy} joined your corner!</b> <span class="dim">Befriended pets live on your home plot.</span>`);
+    }
+  }
+  toWorld();
   state.steps = { ...state.steps, fought: true, ...(boss && replay.outcome === "win" ? { boss: true } : {}) };
   renderSteps();
   if (boss && replay.outcome !== "win") {
@@ -269,6 +346,7 @@ function renderHome() {
       state.home = cycleSlot(state.home, i);
       save();
       arena.setDecor(state.home);
+      world.setHomeDecor(state.home);
       showGhostCard(null);
       renderHome();
     };
@@ -307,6 +385,8 @@ async function share(auto = false) {
 
 // Replays a recorded fight (used by the proof panel). No model calls: the moves are already decided.
 async function playReplay(r: Replay, title: string) {
+  world.paused = true;
+  arena.mode = "battle";
   arena.setEnemy(r.enemy);
   setHp(pet.maxHp, archetypeOpp(r.enemy), ENEMIES[r.enemy].maxHp);
   await banner(title, 1200);
@@ -319,6 +399,7 @@ async function playReplay(r: Replay, title: string) {
   }
   await arena.playEnd(r.outcome);
   await banner(OUTCOME[r.outcome], 1100);
+  toWorld();
 }
 
 // ---------------- coach (Cortex) + proof ----------------
@@ -588,6 +669,7 @@ $("petName").textContent = pet.name;
 
 renderMemo();
 renderSteps();
+void loadCorners();
 renderHome();
 setHp(pet.maxHp, null, null);
 setButtons();

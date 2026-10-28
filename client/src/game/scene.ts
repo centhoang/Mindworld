@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Action, ArchetypeId, EnemyAct } from "../sim/types";
 import { slotPosition, type DecorKind, type Slot } from "./home";
+import type { WorldView } from "../world/view";
 
 // The arena: a procedural pet (left) and enemy (right) on a low-poly plot, plus short tweened animations
 // for each move. Everything is built from primitives so there are no asset files to load.
@@ -212,6 +213,9 @@ export class Arena {
   private readonly enemyHome = new THREE.Vector3(1.4, 0, 0);
   speed = 1;
   thinking = false; // pet sways its head while the coach (Cortex) call runs
+  world: WorldView | null = null; // the walkable world; shown instead of the fight plot while mode is "world"
+  mode: "world" | "battle" = "battle";
+  private lastT = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -246,6 +250,7 @@ export class Arena {
     this.camera.top = half;
     this.camera.bottom = -half;
     this.camera.updateProjectionMatrix();
+    this.world?.resize(aspect);
   }
 
   // Home-plot decor around the platform edge (yours, or a ghost owner's during a ghost fight).
@@ -277,6 +282,7 @@ export class Arena {
 
   // Screen position (CSS px) above a fighter, for speech bubbles.
   anchor(who: "pet" | "enemy"): { x: number; y: number } | null {
+    if (this.mode === "world" && this.world) return this.world.anchor(who);
     const obj = who === "pet" ? this.pet : this.enemy;
     if (!obj || !obj.visible) return null;
     const v = obj.position.clone().add(new THREE.Vector3(0, 1.7, 0)).project(this.camera);
@@ -398,6 +404,13 @@ export class Arena {
   }
 
   private frame(t: number) {
+    const dt = this.lastT ? (t - this.lastT) / 1000 : 0;
+    this.lastT = t;
+    if (this.mode === "world" && this.world) {
+      this.world.update(dt, t);
+      this.renderer.render(this.world.scene, this.world.camera);
+      return;
+    }
     const live = this.tweens;
     this.tweens = [];
     for (const tw of live) {
