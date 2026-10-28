@@ -82,7 +82,7 @@ function buildWorld(corners: readonly Ghost[]) {
 buildWorld(LOCAL_SEED_GHOSTS);
 arena.mode = "world";
 arena.resize();
-if (import.meta.env.DEV) Object.assign(window, { __world: world }); // for browser checks in dev only
+if (import.meta.env.DEV) Object.assign(window, { __world: world, __arena: arena }); // for browser checks in dev only
 
 // Other players' pets move into the corner plots when the server has some (the built-in ghosts otherwise).
 async function loadCorners() {

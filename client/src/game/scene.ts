@@ -1,12 +1,14 @@
 import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { Action, ArchetypeId, EnemyAct } from "../sim/types";
 import { slotPosition, type DecorKind, type Slot } from "./home";
 import type { WorldView } from "../world/view";
+import { addLights, castAll, Clouds, makeIsland, Motes, PAL, setupRenderer, skyTexture, toon } from "./style";
 
 // The arena: a procedural pet (left) and enemy (right) on a low-poly plot, plus short tweened animations
 // for each move. Everything is built from primitives so there are no asset files to load.
 
-const mat = (color: number) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.8 });
+const mat = (color: number) => toon(color);
 
 function eyes(parent: THREE.Object3D, y: number, z: number, spread: number, r: number, angry = false) {
   for (const s of [-1, 1]) {
@@ -15,6 +17,9 @@ function eyes(parent: THREE.Object3D, y: number, z: number, spread: number, r: n
     const pupil = new THREE.Mesh(new THREE.SphereGeometry(r * 0.55, 10, 8), mat(0x111111));
     pupil.position.set(0, 0, r * 0.6);
     white.add(pupil);
+    const shine = new THREE.Mesh(new THREE.SphereGeometry(r * 0.2, 6, 5), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    shine.position.set(r * 0.18, r * 0.2, r * 0.5);
+    pupil.add(shine);
     if (angry) {
       const brow = new THREE.Mesh(new THREE.BoxGeometry(r * 2.2, r * 0.4, r * 0.4), mat(0x222222));
       brow.position.set(0, r * 1.1, r * 0.4);
@@ -41,10 +46,12 @@ export function makePet(color = 0xf4b183): THREE.Group {
     g.add(foot);
   }
   eyes(g, 0.68, 0.48, 0.2, 0.11);
-  const blush = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat(0xff8fa3));
-  blush.position.set(0, 0.5, 0.55);
-  blush.scale.set(1.6, 0.6, 0.4);
-  g.add(blush);
+  for (const s of [-1, 1]) {
+    const blush = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat(0xff9fb2));
+    blush.position.set(s * 0.33, 0.55, 0.47);
+    blush.scale.set(1.5, 0.7, 0.4);
+    g.add(blush);
+  }
   return g;
 }
 
@@ -52,7 +59,7 @@ export function makePet(color = 0xf4b183): THREE.Group {
 export function makeGhostPet(hue: number): THREE.Group {
   const g = makePet(new THREE.Color().setHSL(hue, 0.55, 0.68).getHex());
   g.traverse((o) => {
-    const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+    const m = (o as THREE.Mesh).material as THREE.MeshToonMaterial | undefined;
     if (m) {
       m.transparent = true;
       m.opacity = 0.72;
@@ -87,12 +94,7 @@ export function makeDecor(kind: DecorKind): THREE.Group {
       break;
     case "lamp":
       add(new THREE.CylinderGeometry(0.04, 0.05, 0.9, 6), 0x3a3f4f, 0, 0.45);
-      add(new THREE.OctahedronGeometry(0.14, 0), 0xffe08a, 0, 0.98).material = new THREE.MeshStandardMaterial({
-        color: 0xffe08a,
-        emissive: 0xffc94d,
-        emissiveIntensity: 0.8,
-        flatShading: true,
-      });
+      add(new THREE.OctahedronGeometry(0.14, 0), 0xffe08a, 0, 0.98).material = toon(0xffe08a, { emissive: 0xffc94d, emissiveIntensity: 0.9 });
       break;
     case "fence":
       for (const x of [-0.35, 0, 0.35]) add(new THREE.BoxGeometry(0.08, 0.45, 0.08), 0xc19a6b, x, 0.22);
@@ -107,7 +109,7 @@ export function makeEnemy(id: ArchetypeId): THREE.Group {
   const g = new THREE.Group();
   switch (id) {
     case "brute": {
-      const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.2, 1.0), mat(0xc0504d));
+      const body = new THREE.Mesh(new RoundedBoxGeometry(1.3, 1.2, 1.0, 4, 0.28), mat(0xe2706a));
       body.position.y = 0.7;
       g.add(body);
       for (const s of [-1, 1]) {
@@ -178,12 +180,12 @@ export function makeEnemy(id: ArchetypeId): THREE.Group {
 export function makeBossMesh(): THREE.Group {
   const g = makeEnemy("bully");
   g.traverse((o) => {
-    if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshStandardMaterial && o.material.color.getHex() === 0xf79646) {
+    if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial && o.material.color.getHex() === 0xf79646) {
       o.material = o.material.clone();
       o.material.color.setHex(0x6a3d9a);
     }
   });
-  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffc000, emissiveIntensity: 0.8 }));
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), toon(0xffe066, { emissive: 0xffc000, emissiveIntensity: 0.8 }));
   eye.position.set(0, 0.95, 0.42);
   g.add(eye);
   g.scale.setScalar(1.35); // on an inner group: the arena's tweens set the outer scale
@@ -216,21 +218,22 @@ export class Arena {
   world: WorldView | null = null; // the walkable world; shown instead of the fight plot while mode is "world"
   mode: "world" | "battle" = "battle";
   private lastT = 0;
+  private readonly clouds = new Clouds(-16, 16, -14, -3, 9, -6, -3);
+  private readonly motes = new Motes(40, 5, 3);
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-    this.scene.background = new THREE.Color(0x1b2030);
+    setupRenderer(this.renderer);
+    this.scene.background = skyTexture(0xa9dcf5, 0xe4f1f8, 0xffd9c7);
+    this.scene.fog = new THREE.Fog(PAL.fog, 14, 30);
     this.camera.position.set(0, 5, 8);
     this.camera.lookAt(0, 0.6, 0);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.4));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-    sun.position.set(3, 6, 4);
-    this.scene.add(sun);
-    const plot = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 4, 0.5, 10), mat(0x6aa84f));
-    plot.position.y = -0.25;
-    this.scene.add(plot);
+    const sun = addLights(this.scene, 6);
+    sun.position.set(3, 9, 5);
+    this.scene.add(makeIsland(3.8));
+    this.scene.add(this.clouds.mesh, this.motes.points);
     this.pet = makePet();
+    castAll(this.pet);
     this.pet.position.copy(this.petHome);
     this.pet.rotation.y = 0.6;
     this.scene.add(this.pet, this.fx, this.decor);
@@ -262,6 +265,7 @@ export class Arena {
       const p = slotPosition(i);
       d.position.set(p.x, 0, p.z);
       d.rotation.y = ((90 - p.deg) * Math.PI) / 180; // fences follow the rim
+      castAll(d);
       this.decor.add(d);
     });
   }
@@ -273,6 +277,7 @@ export class Arena {
     if (this.enemy) {
       this.enemy.position.copy(this.enemyHome);
       this.enemy.rotation.y = -0.6;
+      castAll(this.enemy);
       this.scene.add(this.enemy);
     }
     this.pet.position.copy(this.petHome);
@@ -423,6 +428,8 @@ export class Arena {
         this.tweens.push(tw);
       }
     }
+    this.clouds.update(dt);
+    this.motes.update(t, 0, 0);
     // Idle breathing.
     this.pet.children[0]!.scale.y = 0.85 + Math.sin(t / 400) * 0.03;
     this.pet.rotation.z = this.thinking ? Math.sin(t / 260) * 0.12 : 0;

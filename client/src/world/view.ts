@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { makeBossMesh, makeDecor, makeEnemy, makeGhostPet, makePet } from "../game/scene";
 import { HOME_SLOTS, slotPosition, type Slot } from "../game/home";
+import { addLights, castAll, Clouds, labelSprite, makeIsland, mergeStatic, Motes, PAL, skyTexture, toon } from "../game/style";
 import { ghostHue, type Ghost } from "../sim/ghost";
 import type { ArchetypeId } from "../sim/types";
 import { walkable, type Platform, type WorldMap } from "./layout";
@@ -29,21 +30,15 @@ export interface WorldContent {
   corners: readonly Ghost[]; // matched to corner platforms by ghost id
 }
 
-const mat = (color: number) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.85 });
+const mat = (color: number) => toon(color);
 
 const TOP: Record<Platform["kind"], number> = {
-  home: 0x7cc35a, wild: 0x9ccc65, boss: 0x5a4a6e, market: 0xd9b26f, npc: 0x8fbf6a, event: 0x9aa3bd, corner: 0x7cc35a,
+  home: 0x8fd17a, wild: 0xa8dc84, boss: 0xbba6dc, market: 0xf2d79a, npc: 0x9fd89a, event: 0xbcc9f0, corner: 0x96d6a0,
 };
 const WILD_POOL: ArchetypeId[] = ["brute", "skitter", "turtle", "pal", "bully"];
 
 function island(p: Platform): THREE.Group {
-  const g = new THREE.Group();
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r * 0.96, 0.5, 14), mat(TOP[p.kind]));
-  top.position.y = -0.25;
-  const rock = new THREE.Mesh(new THREE.ConeGeometry(p.r * 0.9, p.r * 1.1, 9), mat(0x7a5a43));
-  rock.rotation.x = Math.PI;
-  rock.position.y = -0.5 - p.r * 0.55;
-  g.add(top, rock);
+  const g = makeIsland(p.r, TOP[p.kind]);
   g.position.set(p.x, 0, p.z);
   return g;
 }
@@ -51,15 +46,32 @@ function island(p: Platform): THREE.Group {
 function bridgeMesh(ax: number, az: number, bx: number, bz: number, w: number): THREE.Group {
   const g = new THREE.Group();
   const len = Math.hypot(bx - ax, bz - az);
-  const planks = Math.max(2, Math.round(len / 0.55));
+  const planks = Math.max(2, Math.round(len / 0.5));
   for (let i = 0; i < planks; i++) {
-    const plank = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, 0.45), mat(i % 2 ? 0xb07d4f : 0xa06d42));
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(w * (0.94 + (i % 3) * 0.03), 0.14, 0.4), mat(i % 2 ? PAL.wood : PAL.woodDark));
     plank.position.set(0, -0.08, -len / 2 + (i + 0.5) * (len / planks));
+    plank.rotation.y = ((i * 37) % 7 - 3) * 0.012;
     g.add(plank);
   }
+  // Posts with a sagging rope between them on each side.
+  const posts = Math.max(2, Math.round(len / 2.5) + 1);
   for (const s of [-1, 1]) {
-    const rope = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, len), mat(0xe8d6b0));
-    rope.position.set((s * w) / 2, 0.45, 0);
+    for (let i = 0; i < posts; i++) {
+      const z = -len / 2 + (i * len) / (posts - 1);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.7, 8), mat(PAL.woodDark));
+      post.position.set((s * w) / 2, 0.25, z);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), mat(PAL.wood));
+      knob.position.set((s * w) / 2, 0.62, z);
+      g.add(post, knob);
+    }
+    const pts: THREE.Vector3[] = [];
+    for (let k = 0; k <= 40; k++) {
+      const z = -len / 2 + (k / 40) * len;
+      const seg = (k / 40) * (posts - 1);
+      const f = seg - Math.floor(seg);
+      pts.push(new THREE.Vector3((s * w) / 2, 0.55 - Math.sin(f * Math.PI) * 0.15, z));
+    }
+    const rope = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.035, 5), mat(PAL.rope));
     g.add(rope);
   }
   g.position.set((ax + bx) / 2, 0, (az + bz) / 2);
@@ -67,67 +79,95 @@ function bridgeMesh(ax: number, az: number, bx: number, bz: number, w: number): 
   return g;
 }
 
-export function makeAvatar(robe = 0x5b8def, hat = 0xe06666): THREE.Group {
+export function makeAvatar(robe = 0x7fa8f0, hat = 0xf28b82): THREE.Group {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.4, 0.9, 10), mat(robe));
-  body.position.y = 0.45;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), mat(0xf1c27d));
-  head.position.y = 1.15;
-  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.4, 10), mat(hat));
-  cap.position.y = 1.5;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.3, 4, 14), mat(robe));
+  body.position.y = 0.5;
+  body.scale.set(1, 1, 0.9);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 16), mat(0xffdcbc));
+  head.position.y = 1.22;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2.1), mat(0x8a5a44));
+  hair.position.y = 1.26;
+  hair.rotation.x = -0.25;
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.42, 14), mat(hat));
+  cap.position.set(0, 1.72, -0.04);
+  cap.rotation.x = -0.2;
+  const pom = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), mat(PAL.cream));
+  pom.position.set(0, 1.94, -0.08);
+  g.add(body, head, hair, cap, pom);
   for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), mat(0x222222));
-    eye.position.set(s * 0.11, 1.18, 0.26);
-    g.add(eye);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), mat(0x3a2a2a));
+    eye.position.set(s * 0.13, 1.2, 0.34);
+    eye.scale.set(1, 1.3, 0.6);
+    const shine = new THREE.Mesh(new THREE.SphereGeometry(0.016, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    shine.position.set(0.015, 0.02, 0.04);
+    eye.add(shine);
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mat(0xffa5b5));
+    cheek.position.set(s * 0.22, 1.1, 0.29);
+    cheek.scale.set(1.3, 0.7, 0.4);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), mat(0x8a5a44));
+    foot.position.set(s * 0.15, 0.08, 0.05);
+    foot.scale.set(1, 0.7, 1.3);
+    g.add(eye, cheek, foot);
   }
-  g.add(body, head, cap);
   return g;
 }
 
-function house(roof = 0xc0504d): THREE.Group {
+function house(roof = 0xe8857a): THREE.Group {
   const g = new THREE.Group();
-  const walls = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.5), mat(0xf3e3c3));
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.5), mat(PAL.cream));
   walls.position.y = 0.6;
-  const top = new THREE.Mesh(new THREE.ConeGeometry(1.45, 0.9, 4), mat(roof));
-  top.position.y = 1.65;
+  const top = new THREE.Mesh(new THREE.ConeGeometry(1.5, 0.95, 4), mat(roof));
+  top.position.y = 1.67;
   top.rotation.y = Math.PI / 4;
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.65, 0.05), mat(0x7a5a43));
-  door.position.set(0, 0.33, 0.76);
-  g.add(walls, top, door);
+  const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), mat(0xc77b6b));
+  chimney.position.set(0.45, 1.9, -0.25);
+  const door = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.3, 4, 10), mat(0x9a6a48));
+  door.position.set(0, 0.36, 0.75);
+  door.scale.z = 0.2;
+  g.add(walls, top, chimney, door);
+  for (const s of [-1, 1]) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.32, 0.05), toon(0xffe9a8, { emissive: 0xffc25e, emissiveIntensity: 0.6 }));
+    win.position.set(s * 0.55, 0.72, 0.76);
+    g.add(win);
+  }
+  const step = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.38, 0.08, 16), mat(0xd8c3a5));
+  step.position.set(0, 0.04, 0.95);
+  g.add(step);
   return g;
 }
 
 function stall(): THREE.Group {
   const g = new THREE.Group();
-  const table = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 0.8), mat(0xa06d42));
+  const table = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 0.8), mat(PAL.wood));
   table.position.y = 0.35;
-  const awning = new THREE.Mesh(new THREE.BoxGeometry(2, 0.12, 1.1), mat(0xe06666));
-  awning.position.y = 1.7;
+  g.add(table);
+  for (let i = 0; i < 5; i++) {
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.12, 1.1), mat(i % 2 ? PAL.cream : 0xf28b82));
+    stripe.position.set(-0.8 + i * 0.4, 1.7, 0);
+    g.add(stripe);
+  }
   for (const s of [-1, 1]) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.7), mat(0x7a5a43));
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.7), mat(PAL.woodDark));
     pole.position.set(s * 0.9, 0.85, 0.4);
     g.add(pole);
   }
-  g.add(table, awning);
+  for (const [x, c] of [[-0.5, 0xffb347], [0, 0xa8dc84], [0.5, 0xff9fb2]] as const) {
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), mat(c));
+    fruit.position.set(x, 0.85, 0.1);
+    g.add(fruit);
+  }
   return g;
 }
 
-function label(text: string): THREE.Sprite {
-  const c = document.createElement("canvas");
-  c.width = 512;
-  c.height = 96;
-  const ctx = c.getContext("2d")!;
-  ctx.font = "bold 44px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = "rgba(20,24,36,0.85)";
-  ctx.strokeText(text, 256, 48);
-  ctx.fillStyle = "#fff";
-  ctx.fillText(text, 256, 48);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
-  s.scale.set(4, 0.75, 1);
-  return s;
+// Small floating islets in the gaps between platforms, bobbing gently.
+function islet(r: number): THREE.Group {
+  const g = makeIsland(r, PAL.grassDark);
+  const tuft = makeDecor(Math.random() < 0.5 ? "tree" : "flower");
+  tuft.scale.setScalar(r * 0.9);
+  g.add(tuft);
+  mergeStatic(g, [...g.children]);
+  return g;
 }
 
 const randIn = (p: Platform, margin = 1.3): Vec => {
@@ -157,15 +197,19 @@ export class WorldView {
   private readonly raycaster = new THREE.Raycaster();
   private readonly ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private aspect = 16 / 9;
+  private readonly sun: THREE.DirectionalLight;
+  private clouds: Clouds | null = null;
+  private readonly motes = new Motes(45, 11, 3.5);
+  private readonly islets: THREE.Group[] = [];
 
   constructor(private readonly canvas: HTMLCanvasElement) {
-    this.scene.background = new THREE.Color(0x9fd3f0);
-    this.scene.fog = new THREE.Fog(0x9fd3f0, 40, 90);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x6a7f99, 1.5));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.3);
-    sun.position.set(6, 12, 8);
-    this.scene.add(sun, this.root, this.avatar, this.pet);
+    this.scene.background = skyTexture();
+    this.scene.fog = new THREE.Fog(PAL.fog, 24, 48);
+    this.sun = addLights(this.scene, 14);
+    this.scene.add(this.root, this.avatar, this.pet, this.motes.points);
     this.pet.scale.setScalar(0.75);
+    castAll(this.avatar);
+    castAll(this.pet);
     window.addEventListener("keydown", (e) => this.key(e, true));
     window.addEventListener("keyup", (e) => this.key(e, false));
     window.addEventListener("blur", () => this.keys.clear());
@@ -176,15 +220,51 @@ export class WorldView {
     this.map = map;
     this.root.clear();
     this.entities = [];
+    this.islets.length = 0;
     for (const b of map.bridges) this.root.add(bridgeMesh(b.ax, b.az, b.bx, b.bz, b.w));
     for (const p of map.platforms) {
       this.root.add(island(p));
-      const tag = label(p.label);
-      tag.position.set(p.x, 3.4, p.z - p.r + 0.6);
+      const tag = labelSprite(p.label);
+      tag.position.set(p.x, 1.7, p.z - p.r * 0.45);
       this.root.add(tag);
       this.furnish(p, content);
+      if (p.kind !== "event" && p.kind !== "boss") {
+        for (let i = 0; i < 5; i++) {
+          const v = randIn(p, 0.6);
+          const tuft = makeDecor("flower");
+          tuft.position.set(v.x, 0, v.z);
+          tuft.rotation.y = Math.random() * Math.PI * 2;
+          tuft.scale.setScalar(0.45);
+          this.root.add(tuft);
+        }
+      }
+    }
+    // Clouds and islets fill the sky around and below the grid of platforms.
+    const xs = map.platforms.map((p) => p.x);
+    const zs = map.platforms.map((p) => p.z);
+    const [x0, x1, z0, z1] = [Math.min(...xs) - 12, Math.max(...xs) + 12, Math.min(...zs) - 12, Math.max(...zs) + 12];
+    this.clouds = new Clouds(x0, x1, z0, z1, 20, -13, -7);
+    this.root.add(this.clouds.mesh);
+    const far = (x: number, z: number) => map.platforms.every((p) => Math.hypot(p.x - x, p.z - z) > p.r + 3);
+    for (let i = 0; i < 40 && this.islets.length < 10; i++) {
+      const x = x0 + 6 + Math.random() * (x1 - x0 - 12);
+      const z = z0 + 6 + Math.random() * (z1 - z0 - 12);
+      const offAxis = map.bridges.every((b) => Math.abs(b.ax - b.bx) < 0.1 ? Math.abs(x - b.ax) > 4.5 || z < Math.min(b.az, b.bz) || z > Math.max(b.az, b.bz) : Math.abs(z - b.az) > 4.5 || x < Math.min(b.ax, b.bx) || x > Math.max(b.ax, b.bx));
+      if (!far(x, z) || !offAxis || this.islets.some((o) => Math.hypot(o.position.x - x, o.position.z - z) < 4)) continue;
+      const o = islet(0.6 + Math.random() * 0.7);
+      o.position.set(x, -1.5 - Math.random() * 2, z);
+      o.userData.y = o.position.y;
+      o.userData.phase = Math.random() * 10;
+      this.islets.push(o);
+      this.root.add(o);
     }
     this.setHomeDecor(content.home);
+    castAll(this.root);
+    if (this.clouds) this.clouds.mesh.castShadow = this.clouds.mesh.receiveShadow = false;
+    // Everything that never moves gets merged; creatures, islets, clouds, labels and home decor stay live.
+    const live = new Set<THREE.Object3D>([...this.entities.map((e) => e.obj), ...this.islets, this.homeDecor]);
+    if (this.clouds) live.add(this.clouds.mesh);
+    mergeStatic(this.root, this.root.children.filter((c) => !live.has(c) && !(c instanceof THREE.Sprite)));
     if (!walkable(map, this.player.x, this.player.z)) this.player = { x: 0, z: 0.5 };
   }
 
@@ -234,7 +314,7 @@ export class WorldView {
         break;
       }
       case "event": {
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.08, 6, 30), mat(0xffd966));
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.1, 8, 48), mat(0xffe08a));
         ring.rotation.x = Math.PI / 2;
         ring.position.set(p.x, 0.02, p.z);
         this.root.add(ring);
@@ -265,6 +345,9 @@ export class WorldView {
   private spawn(o: { id: string; kind: EntityKind; label: string; home: Platform; archetype?: ArchetypeId; ghost?: Ghost; obj?: THREE.Group; scale?: number; still?: boolean }): Entity {
     const obj = o.obj ?? makeEnemy(o.archetype!);
     if (o.scale) obj.scale.setScalar(o.scale);
+    obj.userData.base = obj.scale.x;
+    obj.userData.phase = Math.random() * 10;
+    castAll(obj);
     const pos = randIn(o.home);
     const e: Entity = { id: o.id, kind: o.kind, label: o.label, obj, pos, home: o.home, archetype: o.archetype, ghost: o.ghost };
     if (!o.still) e.wander = { target: randIn(o.home), wait: Math.random() * 2, speed: 0.9 + Math.random() * 0.6 };
@@ -303,6 +386,7 @@ export class WorldView {
       const d = makeDecor(kind);
       d.position.set(home.x + s.x, 0, home.z + s.z);
       d.rotation.y = ((90 - s.deg) * Math.PI) / 180;
+      castAll(d);
       this.homeDecor.add(d);
     }
   }
@@ -382,7 +466,12 @@ export class WorldView {
         const fz = this.player.z - e.pos.z;
         if (Math.hypot(fx, fz) < 5) e.obj.rotation.y = Math.atan2(fx, fz);
       }
-      e.obj.position.set(e.pos.x, 0, e.pos.z);
+      // Idle life: a little hop while walking, slow breathing while standing.
+      const ph = e.obj.userData.phase ?? 0;
+      const base = e.obj.userData.base ?? 1;
+      const walking = !!w && w.wait <= 0 && !this.paused;
+      e.obj.position.set(e.pos.x, walking ? Math.abs(Math.sin(t / 130 + ph)) * 0.12 : 0, e.pos.z);
+      e.obj.scale.set(base, base * (1 + Math.sin(t / 520 + ph) * 0.035), base);
     }
 
     // Closest creature within reach is the one the player can interact with.
@@ -401,6 +490,11 @@ export class WorldView {
       this.onNear(best);
     }
 
+    this.clouds?.update(dt);
+    this.motes.update(t, this.player.x, this.player.z);
+    for (const o of this.islets) o.position.y = o.userData.y + Math.sin(t / 1400 + o.userData.phase) * 0.25;
+    this.sun.position.set(this.player.x + 8, 18, this.player.z + 10);
+    this.sun.target.position.set(this.player.x, 0, this.player.z);
     this.camera.position.set(this.player.x, 14, this.player.z + 13);
     this.camera.lookAt(this.player.x, 0, this.player.z);
   }

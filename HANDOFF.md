@@ -1,3 +1,15 @@
+DIRECTOR MODE ACTIVE since 2026-10-29 (night, UTC+7)
+
+## Morning report
+- (in progress) Queue below runs through worker sessions one at a time. Nothing pushed or deployed.
+
+## Queue (Director)
+1. [x] Visuals research -> `docs/VISUALS.md` (skills/plugins, CC0 packs + licenses, three.js techniques). Done: doc exists with picks + reasons.
+2. [x] (committed; shots `.scratch/visuals/{before,after}-*`) Cozy restyle of world + battle view (palette, gradient sky, soft shadows/toon, clouds/water under islands, idle bobbing, particles; small bundle). Done: build + tests pass, before/after screenshots in `.scratch/visuals/`.
+3. [ ] A-frame house per corner (0b): enterable/porch chill area for player+pet, decor slots (inside + plot) stored in state; other corners show their A-frame + decor. Done: tests for decor state, visible in pane.
+4. [ ] Verification pass: `npm test` + build (client, worker), secrets scan, local commit.
+API spend tonight: $0 (cap $3).
+
 ## Latest (2026-10-29, pivot to **Mindworld**, approved by the user)
 - New direction (docs/PLAN.md v3): a shared world of pets that think. Track **Build for Your World**, name **Mindworld** (UI + README renamed; repo/HF names unchanged). Order: (1) world + avatar + following pet [v1 DONE, live], (2) live multiplayer on Durable Object WebSockets, (3) pet chat/breeding if time.
 - World v1 live on https://pets.uryto.dev: `client/src/world/{layout,movement,view}.ts` (+8 tests, client 116). 3x3 grid of islands joined by bridges: home (center), event/ghost arena (N), wild meadow (E, plus spare diagonals), market (S, placeholder), elder's house (W, canned tips), boss room (NE), 3 ghost corners (online ghosts, else seed ghosts). WASD/arrows or click to move, E/Space/click to interact; pet follows. Wild fight → battle view (Arena `mode` world/battle); KO or befriend removes it (respawns in 15 s); befriend = tamed, lives at home (`state.tamed`, max 6). Dev-only `window.__world` for checks.
