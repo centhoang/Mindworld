@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Battle, MAX_TURNS, runBattle, runBattleAsync } from "./battle";
-import { CortexUnavailable, LlmCortex, ScriptedCortex, buildReflectPrompt, buildTeachPrompt, summarizeFights, type LlmClient } from "./cortex";
+import { CortexUnavailable, LlmCortex, LocalCortex, MEMO_JSON_SCHEMA, ScriptedCortex, buildReflectPrompt, buildTeachPrompt, summarizeFights, type LlmClient } from "./cortex";
 import { bootstrapMeanCi, comparePaired, makeScenarios, runArm, seedRange, signTestP } from "./evaluate";
 import { EMPTY_MEMO, extractJson, renderMemo, validateMemo, type Memo } from "./memo";
 import { baselinePolicy, memoPolicy } from "./policy";
@@ -270,6 +270,24 @@ describe("cortex", () => {
     expect(r.dropped).toHaveLength(1);
     expect(r.source).toBe("muse-spark-open");
     expect(r.costUsd).toBe(0.002);
+  });
+
+  it("LocalCortex sends the memo JSON schema to llama-server and validates the reply", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetchFn = (async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      const content = '{"summary":"s","rules":[{"if":[{"k":"intent","is":"heavy"}],"do":"guard","why":"w"}]}';
+      return new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }] }));
+    }) as typeof fetch;
+    const r = await new LocalCortex("http://x", { fetchFn }).teach(EMPTY_MEMO, "guard heavy");
+    expect(r.memo.rules).toHaveLength(1);
+    expect(r.source).toBe("local-llama");
+    expect(r.costUsd).toBe(0);
+    expect(bodies[0]!.json_schema).toEqual(MEMO_JSON_SCHEMA);
+    await new LocalCortex("http://x", { fetchFn, grammar: false }).teach(EMPTY_MEMO, "x");
+    expect(bodies[1]!.json_schema).toBeUndefined();
+    const down = (async () => { throw new TypeError("fetch failed"); }) as typeof fetch;
+    await expect(new LocalCortex("http://x", { fetchFn: down }).teach(EMPTY_MEMO, "x")).rejects.toBeInstanceOf(CortexUnavailable);
   });
 
   it("LlmCortex rejects non-JSON, cut-off and wipe-everything replies so the caller can fall back", async () => {

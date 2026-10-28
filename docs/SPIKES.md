@@ -79,3 +79,18 @@ Reflect fix (task E, same day, ledger 0.0814 -> 0.2148, **$0.133**):
 
 Teach (Baseten, unchanged) across runs 3-7: heldout 60.5% -> 88.9..89.8% (+28.4..+29.3 pts), $0.006-0.010.
 State: Reflect reliably returns a valid memo (3/3 with effort low) and can no longer make the pet worse; whether it improves depends on how strong the taught memo already is (+2.8 pts on a 3-rule memo, nothing over a 4-rule memo with an attack rule). In the game, a rejected revision shows "did worse in practice fights, your pet keeps its memo".
+
+## Fine-tune step 0: Teach baseline on 100 held-out lessons (2026-10-28)
+`client/src/finetune/teach-bench.ts` teaches each of the 100 hand-written held-out lessons (`client/src/finetune/lessons.ts`, never trained on) to an untrained pet, then scores the memo with Prove (1000 paired held-out fights vs the uncoached pet). Lift = held-out win-rate delta; a lesson with no memo counts as 0. Local runs: `LocalCortex` -> llama-server (b11934 CUDA, GTX 1050, Q4_K_M, temperature 0, `json_schema` = the memo DSL). Raw rows with every memo: `.scratch/teach-*.json`.
+
+| coach | valid | clean | mean lift | lift when valid | harmful (< -2 pts) | rules | p50 |
+|---|---|---|---|---|---|---|---|
+| Muse Spark Open (teacher, Baseten, $0.80 total) | 88% | 88% | **+21.6** | +24.5 | 0 | 3.5 | 7.2 s |
+| scripted double | 71% | 71% | +7.8 | +10.9 | 13 | 1.4 | 0 |
+| Llama 3.2 3B + schema | 100% | 95% | -3.0 | -3.0 | 29 | 2.1 | 2.8 s |
+| Llama 3.2 3B free | 49% | 43% | -2.3 | -4.8 | 16 | 1.3 | 2.1 s |
+| Llama 3.2 1B + schema | 100% | 84% | +0.7 | +0.7 | 24 | 2.2 | 1.3 s |
+| Llama 3.2 1B free | 20% | 20% | -0.3 | -1.4 | 5 | 1.0 | 1.0 s |
+
+On the 88 lessons where the teacher answered: teacher +24.5, 3B -1.7, 1B +1.2. **Reading:** the schema makes untuned Llama always produce a valid memo, but the rules carry no coaching knowledge (about a quarter of lessons make the pet worse). That gap is exactly what distillation must close. All 12 teacher failures were replies cut off at 4000 output tokens (reasoning), not bad JSON: step 2 should use effort low or a larger budget and retry. Acceptance target (>= 70% of teacher on the same lessons): student mean lift >= +15 pts with >= 95% valid.
+Gotcha: the local Worker's per-client cap ($0.40/day) stops bulk runs; for benches start `wrangler dev --env-file ../.env --env-file ../.scratch/bench.env` (CLIENT_DAILY_USD=2, CLIENT_PER_MINUTE=30). `--var` did not override. Check port 8787 has one listener (stale workerd processes caused `fetch failed`).

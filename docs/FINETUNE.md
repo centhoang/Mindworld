@@ -7,7 +7,7 @@
 
 ## Baselines to beat (all in `docs/SPIKES.md`)
 - Uncoached held-out win rate 60.5%. Scripted coach 88.0%. Live Muse Spark Open Teach 88.9-89.8% (+28.4..+29.3 pts, ~$0.008, 7-10 s on Baseten; Modal ~2-4 s).
-- Untuned Llama: 1B browser valid 90.6% (100% with grammar), sane 40-45%, follows memo 50%; 3B native valid 100%, memo 100/92%, sane 70%. Teach by an untuned small Llama: not measured yet (step 0).
+- Untuned Llama: 1B browser valid 90.6% (100% with grammar), sane 40-45%, follows memo 50%; 3B native valid 100%, memo 100/92%, sane 70%. **Step 0 done (docs/SPIKES.md "Fine-tune step 0")**: on the 100 held-out lessons the teacher scores +21.6 pts mean lift (88% valid, 12 cut off by reasoning); untuned Llama with the schema is 100% valid but useless: 3B -3.0 pts, 1B +0.7 pts, ~25% of lessons harmful. Student target: >= +15 pts mean lift on these lessons.
 
 ## Pipeline
 0. **Baseline (cheap, first):** a `LocalCortex` (implements `Cortex` in `client/src/sim/cortex.ts`) that calls a llama-server (`/v1/chat/completions`, JSON-schema or GBNF grammar for the memo DSL) with the exact Teach prompt. Run Prove on 100 held-out lessons with untuned Llama 3.2 3B and 1B (native, `.scratch/native/bin`). This is the "before" number.

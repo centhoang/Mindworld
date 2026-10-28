@@ -1,11 +1,11 @@
-import { describeRule, extractJson, ruleMatches, validateMemo, type Memo, type Rule } from "./memo";
+import { MAX_RULES, describeRule, extractJson, ruleMatches, validateMemo, type Memo, type Rule } from "./memo";
 import { ACTIONS, ARCHETYPES, INTENTS, SIZES, type Replay } from "./types";
 
 // The Cortex turns replays (and the player's plain-language teaching) into a memo. The live implementation
 // calls a Meta model through the Worker proxy; ScriptedCortex is a deterministic offline double for tests,
 // dev without keys, and the "budget exhausted" fallback. Results say which one produced them.
 
-export type CortexSource = "muse-spark-open" | "muse-spark" | "scripted";
+export type CortexSource = "muse-spark-open" | "muse-spark" | "local-llama" | "scripted";
 
 export interface CortexResult {
   memo: Memo;
@@ -166,9 +166,105 @@ export class FetchLlmClient implements LlmClient {
   }
 }
 
+// ---------------- local coach (llama.cpp) ----------------
+
+// JSON schema of the memo DSL. llama-server turns it into a grammar, so a small model can only emit memos
+// that parse; validateMemo still runs after it (the schema cannot express "no duplicate rules").
+const enumOf = (xs: readonly string[]) => ({ type: "string", enum: [...xs] });
+const condSchema = (k: string, is: object) => ({ type: "object", properties: { k: { const: k }, is }, required: ["k", "is"], additionalProperties: false });
+export const MEMO_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    summary: { type: "string", maxLength: 160 },
+    rules: {
+      type: "array",
+      maxItems: MAX_RULES,
+      items: {
+        type: "object",
+        properties: {
+          if: {
+            type: "array",
+            minItems: 1,
+            maxItems: 3,
+            items: {
+              anyOf: [
+                condSchema("enemy", enumOf(ARCHETYPES)),
+                condSchema("intent", enumOf(INTENTS)),
+                condSchema("size", enumOf(SIZES)),
+                condSchema("last", enumOf(ACTIONS)),
+                {
+                  type: "object",
+                  properties: { k: enumOf(["myHp", "enemyHp", "turn"]), op: enumOf(["<", ">="]), n: { type: "integer", minimum: 0, maximum: 100 } },
+                  required: ["k", "op", "n"],
+                  additionalProperties: false,
+                },
+              ],
+            },
+          },
+          do: enumOf(ACTIONS),
+          why: { type: "string", maxLength: 100 },
+        },
+        required: ["if", "do", "why"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["summary", "rules"],
+  additionalProperties: false,
+};
+
+// Teach/Reflect on a local Llama served by llama.cpp's llama-server (OpenAI-compatible endpoint): free,
+// offline, no key. Same prompts as the Muse Spark path, so the two can be compared on the same lessons.
+export class LocalCortex implements Cortex {
+  constructor(
+    private readonly baseUrl = "http://127.0.0.1:8080",
+    private readonly opts: { grammar?: boolean; maxTokens?: number; fetchFn?: typeof fetch } = {},
+  ) {}
+
+  reflect(memo: Memo, replays: Replay[]): Promise<CortexResult> {
+    return this.run(memo, buildReflectPrompt(memo, replays));
+  }
+
+  teach(memo: Memo, instruction: string): Promise<CortexResult> {
+    return this.run(memo, buildTeachPrompt(memo, instruction));
+  }
+
+  private async run(before: Memo, p: { system: string; prompt: string }): Promise<CortexResult> {
+    const fetchFn = this.opts.fetchFn ?? ((...a) => fetch(...a));
+    const t0 = performance.now();
+    let text: string;
+    let truncated: boolean;
+    try {
+      const res = await fetchFn(`${this.baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: p.system },
+            { role: "user", content: p.prompt },
+          ],
+          temperature: 0,
+          max_tokens: this.opts.maxTokens ?? 700,
+          ...(this.opts.grammar === false ? {} : { json_schema: MEMO_JSON_SCHEMA }),
+        }),
+      });
+      if (!res.ok) throw new CortexUnavailable(`llama-server HTTP ${res.status}`);
+      const body = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+      text = body.choices?.[0]?.message?.content ?? "";
+      truncated = body.choices?.[0]?.finish_reason === "length";
+    } catch (e) {
+      throw e instanceof CortexUnavailable ? e : new CortexUnavailable(`local coach unreachable: ${(e as Error).message}`);
+    }
+    const parsed = extractJson(text);
+    if (parsed === null) throw new CortexUnavailable(truncated ? "reply cut off (token budget)" : "reply was not JSON");
+    const { memo, dropped } = validateMemo(parsed);
+    if (memo.rules.length === 0 && before.rules.length > 0 && dropped.length > 0) throw new CortexUnavailable("reply had no valid rules");
+    return { memo, dropped, source: "local-llama", costUsd: 0, latencyMs: performance.now() - t0 };
+  }
+}
+
 // ---------------- scripted double ----------------
 
-const MAX_RULES = 8;
 
 function addRules(memo: Memo, fresh: Rule[], summaryNote: string): Memo {
   const rules = [...fresh];
