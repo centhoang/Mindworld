@@ -880,6 +880,12 @@ export class WorldView {
     this.camera.lookAt(this.player.x, 0, this.player.z);
   }
 
+  // The on-screen interact button (touch): same as pressing E.
+  interact() {
+    if (this.chilling) return void this.setChill(false);
+    if (this.near && !this.paused) this.onInteract(this.near);
+  }
+
   private key(e: KeyboardEvent, down: boolean) {
     const el = document.activeElement;
     if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) return;

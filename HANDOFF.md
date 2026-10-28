@@ -7,6 +7,8 @@ DIRECTOR MODE ACTIVE since 2026-10-29 ~01:00 UTC+7 (round 2). Round 1 pushed (a1
 10. [x] 7-9 verified (client 145, worker 126, builds, scan clean), committed + pushed 6bec053 (2 live Muse calls $0.0034). **Deploy NOT done**: auto-mode classifier denied `wrangler deploy` ("Production Deploy"); user runs `cd worker; npx wrangler deploy` (adds DO migration v2 `WorldRoom`) or allows it.
 11. [x] Live pet-vs-pet duel (shared seed, both clients run the same sim, room relays challenge/accept + memo snapshot) + short text chat/emotes in room (rate-limited, length-capped, basic profanity filter). Done: tests, two-tab check.
 12. [x] (draft, needs user review) Rewrite `docs/DEMO.md` for Mindworld / Build for Your World (3-min script, opens with pre-existed vs built-this-week line, Meta model uses called out). Done: draft for the user's review.
+14. [x] First-run onboarding for strangers (3-step cozy hint overlay, hatch moment, clear goals) + touch/mobile controls (tap-to-move, on-screen interact button, layout at 375px). Done: tests, mobile screenshots.
+15. [x] (needs deploy for cron) Scheduled Worker cron: Muse Spark re-teaches wild pets/boss from recent shared fights (ghost KV), capped $0.30/day, validated DSL, scripted fallback; mocked tests, at most 2 live calls. Done: worker tests, build.
 13. [x] Verified (client 151, worker 133, builds, scan clean), committed + pushed; $0 spend.
 
 ## Morning report

@@ -92,7 +92,35 @@
         background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 8px 12px; font-weight: 700; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.2); }
       .invite[hidden] { display: none; }
       .chatnote { flex-basis: 100%; text-align: center; font-size: 10.5px; opacity: 0.65; }
+      .overlay { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); background: var(--panel); border: 2px solid var(--line); border-radius: 20px;
+        box-shadow: 0 8px 26px rgba(120, 80, 50, 0.25); padding: 14px 16px; width: min(360px, calc(100vw - 32px)); }
+      #hatch[hidden], #hints[hidden], #goals[hidden], #interactBtn[hidden] { display: none; }
+      #hatch { top: 50%; transform: translate(-50%, -50%); text-align: center; cursor: pointer; padding: 22px 16px; }
+      #hatch .egg { font-size: 64px; display: inline-block; animation: wobble 0.5s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+      #hatch.hatched .egg { animation: pop 0.45s ease-out; }
+      #hatch .hatchText { font-size: 17px; margin-top: 6px; }
+      @keyframes wobble { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+      @keyframes pop { 0% { transform: scale(0.4); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+      #hints { bottom: 72px; display: grid; grid-template-columns: 44px 1fr; gap: 6px 10px; align-items: start; }
+      #hints .hintIcon { font-size: 34px; line-height: 1; }
+      #hints .hintBody b { font-size: 16px; }
+      #hints .hintNav { grid-column: 1 / -1; justify-content: flex-end; }
+      #hints .hintNav .dim { margin-right: auto; }
+      #goals { position: fixed; top: 52px; left: 354px; width: 230px; z-index: 4; padding: 8px 10px; font-size: 12px; background: var(--panel);
+        border: 2px solid var(--line); border-radius: 14px; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.16); }
+      #goals .goal { padding: 3px 0; border-top: 1px dashed var(--line); }
+      #goals .goal.done { color: var(--good); }
+      #goals .goal .dim { font-size: 11px; padding-left: 22px; }
+      #goals button.chip { padding: 0 7px; }
+      #interactBtn { position: fixed; right: 16px; bottom: 76px; z-index: 6; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        padding: 12px 18px; border-radius: 999px; font-size: 15px; display: none; }
+      @media (pointer: coarse), (max-width: 1100px) { #interactBtn:not([hidden]) { display: block; } }
       @media (max-width: 1100px) {
+        #goals { position: static; width: auto; margin: 8px 16px 0; }
+        .hint { display: none; }
+        #interactBtn { position: absolute; bottom: auto; top: calc(46vh - 136px); }
+        #hints { bottom: auto; top: 18vh; }
+        #hatch { top: 23vh; }
         #stage { position: relative; height: 46vh; }
         header { position: absolute; }
         .panel { position: static; width: auto; max-height: none; margin: 8px 16px; }
@@ -106,6 +134,7 @@
     <canvas id="stage"></canvas>
     <header>
       <h1>Mindworld</h1>
+      <button id="helpBtn" class="chip" type="button" title="How to play" aria-label="How to play">?</button>
       <span class="chip">Instinct: <b id="brain">rules only</b></span>
       <span class="chip">Coach: <b id="coachSrc">Muse Spark</b></span>
       <span class="chip" title="Coins from wild wins and befriends">🪙 <b id="coins">0</b></span>
@@ -126,6 +155,10 @@
     <div id="bubbleEnemy" class="bubble"></div>
     <div id="banner"></div>
     <div id="hint" class="hint" hidden></div>
+    <div id="hatch" class="overlay" hidden role="dialog" aria-label="Your pet hatches"></div>
+    <div id="hints" class="overlay" hidden role="dialog" aria-label="How to play"></div>
+    <aside id="goals" aria-label="Goals" hidden></aside>
+    <button id="interactBtn" class="primary" type="button" hidden></button>
     <div id="duelInvite" class="invite" hidden role="dialog" aria-live="polite">
       <span id="duelInviteText"></span>
       <button id="duelYes" type="button">Accept</button>

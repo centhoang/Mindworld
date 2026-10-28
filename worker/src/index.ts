@@ -2,6 +2,7 @@ import { handleRequest, type AppConfig, type Deps } from "./app";
 import type { Env } from "./env";
 import { WorldRoom } from "./room-do";
 import { SpendCounter } from "./spend-do";
+import { runWildMemos } from "./wild-memos";
 
 export { SpendCounter, WorldRoom };
 
@@ -52,4 +53,8 @@ function buildDeps(env: Env): Deps {
 
 export default {
   fetch: (request: Request, env: Env) => handleRequest(request, buildDeps(env)),
+  // Every 6 h: Muse Spark re-teaches the wild pets from what shared ghosts learned (capped, see wild-memos.ts).
+  scheduled: async (_controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
+    ctx.waitUntil(runWildMemos(buildDeps(env)).then((r) => console.log("wild-memos", JSON.stringify(r))));
+  },
 } satisfies ExportedHandler<Env>;

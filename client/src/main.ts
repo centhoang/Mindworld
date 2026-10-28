@@ -11,6 +11,7 @@ import { duelCoins, duelView, type DuelResult, type Fighter } from "./sim/duel";
 import { askNpc, chatWhoFor, type ChatWho } from "./game/npc-chat";
 import { newSeed, parseGenes, randomGenes } from "./game/genes";
 import { thinkingLabel } from "./game/thinking";
+import { goals, hints, isTouch, parseOnboard, playHatch, playHints, renderGoals, type OnboardSave } from "./game/onboard";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
 import { CloudVoice, localAccessState, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
 import { Battle } from "./sim/battle";
@@ -18,6 +19,7 @@ import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, LocalCortex
 import { ENEMIES, type EnemyDef } from "./sim/enemies";
 import { comparePaired, makeScenarios, pct } from "./sim/evaluate";
 import { ghostEnemyDef, LOCAL_SEED_GHOSTS, type Genes, type Ghost } from "./sim/ghost";
+import { fetchWildMemos, withTactics, type WildMemos } from "./sim/tactics";
 import { generateWorld } from "./world/layout";
 import { WorldView, type Entity } from "./world/view";
 import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "./sim/boss";
@@ -45,6 +47,7 @@ interface Save {
   steps?: { fought?: boolean; proved?: boolean; boss?: boolean }; // first-steps guide progress
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
   genes: Genes; // the pet's looks, rolled at hatch (older saves get one on first load)
+  onboard?: OnboardSave; // first-run hatch + hints seen, goals card closed
 }
 
 function load(): Save {
@@ -67,6 +70,7 @@ function load(): Save {
         ...(Array.isArray(raw.tamed)
           ? { tamed: raw.tamed.filter((a): a is ArchetypeId => (ARCHETYPES as readonly string[]).includes(a as string)).slice(-MAX_TAMED) }
           : {}),
+        ...(parseOnboard(raw.onboard) ? { onboard: parseOnboard(raw.onboard) } : {}),
         ...(raw.steps && typeof raw.steps === "object"
           ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true } }
           : {}),
@@ -189,6 +193,7 @@ world.onNear = (e) => {
   const who = e ? speakerFor(e.kind, e.archetype) : null;
   if (who && !busy) chatter(who, "enemy", 1800);
   if (e) hint.innerHTML = `<b>E</b> or click: ${VERB[e.kind]} <b>${esc(e.label)}</b>`;
+  if (e) $("interactBtn").textContent = `${VERB[e.kind]} ${e.label}`;
   showChatBar(e);
 };
 
@@ -484,6 +489,8 @@ function toWorld() {
   showGhostCard(null);
 }
 const instinct = new Instinct(null);
+let wildMemos: WildMemos = {}; // fetched below; empty = bundled patterns
+void fetchWildMemos().then((m) => (wildMemos = m));
 let busy = false;
 
 // ---------------- speech bubbles ----------------
@@ -587,7 +594,8 @@ async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {
     : pick === "random"
       ? ARCHETYPES[Math.floor(Math.random() * ARCHETYPES.length)]!
       : (pick as ArchetypeId);
-  const def: EnemyDef = ghost ? ghostEnemyDef(ghost, pet) : boss ? boss.def : ENEMIES[enemy];
+  const tactic = ghost || boss ? undefined : wildMemos[enemy];
+  const def: EnemyDef = ghost ? ghostEnemyDef(ghost, pet) : boss ? boss.def : withTactics(ENEMIES[enemy], tactic);
   const opp: Opponent = ghost
     ? { label: `${ghost.name} (ghost)`, maxHp: def.maxHp }
     : boss
@@ -596,7 +604,7 @@ async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {
   const battle = new Battle({
     enemy,
     seed: Math.floor(Math.random() * 1e9),
-    ...(ghost || boss ? { enemyDef: def } : {}),
+    ...(ghost || boss || tactic ? { enemyDef: def } : {}),
     ...(boss ? { maxTurns: BOSS_TURNS } : {}),
   });
   arena.mode = "battle";
@@ -616,7 +624,11 @@ async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {
       `<b>${pet.name}</b> vs <b>${BOSS_STATS.label}</b>. <span class="dim">It has read your ${state.memo.rules.length} memo rules: ` +
         `when a rule would fire it fakes the tell and counters. It can read ${BOSS_FOCUS} times, then it needs a turn to recover.</span>`,
     );
-  } else logLine(`<b>${pet.name}</b> vs <b>${enemy}</b>`);
+    if (wildMemos.boss?.summary) logLine(`<span class="dim">🧠 Lately it boasts: “${esc(wildMemos.boss.summary)}” (Muse Spark)</span>`);
+  } else {
+    logLine(`<b>${pet.name}</b> vs <b>${enemy}</b>`);
+    if (tactic) logLine(`<span class="dim">🧠 New wild tactic: ${esc(tactic.summary || `${tactic.rules.length} rules`)} (Muse Spark re-teaches wild pets from shared fights every 6 h)</span>`);
+  }
   setHp(pet.maxHp, opp, def.maxHp);
   await banner(ghost ? `vs ${ghost.name}'s ghost` : boss ? `Boss: ${BOSS_STATS.label}` : `vs ${enemy}`, 900);
   while (!battle.done) {
@@ -717,6 +729,7 @@ function renderHome() {
   porch.innerHTML = "";
   for (let i = 0; i < PORCH_SLOTS; i++) porch.appendChild(slotButton(porchSlot(i), `Porch spot ${i + 1}`));
   const onPorch = porchSlots(state.decor).filter(Boolean).length;
+  renderGoalsCard();
   $("homeInfo").textContent = `${decorCount(state.home)}/${HOME_SLOTS} plot spots, ${onPorch}/${PORCH_SLOTS} porch spots decorated. Click a spot to cycle its item; your shared ghost carries your plot.`;
 }
 
@@ -894,6 +907,7 @@ function renderSteps() {
     ["See the proof", !!state.steps?.proved],
     ["Beat the boss", !!state.steps?.boss],
   ];
+  renderGoalsCard();
   const next = steps.findIndex(([, done]) => !done);
   $("steps").innerHTML = steps
     .map(([label, done], i) => `<li class="${done ? "done" : i === next ? "now" : ""}">${done ? "✓ " : `${i + 1}. `}${label}</li>`)
@@ -1041,6 +1055,47 @@ setHp(pet.maxHp, null, null);
 setButtons();
 void probeNative(true);
 void probeCloud();
+
+// ---------------- first run: hatch, three hints, goals (shown once; "?" replays) ----------------
+
+function renderGoalsCard() {
+  const card = $("goals");
+  card.hidden = !state.onboard?.seen || !!state.onboard.goalsHidden;
+  renderGoals(card, goals({ tamed: state.tamed?.length ?? 0, decor: state.decor.length, boss: !!state.steps?.boss }));
+}
+$("goals").addEventListener("click", (ev) => {
+  if ((ev.target as HTMLElement).closest("button")?.dataset.a !== "close") return;
+  state.onboard = { ...state.onboard, goalsHidden: true };
+  save();
+  renderGoalsCard();
+});
+let onboarding = false;
+async function onboard(withHatch: boolean) {
+  if (onboarding) return;
+  onboarding = true;
+  world.paused = true;
+  try {
+    if (withHatch) {
+      await playHatch($("hatch"), pet.name);
+      say("pet", "Hi! Let's explore!", 2400);
+    }
+    await playHints($("hints"), hints(isTouch()));
+  } finally {
+    world.paused = arena.mode !== "world";
+    onboarding = false;
+  }
+  state.onboard = { ...state.onboard, seen: true, goalsHidden: false };
+  save();
+  renderGoalsCard();
+}
+$("helpBtn").addEventListener("click", () => void onboard(false));
+$("interactBtn").addEventListener("click", () => world.interact());
+setInterval(() => {
+  $("interactBtn").hidden = arena.mode !== "world" || busy || onboarding || world.paused || (!world.nearEntity && !world.isChilling);
+  if (world.isChilling) $("interactBtn").textContent = "Get up";
+}, 150);
+if (!state.onboard?.seen) void onboard(state.recent.length === 0);
+if (import.meta.env.DEV) Object.assign(window, { __onboard: onboard });
 
 // Connect last: the live handlers touch UI state declared above.
 if (import.meta.env.VITE_LIVE !== "0") {

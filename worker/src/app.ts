@@ -14,6 +14,7 @@ import type { ReserveRequest, ReserveResult, SpendSnapshot, RejectReason } from 
 import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
 import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
 import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
+import { loadWildMemos } from "./wild-memos";
 import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
 
 export interface SpendClient {
@@ -96,6 +97,10 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     if (path === "/api/room" && method === "GET") {
       if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return fail(426, "expected_websocket");
       return deps.room ? deps.room.fetch(request) : fail(503, "no_room");
+    }
+    if (path === "/api/wild-memos" && method === "GET") {
+      const w = await loadWildMemos(deps);
+      return json(w ?? { version: 0, updatedAt: 0, source: "default", memos: {} });
     }
     if (path === "/api/transcribe" && method === "POST") return handleTranscribe(request, deps);
     if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);

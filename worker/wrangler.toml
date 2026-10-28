@@ -7,6 +7,9 @@ compatibility_date = "2026-10-01"
 # the DNS record for pets.uryto.dev on deploy (approved by the user 2026-10-28).
 routes = [{ pattern = "pets.uryto.dev", custom_domain = true }]
 
+[triggers]
+crons = ["17 */6 * * *"] # wild-pet tactics re-taught by Muse Spark (src/wild-memos.ts), <= $0.30/day
+
 [assets]
 directory = "../client/dist"
 binding = "ASSETS"
