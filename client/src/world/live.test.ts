@@ -104,3 +104,51 @@ describe("LiveLink", () => {
     vi.useRealTimers();
   });
 });
+
+describe("live chat + duel messages", () => {
+  const memo = { summary: "my name is Alex", rules: [{ if: [{ k: "intent" as const, is: "heavy" as const }], do: "guard" as const, why: "Alex said" }] };
+
+  it("dispatches say / notice / duel / duelStart / duelEnd and ignores malformed ones", () => {
+    const got: unknown[] = [];
+    const { h } = handlers();
+    Object.assign(h, {
+      say: (...a: unknown[]) => got.push(["say", ...a]),
+      notice: (...a: unknown[]) => got.push(["notice", ...a]),
+      duel: (...a: unknown[]) => got.push(["duel", ...a]),
+      duelStart: (...a: unknown[]) => got.push(["duelStart", ...a]),
+      duelEnd: (...a: unknown[]) => got.push(["duelEnd", ...a]),
+    });
+    const f = (id: string) => ({ id, name: id, genes: { hue: 0.5 }, memo });
+    dispatch(JSON.stringify({ t: "say", id: "a1", text: "hi!" }), h);
+    dispatch(JSON.stringify({ t: "say", id: "a1", text: "x".repeat(81) }), h);
+    dispatch(JSON.stringify({ t: "notice", text: "Slow down a little." }), h);
+    dispatch(JSON.stringify({ t: "duel", duel: "d1", from: "a1", name: "Ann" }), h);
+    dispatch(JSON.stringify({ t: "duelStart", duel: "d1", seed: 7, a: f("a1"), b: f("b2") }), h);
+    dispatch(JSON.stringify({ t: "duelStart", duel: "d1", seed: -1, a: f("a1"), b: f("b2") }), h);
+    dispatch(JSON.stringify({ t: "duelEnd", duel: "d1", reason: "declined" }), h);
+    dispatch(JSON.stringify({ t: "duelEnd", duel: "d1", reason: "boom" }), h);
+    expect(got.map((g) => (g as unknown[])[0])).toEqual(["say", "notice", "duel", "duelStart", "duelEnd"]);
+    expect((got[3] as unknown[])[2]).toBe(7);
+  });
+
+  it("sends chat and duel messages with rules only (no free text)", () => {
+    const { h } = handlers();
+    const ws = fakeSocket();
+    const link = new LiveLink("ws://x", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, () => ws);
+    expect(link.say("hi")).toBe(false); // offline
+    link.connect();
+    ws.readyState = 1;
+    ws.onopen!({});
+    expect(link.say("   ")).toBe(false);
+    expect(link.say("  hello   there ")).toBe(true);
+    expect(JSON.parse(ws.sent.at(-1)!)).toEqual({ t: "say", text: "hello there" });
+    link.challenge("b2", memo, { hue: 0.2 });
+    const c = JSON.parse(ws.sent.at(-1)!);
+    expect(c).toMatchObject({ t: "duel", to: "b2", genes: { hue: 0.2 }, memo: { summary: "", rules: [{ do: "guard", why: "" }] } });
+    expect(JSON.stringify(c)).not.toContain("Alex");
+    link.accept("d1", memo, {});
+    expect(JSON.parse(ws.sent.at(-1)!)).toMatchObject({ t: "duelAccept", duel: "d1" });
+    link.decline("d1");
+    expect(JSON.parse(ws.sent.at(-1)!)).toEqual({ t: "duelDecline", duel: "d1" });
+  });
+});

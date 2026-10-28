@@ -1,5 +1,7 @@
 import { parseGenes } from "../game/genes";
+import { parseFighter, type Fighter } from "../sim/duel";
 import type { Genes } from "../sim/ghost";
+import type { Memo } from "../sim/memo";
 
 // Live layer v0: one WebSocket to the world room (Worker Durable Object). Other online players' avatars
 // and pets walk around in our world; when the room is unreachable or full the world just keeps its
@@ -29,7 +31,14 @@ export interface LiveHandlers {
   pos(id: string, x: number, z: number, px: number, pz: number): void;
   emote(id: string, e: Emote): void;
   status(s: LiveStatus): void;
+  say?(id: string, text: string): void;
+  notice?(text: string): void;
+  duel?(duel: string, from: string, name: string): void; // someone challenges us
+  duelStart?(duel: string, seed: number, a: Fighter, b: Fighter): void;
+  duelEnd?(duel: string, reason: "declined" | "gone"): void;
 }
+
+export const SAY_MAX = 80;
 
 export interface Me {
   x: number;
@@ -95,6 +104,27 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
     }
     case "full":
       return h.status("full");
+    case "say": {
+      const id = str(m.id, 16), text = str(m.text, SAY_MAX);
+      return id && text ? h.say?.(id, text) : undefined;
+    }
+    case "notice": {
+      const text = str(m.text, 120);
+      return text ? h.notice?.(text) : undefined;
+    }
+    case "duel": {
+      const duel = str(m.duel, 16), from = str(m.from, 16), name = str(m.name, 16);
+      return duel && from && name ? h.duel?.(duel, from, name) : undefined;
+    }
+    case "duelStart": {
+      const duel = str(m.duel, 16), a = parseFighter(m.a), b = parseFighter(m.b);
+      const seed = typeof m.seed === "number" && Number.isInteger(m.seed) && m.seed >= 0 ? m.seed : null;
+      return duel && a && b && seed !== null ? h.duelStart?.(duel, seed, a, b) : undefined;
+    }
+    case "duelEnd": {
+      const duel = str(m.duel, 16) ?? "";
+      return m.reason === "declined" || m.reason === "gone" ? h.duelEnd?.(duel, m.reason) : undefined;
+    }
   }
 }
 
@@ -111,6 +141,7 @@ export class LiveLink {
   private full = false;
   private ping: ReturnType<typeof setInterval> | null = null;
   status: LiveStatus = "offline";
+  myId: string | null = null; // our id in the room, from the welcome
 
   constructor(
     private readonly url: string,
@@ -141,6 +172,10 @@ export class LiveLink {
       if (ev.data === "pong") return;
       dispatch(ev.data, {
         ...this.h,
+        welcome: (id, corner, peers) => {
+          this.myId = id;
+          this.h.welcome(id, corner, peers);
+        },
         status: (s) => {
           if (s === "full") this.full = true;
           this.set(s);
@@ -190,8 +225,30 @@ export class LiveLink {
   }
 
   emote(e: Emote): boolean {
+    return this.send({ t: "emote", e });
+  }
+
+  say(text: string): boolean {
+    const t = text.replace(/\s+/g, " ").trim().slice(0, SAY_MAX);
+    return t ? this.send({ t: "say", text: t }) : false;
+  }
+
+  // Duels carry the memo rules only (no summary or notes) and the genes.
+  challenge(to: string, memo: Memo, genes: Genes): boolean {
+    return this.send({ t: "duel", to, memo: rulesOnly(memo), genes });
+  }
+
+  accept(duel: string, memo: Memo, genes: Genes): boolean {
+    return this.send({ t: "duelAccept", duel, memo: rulesOnly(memo), genes });
+  }
+
+  decline(duel: string): boolean {
+    return this.send({ t: "duelDecline", duel });
+  }
+
+  private send(m: object): boolean {
     if (!this.ws || this.ws.readyState !== 1 || this.status !== "online") return false;
-    this.ws.send(JSON.stringify({ t: "emote", e }));
+    this.ws.send(JSON.stringify(m));
     return true;
   }
 
@@ -203,6 +260,8 @@ export class LiveLink {
     this.set("offline");
   }
 }
+
+const rulesOnly = (m: Memo) => ({ summary: "", rules: m.rules.map((r) => ({ if: r.if, do: r.do, why: "" })) });
 
 export const roomUrl = (loc: { protocol: string; host: string }): string => `${loc.protocol === "https:" ? "wss" : "ws"}://${loc.host}/api/room`;
 

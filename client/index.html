@@ -86,6 +86,11 @@
       .emotes[hidden] { display: none; }
       .emotes .chip { padding: 2px 7px; color: inherit; }
       .chatbar input { flex: 1; min-width: 0; border: 2px solid var(--line); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; }
+      .roomlog { flex-basis: 100%; font-size: 12px; max-height: 76px; overflow: hidden; line-height: 1.35; padding: 0 4px; }
+      .roomlog[hidden] { display: none; }
+      .invite { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; gap: 8px; align-items: center;
+        background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 8px 12px; font-weight: 700; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.2); }
+      .invite[hidden] { display: none; }
       .chatnote { flex-basis: 100%; text-align: center; font-size: 10.5px; opacity: 0.65; }
       @media (max-width: 1100px) {
         #stage { position: relative; height: 46vh; }
@@ -108,6 +113,7 @@
       <span id="liveChip" class="chip" title="Other players in this world right now" hidden>🟢 <b id="liveCount">0</b> online</span>
       <span id="emotes" class="emotes" hidden>
         <button class="chip" data-emote="wave" title="Wave (1)">👋</button><button class="chip" data-emote="heart" title="Heart (2)">❤️</button><button class="chip" data-emote="dance" title="Dance (3)">🎵</button><button class="chip" data-emote="laugh" title="Laugh (4)">😄</button>
+        <button id="duelBtn" class="chip" type="button" hidden title="Challenge this player's pet to a live duel"></button>
       </span>
     </header>
     <section id="shop" class="panel" hidden aria-label="Market stall">
@@ -120,10 +126,16 @@
     <div id="bubbleEnemy" class="bubble"></div>
     <div id="banner"></div>
     <div id="hint" class="hint" hidden></div>
+    <div id="duelInvite" class="invite" hidden role="dialog" aria-live="polite">
+      <span id="duelInviteText"></span>
+      <button id="duelYes" type="button">Accept</button>
+      <button id="duelNo" type="button">Decline</button>
+    </div>
     <form id="chatBar" class="chatbar" hidden autocomplete="off">
+      <div id="roomLog" class="roomlog" hidden></div>
       <input id="chatInput" maxlength="140" aria-label="Say something" />
       <button id="chatSay" type="submit">Say</button>
-      <div class="chatnote">Replies by Muse Spark (Meta AI). Please don't share personal info.</div>
+      <div id="chatNote" class="chatnote">Replies by Muse Spark (Meta AI). Please don't share personal info.</div>
     </form>
 
     <section id="fight" class="panel">

@@ -268,6 +268,9 @@ interface LiveGhost {
   to: Me;
   emote: THREE.Sprite | null;
   emoteAge: number;
+  name: string;
+  speech: THREE.Sprite | null; // room chat line over the head
+  speechAge: number;
 }
 
 export class WorldView {
@@ -307,6 +310,7 @@ export class WorldView {
   onChill: (on: boolean) => void = () => {};
   private readonly live = new Map<string, LiveGhost>();
   private myEmote: { sprite: THREE.Sprite; age: number } | null = null;
+  private mySpeech: { sprite: THREE.Sprite; age: number } | null = null;
   // Camera zoom: wheel or pinch sets a target, the camera eases towards it.
   static readonly ZOOM_MIN = 0.7;
   static readonly ZOOM_MAX = 2.2;
@@ -640,7 +644,7 @@ export class WorldView {
     avatar.position.set(p.x, 0, p.z);
     pet.position.set(p.px, 0, p.pz);
     this.scene.add(avatar, pet, tag);
-    this.live.set(p.id, { avatar, pet, tag, to: { x: p.x, z: p.z, px: p.px, pz: p.pz }, emote: null, emoteAge: 0 });
+    this.live.set(p.id, { avatar, pet, tag, to: { x: p.x, z: p.z, px: p.px, pz: p.pz }, emote: null, emoteAge: 0, name: p.name, speech: null, speechAge: 0 });
   }
 
   movePeer(id: string, to: Me) {
@@ -653,6 +657,7 @@ export class WorldView {
     if (!g) return;
     this.scene.remove(g.avatar, g.pet, g.tag);
     if (g.emote) this.scene.remove(g.emote);
+    if (g.speech) this.scene.remove(g.speech);
     this.live.delete(id);
   }
 
@@ -677,6 +682,43 @@ export class WorldView {
     g.emoteAge = 0;
   }
 
+  // The online player whose avatar or pet we stand next to (for a duel challenge), if any.
+  nearPeer(reach = 2.2): { id: string; name: string } | null {
+    let best: { id: string; name: string } | null = null;
+    let bestD = reach;
+    for (const [id, g] of this.live) {
+      const d = Math.min(
+        Math.hypot(g.avatar.position.x - this.player.x, g.avatar.position.z - this.player.z),
+        Math.hypot(g.pet.position.x - this.player.x, g.pet.position.z - this.player.z),
+      );
+      if (d < bestD) {
+        best = { id, name: g.name };
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
+  peerName(id: string): string | null {
+    return this.live.get(id)?.name ?? null;
+  }
+
+  // A room chat line over a live player's head (id) or our own (null), for a few seconds.
+  showSpeech(id: string | null, text: string) {
+    const sprite = labelSprite(text.length > 40 ? `${text.slice(0, 38)}...` : text, 0.75);
+    this.scene.add(sprite);
+    if (id === null) {
+      if (this.mySpeech) this.scene.remove(this.mySpeech.sprite);
+      this.mySpeech = { sprite, age: 0 };
+      return;
+    }
+    const g = this.live.get(id);
+    if (!g) return void this.scene.remove(sprite);
+    if (g.speech) this.scene.remove(g.speech);
+    g.speech = sprite;
+    g.speechAge = 0;
+  }
+
   private updateLive(dt: number, t: number) {
     const k = 1 - Math.exp(-dt * 10);
     for (const g of this.live.values()) {
@@ -692,6 +734,14 @@ export class WorldView {
       p.z += pdz * k;
       if (Math.hypot(pdx, pdz) > 0.03) g.pet.rotation.y = Math.atan2(pdx, pdz);
       g.tag.position.set(a.x, 2.3, a.z);
+      if (g.speech) {
+        g.speechAge += dt;
+        g.speech.position.set(a.x, 3.0, a.z);
+        if (g.speechAge > 5) {
+          this.scene.remove(g.speech);
+          g.speech = null;
+        }
+      }
       if (g.emote) {
         g.emoteAge += dt;
         g.emote.position.set(a.x, 2.9 + g.emoteAge * 0.3, a.z);
@@ -699,6 +749,14 @@ export class WorldView {
           this.scene.remove(g.emote);
           g.emote = null;
         }
+      }
+    }
+    if (this.mySpeech) {
+      this.mySpeech.age += dt;
+      this.mySpeech.sprite.position.set(this.avatar.position.x, 2.4, this.avatar.position.z);
+      if (this.mySpeech.age > 5) {
+        this.scene.remove(this.mySpeech.sprite);
+        this.mySpeech = null;
       }
     }
     if (this.myEmote) {

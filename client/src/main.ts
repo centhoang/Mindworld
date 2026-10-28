@@ -4,9 +4,10 @@ import { DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOT
 import { nextChatter, pickLine, speakerFor, voiceFor, type Speaker } from "./game/chatter";
 import { addCoins, buy, coinsFor, parseCoins, parseOwned, PRICES, SHOP_ITEMS } from "./game/shop";
 import { cycle, fromHome, itemAt, ownedItems, parseDecor, plotSlot, plotSlots, porchSlot, porchSlots, PORCH_SLOTS, type Placement, type SlotId } from "./game/decor";
-import { Arena, dressPet, makeBossMesh, makeGhostPet } from "./game/scene";
+import { Arena, dressPet, makeBossMesh, makeGhostPet, makePet } from "./game/scene";
 import { castAll } from "./game/style";
-import { EMOTE_ICON, EMOTES, LiveLink, liveName, roomUrl, type Emote } from "./world/live";
+import { EMOTE_ICON, EMOTES, LiveLink, liveName, roomUrl, SAY_MAX, type Emote } from "./world/live";
+import { duelCoins, duelView, type DuelResult, type Fighter } from "./sim/duel";
 import { askNpc, chatWhoFor, type ChatWho } from "./game/npc-chat";
 import { newSeed, parseGenes, randomGenes } from "./game/genes";
 import { thinkingLabel } from "./game/thinking";
@@ -135,7 +136,16 @@ const live = new LiveLink(
       if (s !== "online") world.clearPeers(); // offline or full: the ghosts keep the world company
       $("emotes").hidden = s !== "online";
       liveCountChanged();
+      showChatBar(world.nearEntity);
     },
+    say: (id, text) => {
+      world.showSpeech(id, text);
+      roomLog(world.peerName(id) ?? "Someone", text);
+    },
+    notice: (text) => roomLog("", text),
+    duel: (duel, from, name) => duelInvited(duel, from, name),
+    duelStart: (duel, seed, a, b) => void duelStarted(duel, seed, a, b),
+    duelEnd: (duel, reason) => duelEnded(duel, reason),
   },
 );
 function liveCountChanged() {
@@ -154,12 +164,6 @@ window.addEventListener("keydown", (ev) => {
   const i = ["1", "2", "3", "4"].indexOf(ev.key);
   if (i >= 0 && live.status === "online") sendEmote(EMOTES[i]!);
 });
-if (import.meta.env.VITE_LIVE !== "0") {
-  live.connect();
-  setInterval(() => {
-    if (arena.mode === "world") live.tick(performance.now(), world.me);
-  }, 50);
-}
 
 if (import.meta.env.DEV) Object.assign(window, { __live: live, __hatch: (seed: number) => ((state.genes = randomGenes(seed)), dressMyPet(), state.genes) });
 if (import.meta.env.DEV) Object.assign(window, { __world: world, __arena: arena }); // for browser checks in dev only
@@ -199,9 +203,25 @@ function showChatBar(e: Entity | null) {
   const who = e && !busy ? chatWhoFor(e.kind, e.archetype) : null;
   if (who && chatWith?.who === who && !chatBar.hidden) return;
   chatWith = who && e ? { who, label: e.label } : null;
-  chatBar.hidden = !chatWith;
+  const roomChat = !chatWith && !busy && live.status === "online";
+  chatBar.hidden = !chatWith && !roomChat;
+  chatInput.maxLength = chatWith ? 140 : SAY_MAX;
+  $("chatNote").textContent = chatWith
+    ? "Replies by Muse Spark (Meta AI). Please don't share personal info."
+    : "Room chat: everyone online sees it. Be kind, no links or personal info.";
   if (chatWith) chatInput.placeholder = `Say something to ${chatWith.label}...`;
+  else if (roomChat) chatInput.placeholder = "Say something to everyone...";
   else if (document.activeElement === chatInput) chatInput.blur();
+}
+
+// Room chat: a tiny log of the last few lines above the chat box.
+function roomLog(who: string, text: string) {
+  const el = $("roomLog");
+  const d = document.createElement("div");
+  d.innerHTML = who ? `<b>${esc(who)}:</b> ${esc(text)}` : `<span class="dim">${esc(text)}</span>`;
+  el.appendChild(d);
+  while (el.children.length > 4) el.firstElementChild!.remove();
+  el.hidden = false;
 }
 async function talk(line: string) {
   if (!chatWith || chatPending) return;
@@ -226,8 +246,102 @@ chatBar.addEventListener("submit", (ev) => {
   ev.preventDefault();
   const line = chatInput.value.trim();
   chatInput.value = "";
-  void talk(line);
+  if (chatWith) return void talk(line);
+  if (line && live.say(line)) {
+    world.showSpeech(null, line);
+    roomLog("You", line);
+  }
 });
+
+// ---------------- live duels: your pet's memo vs another online player's pet ----------------
+
+const DUEL_WAIT_MS = 30_000;
+let duelOut: { to: string; name: string; timer: number } | null = null;
+let duelIn: { duel: string; from: string; name: string; timer: number } | null = null;
+
+function duelChallenge() {
+  const p = world.nearPeer();
+  if (!p || busy || duelOut) return;
+  if (!live.challenge(p.id, state.memo, state.genes)) return;
+  duelOut = { to: p.id, name: p.name, timer: window.setTimeout(() => duelEnded("", "gone"), DUEL_WAIT_MS) };
+  roomLog("", `You challenged ${p.name}. Waiting for an answer...`);
+  say("pet", "A duel? I'm ready!", 2000);
+}
+function duelInvited(duel: string, from: string, name: string) {
+  if (busy || duelIn) return void live.decline(duel);
+  const timer = window.setTimeout(() => answerInvite(false), DUEL_WAIT_MS - 3000);
+  duelIn = { duel, from, name, timer };
+  $("duelInviteText").textContent = `${name} challenges your pet to a duel!`;
+  $("duelInvite").hidden = false;
+}
+function answerInvite(yes: boolean) {
+  if (!duelIn) return;
+  clearTimeout(duelIn.timer);
+  if (yes) live.accept(duelIn.duel, state.memo, state.genes);
+  else live.decline(duelIn.duel);
+  duelIn = null;
+  $("duelInvite").hidden = true;
+}
+$("duelYes").addEventListener("click", () => answerInvite(true));
+$("duelNo").addEventListener("click", () => answerInvite(false));
+$("duelBtn").addEventListener("click", duelChallenge);
+function duelEnded(_duel: string, reason: "declined" | "gone") {
+  if (duelIn && reason === "gone") {
+    clearTimeout(duelIn.timer);
+    duelIn = null;
+    $("duelInvite").hidden = true;
+    roomLog("", "The challenge was withdrawn.");
+  }
+  if (!duelOut) return;
+  clearTimeout(duelOut.timer);
+  roomLog("", reason === "declined" ? `${duelOut.name} said no thanks.` : `${duelOut.name} did not answer.`);
+  duelOut = null;
+}
+
+const DUEL_BANNER: Record<DuelResult, string> = { win: "You won the duel!", loss: "You lost the duel...", draw: "A draw!", friends: "They became friends!" };
+async function duelStarted(_duel: string, seed: number, a: Fighter, b: Fighter) {
+  const me = live.myId === a.id ? "a" : live.myId === b.id ? "b" : null;
+  if (!me || busy) return; // not ours, or we are mid-fight (the other side still sees the full duel)
+  if (duelOut) clearTimeout(duelOut.timer);
+  duelOut = null;
+  const them = me === "a" ? b : a;
+  const v = duelView(a, b, seed, me);
+  busy = true;
+  setButtons();
+  world.paused = true;
+  arena.mode = "battle";
+  arena.setEnemy(makePet(them.genes));
+  arena.setDecor(state.home);
+  showGhostCard(null);
+  log.innerHTML = "";
+  const opp: Opponent = { label: `${them.name} (live)`, maxHp: v.theirMaxHp };
+  logLine(`<b>Live duel</b>: <b>${esc(liveName(state.genes))}</b> vs <b>${esc(them.name)}</b>. <span class="dim">Both pets follow their own memo rules; both players see this same fight (seed ${seed}).</span>`);
+  setHp(v.myMaxHp, opp, v.theirMaxHp);
+  await banner(`Duel vs ${them.name}`, 900);
+  for (const [i, t] of v.turns.entries()) {
+    const last = i === v.turns.length - 1;
+    say("enemy", t.theirs === "attack" ? (t.theirAct === "heavy" ? "*HEAVY hit!*" : "Hyah!") : t.theirs === "guard" ? "*guards*" : t.theirs === "flee" ? "*runs*" : "*waves*");
+    say("pet", t.mine);
+    logLine(`T${i + 1} <b>${t.mine}</b> vs <b>${t.theirs}</b> <span class="dim">${t.dealt ? `hit ${t.dealt}` : ""}${t.taken ? ` took ${t.taken}` : ""}</span>`);
+    const anim = last ? (v.result === "win" ? "win" : v.result === "loss" ? "loss" : null) : null;
+    await arena.playTurn(t.mine, t.theirAct, t.dealt, t.taken, anim);
+    setHp(t.myHp, opp, t.theirHp);
+  }
+  await arena.playEnd(v.result === "friends" ? "win" : v.result === "draw" ? "timeout" : v.result);
+  const earned = duelCoins(v.result);
+  logLine(`<b>${DUEL_BANNER[v.result]}</b>${earned ? ` <b>+${earned} coins</b>` : ""}`);
+  await banner(DUEL_BANNER[v.result]);
+  if (earned) {
+    state.coins = addCoins(state.coins ?? 0, earned);
+    renderCoins();
+  }
+  roomLog("", `Duel vs ${them.name}: ${DUEL_BANNER[v.result]}`);
+  arena.setEnemy(null);
+  toWorld();
+  save();
+  busy = false;
+  setButtons();
+}
 
 const ELDER_TIPS = [
   "Teach your pet in plain words, or press Speak and say it.",
@@ -927,3 +1041,16 @@ setHp(pet.maxHp, null, null);
 setButtons();
 void probeNative(true);
 void probeCloud();
+
+// Connect last: the live handlers touch UI state declared above.
+if (import.meta.env.VITE_LIVE !== "0") {
+  live.connect();
+  setInterval(() => {
+    if (arena.mode !== "world") return;
+    live.tick(performance.now(), world.me);
+    const p = live.status === "online" && !busy && !duelOut ? world.nearPeer() : null;
+    const btn = $<HTMLButtonElement>("duelBtn");
+    btn.hidden = !p;
+    if (p) btn.textContent = `\u2694\uFE0F Duel ${p.name}`;
+  }, 50);
+}

@@ -4,7 +4,10 @@ DIRECTOR MODE ACTIVE since 2026-10-29 ~01:00 UTC+7 (round 2). Round 1 pushed (a1
 7. [ ] Random modular pet at hatch (more genes/parts: ears, tail, horns, pattern, palette; seeded, saved, ghosts carry genes, old saves tolerated). Done: tests + build, screenshots.
 8. [ ] NPC chat via Muse Spark: Worker kind `chat` (elder + wild pets), short persona prompts, capped (per-client + daily), cached, scripted fallback; client chat box. Mocked in tests; live check <= 5 calls. Done: worker + client tests, build.
 9. [ ] Live layer v0: Durable Object room (WebSocket hibernation): presence, avatar/pet positions ~10 Hz while moving, emotes; other online players' avatars appear; fall back to ghosts when offline/over limit. Done: worker tests, two-tab check with `wrangler dev`.
-10. [ ] Verify (tests, build, secrets scan), commit, push + deploy (user OK'd tonight), Morning report.
+10. [x] 7-9 verified (client 145, worker 126, builds, scan clean), committed + pushed 6bec053 (2 live Muse calls $0.0034). **Deploy NOT done**: auto-mode classifier denied `wrangler deploy` ("Production Deploy"); user runs `cd worker; npx wrangler deploy` (adds DO migration v2 `WorldRoom`) or allows it.
+11. [x] Live pet-vs-pet duel (shared seed, both clients run the same sim, room relays challenge/accept + memo snapshot) + short text chat/emotes in room (rate-limited, length-capped, basic profanity filter). Done: tests, two-tab check.
+12. [x] (draft, needs user review) Rewrite `docs/DEMO.md` for Mindworld / Build for Your World (3-min script, opens with pre-existed vs built-this-week line, Meta model uses called out). Done: draft for the user's review.
+13. [x] Verified (client 151, worker 133, builds, scan clean), committed + pushed; $0 spend.
 
 ## Morning report
 - Done, committed locally (NOT pushed, NOT deployed): cozy restyle cd2217e (`docs/VISUALS.md`, `client/src/game/style.ts`), A-frame cabins + porch chill + decor fe5fc73 (`world/aframe.ts`, `game/decor.ts`), polish (chatter bubbles + voice toggle, wheel/pinch zoom, coins + market shop; `game/chatter.ts`). Tests: client 132, worker 106, build OK, secrets scan clean.

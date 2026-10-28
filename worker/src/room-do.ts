@@ -62,6 +62,7 @@ export class WorldRoom extends DurableObject<Env> {
       this.deliver(ws, this.room.leave(a.id));
       ws.close(1008, r.close);
     }
+    this.persistDirty();
   }
 
   async webSocketClose(ws: WebSocket) {
@@ -75,6 +76,18 @@ export class WorldRoom extends DurableObject<Env> {
   private drop(ws: WebSocket) {
     const a = ws.deserializeAttachment() as Attachment | null;
     if (a) this.deliver(ws, this.room.leave(a.id));
+    this.persistDirty();
+  }
+
+  // Peers changed by someone else's message (a challenge answered or dropped) get their attachment rewritten.
+  private persistDirty() {
+    const ids = new Set(this.room.takeDirty());
+    if (!ids.size) return;
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment() as Attachment | null;
+      const peer = a && ids.has(a.id) ? this.room.peers.get(a.id) : undefined;
+      if (a && peer) ws.serializeAttachment({ id: a.id, peer } satisfies Attachment);
+    }
   }
 
   private deliver(from: WebSocket, out: Out[]) {
@@ -84,8 +97,11 @@ export class WorldRoom extends DurableObject<Env> {
         safeSend(from, text);
         continue;
       }
+      const target = typeof o.to === "object" ? o.to.id : null;
       for (const ws of this.ctx.getWebSockets()) {
-        if (ws !== from && (ws.deserializeAttachment() as Attachment | null)?.peer) safeSend(ws, text);
+        const a = ws.deserializeAttachment() as Attachment | null;
+        if (!a?.peer) continue;
+        if (target ? a.id === target : ws !== from) safeSend(ws, text);
       }
     }
   }
