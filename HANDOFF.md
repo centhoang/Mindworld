@@ -11,7 +11,7 @@ SLEEP MODE ended for the night 2026-10-29 ~01:15 (UTC+7): the queue is empty, an
 Last updated: 2026-10-28 (fine-tune step 0 session). Phase: **fine-tune a free local coach (docs/FINETUNE.md): step 0 done, step 1 next**. Deadline Nov 4 9 PM ET (user is UTC+7). 8 local commits (HEAD 46b1067), no remote.
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions. Follow CLAUDE.md. Tell me when the context gets long and I will start a new session."
-Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Sleep mode = unattended overnight chain.
+Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Normal mode (dayshift) runs to the 35% context limit then hands off; Director mode (nightshift) runs workers one at a time.
 
 ## State
 - Local git repo, 6 commits (HEAD 89b5111), clean tree. No remote. `.env` has both keys (gitignored). Smoke test `python -I scripts/smoke_llm.py` passes both. Tests: client 81, worker 76. Ghosts, home plot and live Teach/Reflect: see the Morning report and `docs/SPIKES.md`.
