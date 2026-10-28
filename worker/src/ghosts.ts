@@ -30,7 +30,7 @@ export const GHOST_POSTS_PER_HOUR = 10;
 const RATE_PREFIX = "rl:ghost:";
 const MAX_GENES = 12;
 const MAX_NAME = 16;
-export const DECOR_KINDS = ["tree", "flower", "rock", "lamp", "fence"] as const; // client/src/game/home.ts
+export const DECOR_KINDS = ["tree", "flower", "rock", "lamp", "fence", "pot", "mushroom", "rug"] as const; // client/src/game/home.ts
 const MAX_DECOR = 8;
 
 // Optional; a missing list is an empty plot.

@@ -1,4 +1,5 @@
 import { homeToWire, parseHome, type Slot } from "../game/home";
+import { parsePorch } from "../game/decor";
 import { sizeOf } from "./battle";
 import type { EnemyCtx, EnemyDef } from "./enemies";
 import { validateMemo, type Memo } from "./memo";
@@ -16,6 +17,7 @@ export interface Ghost {
   genes: Genes;
   memo: Memo;
   decor: Slot[]; // the owner's home plot, where the ghost fight takes place
+  porch?: Slot[]; // items on the owner's A-frame porch (seed ghosts; the server does not carry it yet)
   seed: boolean; // a built-in ghost, not a real player's
 }
 
@@ -122,6 +124,7 @@ export function parseGhostRecord(raw: unknown): Ghost | null {
     genes,
     memo: validateMemo(o.memo).memo,
     decor: parseHome(o.decor),
+    porch: parsePorch(o.porch),
     seed: o.seed === true,
   };
 }
@@ -150,6 +153,7 @@ export const LOCAL_SEED_GHOSTS: Ghost[] = [
     seed: true,
     genes: { hue: 0.55, build: 0.4, ears: 0.7, tail: 0.3 },
     decor: parseHome(["tree", "flower", null, "lamp", null, "flower", "tree", null]),
+    porch: parsePorch(["pot", "lamp", null, "rug"]),
     memo: {
       summary: "",
       rules: [
@@ -165,6 +169,7 @@ export const LOCAL_SEED_GHOSTS: Ghost[] = [
     seed: true,
     genes: { hue: 0.3, build: 0.8, ears: 0.2, tail: 0.9 },
     decor: parseHome(["rock", "fence", "fence", "rock", "fence", "fence", "rock", null]),
+    porch: parsePorch(["mushroom", null, "lamp", "mushroom"]),
     memo: {
       summary: "",
       rules: [
@@ -180,6 +185,7 @@ export const LOCAL_SEED_GHOSTS: Ghost[] = [
     seed: true,
     genes: { hue: 0.85, build: 0.15, ears: 0.9, tail: 0.6 },
     decor: parseHome(["flower", "flower", "lamp", "flower", "flower", "lamp", "flower", "flower"]),
+    porch: parsePorch(["rug", "pot", "pot", null]),
     memo: {
       summary: "",
       rules: [

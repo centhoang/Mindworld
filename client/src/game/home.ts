@@ -2,14 +2,14 @@
 // scene.ts draws it, main.ts saves it with the rest of the pet. Ghosts carry their owner's decor, so a
 // ghost fight happens on the other player's plot.
 
-export const DECOR = ["tree", "flower", "rock", "lamp", "fence"] as const;
+export const DECOR = ["tree", "flower", "rock", "lamp", "fence", "pot", "mushroom", "rug"] as const; // worker/src/ghosts.ts DECOR_KINDS
 export type DecorKind = (typeof DECOR)[number];
 export type Slot = DecorKind | null;
 
 export const HOME_SLOTS = 8;
 
-export const DECOR_ICON: Record<DecorKind, string> = { tree: "🌳", flower: "🌸", rock: "🪨", lamp: "🏮", fence: "🚧" };
-export const DECOR_LABEL: Record<DecorKind, string> = { tree: "Tree", flower: "Flowers", rock: "Rock", lamp: "Lamp", fence: "Fence" };
+export const DECOR_ICON: Record<DecorKind, string> = { tree: "🌳", flower: "🌸", rock: "🪨", lamp: "🏮", fence: "🚧", pot: "🪴", mushroom: "🍄", rug: "🧶" };
+export const DECOR_LABEL: Record<DecorKind, string> = { tree: "Tree", flower: "Flowers", rock: "Rock", lamp: "Lamp", fence: "Fence", pot: "Flower pot", mushroom: "Mushroom", rug: "Rug" };
 
 export const emptyHome = (): Slot[] => Array<Slot>(HOME_SLOTS).fill(null);
 
@@ -31,7 +31,7 @@ export function cycleSlot(home: readonly Slot[], i: number): Slot[] {
   return next;
 }
 
-const isKind = (v: unknown): v is DecorKind => typeof v === "string" && (DECOR as readonly string[]).includes(v);
+export const isKind = (v: unknown): v is DecorKind => typeof v === "string" && (DECOR as readonly string[]).includes(v);
 
 // Accepts saved data or a ghost's decor list; anything unknown becomes an empty slot. Never throws.
 export function parseHome(raw: unknown): Slot[] {

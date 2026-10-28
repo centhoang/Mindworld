@@ -53,6 +53,10 @@
       .steps li.now { color: inherit; border-color: var(--blue); }
       .slots { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 4px 0; }
       .slots button { padding: 4px 0; font-size: 16px; min-height: 32px; }
+      .slots.porch { grid-template-columns: repeat(4, 1fr); max-width: 50%; }
+      #decorBox { border-radius: 14px; transition: box-shadow 0.3s; }
+      #decorBox.flash { animation: flash 1.6s ease-out; }
+      @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
       .card { border: 2px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.5); padding: 6px 8px; margin-top: 6px; font-size: 12px; }
       .card b { font-size: 13px; }
       ol#memo { padding-left: 18px; margin: 4px 0; font-size: 12px; }
@@ -119,9 +123,14 @@
         <button id="probeNative" title="Power mode: a llama.cpp server with Llama 3.2 3B on this computer">Power mode</button>
       </div>
       <div id="brainStatus" class="dim">Rules only: the pet follows its memo and reflexes. Loading a local model adds personality and voice.</div>
-      <h2>Home plot</h2>
-      <div id="homeSlots" class="slots" aria-label="Decor spots around the plot"></div>
-      <div id="homeInfo" class="dim">Click a spot to place or change decor. Your shared ghost carries your plot with it.</div>
+      <div id="decorBox">
+        <h2>Decorate your corner</h2>
+        <div class="dim">Plot</div>
+        <div id="homeSlots" class="slots" aria-label="Decor spots around the plot"></div>
+        <div class="dim">A-frame porch</div>
+        <div id="porchSlots" class="slots porch" aria-label="Decor spots on the porch"></div>
+        <div id="homeInfo" class="dim">Click a spot to place or change decor. Your shared ghost carries your plot with it.</div>
+      </div>
     </section>
 
     <section id="coach" class="panel">

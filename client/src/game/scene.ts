@@ -101,6 +101,25 @@ export function makeDecor(kind: DecorKind): THREE.Group {
       add(new THREE.BoxGeometry(0.85, 0.07, 0.05), 0xa67c52, 0, 0.32);
       add(new THREE.BoxGeometry(0.85, 0.07, 0.05), 0xa67c52, 0, 0.14);
       break;
+    case "pot":
+      add(new THREE.CylinderGeometry(0.17, 0.12, 0.26, 14), 0xe07a5f, 0, 0.13);
+      add(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 14), 0xc8654c, 0, 0.27);
+      add(new THREE.IcosahedronGeometry(0.17, 1), 0x6fb85e, 0, 0.42);
+      for (const [x, z, c] of [[0.09, 0.08, 0xff9fb2], [-0.08, 0.06, 0xffd966], [0, -0.1, 0xb4a7d6]] as const) add(new THREE.SphereGeometry(0.05, 8, 6), c, x, 0.53, z);
+      break;
+    case "mushroom":
+      add(new THREE.CylinderGeometry(0.07, 0.09, 0.26, 10), 0xfff3dc, 0, 0.13);
+      add(new THREE.SphereGeometry(0.22, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), 0xef6f6f, 0, 0.24).scale.y = 0.75;
+      for (const [x, z] of [[0.1, 0.08], [-0.09, 0.1], [0, -0.12], [0.12, -0.05]] as const) add(new THREE.SphereGeometry(0.035, 6, 5), 0xffffff, x, 0.37, z);
+      add(new THREE.CylinderGeometry(0.04, 0.05, 0.12, 8), 0xfff3dc, 0.22, 0.06, 0.08);
+      add(new THREE.SphereGeometry(0.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0xef6f6f, 0.22, 0.11, 0.08);
+      break;
+    case "rug": {
+      add(new THREE.CylinderGeometry(0.5, 0.5, 0.03, 28), 0xf4a7b9, 0, 0.02).scale.z = 0.7;
+      add(new THREE.CylinderGeometry(0.36, 0.36, 0.035, 28), 0xfff3dc, 0, 0.025).scale.z = 0.7;
+      add(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 24), 0x9fd8c8, 0, 0.03).scale.z = 0.7;
+      break;
+    }
   }
   return g;
 }

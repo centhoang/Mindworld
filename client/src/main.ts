@@ -1,6 +1,7 @@
 import { Instinct, type Choice } from "./game/instinct";
 import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
-import { cycleSlot, DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, parseHome, type Slot } from "./game/home";
+import { DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, type Slot } from "./game/home";
+import { cycle, fromHome, itemAt, ownedItems, parseDecor, plotSlot, plotSlots, porchSlot, porchSlots, PORCH_SLOTS, type Placement, type SlotId } from "./game/decor";
 import { Arena, makeBossMesh, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
@@ -29,7 +30,8 @@ interface Save {
   recent: Replay[];
   shared?: string; // the memo rules last uploaded as a ghost, so the same pet is not re-shared every fight
   mine?: string[]; // ids of ghosts this browser uploaded, to label your own ghost when you meet it
-  home: Slot[]; // decor on the pet's home plot
+  home: Slot[]; // decor on the pet's home plot (derived from decor; kept for older readers)
+  decor: Placement[]; // everything placed in your corner: plot ring + A-frame porch
   steps?: { fought?: boolean; proved?: boolean; boss?: boolean }; // first-steps guide progress
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
 }
@@ -41,7 +43,10 @@ function load(): Save {
       return {
         memo: validateMemo(raw.memo).memo,
         recent: Array.isArray(raw.recent) ? raw.recent.slice(-8) : [],
-        home: parseHome(raw.home),
+        ...(() => {
+          const decor = Array.isArray(raw.decor) ? parseDecor(raw.decor) : fromHome(raw.home);
+          return { decor, home: plotSlots(decor) };
+        })(),
         ...(typeof raw.shared === "string" ? { shared: raw.shared } : {}),
         ...(Array.isArray(raw.mine) ? { mine: raw.mine.filter((x): x is string => typeof x === "string").slice(-20) } : {}),
         ...(Array.isArray(raw.tamed)
@@ -55,7 +60,7 @@ function load(): Save {
   } catch {
     /* private mode or corrupt save: start fresh */
   }
-  return { memo: EMPTY_MEMO, recent: [], home: emptyHome() };
+  return { memo: EMPTY_MEMO, recent: [], home: emptyHome(), decor: [] };
 }
 
 const state = load();
@@ -77,7 +82,7 @@ const world = new WorldView(arena.renderer.domElement);
 arena.world = world;
 const cornerOwners = (gs: readonly Ghost[]) => gs.map((g) => ({ id: g.id, name: g.name }));
 function buildWorld(corners: readonly Ghost[]) {
-  world.build(generateWorld(cornerOwners(corners)), { home: state.home, tamed: state.tamed ?? [], corners });
+  world.build(generateWorld(cornerOwners(corners)), { home: state.home, porch: porchSlots(state.decor), tamed: state.tamed ?? [], corners });
 }
 buildWorld(LOCAL_SEED_GHOSTS);
 arena.mode = "world";
@@ -97,9 +102,10 @@ async function loadCorners() {
   buildWorld(corners);
 }
 
-const VERB: Record<Entity["kind"], string> = { wild: "Fight or tame", boss: "Challenge", npc: "Talk to", market: "Visit", arena: "Fight a random ghost at", ghost: "Fight", tamed: "" };
+const VERB: Record<Entity["kind"], string> = { wild: "Fight or tame", boss: "Challenge", npc: "Talk to", market: "Visit", arena: "Fight a random ghost at", ghost: "Fight", tamed: "", porch: "Sit on", decorate: "Decorate" };
 world.onNear = (e) => {
   const hint = $("hint");
+  if (world.isChilling) return;
   hint.hidden = !e;
   if (e) hint.innerHTML = `<b>E</b> or click: ${VERB[e.kind]} <b>${esc(e.label)}</b>`;
 };
@@ -121,8 +127,27 @@ world.onInteract = (e) => {
     case "arena": return void fight({ pick: "ghost" });
     case "npc": return say("enemy", ELDER_TIPS[tip++ % ELDER_TIPS.length]!, 3200);
     case "market": return say("enemy", "The stall opens soon. Bring coins from your wins!", 2400);
+    case "porch": return world.setChill(true);
+    case "decorate": return openDecorate();
   }
 };
+world.onChill = (on) => {
+  const hint = $("hint");
+  if (on) {
+    hint.hidden = false;
+    hint.innerHTML = `Chilling on the porch with <b>${esc(pet.name)}</b> · move, click or <b>E</b> to get up`;
+    say("pet", "So cozy here.", 2200);
+  } else world.onNear(world.nearEntity);
+};
+
+// The signpost at your corner opens the decorate panel.
+function openDecorate() {
+  const box = $("decorBox");
+  box.scrollIntoView({ behavior: "smooth", block: "center" });
+  box.classList.remove("flash");
+  void box.offsetWidth;
+  box.classList.add("flash");
+}
 
 function toWorld() {
   arena.mode = "world";
@@ -333,26 +358,33 @@ function showGhostCard(g: Ghost | null) {
 }
 
 function renderHome() {
-  const box = $("homeSlots");
-  box.innerHTML = "";
-  state.home.forEach((s, i) => {
+  const slotButton = (slot: SlotId, name: string) => {
+    const s = itemAt(state.decor, slot);
     const b = document.createElement("button");
     b.textContent = s ? DECOR_ICON[s] : "·";
     b.title = s ? `${DECOR_LABEL[s]} (click to change)` : "Empty spot (click to place decor)";
-    b.setAttribute("aria-label", `Spot ${i + 1}: ${s ? DECOR_LABEL[s] : "empty"}`);
+    b.setAttribute("aria-label", `${name}: ${s ? DECOR_LABEL[s] : "empty"}`);
     b.disabled = busy;
     b.onclick = () => {
       if (busy) return;
-      state.home = cycleSlot(state.home, i);
+      state.decor = cycle(state.decor, slot, ownedItems()); // the market will pass bought items here
+      state.home = plotSlots(state.decor);
       save();
       arena.setDecor(state.home);
-      world.setHomeDecor(state.home);
+      world.setHomeDecor(state.home, porchSlots(state.decor));
       showGhostCard(null);
       renderHome();
     };
-    box.appendChild(b);
-  });
-  $("homeInfo").textContent = `${decorCount(state.home)}/${HOME_SLOTS} spots decorated. Click a spot to place or change decor; your shared ghost carries your plot.`;
+    return b;
+  };
+  const plot = $("homeSlots");
+  plot.innerHTML = "";
+  for (let i = 0; i < HOME_SLOTS; i++) plot.appendChild(slotButton(plotSlot(i), `Plot spot ${i + 1}`));
+  const porch = $("porchSlots");
+  porch.innerHTML = "";
+  for (let i = 0; i < PORCH_SLOTS; i++) porch.appendChild(slotButton(porchSlot(i), `Porch spot ${i + 1}`));
+  const onPorch = porchSlots(state.decor).filter(Boolean).length;
+  $("homeInfo").textContent = `${decorCount(state.home)}/${HOME_SLOTS} plot spots, ${onPorch}/${PORCH_SLOTS} porch spots decorated. Click a spot to cycle its item; your shared ghost carries your plot.`;
 }
 
 // What a shared ghost carries: its rules and its plot. A change to either makes the pet worth re-sharing.
@@ -599,7 +631,7 @@ function setButtons() {
   for (const id of ["go", "teach", "speak", "reflect", "reset", "watchProof", "shareGhost"]) $<HTMLButtonElement>(id).disabled = busy;
   if (!busy && !lastProof?.showcase) $<HTMLButtonElement>("watchProof").disabled = true;
   if (!busy) $<HTMLButtonElement>("reflect").disabled = state.recent.length === 0;
-  for (const b of $("homeSlots").querySelectorAll("button")) b.disabled = busy;
+  for (const b of document.querySelectorAll<HTMLButtonElement>("#homeSlots button, #porchSlots button")) b.disabled = busy;
 }
 
 $("go").onclick = () => void fight();
