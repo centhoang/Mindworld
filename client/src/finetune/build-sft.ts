@@ -7,6 +7,7 @@
 // Usage: npx tsx src/finetune/build-sft.ts [--voice-ratio 0.25] [--seed 11] [--cap 1]
 // Writes data/finetune/sft-{train,val}.jsonl ({"messages": [...], "task": "teach"|"voice"}).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { allowedMoves, buildVoicePrompt, CANNED, PERSONALITY } from "../game/instinct";
 import { runBattle } from "../sim/battle";
 import { buildTeachPrompt } from "../sim/cortex";
@@ -129,7 +130,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

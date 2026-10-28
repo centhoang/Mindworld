@@ -3,9 +3,9 @@ import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
 import { cycleSlot, DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, parseHome, type Slot } from "./game/home";
 import { Arena, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
-import { CloudVoice, NativeVoice, WebLlmVoice } from "./game/voices";
+import { CloudVoice, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
 import { Battle } from "./sim/battle";
-import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, ScriptedCortex, type Cortex, type CortexResult } from "./sim/cortex";
+import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult, type CortexSource } from "./sim/cortex";
 import { ENEMIES, type EnemyDef } from "./sim/enemies";
 import { comparePaired, makeScenarios, pct } from "./sim/evaluate";
 import { ghostEnemyDef, ghostHue, PET_GENES, type Ghost } from "./sim/ghost";
@@ -285,6 +285,20 @@ async function playReplay(r: Replay, title: string) {
 
 const liveCortex = new LlmCortex(new FetchLlmClient(""));
 const offlineCortex = new ScriptedCortex();
+// Free coach: the Llama 3.2 3B distilled from Muse Spark Teach (docs/FINETUNE.md), served by power mode's llama-server.
+const localCortex = new LocalCortex(NATIVE_URL);
+const COACH_LABEL: Record<CortexSource, string> = {
+  "muse-spark": "Muse Spark",
+  "muse-spark-open": "Muse Spark (open weights)",
+  "local-llama": "Llama coach (local, free)",
+  scripted: "offline coach",
+};
+// Who to ask, in order: the player's free-coach choice skips the cloud; the scripted coach always answers.
+function coachChain(): Cortex[] {
+  const localOk = native.ready();
+  if (localOk && $<HTMLInputElement>("freeCoach").checked) return [localCortex, offlineCortex];
+  return localOk ? [liveCortex, localCortex, offlineCortex] : [liveCortex, offlineCortex];
+}
 let lastProof: ProofReport | null = null;
 
 async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string, gated = false) {
@@ -293,9 +307,11 @@ async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string, ga
   setButtons();
   const status = $("coachStatus");
   const t0 = performance.now();
+  const chain = coachChain();
+  let coachName = chain[0] === localCortex ? "your local coach" : "Muse Spark";
   const tick = () => {
     const label = thinkingLabel(performance.now() - t0);
-    status.textContent = `${what}… Muse Spark is ${label}`;
+    status.textContent = `${what}… ${coachName} is ${label}`;
     say("pet", label, 1000);
   };
   tick();
@@ -304,14 +320,22 @@ async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string, ga
   let note = "";
   let res: CortexResult | null = null;
   try {
-    try {
-      res = await run(liveCortex);
-      $("coachSrc").textContent = res.source === "muse-spark" ? "Muse Spark" : "Muse Spark (open weights)";
-    } catch (e) {
-      // Budget refusal, network down, or a reply we could not validate: the scripted coach keeps the game going.
-      res = await run(offlineCortex);
-      $("coachSrc").textContent = "offline coach";
-      note = `Live coach unavailable (${e instanceof CortexUnavailable ? e.message : "offline"}); used the offline coach.`;
+    // Budget refusal, network down, or a reply we could not validate: the next coach in the chain takes over,
+    // ending with the scripted coach, which always answers.
+    const failed: string[] = [];
+    for (const c of chain) {
+      try {
+        res = await run(c);
+        break;
+      } catch (e) {
+        if (c === offlineCortex) throw e;
+        failed.push(`${c === localCortex ? "local coach" : "live coach"}: ${e instanceof CortexUnavailable ? e.message : "offline"}`);
+        if (c === liveCortex && chain.includes(localCortex)) coachName = "your local coach";
+      }
+    }
+    if (res) {
+      $("coachSrc").textContent = COACH_LABEL[res.source];
+      if (failed.length) note = `${failed.join("; ")}. Used the ${COACH_LABEL[res.source]}.`;
     }
   } catch (e) {
     note = `Coach failed (${(e as Error).message}). Memo unchanged.`;
@@ -333,7 +357,7 @@ async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string, ga
   state.memo = res.memo;
   save();
   renderMemo();
-  if (!note) status.textContent = `Memo updated by ${res.source}${res.dropped.length ? ` (${res.dropped.length} invalid parts dropped)` : ""}.`;
+  if (!note) status.textContent = `Memo updated by the ${COACH_LABEL[res.source]}${res.dropped.length ? ` (${res.dropped.length} invalid parts dropped)` : ""}.`;
   say("pet", "Got it!", 1400);
   showProof(before, res.memo);
 }
@@ -407,6 +431,7 @@ async function probeNative(quiet = false) {
   if (await native.probe()) {
     instinct.voice = native;
     $("brain").textContent = "Llama 3.2 3B (power mode)";
+    $("freeCoachRow").hidden = false;
     status.textContent = "Power mode: Llama 3.2 3B on this computer (llama.cpp). Faster and smarter than the in-browser model.";
   } else if (!quiet) {
     status.textContent = "No local llama.cpp server found on 127.0.0.1:8080. See the README for the one-line power-mode setup.";
