@@ -27,6 +27,7 @@ interface Save {
   shared?: string; // the memo rules last uploaded as a ghost, so the same pet is not re-shared every fight
   mine?: string[]; // ids of ghosts this browser uploaded, to label your own ghost when you meet it
   home: Slot[]; // decor on the pet's home plot
+  steps?: { fought?: boolean; proved?: boolean; boss?: boolean }; // first-steps guide progress
 }
 
 function load(): Save {
@@ -39,6 +40,9 @@ function load(): Save {
         home: parseHome(raw.home),
         ...(typeof raw.shared === "string" ? { shared: raw.shared } : {}),
         ...(Array.isArray(raw.mine) ? { mine: raw.mine.filter((x): x is string => typeof x === "string").slice(-20) } : {}),
+        ...(raw.steps && typeof raw.steps === "object"
+          ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true } }
+          : {}),
       };
     }
   } catch {
@@ -212,6 +216,8 @@ async function fight() {
   await arena.playEnd(replay.outcome);
   logLine(`<b>${OUTCOME[replay.outcome]}</b> <span class="dim">(${replay.how})</span>`);
   await banner(OUTCOME[replay.outcome]);
+  state.steps = { ...state.steps, fought: true, ...(boss && replay.outcome === "win" ? { boss: true } : {}) };
+  renderSteps();
   if (boss && replay.outcome !== "win") {
     logLine(`<span class="dim">Tip: it only reads your memo rules. Rules it counters cost it focus; when it runs out it looks calm, and a dazed boss is open to friendship (a chance, better after a couple of emotes). Teach your pet a plan for that.</span>`);
   }
@@ -399,6 +405,9 @@ async function coach(run: (c: Cortex) => Promise<CortexResult>, what: string, ga
 function showProof(before: Memo, after: Memo) {
   const report = prove(before.rules.length ? before : null, after);
   lastProof = report;
+  state.steps = { ...state.steps, proved: true };
+  save();
+  renderSteps();
   const h = report.heldout;
   $("proofBox").hidden = false;
   const d = h.winRateDelta;
@@ -429,6 +438,20 @@ async function watchProof() {
   await playReplay(s.after, `After: same fight`);
   busy = false;
   setButtons();
+}
+
+// First-steps guide for a new player: the next step is highlighted, finished ones get a check.
+function renderSteps() {
+  const steps: [string, boolean][] = [
+    ["Fight once", !!state.steps?.fought],
+    ["Teach a lesson", state.memo.rules.length > 0],
+    ["See the proof", !!state.steps?.proved],
+    ["Beat the boss", !!state.steps?.boss],
+  ];
+  const next = steps.findIndex(([, done]) => !done);
+  $("steps").innerHTML = steps
+    .map(([label, done], i) => `<li class="${done ? "done" : i === next ? "now" : ""}">${done ? "✓ " : `${i + 1}. `}${label}</li>`)
+    .join("");
 }
 
 function renderMemo() {
@@ -554,6 +577,7 @@ $("reset").onclick = () => {
   renderMemo();
   $("proofBox").hidden = true;
   lastProof = null;
+  renderSteps();
   setButtons();
 };
 $("watchProof").onclick = () => void watchProof();
@@ -563,6 +587,7 @@ $("probeNative").onclick = () => void probeNative();
 $("petName").textContent = pet.name;
 
 renderMemo();
+renderSteps();
 renderHome();
 setHp(pet.maxHp, null, null);
 setButtons();
