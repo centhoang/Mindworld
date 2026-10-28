@@ -18,9 +18,9 @@ import modal
 MODEL_NAME = "meta-models/Muse-Glimmer-30B"
 MODEL_REVISION = "cec94fcfd6512f2cfe708138c32533b346ea4f69"  # pinned so a repo update cannot change the model
 SERVED_NAME = "glimmer"
-# H100, H200 and A100-80GB are refused on a workspace without a payment method (checked 2026-10-28), so the
-# default is the 48 GB L40S, which needs the FP8 path. With a card: GPU="A100-80GB", QUANT=None serves BF16.
-GPU = os.environ.get("GLIMMER_GPU", "L40S")  # read at deploy time only
+# Modal refuses H200, H100, A100-80GB and L40S on a workspace without a payment method (checked 2026-10-28);
+# with a card on file the H100 below is allowed. FP8 halves the bytes read per token (decode is memory-bound).
+GPU = os.environ.get("GLIMMER_GPU", "H100")  # read at deploy time only
 QUANT = "fp8"  # None = BF16 as released (~60 GB). "fp8" = vLLM quantizes the same weights on load (~30 GB).
 MAX_MODEL_LEN = 16384  # the game prompts are a few thousand tokens at most
 MINUTES = 60

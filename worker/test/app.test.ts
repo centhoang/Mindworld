@@ -113,6 +113,15 @@ describe("POST /api/llm", () => {
     expect((await h.ledger.snapshot()).dailySpentUsd).toBe(0);
   });
 
+  it("accepts move requests for Modal in mock mode without calling upstream", async () => {
+    const h = harness({ cfg: { mock: true } });
+    const res = await h.call("/api/llm", postJson({ ...llmBody, kind: "move", provider: "modal", maxTokens: 600, effort: "low" }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ text: "attack: Hyaa!", provider: "modal", mock: true, costUsd: 0, truncated: false });
+    expect(h.upstream.calls).toHaveLength(0);
+    expect((await h.ledger.snapshot()).dailySpentUsd).toBe(0);
+  });
+
   it("refuses with a reflex fallback once the daily cap would be exceeded, without calling upstream", async () => {
     const h = harness({ limits: { dailyUsd: 0.001 } });
     h.upstream.respond = async () => basetenReply("never");

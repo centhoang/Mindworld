@@ -3,7 +3,7 @@ import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
 import { cycleSlot, DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, parseHome, type Slot } from "./game/home";
 import { Arena, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
-import { NativeVoice, WebLlmVoice } from "./game/voices";
+import { CloudVoice, NativeVoice, WebLlmVoice } from "./game/voices";
 import { Battle } from "./sim/battle";
 import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, ScriptedCortex, type Cortex, type CortexResult } from "./sim/cortex";
 import { ENEMIES, type EnemyDef } from "./sim/enemies";
@@ -413,6 +413,16 @@ async function probeNative(quiet = false) {
   }
 }
 
+async function probeCloud() {
+  const provider = (import.meta.env.VITE_CLOUD_PROVIDER ?? "modal") as "modal" | "glimmer";
+  const cloud = new CloudVoice({ provider, label: provider === "glimmer" ? "Muse Glimmer 30B (cloud)" : undefined });
+  // A manually selected WebLLM voice keeps precedence even while generating (not ready).
+  if (await cloud.probe() && instinct.voice !== web && (!instinct.voice || !instinct.voice.ready())) {
+    instinct.voice = cloud;
+    $("brain").textContent = cloud.label;
+  }
+}
+
 // ---------------- wiring ----------------
 
 function setButtons() {
@@ -453,3 +463,4 @@ renderHome();
 setHp(pet.maxHp, null, null);
 setButtons();
 void probeNative(true);
+void probeCloud();

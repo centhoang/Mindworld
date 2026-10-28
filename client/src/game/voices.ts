@@ -9,6 +9,76 @@ import { splitReply, type VoiceBackend, type VoicePrompt, type VoiceReply } from
 
 export const NATIVE_URL = "http://127.0.0.1:8080";
 
+export class CloudVoice implements VoiceBackend {
+  readonly timeoutMs = 4000;
+  readonly label: string;
+  private readonly baseUrl: string;
+  private readonly provider: "modal" | "glimmer";
+  private readonly fetchFn: typeof fetch;
+  private readonly now: () => number;
+  private ok = false;
+  private failures = 0;
+  private openUntil = 0;
+
+  constructor({ baseUrl = "", provider = "modal", label = "Muse Spark Open (cloud)", fetchFn = (...a) => fetch(...a), now = Date.now }: {
+    baseUrl?: string;
+    provider?: "modal" | "glimmer";
+    label?: string;
+    fetchFn?: typeof fetch;
+    now?: () => number;
+  } = {}) {
+    this.baseUrl = baseUrl;
+    this.provider = provider;
+    this.label = label;
+    this.fetchFn = fetchFn;
+    this.now = now;
+  }
+
+  async probe(): Promise<boolean> {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 2500);
+    try {
+      const res = await this.fetchFn(`${this.baseUrl}/api/health`, { signal: ctl.signal });
+      const body = await res.json() as { providers?: Record<string, unknown> } | null;
+      this.ok = !ctl.signal.aborted && res.ok && body?.providers?.[this.provider] === true;
+    } catch {
+      this.ok = false;
+    } finally {
+      clearTimeout(timer);
+    }
+    return this.ok;
+  }
+
+  ready(): boolean {
+    return this.ok && this.now() >= this.openUntil;
+  }
+
+  async pick(p: VoicePrompt, signal: AbortSignal): Promise<VoiceReply> {
+    try {
+      signal.throwIfAborted();
+      const res = await this.fetchFn(`${this.baseUrl}/api/llm`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        signal,
+        body: JSON.stringify({ kind: "move", provider: this.provider, system: p.system, prompt: p.user, maxTokens: 600, effort: "low" }),
+      });
+      if (!res.ok) throw new Error(`cloud HTTP ${res.status}`);
+      const body = await res.json() as { text?: string; truncated?: boolean };
+      signal.throwIfAborted();
+      if (body.truncated) throw new Error("truncated cloud reply");
+      if (typeof body.text !== "string" || !body.text.trim()) throw new Error("empty cloud reply");
+      const match = /^\s*(attack|guard|flee|emote|befriend)\s*:\s*(.*)$/im.exec(body.text);
+      if (!match) throw new Error("invalid cloud reply");
+      this.failures = 0;
+      this.openUntil = 0;
+      return { action: match[1]!.toLowerCase(), line: match[2]!.trim() };
+    } catch (e) {
+      if (++this.failures >= 2) this.openUntil = this.now() + 60_000;
+      throw e;
+    }
+  }
+}
+
 export class NativeVoice implements VoiceBackend {
   readonly label = "Llama 3.2 3B (native, power mode)";
   private ok = false;

@@ -1,7 +1,7 @@
 import { estimateInputTokens } from "./pricing";
 import type { Completion } from "./providers";
 
-export const LLM_KINDS = ["memo", "teach", "chat", "dialogue"] as const;
+export const LLM_KINDS = ["memo", "teach", "chat", "dialogue", "move"] as const;
 export type LlmKind = (typeof LLM_KINDS)[number];
 
 // Deterministic, free stand-in for the paid models (LLM_MOCK=1 and tests). It never learns anything:
@@ -10,7 +10,9 @@ export function mockCompletion(kind: LlmKind, system: string | undefined, prompt
   const text =
     kind === "memo" || kind === "teach"
       ? JSON.stringify({ summary: "[mock] no new lessons", rules: [] })
-      : "[mock] ...";
+      : kind === "move"
+        ? "attack: Hyaa!"
+        : "[mock] ...";
   return {
     text,
     truncated: false,

@@ -33,6 +33,7 @@ export interface VoiceReply {
 // A local-model backend (WebLLM in the tab, or a native llama.cpp server on this machine).
 export interface VoiceBackend {
   readonly label: string;
+  readonly timeoutMs?: number;
   ready(): boolean;
   pick(prompt: VoicePrompt, signal: AbortSignal): Promise<VoiceReply>;
 }
@@ -104,7 +105,7 @@ export class Instinct {
     });
     if (!this.voice || !this.voice.ready()) return fallback(this.voice ? "model loading" : undefined);
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), this.timeoutMs);
+    const timer = setTimeout(() => ctl.abort(), this.voice.timeoutMs ?? this.timeoutMs);
     try {
       const reply = await this.voice.pick(buildVoicePrompt(petName, memo, o, a), ctl.signal);
       const ok = parseVoice(reply, a.moves);

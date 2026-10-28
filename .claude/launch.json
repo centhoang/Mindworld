@@ -43,6 +43,23 @@
         "WRANGLER_SEND_METRICS": "false"
       },
       "port": 8799
+    },
+    {
+      "name": "worker-live",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "worker",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "8787"
+      ],
+      "env": {
+        "WRANGLER_SEND_METRICS": "false"
+      },
+      "port": 8787
     }
   ]
 }

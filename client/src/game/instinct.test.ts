@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Battle } from "../sim/battle";
 import { ScriptedCortex } from "../sim/cortex";
 import { EMPTY_MEMO } from "../sim/memo";
@@ -61,5 +61,25 @@ describe("Instinct", () => {
     const slow = fakeVoice((_, signal) => new Promise((_r, rej) => signal.addEventListener("abort", () => rej(new Error("aborted")))));
     expect(await new Instinct(slow, 20).decide("Mochi", EMPTY_MEMO, obs)).toMatchObject({ action: "attack", note: "model timeout" });
     expect(await new Instinct(null).decide("Mochi", EMPTY_MEMO, obs)).toMatchObject({ action: "attack", source: "reflex" });
+  });
+
+  it("uses the backend timeout before the Instinct default", async () => {
+    vi.useFakeTimers();
+    try {
+      const slow: VoiceBackend = {
+        ...fakeVoice((_, signal) => new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))))),
+        timeoutMs: 50,
+      };
+      const memo = (await new ScriptedCortex().teach(EMPTY_MEMO, "guard the heavy hits")).memo;
+      const pending = new Instinct(slow).decide("Mochi", memo, obs);
+      const settled = vi.fn();
+      void pending.then(settled);
+      await vi.advanceTimersByTimeAsync(49);
+      expect(settled).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await pending).toMatchObject({ action: "guard", source: "rule", note: "model timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
