@@ -13,6 +13,7 @@ import type { ReserveResult, SpendSnapshot, RejectReason } from "./ledger";
 import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
 import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
 import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
+import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
 
 export interface SpendClient {
   reserve(req: { id: string; provider: Provider; worstCaseUsd: number; clientKey: string }): Promise<ReserveResult>;
@@ -86,6 +87,7 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     }
     if (path === "/api/spend" && method === "GET") return json(await deps.spend.snapshot());
     if (path === "/api/llm" && method === "POST") return handleLlm(request, deps);
+    if (path === "/api/transcribe" && method === "POST") return handleTranscribe(request, deps);
     if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);
     if (path === "/api/ghosts/random" && method === "GET") return handleGhostGet(await randomGhost(deps.ghosts, deps.random));
     const ghostId = /^\/api\/ghosts\/([^/]+)$/.exec(path)?.[1];
@@ -206,6 +208,44 @@ async function handleLlm(request: Request, deps: Deps): Promise<Response> {
     costUsd,
     latencyMs: deps.now() - started,
   });
+}
+
+// ---------- voice teaching ----------
+
+async function handleTranscribe(request: Request, deps: Deps): Promise<Response> {
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared > MAX_WAV_BYTES) return fail(413, "too_large");
+  const wav = await request.arrayBuffer().catch(() => null);
+  if (!wav) return fail(400, "bad_body");
+  if (wav.byteLength > MAX_WAV_BYTES) return fail(413, "too_large");
+  const info = parseWav(wav);
+  if (typeof info === "string") return fail(400, "bad_audio", { message: info });
+  if (info.durationMs > MAX_CLIP_MS) return fail(400, "bad_audio", { message: `clip longer than ${MAX_CLIP_MS / 1000} s` });
+
+  const { cfg } = deps;
+  if (cfg.mock) return json({ transcript: "guard when it winds up a heavy hit", mock: true, costUsd: 0, audioDurationMs: info.durationMs });
+  if (!providerConfigured(cfg.providers, "meta")) return fail(503, "provider_unconfigured");
+
+  const worst = transcribeCostUsd(info.durationMs);
+  const id = deps.newId();
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  const reserved = await deps.spend.reserve({ id, provider: "meta", worstCaseUsd: worst, clientKey });
+  if (!reserved.ok) return fail(REJECT_STATUS[reserved.reason], reserved.reason === "rate_limit" ? "rate_limited" : "budget_exhausted", { reason: reserved.reason });
+
+  const started = deps.now();
+  try {
+    const r = await transcribeMeta(cfg.providers.meta, wav, deps.fetch);
+    const costUsd = Number.isNaN(r.audioDurationMs) ? worst : Math.min(worst, transcribeCostUsd(r.audioDurationMs));
+    await deps.spend.settle(id, costUsd);
+    return json({ transcript: r.transcript.trim().slice(0, 300), audioDurationMs: r.audioDurationMs, costUsd, latencyMs: deps.now() - started });
+  } catch (e) {
+    if (e instanceof UpstreamError) {
+      await deps.spend.release(id);
+      return fail(502, "upstream_error", { upstreamStatus: e.status });
+    }
+    await deps.spend.settle(id, worst); // may have been billed
+    return fail(502, "upstream_unreadable", { message: e instanceof UnreadableResponse ? e.message : "unexpected error" });
+  }
 }
 
 // ---------- ghosts ----------

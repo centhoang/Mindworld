@@ -26,6 +26,7 @@
       button, select, textarea { font: inherit; color: var(--text); background: #262d45; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
       button { cursor: pointer; }
       button.primary { background: var(--accent); color: #2a1a0c; border-color: var(--accent); font-weight: 600; }
+      button.recording { background: #c0392b; color: #fff; border-color: #c0392b; }
       button:disabled { opacity: 0.5; cursor: default; }
       textarea { width: 100%; resize: vertical; min-height: 56px; }
       .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -112,6 +113,7 @@
       <textarea id="teachText" maxlength="300" placeholder="e.g. When the big one winds up a heavy hit, guard. Make friends with hurt enemies."></textarea>
       <div class="row" style="margin-top:6px">
         <button id="teach" class="primary">Teach</button>
+        <button id="speak" title="Say the lesson out loud; Meta's Muse Voice Transcribe writes it down, then your pet is taught" hidden>Speak</button>
         <button id="reflect" title="The coach reviews your recent fights and updates the memo">Learn from my fights</button>
         <button id="reset" title="Forget everything">Reset</button>
       </div>
@@ -128,7 +130,7 @@
       </div>
     </section>
 
-    <footer>Your pet's decisions run on your device. Teaching text is sent to a Meta model through our server; free-tier content may be used by Meta, so don't type personal info.</footer>
+    <footer>Your pet's decisions run on your device. Teaching text (and your voice, if you press Speak) is sent to Meta models through our server; free-tier content may be used by Meta, so don't type or say personal info. The mic is only on while the Speak button says Stop.</footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

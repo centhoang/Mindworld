@@ -3,6 +3,7 @@ import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
 import { cycleSlot, DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, parseHome, type Slot } from "./game/home";
 import { Arena, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
+import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
 import { CloudVoice, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
 import { Battle } from "./sim/battle";
 import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult, type CortexSource } from "./sim/cortex";
@@ -453,7 +454,7 @@ async function probeCloud() {
 // ---------------- wiring ----------------
 
 function setButtons() {
-  for (const id of ["go", "teach", "reflect", "reset", "watchProof", "shareGhost"]) $<HTMLButtonElement>(id).disabled = busy;
+  for (const id of ["go", "teach", "speak", "reflect", "reset", "watchProof", "shareGhost"]) $<HTMLButtonElement>(id).disabled = busy;
   if (!busy && !lastProof?.showcase) $<HTMLButtonElement>("watchProof").disabled = true;
   if (!busy) $<HTMLButtonElement>("reflect").disabled = state.recent.length === 0;
   for (const b of $("homeSlots").querySelectorAll("button")) b.disabled = busy;
@@ -467,6 +468,44 @@ $("speed").onclick = () => {
 $("teach").onclick = () => {
   const text = $<HTMLTextAreaElement>("teachText").value.trim();
   if (text) void coach((c) => c.teach(state.memo, text), "Teaching");
+};
+
+// Voice teaching: Speak -> (speak) -> Stop -> transcript in the Teach box -> Teach as usual.
+const recorder = new VoiceRecorder();
+const speakBtn = $<HTMLButtonElement>("speak");
+speakBtn.hidden = !voiceInputSupported();
+async function stopAndTeach() {
+  if (!recorder.recording) return;
+  const status = $("coachStatus");
+  speakBtn.textContent = "Speak";
+  speakBtn.classList.remove("recording");
+  speakBtn.disabled = true;
+  status.textContent = "Writing down what you said (Muse Voice Transcribe)…";
+  try {
+    const { transcript } = await transcribe(await recorder.stop());
+    if (!transcript.trim()) {
+      status.textContent = "I didn't catch any words. Try again a little closer to the mic.";
+      return;
+    }
+    $<HTMLTextAreaElement>("teachText").value = transcript;
+    status.textContent = "";
+    void coach((c) => c.teach(state.memo, transcript), "Teaching");
+  } catch (e) {
+    status.textContent = `Could not transcribe (${(e as Error).message}). Type the lesson instead.`;
+  } finally {
+    speakBtn.disabled = busy;
+  }
+}
+speakBtn.onclick = async () => {
+  if (recorder.recording) return void stopAndTeach();
+  try {
+    await recorder.start(() => void stopAndTeach());
+    speakBtn.textContent = "Stop";
+    speakBtn.classList.add("recording");
+    $("coachStatus").textContent = "Listening… say your lesson, then press Stop.";
+  } catch (e) {
+    $("coachStatus").textContent = `Microphone unavailable (${(e as Error).message}). Type the lesson instead.`;
+  }
 };
 $("reflect").onclick = () => void coach((c) => c.reflect(state.memo, state.recent), "Reviewing your fights", true);
 $("reset").onclick = () => {
