@@ -80,7 +80,7 @@ export class Battle {
       enemyHpPct,
       enemy: this.def.id,
       size: sizeOf(this.def.size, this.pet.size),
-      intent: intentOf(this.enemyAct, this.def, enemyHpPct),
+      intent: this.def.tell?.() ?? intentOf(this.enemyAct, this.def, enemyHpPct),
       last: this.last,
     };
   }

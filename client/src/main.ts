@@ -1,7 +1,7 @@
 import { Instinct, type Choice } from "./game/instinct";
 import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
 import { cycleSlot, DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, parseHome, type Slot } from "./game/home";
-import { Arena, makeGhostPet } from "./game/scene";
+import { Arena, makeBossMesh, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
 import { CloudVoice, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
@@ -10,6 +10,7 @@ import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, LocalCortex
 import { ENEMIES, type EnemyDef } from "./sim/enemies";
 import { comparePaired, makeScenarios, pct } from "./sim/evaluate";
 import { ghostEnemyDef, ghostHue, PET_GENES, type Ghost } from "./sim/ghost";
+import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "./sim/boss";
 import { EMPTY_MEMO, validateMemo, type Memo } from "./sim/memo";
 import { baselinePolicy, memoPolicy } from "./sim/policy";
 import { HELDOUT_SEEDS, passesGate, prove, type ProofReport } from "./sim/proof";
@@ -153,15 +154,27 @@ async function fight() {
   let ghost: Ghost | null = null;
   let ghostOnline = false;
   if (pick === "ghost") ({ ghost, online: ghostOnline } = await fetchRandomGhost());
+  const boss: Boss | null = pick === "boss" ? makeBoss(state.memo, pet) : null;
   const enemy: ArchetypeId = ghost
     ? "bully"
+    : boss
+      ? BOSS_ARCHETYPE
     : pick === "random"
       ? ARCHETYPES[Math.floor(Math.random() * ARCHETYPES.length)]!
       : (pick as ArchetypeId);
-  const def: EnemyDef = ghost ? ghostEnemyDef(ghost, pet) : ENEMIES[enemy];
-  const opp: Opponent = ghost ? { label: `${ghost.name} (ghost)`, maxHp: def.maxHp } : archetypeOpp(enemy);
-  const battle = new Battle({ enemy, seed: Math.floor(Math.random() * 1e9), ...(ghost ? { enemyDef: def } : {}) });
-  arena.setEnemy(ghost ? makeGhostPet(ghostHue(ghost.genes)) : enemy);
+  const def: EnemyDef = ghost ? ghostEnemyDef(ghost, pet) : boss ? boss.def : ENEMIES[enemy];
+  const opp: Opponent = ghost
+    ? { label: `${ghost.name} (ghost)`, maxHp: def.maxHp }
+    : boss
+      ? { label: `${BOSS_STATS.label} (boss)`, maxHp: def.maxHp }
+      : archetypeOpp(enemy);
+  const battle = new Battle({
+    enemy,
+    seed: Math.floor(Math.random() * 1e9),
+    ...(ghost || boss ? { enemyDef: def } : {}),
+    ...(boss ? { maxTurns: BOSS_TURNS } : {}),
+  });
+  arena.setEnemy(ghost ? makeGhostPet(ghostHue(ghost.genes)) : boss ? makeBossMesh() : enemy);
   arena.setDecor(ghost ? ghost.decor : state.home); // a ghost fight happens on its owner's plot
   showGhostCard(ghost);
   log.innerHTML = "";
@@ -172,9 +185,14 @@ async function fight() {
         `${ghostOnline ? "" : " <span class=\"dim\">(offline: local ghost)</span>"}. ` +
         `<span class="dim">It follows ${ghost.seed ? "its" : "its owner's"} ${ghost.memo.rules.length} memo rules.</span>`,
     );
+  } else if (boss) {
+    logLine(
+      `<b>${pet.name}</b> vs <b>${BOSS_STATS.label}</b>. <span class="dim">It has read your ${state.memo.rules.length} memo rules: ` +
+        `when a rule would fire it fakes the tell and counters. It can read ${BOSS_FOCUS} times, then it needs a turn to recover.</span>`,
+    );
   } else logLine(`<b>${pet.name}</b> vs <b>${enemy}</b>`);
   setHp(pet.maxHp, opp, def.maxHp);
-  await banner(ghost ? `vs ${ghost.name}'s ghost` : `vs ${enemy}`, 900);
+  await banner(ghost ? `vs ${ghost.name}'s ghost` : boss ? `Boss: ${BOSS_STATS.label}` : `vs ${enemy}`, 900);
   while (!battle.done) {
     const obs = battle.observe();
     say("enemy", TELL[obs.intent]);
@@ -186,6 +204,7 @@ async function fight() {
       `T${obs.turn} <span class="dim">${obs.intent}</span> → <b>${choice.action}</b>${sourceTag(choice)} ` +
         `<span class="dim">${rec.dealt ? `hit ${rec.dealt}` : ""}${rec.taken ? ` took ${rec.taken}` : ""}</span>`,
     );
+    if (boss) logBossTurn(boss, obs.turn);
     await arena.playTurn(choice.action, rec.enemyAct, rec.dealt, rec.taken, outcome);
     setHp(rec.myHp, opp, rec.enemyHp);
   }
@@ -193,13 +212,27 @@ async function fight() {
   await arena.playEnd(replay.outcome);
   logLine(`<b>${OUTCOME[replay.outcome]}</b> <span class="dim">(${replay.how})</span>`);
   await banner(OUTCOME[replay.outcome]);
-  // Ghost fights are not archetype fights, so they stay out of what the coach reviews.
-  if (!ghost) state.recent = [...state.recent, replay].slice(-8);
+  if (boss && replay.outcome !== "win") {
+    logLine(`<span class="dim">Tip: it only reads your memo rules. Rules it counters cost it focus; when it runs out it looks calm, and a dazed boss is open to friendship. Teach your pet a plan for that.</span>`);
+  }
+  // Ghost and boss fights are not archetype fights, so they stay out of what the coach reviews.
+  if (!ghost && !boss) state.recent = [...state.recent, replay].slice(-8);
   save();
   busy = false;
   setButtons();
   // After a win with a coached memo the pet joins the ghost pool (once per memo version).
-  if (!ghost && replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== memoKey()) void share(true);
+  if (!ghost && !boss && replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== memoKey()) void share(true);
+}
+
+function logBossTurn(boss: Boss, turn: number) {
+  const read = boss.reads.find((r) => r.turn === turn);
+  if (read) {
+    const rule = describeMemo(state.memo)[read.rule] ?? "";
+    logLine(
+      `<span class="tag boss" title="${esc(rule)}">read memo #${read.rule + 1}</span> ` +
+        `<span class="dim">${read.did === "idle" ? "it faked the tell and held back" : read.feint === "heavy" ? "it knew your answer and hit hard anyway" : `it looked "${read.feint}" but did a heavy hit`}</span>`,
+    );
+  } else if (boss.dazedTurns.includes(turn)) logLine(`<span class="tag boss">dazed</span> <span class="dim">out of focus: it could not read this turn</span>`);
 }
 
 // ---------------- ghosts (share + fight other players' pets) ----------------

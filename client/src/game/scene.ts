@@ -173,6 +173,24 @@ export function makeEnemy(id: ArchetypeId): THREE.Group {
   return g;
 }
 
+// The boss: a big dark bully with a third eye, the one that reads the memo.
+export function makeBossMesh(): THREE.Group {
+  const g = makeEnemy("bully");
+  g.traverse((o) => {
+    if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshStandardMaterial && o.material.color.getHex() === 0xf79646) {
+      o.material = o.material.clone();
+      o.material.color.setHex(0x6a3d9a);
+    }
+  });
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffe066, emissive: 0xffc000, emissiveIntensity: 0.8 }));
+  eye.position.set(0, 0.95, 0.42);
+  g.add(eye);
+  g.scale.setScalar(1.35); // on an inner group: the arena's tweens set the outer scale
+  const outer = new THREE.Group();
+  outer.add(g);
+  return outer;
+}
+
 interface Tween {
   t0: number;
   dur: number;

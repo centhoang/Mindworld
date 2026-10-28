@@ -36,7 +36,7 @@
       #log { font-size: 12px; max-height: 210px; overflow: auto; border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
       #log div { padding: 2px 0; border-bottom: 1px dashed #2b3350; }
       .tag { font-size: 10px; padding: 0 5px; border-radius: 4px; margin-left: 4px; }
-      .tag.rule { background: #5b4a1f; color: #ffd27a; } .tag.model { background: #1f3f5b; color: var(--blue); } .tag.reflex { background: #333; color: var(--dim); }
+      .tag.rule { background: #5b4a1f; color: #ffd27a; } .tag.model { background: #1f3f5b; color: var(--blue); } .tag.reflex { background: #333; color: var(--dim); } .tag.boss { background: #4a1f5b; color: #e0a8ff; }
       .dim { color: var(--dim); font-size: 12px; }
       .slots { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 4px 0; }
       .slots button { padding: 4px 0; font-size: 16px; min-height: 32px; }
@@ -84,6 +84,7 @@
           <option value="pal">Pal (friendly)</option>
           <option value="bully">Bully (picks on the weak)</option>
           <option value="ghost">Another player's ghost</option>
+          <option value="boss">Boss: The Reader (reads your memo)</option>
         </select>
         <button id="go" class="primary">Fight!</button>
         <button id="speed" title="Playback speed">1x</button>

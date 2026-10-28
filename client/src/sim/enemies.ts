@@ -1,5 +1,5 @@
 import { roll } from "./rng";
-import type { Action, ArchetypeId, EnemyAct } from "./types";
+import type { Action, ArchetypeId, EnemyAct, Intent } from "./types";
 
 export interface EnemyDef {
   id: ArchetypeId;
@@ -10,6 +10,7 @@ export interface EnemyDef {
   size: number;
   befriendBase: number; // chance for befriend with no calm and a healthy enemy
   act(ctx: EnemyCtx): EnemyAct;
+  tell?(): Intent | undefined; // what the pet sees this turn when it differs from the real act (a feint)
 }
 
 export interface EnemyCtx {
