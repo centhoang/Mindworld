@@ -20,7 +20,7 @@ export function memoryStorage(delayMs = 0): LedgerStorage & { data: Map<string, 
 
 export const LIMITS: LedgerLimits = {
   dailyUsd: 1,
-  totalUsd: { baseten: 10, meta: 10 },
+  totalUsd: { baseten: 10, meta: 10, modal: 10, glimmer: 10 },
   clientDailyUsd: 1,
   clientPerMinute: 100,
   reservationTtlMs: 60_000,
@@ -45,6 +45,8 @@ export const CFG: AppConfig = {
   providers: {
     baseten: { apiKey: "test-baseten-key", baseUrl: "https://baseten.test/v1", model: "meta-models/muse-spark-open-1026" },
     meta: { apiKey: "test-meta-key", model: "muse-spark-1.3" },
+    modal: { apiKey: "wk-test.ws-test", baseUrl: "https://modal.test/v1", model: "meta-models/Muse-Spark-Open" },
+    glimmer: { apiKey: "wk-test.ws-test", baseUrl: "https://glimmer.test", model: "glimmer" },
   },
 };
 

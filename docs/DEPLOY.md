@@ -13,7 +13,7 @@ npm test             # unit tests (no network)
 Client dev with hot reload: `cd client && npm run dev` (proxies /api to :8787). Spike B page: `/spike-b.html` (served as `/spike-b` by the Worker).
 
 ## First deploy (needs `wrangler login`; the user's Cloudflare account)
-1. `cd worker && npx wrangler secret put BASETEN_API_KEY` and `... META_API_KEY` (paste from `.env`; never commit).
+1. `cd worker && npx wrangler secret put BASETEN_API_KEY` and `... META_API_KEY` (paste from `.env`; never commit). Same for `MODAL_PROXY_TOKEN` and `MODAL_BASE_URL` (the Modal Spark Open provider stays disabled until both are set).
 2. `npx wrangler deploy` (provisions the `GHOSTS` KV and the `SpendCounter` Durable Object automatically).
 3. Add the custom domain `pets.uryto.dev` to the Worker (dashboard: Workers > pet-mind > Settings > Domains) or a `routes` entry with `custom_domain = true` in `wrangler.toml`. That is the only DNS-touching step.
 4. Optional second layer: a Cloudflare WAF custom rule blocking the restricted countries on the zone (the Worker already returns 451).

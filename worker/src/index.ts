@@ -23,6 +23,16 @@ function buildDeps(env: Env): Deps {
         model: env.BASETEN_MODEL ?? "meta-models/muse-spark-open-1026",
       },
       meta: { apiKey: env.META_API_KEY, model: env.META_MODEL ?? "muse-spark-1.3" },
+      modal: {
+        apiKey: env.MODAL_PROXY_TOKEN,
+        baseUrl: env.MODAL_BASE_URL ?? "",
+        model: env.MODAL_MODEL ?? "meta-models/Muse-Spark-Open-816B-A42B",
+      },
+      glimmer: {
+        apiKey: env.MODAL_PROXY_TOKEN,
+        baseUrl: env.MODAL_GLIMMER_URL ?? "",
+        model: env.MODAL_GLIMMER_MODEL ?? "glimmer",
+      },
     },
   };
   return {

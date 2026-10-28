@@ -3,6 +3,8 @@ import type { Provider, Usage } from "./pricing";
 export interface ProviderConfig {
   baseten: { apiKey?: string; baseUrl: string; model: string };
   meta: { apiKey?: string; model: string };
+  modal: { apiKey?: string; baseUrl: string; model: string };
+  glimmer: { apiKey?: string; baseUrl: string; model: string };
 }
 
 export interface Completion {
@@ -73,13 +75,13 @@ function readUsage(raw: unknown, inKey: string, outKey: string, detailsKey: stri
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 const int = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
 
-export async function completeBaseten(cfg: ProviderConfig["baseten"], req: CompletionRequest, fetchFn: FetchFn): Promise<Completion> {
+async function openAiChat(cfg: ProviderConfig["baseten"], url: string, req: CompletionRequest, fetchFn: FetchFn): Promise<Completion> {
   const messages = [
     ...(req.system ? [{ role: "system", content: req.system }] : []),
     { role: "user", content: req.prompt },
   ];
   const json = obj(
-    await postJson(fetchFn, `${cfg.baseUrl}/chat/completions`, cfg.apiKey ?? "", {
+    await postJson(fetchFn, url, cfg.apiKey ?? "", {
       model: cfg.model,
       messages,
       max_tokens: req.maxTokens,
@@ -94,6 +96,25 @@ export async function completeBaseten(cfg: ProviderConfig["baseten"], req: Compl
     model: typeof json.model === "string" ? json.model : cfg.model,
     usage: readUsage(json.usage, "prompt_tokens", "completion_tokens", "prompt_tokens_details"),
   };
+}
+
+export function completeBaseten(cfg: ProviderConfig["baseten"], req: CompletionRequest, fetchFn: FetchFn): Promise<Completion> {
+  return openAiChat(cfg, `${cfg.baseUrl}/chat/completions`, req, fetchFn);
+}
+
+function modalChatUrl(baseUrl: string): string {
+  const url = baseUrl.replace(/\/+$/, "");
+  return `${url.endsWith("/v1") ? url : `${url}/v1`}/chat/completions`;
+}
+
+export function completeModal(cfg: ProviderConfig["modal"], req: CompletionRequest, fetchFn: FetchFn): Promise<Completion> {
+  return openAiChat(cfg, modalChatUrl(cfg.baseUrl), req, fetchFn);
+}
+
+export function completeGlimmer(cfg: ProviderConfig["glimmer"], req: CompletionRequest, fetchFn: FetchFn): Promise<Completion> {
+  const { effort, ...chatReq } = req;
+  if (effort) chatReq.system = `Reasoning strength: ${effort}${req.system ? `\n${req.system}` : ""}`;
+  return openAiChat(cfg, modalChatUrl(cfg.baseUrl), chatReq, fetchFn);
 }
 
 export async function completeMeta(cfg: ProviderConfig["meta"], req: CompletionRequest, fetchFn: FetchFn): Promise<Completion> {
@@ -135,5 +156,10 @@ export function complete(
   req: CompletionRequest,
   fetchFn: FetchFn,
 ): Promise<Completion> {
-  return provider === "baseten" ? completeBaseten(cfg.baseten, req, fetchFn) : completeMeta(cfg.meta, req, fetchFn);
+  switch (provider) {
+    case "baseten": return completeBaseten(cfg.baseten, req, fetchFn);
+    case "meta": return completeMeta(cfg.meta, req, fetchFn);
+    case "modal": return completeModal(cfg.modal, req, fetchFn);
+    case "glimmer": return completeGlimmer(cfg.glimmer, req, fetchFn);
+  }
 }

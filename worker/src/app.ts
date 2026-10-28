@@ -55,6 +55,11 @@ const json = (data: unknown, status = 200): Response =>
 const fail = (status: number, error: string, extra: Record<string, unknown> = {}): Response =>
   json({ error, ...extra }, status);
 
+function providerConfigured(providers: ProviderConfig, provider: Provider): boolean {
+  return !!providers[provider].apiKey &&
+    (provider !== "modal" && provider !== "glimmer" || !!providers[provider].baseUrl);
+}
+
 export async function handleRequest(request: Request, deps: Deps): Promise<Response> {
   if (isRestricted(geoOf(request))) {
     return fail(451, "region_restricted", {
@@ -69,7 +74,15 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
   if (path.startsWith("/api/")) {
     if (path === "/api/health" && method === "GET") {
       const { providers, mock } = deps.cfg;
-      return json({ ok: true, mock, providers: { baseten: !!providers.baseten.apiKey, meta: !!providers.meta.apiKey } });
+      return json({
+        ok: true, mock,
+        providers: {
+          baseten: providerConfigured(providers, "baseten"),
+          meta: providerConfigured(providers, "meta"),
+          modal: providerConfigured(providers, "modal"),
+          glimmer: providerConfigured(providers, "glimmer"),
+        },
+      });
     }
     if (path === "/api/spend" && method === "GET") return json(await deps.spend.snapshot());
     if (path === "/api/llm" && method === "POST") return handleLlm(request, deps);
@@ -149,9 +162,10 @@ async function handleLlm(request: Request, deps: Deps): Promise<Response> {
   if (typeof req === "string") return fail(400, "bad_request", { message: req });
 
   const { cfg } = deps;
-  if (!cfg.mock && !cfg.providers[req.provider].apiKey) return fail(503, "provider_unconfigured", { fallback: "reflex" });
+  if (!cfg.mock && !providerConfigured(cfg.providers, req.provider)) return fail(503, "provider_unconfigured", { fallback: "reflex" });
 
-  const worst = worstCaseCostUsd(req.provider, estimateInputTokens((req.system ?? "") + req.prompt), req.maxTokens);
+  const reasoningLine = req.provider === "glimmer" && req.effort ? `Reasoning strength: ${req.effort}\n` : "";
+  const worst = worstCaseCostUsd(req.provider, estimateInputTokens(reasoningLine + (req.system ?? "") + req.prompt), req.maxTokens);
   const id = deps.newId();
   const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
   // Mock calls cost nothing but still pass through the ledger so rate limits behave the same.

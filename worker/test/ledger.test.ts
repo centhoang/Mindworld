@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { SpendLedger } from "../src/ledger";
+import type { Provider } from "../src/pricing";
 import { LIMITS, memoryStorage } from "./helpers";
 
 const T0 = Date.parse("2026-10-28T12:00:00Z");
-const req = (id: string, usd: number, over: Partial<{ provider: "baseten" | "meta"; clientKey: string }> = {}) => ({
+const req = (id: string, usd: number, over: Partial<{ provider: Provider; clientKey: string }> = {}) => ({
   id,
   provider: over.provider ?? ("baseten" as const),
   clientKey: over.clientKey ?? "c1",
@@ -11,6 +12,23 @@ const req = (id: string, usd: number, over: Partial<{ provider: "baseten" | "met
 });
 
 describe("SpendLedger", () => {
+  it.each(["modal", "glimmer"] as const)("enforces %s caps after restoring a pre-Modal ledger", async (provider) => {
+    const storage = memoryStorage();
+    const first = new SpendLedger(storage, LIMITS, () => T0);
+    await first.reserve(req("old", 0.1));
+    await first.settle("old", 0.1);
+    const saved = storage.data.get("ledger") as { totalSpent: Record<string, number> };
+    delete saved.totalSpent.modal;
+    delete saved.totalSpent.glimmer;
+    const second = new SpendLedger(storage, { ...LIMITS, totalUsd: { ...LIMITS.totalUsd, [provider]: 0.5 } }, () => T0);
+    expect((await second.snapshot()).totalSpentUsd).toEqual({ baseten: 0.1, meta: 0, modal: 0, glimmer: 0 });
+    expect(await second.reserve(req("new", 0.4, { provider }))).toEqual({ ok: true });
+    expect(await second.reserve(req("over", 0.2, { provider }))).toEqual({ ok: false, reason: "total_cap" });
+    await second.settle("new", 0.4);
+    expect((await second.snapshot()).totalSpentUsd[provider]).toBe(0.4);
+    expect(await second.reserve(req("over-again", 0.2, { provider }))).toEqual({ ok: false, reason: "total_cap" });
+  });
+
   it("reserves up to the daily cap and refuses beyond it", async () => {
     const l = new SpendLedger(memoryStorage(), LIMITS, () => T0);
     expect((await l.reserve(req("a", 0.6, { clientKey: "x" }))).ok).toBe(true);
@@ -64,7 +82,7 @@ describe("SpendLedger", () => {
   it("tracks per-provider total budgets separately", async () => {
     const l = new SpendLedger(
       memoryStorage(),
-      { ...LIMITS, dailyUsd: 100, clientDailyUsd: 100, totalUsd: { baseten: 0.5, meta: 5 } },
+      { ...LIMITS, dailyUsd: 100, clientDailyUsd: 100, totalUsd: { ...LIMITS.totalUsd, baseten: 0.5, meta: 5 } },
       () => T0,
     );
     expect((await l.reserve(req("a", 0.4, { provider: "baseten" }))).ok).toBe(true);

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { geoOf, isRestricted } from "../src/geo";
 import { actualCostUsd, estimateInputTokens, worstCaseCostUsd } from "../src/pricing";
-import { basetenReply, harness, metaReply, postJson } from "./helpers";
+import { basetenReply, CFG, harness, metaReply, postJson } from "./helpers";
 
 const llmBody = { kind: "memo", system: "be brief", prompt: "summarize the fight", maxTokens: 400 };
 
@@ -103,7 +103,7 @@ describe("POST /api/llm", () => {
   });
 
   it("mock mode never calls upstream, costs nothing and needs no keys", async () => {
-    const h = harness({ cfg: { mock: true, providers: { baseten: { baseUrl: "x", model: "m" }, meta: { model: "m" } } } });
+    const h = harness({ cfg: { mock: true, providers: { baseten: { baseUrl: "x", model: "m" }, meta: { model: "m" }, modal: { baseUrl: "", model: "m" }, glimmer: { baseUrl: "", model: "m" } } } });
     const res = await h.call("/api/llm", postJson(llmBody));
     expect(res.status).toBe(200);
     const out = (await res.json()) as { mock: boolean; costUsd: number; text: string };
@@ -218,7 +218,7 @@ describe("POST /api/llm", () => {
   });
 
   it("returns 503 when the chosen provider has no key", async () => {
-    const h = harness({ cfg: { providers: { baseten: { baseUrl: "x", model: "m" }, meta: { model: "m" } } } });
+    const h = harness({ cfg: { providers: { ...CFG.providers, baseten: { baseUrl: "x", model: "m" }, meta: { model: "m" } } } });
     const res = await h.call("/api/llm", postJson(llmBody));
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ error: "provider_unconfigured" });

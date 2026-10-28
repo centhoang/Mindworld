@@ -74,7 +74,7 @@ function freshState(now: number): LedgerState {
   return {
     day: dayOf(now),
     dailySpent: 0,
-    totalSpent: { baseten: 0, meta: 0 },
+    totalSpent: { baseten: 0, meta: 0, modal: 0, glimmer: 0 },
     overrun: 0,
     reservations: {},
     clients: {},
@@ -162,7 +162,12 @@ export class SpendLedger {
       dailySpentUsd: round6(s.dailySpent),
       dailyReservedUsd: round6(reserved),
       dailyCapUsd: this.limits.dailyUsd,
-      totalSpentUsd: { baseten: round6(s.totalSpent.baseten), meta: round6(s.totalSpent.meta) },
+      totalSpentUsd: {
+        baseten: round6(s.totalSpent.baseten),
+        meta: round6(s.totalSpent.meta),
+        modal: round6(s.totalSpent.modal),
+        glimmer: round6(s.totalSpent.glimmer),
+      },
       totalCapUsd: this.limits.totalUsd,
       inflight: Object.keys(s.reservations).length,
       overrunUsd: round6(s.overrun),
@@ -173,6 +178,9 @@ export class SpendLedger {
     if (this.state) return Promise.resolve(this.state);
     this.loading ??= this.storage.get<LedgerState>(STATE_KEY).then((saved) => {
       this.state = saved ?? freshState(this.now());
+      // Ledgers saved before Modal support have only Baseten and Meta balances.
+      this.state.totalSpent.modal ??= 0;
+      this.state.totalSpent.glimmer ??= 0;
       return this.state;
     });
     return this.loading;
