@@ -1,7 +1,9 @@
 import type { SpendCounter } from "./spend-do";
+import type { WorldRoom } from "./room-do";
 
 export interface Env {
   SPEND: DurableObjectNamespace<SpendCounter>;
+  ROOM: DurableObjectNamespace<WorldRoom>;
   GHOSTS: KVNamespace;
   ASSETS: Fetcher;
   // secrets (never exposed to the client)

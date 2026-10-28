@@ -1,8 +1,9 @@
 import { handleRequest, type AppConfig, type Deps } from "./app";
 import type { Env } from "./env";
+import { WorldRoom } from "./room-do";
 import { SpendCounter } from "./spend-do";
 
-export { SpendCounter };
+export { SpendCounter, WorldRoom };
 
 const flag = (v: string | undefined) => v === "1" || v === "true";
 
@@ -39,6 +40,7 @@ function buildDeps(env: Env): Deps {
     cfg,
     spend: env.SPEND.get(env.SPEND.idFromName("global")),
     ghosts: env.GHOSTS,
+    room: env.ROOM.get(env.ROOM.idFromName("main")),
     assets: env.ASSETS,
     fetch: (input, init) => fetch(input, init),
     newId: () => crypto.randomUUID(),

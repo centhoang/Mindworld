@@ -4,7 +4,11 @@ import { DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOT
 import { nextChatter, pickLine, speakerFor, voiceFor, type Speaker } from "./game/chatter";
 import { addCoins, buy, coinsFor, parseCoins, parseOwned, PRICES, SHOP_ITEMS } from "./game/shop";
 import { cycle, fromHome, itemAt, ownedItems, parseDecor, plotSlot, plotSlots, porchSlot, porchSlots, PORCH_SLOTS, type Placement, type SlotId } from "./game/decor";
-import { Arena, makeBossMesh, makeGhostPet } from "./game/scene";
+import { Arena, dressPet, makeBossMesh, makeGhostPet } from "./game/scene";
+import { castAll } from "./game/style";
+import { EMOTE_ICON, EMOTES, LiveLink, liveName, roomUrl, type Emote } from "./world/live";
+import { askNpc, chatWhoFor, type ChatWho } from "./game/npc-chat";
+import { newSeed, parseGenes, randomGenes } from "./game/genes";
 import { thinkingLabel } from "./game/thinking";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
 import { CloudVoice, localAccessState, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
@@ -12,7 +16,7 @@ import { Battle } from "./sim/battle";
 import { CortexUnavailable, describeMemo, FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult, type CortexSource } from "./sim/cortex";
 import { ENEMIES, type EnemyDef } from "./sim/enemies";
 import { comparePaired, makeScenarios, pct } from "./sim/evaluate";
-import { ghostEnemyDef, ghostHue, LOCAL_SEED_GHOSTS, PET_GENES, type Ghost } from "./sim/ghost";
+import { ghostEnemyDef, LOCAL_SEED_GHOSTS, type Genes, type Ghost } from "./sim/ghost";
 import { generateWorld } from "./world/layout";
 import { WorldView, type Entity } from "./world/view";
 import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "./sim/boss";
@@ -39,6 +43,7 @@ interface Save {
   muted?: boolean; // in-world voice off
   steps?: { fought?: boolean; proved?: boolean; boss?: boolean }; // first-steps guide progress
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
+  genes: Genes; // the pet's looks, rolled at hatch (older saves get one on first load)
 }
 
 function load(): Save {
@@ -47,6 +52,7 @@ function load(): Save {
     if (raw) {
       return {
         memo: validateMemo(raw.memo).memo,
+        genes: parseGenes(raw.genes) ?? randomGenes(newSeed()),
         recent: Array.isArray(raw.recent) ? raw.recent.slice(-8) : [],
         ...(() => {
           const decor = Array.isArray(raw.decor) ? parseDecor(raw.decor) : fromHome(raw.home);
@@ -68,7 +74,7 @@ function load(): Save {
   } catch {
     /* private mode or corrupt save: start fresh */
   }
-  return { memo: EMPTY_MEMO, recent: [], home: emptyHome(), decor: [] };
+  return { memo: EMPTY_MEMO, genes: randomGenes(newSeed()), recent: [], home: emptyHome(), decor: [] };
 }
 
 const state = load();
@@ -95,6 +101,67 @@ function buildWorld(corners: readonly Ghost[]) {
 buildWorld(LOCAL_SEED_GHOSTS);
 arena.mode = "world";
 arena.resize();
+// The pet hatched with random genes: dress both views in its looks (and keep the roll in the save).
+function dressMyPet() {
+  for (const g of [arena.pet, world.pet]) {
+    dressPet(g, state.genes);
+    castAll(g);
+  }
+}
+dressMyPet();
+save();
+// ---------------- live layer: other online players walk around in our world ----------------
+
+const live = new LiveLink(
+  roomUrl(location),
+  () => ({ name: liveName(state.genes), genes: state.genes, ...world.me }),
+  {
+    welcome: (_id, _corner, peers) => {
+      world.clearPeers();
+      for (const p of peers) world.addPeer(p);
+      liveCountChanged();
+    },
+    join: (p) => {
+      world.addPeer(p);
+      liveCountChanged();
+    },
+    leave: (id) => {
+      world.removePeer(id);
+      liveCountChanged();
+    },
+    pos: (id, x, z, px, pz) => world.movePeer(id, { x, z, px, pz }),
+    emote: (id, e) => world.showEmote(id, EMOTE_ICON[e]),
+    status: (s) => {
+      if (s !== "online") world.clearPeers(); // offline or full: the ghosts keep the world company
+      $("emotes").hidden = s !== "online";
+      liveCountChanged();
+    },
+  },
+);
+function liveCountChanged() {
+  $("liveChip").hidden = live.status !== "online";
+  $("liveCount").textContent = String(world.liveCount);
+}
+function sendEmote(e: Emote) {
+  if (live.emote(e)) world.showEmote(null, EMOTE_ICON[e]);
+}
+for (const b of document.querySelectorAll<HTMLButtonElement>("#emotes [data-emote]")) {
+  b.addEventListener("click", () => sendEmote(b.dataset.emote as Emote));
+}
+window.addEventListener("keydown", (ev) => {
+  const el = document.activeElement;
+  if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) return;
+  const i = ["1", "2", "3", "4"].indexOf(ev.key);
+  if (i >= 0 && live.status === "online") sendEmote(EMOTES[i]!);
+});
+if (import.meta.env.VITE_LIVE !== "0") {
+  live.connect();
+  setInterval(() => {
+    if (arena.mode === "world") live.tick(performance.now(), world.me);
+  }, 50);
+}
+
+if (import.meta.env.DEV) Object.assign(window, { __live: live, __hatch: (seed: number) => ((state.genes = randomGenes(seed)), dressMyPet(), state.genes) });
 if (import.meta.env.DEV) Object.assign(window, { __world: world, __arena: arena }); // for browser checks in dev only
 
 // Other players' pets move into the corner plots when the server has some (the built-in ghosts otherwise).
@@ -118,7 +185,49 @@ world.onNear = (e) => {
   const who = e ? speakerFor(e.kind, e.archetype) : null;
   if (who && !busy) chatter(who, "enemy", 1800);
   if (e) hint.innerHTML = `<b>E</b> or click: ${VERB[e.kind]} <b>${esc(e.label)}</b>`;
+  showChatBar(e);
 };
+
+// ---------------- talk to the elder and wild pets (Muse Spark via the Worker, capped) ----------------
+
+const chatBar = $<HTMLFormElement>("chatBar");
+const chatInput = $<HTMLInputElement>("chatInput");
+let chatWith: { who: ChatWho; label: string } | null = null;
+let chatPending = false;
+let chatQuietUntil = 0; // ambient chatter waits while a chat reply is on screen
+function showChatBar(e: Entity | null) {
+  const who = e && !busy ? chatWhoFor(e.kind, e.archetype) : null;
+  if (who && chatWith?.who === who && !chatBar.hidden) return;
+  chatWith = who && e ? { who, label: e.label } : null;
+  chatBar.hidden = !chatWith;
+  if (chatWith) chatInput.placeholder = `Say something to ${chatWith.label}...`;
+  else if (document.activeElement === chatInput) chatInput.blur();
+}
+async function talk(line: string) {
+  if (!chatWith || chatPending) return;
+  const { who } = chatWith;
+  const speaker: Speaker = who;
+  chatPending = true;
+  if (line) say("pet", line, 2400);
+  say("enemy", "...", 20_000);
+  try {
+    const r = await askNpc(who, line);
+    if (chatWith?.who !== who) return; // walked away
+    const ms = Math.min(9000, 2500 + r.text.length * 60);
+    chatQuietUntil = Date.now() + ms + 1500;
+    say("enemy", r.text, ms);
+    lastLine[speaker] = r.text;
+    speak(r.text, speaker);
+  } finally {
+    chatPending = false;
+  }
+}
+chatBar.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const line = chatInput.value.trim();
+  chatInput.value = "";
+  void talk(line);
+});
 
 const ELDER_TIPS = [
   "Teach your pet in plain words, or press Speak and say it.",
@@ -135,7 +244,12 @@ world.onInteract = (e) => {
     case "boss": return void fight({ pick: "boss" });
     case "ghost": return void fight({ pick: "ghost", ghost: e.ghost! });
     case "arena": return void fight({ pick: "ghost" });
-    case "npc": return say("enemy", ELDER_TIPS[tip++ % ELDER_TIPS.length]!, 3200);
+    case "npc":
+      if (chatWith) {
+        chatInput.focus();
+        return void talk(""); // the elder greets you (Muse Spark), then you can ask anything
+      }
+      return say("enemy", ELDER_TIPS[tip++ % ELDER_TIPS.length]!, 3200);
     case "market": return openShop();
     case "porch": return world.setChill(true);
     case "decorate": return openDecorate();
@@ -180,7 +294,7 @@ function nearSpeaker(): Speaker | null {
 }
 // Ambient: every few seconds the creature you stand next to, or else your pet, says something.
 function ambient() {
-  if (arena.mode === "world" && !busy && !document.hidden) {
+  if (arena.mode === "world" && !busy && !document.hidden && !chatPending && Date.now() > chatQuietUntil) {
     const who = nearSpeaker();
     if (who) chatter(who, "enemy");
     else if (!world.isChilling || Math.random() < 0.5) chatter("pet", "pet");
@@ -372,7 +486,7 @@ async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {
     ...(boss ? { maxTurns: BOSS_TURNS } : {}),
   });
   arena.mode = "battle";
-  arena.setEnemy(ghost ? makeGhostPet(ghostHue(ghost.genes)) : boss ? makeBossMesh() : enemy);
+  arena.setEnemy(ghost ? makeGhostPet(ghost.genes) : boss ? makeBossMesh() : enemy);
   arena.setDecor(ghost ? ghost.decor : state.home); // a ghost fight happens on its owner's plot
   showGhostCard(ghost);
   log.innerHTML = "";
@@ -503,7 +617,7 @@ async function share(auto = false) {
   }
   $<HTMLButtonElement>("shareGhost").disabled = true;
   status.textContent = auto ? "Sharing your pet as a ghost…" : "Sharing…";
-  const res = await shareGhost(pet.name, PET_GENES, state.memo, state.home);
+  const res = await shareGhost(pet.name, state.genes, state.memo, state.home);
   if (res.ok) {
     state.shared = memoKey();
     state.mine = [...(state.mine ?? []), res.id].slice(-20);
@@ -733,6 +847,7 @@ async function probeCloud() {
 // ---------------- wiring ----------------
 
 function setButtons() {
+  if (busy && !chatBar.hidden) showChatBar(null);
   for (const id of ["go", "teach", "speak", "reflect", "reset", "watchProof", "shareGhost"]) $<HTMLButtonElement>(id).disabled = busy;
   if (!busy && !lastProof?.showcase) $<HTMLButtonElement>("watchProof").disabled = true;
   if (!busy) $<HTMLButtonElement>("reflect").disabled = state.recent.length === 0;

@@ -2,7 +2,9 @@ import * as THREE from "three";
 import { makeBossMesh, makeDecor, makeEnemy, makeGhostPet, makePet } from "../game/scene";
 import { HOME_SLOTS, slotPosition, type Slot } from "../game/home";
 import { addLights, castAll, Clouds, labelSprite, makeIsland, mergeStatic, Motes, PAL, skyTexture, toon } from "../game/style";
-import { ghostHue, type Ghost } from "../sim/ghost";
+import { ghostHue, type Genes, type Ghost } from "../sim/ghost";
+import { petLook } from "../game/genes";
+import type { LivePeer, Me } from "./live";
 import type { ArchetypeId } from "../sim/types";
 import { makeAFrame, type AFrame } from "./aframe";
 import { walkable, type Platform, type WorldMap } from "./layout";
@@ -257,6 +259,17 @@ const randIn = (p: Platform, margin = 1.3): Vec => {
   return { x: p.x + Math.cos(a) * d, z: p.z + Math.sin(a) * d };
 };
 
+// Another online player (live room): their avatar, their pet, a name tag and an emote bubble. Positions
+// arrive at <= 10 Hz; the view eases towards them every frame.
+interface LiveGhost {
+  avatar: THREE.Group;
+  pet: THREE.Group;
+  tag: THREE.Sprite;
+  to: Me;
+  emote: THREE.Sprite | null;
+  emoteAge: number;
+}
+
 export class WorldView {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.OrthographicCamera(-8, 8, 6, -6, 0.1, 200);
@@ -292,6 +305,8 @@ export class WorldView {
   private readonly zTex = textSprite("z", "#7f8fd8").material.map!;
   private readonly motesUp = Array.from({ length: 5 }, () => ({ sprite: textSprite("\u2665", "#f2738d"), age: 9, life: 1.8, from: new THREE.Vector3() }));
   onChill: (on: boolean) => void = () => {};
+  private readonly live = new Map<string, LiveGhost>();
+  private myEmote: { sprite: THREE.Sprite; age: number } | null = null;
   // Camera zoom: wheel or pinch sets a target, the camera eases towards it.
   static readonly ZOOM_MIN = 0.7;
   static readonly ZOOM_MAX = 2.2;
@@ -461,7 +476,7 @@ export class WorldView {
         ring.rotation.x = Math.PI / 2;
         ring.position.set(p.x, 0.02, p.z);
         this.root.add(ring);
-        const e = this.spawn({ id: "arena", kind: "arena", label: "Ghost arena", home: p, obj: makeGhostPet(0.6), still: true });
+        const e = this.spawn({ id: "arena", kind: "arena", label: "Ghost arena", home: p, obj: makeGhostPet({ hue: 0.6 }), still: true });
         e.obj.traverse((o) => {
           if (o instanceof THREE.Mesh) o.material = Object.assign(o.material.clone(), { transparent: true, opacity: 0.55 });
         });
@@ -473,7 +488,7 @@ export class WorldView {
         this.root.add(h.frame.group);
         if (!g) break;
         placeDecor(this.root, p, h, g.decor ?? [], g.porch ?? []);
-        this.spawn({ id: `ghost-${g.id}`, kind: "ghost", label: `${g.name} (ghost)`, ghost: g, home: p, obj: makeGhostPet(ghostHue(g.genes)), scale: 0.8 });
+        this.spawn({ id: `ghost-${g.id}`, kind: "ghost", label: `${g.name} (ghost)`, ghost: g, home: p, obj: makeGhostPet(g.genes), scale: 0.8 });
         break;
       }
     }
@@ -603,6 +618,99 @@ export class WorldView {
     return { x: ((v.x + 1) / 2) * this.canvas.clientWidth, y: ((1 - v.y) / 2) * this.canvas.clientHeight };
   }
 
+  // ---- live players ----
+
+  get me(): Me {
+    return { x: this.player.x, z: this.player.z, px: this.petPos.x, pz: this.petPos.z };
+  }
+
+  get liveCount(): number {
+    return this.live.size;
+  }
+
+  addPeer(p: LivePeer) {
+    this.removePeer(p.id);
+    const robe = new THREE.Color().setHSL(petLook(p.genes).accentHue, 0.55, 0.68).getHex();
+    const avatar = makeAvatar(robe, new THREE.Color().setHSL(petLook(p.genes).hue, 0.6, 0.7).getHex());
+    const pet = makePet(p.genes as Genes);
+    pet.scale.setScalar(0.75);
+    const tag = labelSprite(p.name, 0.8);
+    castAll(avatar);
+    castAll(pet);
+    avatar.position.set(p.x, 0, p.z);
+    pet.position.set(p.px, 0, p.pz);
+    this.scene.add(avatar, pet, tag);
+    this.live.set(p.id, { avatar, pet, tag, to: { x: p.x, z: p.z, px: p.px, pz: p.pz }, emote: null, emoteAge: 0 });
+  }
+
+  movePeer(id: string, to: Me) {
+    const g = this.live.get(id);
+    if (g) g.to = to;
+  }
+
+  removePeer(id: string) {
+    const g = this.live.get(id);
+    if (!g) return;
+    this.scene.remove(g.avatar, g.pet, g.tag);
+    if (g.emote) this.scene.remove(g.emote);
+    this.live.delete(id);
+  }
+
+  clearPeers() {
+    for (const id of [...this.live.keys()]) this.removePeer(id);
+  }
+
+  // An emote bubble over a live player's head (id) or over our own avatar (id = null).
+  showEmote(id: string | null, icon: string) {
+    const sprite = textSprite(icon, "#f2738d");
+    sprite.scale.setScalar(0.8);
+    this.scene.add(sprite);
+    if (id === null) {
+      if (this.myEmote) this.scene.remove(this.myEmote.sprite);
+      this.myEmote = { sprite, age: 0 };
+      return;
+    }
+    const g = this.live.get(id);
+    if (!g) return void this.scene.remove(sprite);
+    if (g.emote) this.scene.remove(g.emote);
+    g.emote = sprite;
+    g.emoteAge = 0;
+  }
+
+  private updateLive(dt: number, t: number) {
+    const k = 1 - Math.exp(-dt * 10);
+    for (const g of this.live.values()) {
+      const a = g.avatar.position, p = g.pet.position;
+      const dx = g.to.x - a.x, dz = g.to.z - a.z;
+      const moving = Math.hypot(dx, dz) > 0.03;
+      a.x += dx * k;
+      a.z += dz * k;
+      a.y = moving ? Math.abs(Math.sin(t / 110)) * 0.08 : 0;
+      if (moving) g.avatar.rotation.y = Math.atan2(dx, dz);
+      const pdx = g.to.px - p.x, pdz = g.to.pz - p.z;
+      p.x += pdx * k;
+      p.z += pdz * k;
+      if (Math.hypot(pdx, pdz) > 0.03) g.pet.rotation.y = Math.atan2(pdx, pdz);
+      g.tag.position.set(a.x, 2.3, a.z);
+      if (g.emote) {
+        g.emoteAge += dt;
+        g.emote.position.set(a.x, 2.9 + g.emoteAge * 0.3, a.z);
+        if (g.emoteAge > 2.5) {
+          this.scene.remove(g.emote);
+          g.emote = null;
+        }
+      }
+    }
+    if (this.myEmote) {
+      this.myEmote.age += dt;
+      this.myEmote.sprite.position.set(this.avatar.position.x, 2.6 + this.myEmote.age * 0.3, this.avatar.position.z);
+      if (this.myEmote.age > 2.5) {
+        this.scene.remove(this.myEmote.sprite);
+        this.myEmote = null;
+      }
+    }
+  }
+
   get nearEntity(): Entity | null {
     return this.near;
   }
@@ -682,6 +790,8 @@ export class WorldView {
       e.obj.position.set(e.pos.x, walking ? Math.abs(Math.sin(t / 130 + ph)) * 0.12 : 0, e.pos.z);
       e.obj.scale.set(base, base * (1 + Math.sin(t / 520 + ph) * 0.035), base);
     }
+
+    this.updateLive(dt, t);
 
     // Closest creature within reach is the one the player can interact with.
     let best: Entity | null = null;

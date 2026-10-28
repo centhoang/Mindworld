@@ -24,6 +24,9 @@ export interface ReserveRequest {
   provider: Provider;
   worstCaseUsd: number;
   clientKey: string;
+  // Optional call-count quota for one feature (e.g. NPC chat), on top of the USD limits: at most
+  // `perClient` calls per client and `total` calls overall per UTC day in pool `pool`.
+  quota?: { pool: string; perClient: number; total: number };
 }
 
 export type RejectReason = "rate_limit" | "client_cap" | "daily_cap" | "total_cap" | "duplicate";
@@ -60,6 +63,7 @@ interface LedgerState {
   overrun: number;
   reservations: Record<string, Reservation>;
   clients: Record<string, ClientState>;
+  counts?: Record<string, number>; // daily call counts for quotas: "<pool>" and "<pool>|<clientKey>"
 }
 
 const STATE_KEY = "ledger";
@@ -119,6 +123,16 @@ export class SpendLedger {
     }
     if (s.totalSpent[req.provider] + reservedProvider + worst > this.limits.totalUsd[req.provider] + EPS) {
       return { ok: false, reason: "total_cap" };
+    }
+    const counts = (s.counts ??= {});
+    const q = req.quota;
+    const mine = q ? `${q.pool}|${req.clientKey}` : "";
+    if (q) {
+      if ((counts[mine] ?? 0) >= q.perClient) return { ok: false, reason: "client_cap" };
+      if ((counts[q.pool] ?? 0) >= q.total) return { ok: false, reason: "daily_cap" };
+      if (!(mine in counts) && Object.keys(counts).length >= MAX_CLIENTS) return { ok: false, reason: "daily_cap" };
+      counts[mine] = (counts[mine] ?? 0) + 1;
+      counts[q.pool] = (counts[q.pool] ?? 0) + 1;
     }
 
     s.reservations[req.id] = { provider: req.provider, usd: worst, clientKey: req.clientKey, at: now };
@@ -197,6 +211,7 @@ export class SpendLedger {
       s.day = today;
       s.dailySpent = 0;
       s.clients = {};
+      s.counts = {};
     }
     for (const [id, r] of Object.entries(s.reservations)) {
       if (now - r.at > this.limits.reservationTtlMs) {

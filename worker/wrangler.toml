@@ -16,9 +16,18 @@ run_worker_first = true
 name = "SPEND"
 class_name = "SpendCounter"
 
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "WorldRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SpendCounter"]
+
+# Live world room (WebSocket hibernation; state lives in socket attachments, storage unused).
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["WorldRoom"]
 
 # Ghost snapshots (traits + memo). `wrangler deploy` provisions this namespace automatically;
 # local dev uses a local simulation. Eventual consistency is fine for ghosts.

@@ -1,3 +1,4 @@
+import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, isChatWho, isOpener, OpenerCache, scriptedLine, tidyReply } from "./chat";
 import { geoOf, isRestricted } from "./geo";
 import {
   allowGhostPost,
@@ -9,14 +10,14 @@ import {
   saveGhost,
   type GhostStore,
 } from "./ghosts";
-import type { ReserveResult, SpendSnapshot, RejectReason } from "./ledger";
+import type { ReserveRequest, ReserveResult, SpendSnapshot, RejectReason } from "./ledger";
 import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
 import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
 import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
 import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
 
 export interface SpendClient {
-  reserve(req: { id: string; provider: Provider; worstCaseUsd: number; clientKey: string }): Promise<ReserveResult>;
+  reserve(req: ReserveRequest): Promise<ReserveResult>;
   settle(id: string, actualUsd: number): Promise<boolean>;
   release(id: string): Promise<boolean>;
   snapshot(): Promise<SpendSnapshot>;
@@ -39,7 +40,11 @@ export interface Deps {
   random(): number;
   now(): number;
   hashClient(raw: string): Promise<string>;
+  room?: { fetch(request: Request): Promise<Response> }; // the live world room (Durable Object)
+  chatCache?: OpenerCache; // tests pass their own; the Worker shares one per isolate
 }
+
+const sharedChatCache = new OpenerCache();
 
 const MAX_SYSTEM_CHARS = 4000;
 const MAX_PROMPT_CHARS = 8000;
@@ -87,6 +92,11 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     }
     if (path === "/api/spend" && method === "GET") return json(await deps.spend.snapshot());
     if (path === "/api/llm" && method === "POST") return handleLlm(request, deps);
+    if (path === "/api/chat" && method === "POST") return handleChat(request, deps);
+    if (path === "/api/room" && method === "GET") {
+      if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return fail(426, "expected_websocket");
+      return deps.room ? deps.room.fetch(request) : fail(503, "no_room");
+    }
     if (path === "/api/transcribe" && method === "POST") return handleTranscribe(request, deps);
     if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);
     if (path === "/api/ghosts/random" && method === "GET") return handleGhostGet(await randomGhost(deps.ghosts, deps.random));
@@ -208,6 +218,51 @@ async function handleLlm(request: Request, deps: Deps): Promise<Response> {
     costUsd,
     latencyMs: deps.now() - started,
   });
+}
+
+// ---------- NPC chat ----------
+
+// Always answers 200 with a line: `source` says whether it came from the model, the opener cache or the
+// scripted fallback (over cap, provider down, unusable reply), so the NPC never goes silent.
+async function handleChat(request: Request, deps: Deps): Promise<Response> {
+  const body = await readJson(request, 1000);
+  if (!body || typeof body !== "object") return fail(400, "bad_json");
+  const b = body as Record<string, unknown>;
+  if (!isChatWho(b.who)) return fail(400, "bad_request", { message: "unknown who" });
+  const who = b.who;
+  const line = cleanLine(b.line);
+  const cache = deps.chatCache ?? sharedChatCache;
+  const scripted = (why: string) => json({ text: scriptedLine(who, deps.random), source: "scripted", why });
+
+  const opener = isOpener(line);
+  if (opener && cache.full(who)) return json({ text: cache.pick(who, deps.random), source: "cache" });
+
+  const { cfg } = deps;
+  const provider = cfg.defaultProvider;
+  if (!cfg.mock && !providerConfigured(cfg.providers, provider)) return scripted("unconfigured");
+  const p = chatPrompt(who, line);
+  const worst = worstCaseCostUsd(provider, estimateInputTokens(p.system + p.prompt), CHAT_MAX_TOKENS);
+  const id = deps.newId();
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  const reserved = await deps.spend.reserve({ id, provider, worstCaseUsd: cfg.mock ? 0 : worst, clientKey, quota: CHAT_QUOTA });
+  if (!reserved.ok) return scripted(reserved.reason);
+
+  let completion: Completion;
+  try {
+    completion = cfg.mock
+      ? mockCompletion("chat", p.system, p.prompt)
+      : await complete(provider, cfg.providers, { ...p, maxTokens: CHAT_MAX_TOKENS, effort: "low" }, deps.fetch);
+  } catch (e) {
+    if (e instanceof UpstreamError) await deps.spend.release(id);
+    else await deps.spend.settle(id, worst); // may have been billed
+    return scripted("upstream");
+  }
+  const costUsd = cfg.mock ? 0 : actualCostUsd(provider, completion.usage);
+  await deps.spend.settle(id, costUsd);
+  const text = completion.truncated ? "" : tidyReply(completion.text);
+  if (!text) return scripted("unusable");
+  if (opener) cache.add(who, text);
+  return json({ text, source: "model", model: completion.model, mock: cfg.mock, costUsd });
 }
 
 // ---------- voice teaching ----------

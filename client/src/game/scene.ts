@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { Action, ArchetypeId, EnemyAct } from "../sim/types";
+import { PET_GENES, type Genes } from "../sim/ghost";
+import { petLook, type Ears, type Horns, type Tail } from "./genes";
 import { slotPosition, type DecorKind, type Slot } from "./home";
 import type { WorldView } from "../world/view";
 import { addLights, castAll, Clouds, makeIsland, Motes, PAL, setupRenderer, skyTexture, toon } from "./style";
@@ -30,21 +32,59 @@ function eyes(parent: THREE.Object3D, y: number, z: number, spread: number, r: n
   }
 }
 
-export function makePet(color = 0xf4b183): THREE.Group {
+const hsl = (h: number, s: number, l: number) => new THREE.Color().setHSL(h, s, l).getHex();
+
+// The pet, built from its genes (see game/genes.ts): body + ears + tail + horns + pattern, pastel toon
+// colours. children[0] is always the body (idle breathing scales it).
+export function makePet(genes: Genes = PET_GENES): THREE.Group {
   const g = new THREE.Group();
+  dressPet(g, genes);
+  return g;
+}
+
+// Rebuilds a pet group's parts in place, so code holding the group (world, arena) keeps working.
+export function dressPet(g: THREE.Group, genes: Genes) {
+  for (const c of [...g.children]) g.remove(c);
+  const l = petLook(genes);
+  const color = hsl(l.hue, 0.7, 0.72);
+  const dark = hsl(l.hue, 0.55, 0.6);
+  const accent = hsl(l.accentHue, 0.7, 0.78);
   const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 2), mat(color));
   body.scale.set(1, 0.85, 0.95);
   body.position.y = 0.55;
   g.add(body);
+  // Pattern: little toon patches pressed onto the body (cheap, no textures).
+  const patch = (x: number, y: number, z: number, sx: number, sy: number, c = accent) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), mat(c));
+    m.scale.set(sx, sy, 0.08);
+    m.position.set(x, y, z).setLength(0.6); // on the body surface (radius 0.6 before the body's scale)
+    m.lookAt(m.position.clone().multiplyScalar(2));
+    body.add(m);
+  };
+  if (l.pattern === "belly") {
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10), mat(hsl(l.hue, 0.5, 0.9)));
+    belly.scale.set(0.95, 0.8, 0.5);
+    belly.position.set(0, -0.15, 0.38);
+    body.add(belly);
+  } else if (l.pattern === "spots") {
+    for (const [x, y, z] of [[0.38, 0.1, 0.42], [-0.45, -0.05, 0.35], [0.1, 0.42, -0.4], [-0.3, 0.3, -0.45], [0.5, -0.1, -0.3]] as const)
+      patch(x, y, z, 0.22, 0.2);
+  } else if (l.pattern === "stripes") {
+    for (const z of [-0.2, -0.34, -0.47]) {
+      // a band over the back: a half ring across the body, sized to the sphere at that depth
+      const s = new THREE.Mesh(new THREE.TorusGeometry(Math.sqrt(0.36 - z * z) - 0.02, 0.045, 6, 20, Math.PI), mat(accent));
+      s.position.z = z;
+      body.add(s);
+    }
+  }
   for (const s of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.38, 6), mat(color));
-    ear.position.set(s * 0.32, 1.05, 0);
-    ear.rotation.z = s * -0.35;
-    g.add(ear);
-    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), mat(new THREE.Color(color).multiplyScalar(0.8).getHex()));
+    addEar(g, l.ears, s, color, accent);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), mat(dark));
     foot.position.set(s * 0.28, 0.1, 0.15);
     g.add(foot);
   }
+  addTail(g, l.tail, color, accent);
+  addHorns(g, l.horns, hsl(l.accentHue, 0.35, 0.9));
   eyes(g, 0.68, 0.48, 0.2, 0.11);
   for (const s of [-1, 1]) {
     const blush = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mat(0xff9fb2));
@@ -52,12 +92,117 @@ export function makePet(color = 0xf4b183): THREE.Group {
     blush.scale.set(1.5, 0.7, 0.4);
     g.add(blush);
   }
-  return g;
+  for (const c of g.children) {
+    c.position.multiplyScalar(l.size);
+    c.scale.multiplyScalar(l.size);
+  }
 }
 
-// Another player's pet: the same body as ours in its own colour, a little see-through so it reads as a ghost.
-export function makeGhostPet(hue: number): THREE.Group {
-  const g = makePet(new THREE.Color().setHSL(hue, 0.55, 0.68).getHex());
+function addEar(g: THREE.Group, kind: Ears, s: number, color: number, accent: number) {
+  if (kind === "pointy") {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.38, 6), mat(color));
+    ear.position.set(s * 0.32, 1.05, 0);
+    ear.rotation.z = s * -0.35;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.16, 6), mat(accent));
+    tip.position.y = 0.12;
+    ear.add(tip);
+    g.add(ear);
+  } else if (kind === "round") {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), mat(color));
+    ear.scale.set(1, 1, 0.5);
+    ear.position.set(s * 0.36, 0.98, 0);
+    const inner = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), mat(accent));
+    inner.scale.set(1, 1, 0.4);
+    inner.position.z = 0.08;
+    ear.add(inner);
+    g.add(ear);
+  } else if (kind === "floppy") {
+    const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.28, 4, 8), mat(accent));
+    ear.position.set(s * 0.5, 0.78, 0.05);
+    ear.rotation.z = s * 0.5;
+    ear.scale.set(1, 1, 0.55);
+    g.add(ear);
+  } else if (kind === "bunny") {
+    const ear = new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.42, 4, 8), mat(color));
+    ear.position.set(s * 0.2, 1.22, -0.05);
+    ear.rotation.z = s * -0.18;
+    ear.scale.set(1, 1, 0.6);
+    const inner = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.32, 4, 6), mat(accent));
+    inner.position.z = 0.05;
+    ear.add(inner);
+    g.add(ear);
+  } else {
+    // tuft: three tiny cones on top (one call per side adds half; the middle one on s = 1)
+    const t = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 5), mat(accent));
+    t.position.set(s * 0.1, 1.08, 0.05);
+    t.rotation.z = s * -0.4;
+    g.add(t);
+    if (s === 1) {
+      const m = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.28, 5), mat(accent));
+      m.position.set(0, 1.12, 0.05);
+      g.add(m);
+    }
+  }
+}
+
+function addTail(g: THREE.Group, kind: Tail, color: number, accent: number) {
+  if (kind === "none") return;
+  const root = new THREE.Group();
+  root.position.set(0, 0.4, -0.55);
+  if (kind === "nub") {
+    const n = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), mat(color));
+    root.add(n);
+  } else if (kind === "puff") {
+    const n = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), mat(accent));
+    root.add(n);
+  } else if (kind === "curl") {
+    const c = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.055, 6, 14, Math.PI * 1.5), mat(color));
+    c.rotation.y = Math.PI / 2;
+    c.position.y = 0.14;
+    root.add(c);
+  } else {
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.55, 8), mat(color));
+    f.rotation.x = -2.2;
+    f.position.set(0, 0.15, -0.15);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 8), mat(0xfffaf0));
+    tip.position.y = -0.22;
+    tip.rotation.x = Math.PI;
+    f.add(tip);
+    root.add(f);
+  }
+  g.add(root);
+}
+
+function addHorns(g: THREE.Group, kind: Horns, color: number) {
+  if (kind === "none") return;
+  if (kind === "unicorn") {
+    const h = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.32, 8), mat(color));
+    h.position.set(0, 1.08, 0.18);
+    h.rotation.x = 0.35;
+    g.add(h);
+    return;
+  }
+  for (const s of [-1, 1]) {
+    if (kind === "nubs") {
+      const h = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.14, 6), mat(color));
+      h.position.set(s * 0.15, 1.02, 0.15);
+      g.add(h);
+    } else {
+      const a = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 0.3, 5), mat(color));
+      a.position.set(s * 0.14, 1.12, 0.05);
+      a.rotation.z = s * -0.4;
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 0.14, 5), mat(color));
+      b.position.set(s * -0.06, 0.06, 0);
+      b.rotation.z = s * 0.9;
+      a.add(b);
+      g.add(a);
+    }
+  }
+}
+
+// Another player's pet: its own genes, a little see-through so it reads as a ghost.
+export function makeGhostPet(genes: Genes): THREE.Group {
+  const g = makePet(genes);
   g.traverse((o) => {
     const m = (o as THREE.Mesh).material as THREE.MeshToonMaterial | undefined;
     if (m) {
