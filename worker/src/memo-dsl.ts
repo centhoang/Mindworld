@@ -47,7 +47,7 @@ function parseCond(c: unknown): Cond | null {
   if (!c || typeof c !== "object" || Array.isArray(c)) return null;
   const o = c as Record<string, unknown>;
   if (typeof o.k !== "string") return null;
-  const list = ENUMS[o.k];
+  const list = Object.hasOwn(ENUMS, o.k) ? ENUMS[o.k] : undefined; // "constructor" etc. are not enums
   if (list) return typeof o.is === "string" && list.includes(o.is) ? { k: o.k as "enemy", is: o.is } : null;
   if (o.k === "myHp" || o.k === "enemyHp" || o.k === "turn") {
     return (o.op === "<" || o.op === ">=") && typeof o.n === "number" && Number.isFinite(o.n) && Math.abs(o.n) <= 1000

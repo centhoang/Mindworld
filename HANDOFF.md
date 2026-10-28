@@ -1,30 +1,12 @@
-DIRECTOR MODE ACTIVE since 2026-10-29 ~01:00 UTC+7 (round 2). Round 1 pushed (a16064e) + deployed 2026-10-29 01:10 (version 210895d9).
+DIRECTOR MODE ended 2026-10-29 ~03:00 UTC+7 (queue done; Claude 5-hour quota nearly used). Normal mode next.
 
-## Queue round 2
-7. [ ] Random modular pet at hatch (more genes/parts: ears, tail, horns, pattern, palette; seeded, saved, ghosts carry genes, old saves tolerated). Done: tests + build, screenshots.
-8. [ ] NPC chat via Muse Spark: Worker kind `chat` (elder + wild pets), short persona prompts, capped (per-client + daily), cached, scripted fallback; client chat box. Mocked in tests; live check <= 5 calls. Done: worker + client tests, build.
-9. [ ] Live layer v0: Durable Object room (WebSocket hibernation): presence, avatar/pet positions ~10 Hz while moving, emotes; other online players' avatars appear; fall back to ghosts when offline/over limit. Done: worker tests, two-tab check with `wrangler dev`.
-10. [x] 7-9 verified (client 145, worker 126, builds, scan clean), committed + pushed 6bec053 (2 live Muse calls $0.0034). **Deploy NOT done**: auto-mode classifier denied `wrangler deploy` ("Production Deploy"); user runs `cd worker; npx wrangler deploy` (adds DO migration v2 `WorldRoom`) or allows it.
-11. [x] Live pet-vs-pet duel (shared seed, both clients run the same sim, room relays challenge/accept + memo snapshot) + short text chat/emotes in room (rate-limited, length-capped, basic profanity filter). Done: tests, two-tab check.
-12. [x] (draft, needs user review) Rewrite `docs/DEMO.md` for Mindworld / Build for Your World (3-min script, opens with pre-existed vs built-this-week line, Meta model uses called out). Done: draft for the user's review.
-14. [x] First-run onboarding for strangers (3-step cozy hint overlay, hatch moment, clear goals) + touch/mobile controls (tap-to-move, on-screen interact button, layout at 375px). Done: tests, mobile screenshots.
-15. [x] (needs deploy for cron) Scheduled Worker cron: Muse Spark re-teaches wild pets/boss from recent shared fights (ghost KV), capped $0.30/day, validated DSL, scripted fallback; mocked tests, at most 2 live calls. Done: worker tests, build.
-13. [x] Verified (client 151, worker 133, builds, scan clean), committed + pushed; $0 spend.
-
-## Morning report
-- Done, committed locally (NOT pushed, NOT deployed): cozy restyle cd2217e (`docs/VISUALS.md`, `client/src/game/style.ts`), A-frame cabins + porch chill + decor fe5fc73 (`world/aframe.ts`, `game/decor.ts`), polish (chatter bubbles + voice toggle, wheel/pinch zoom, coins + market shop; `game/chatter.ts`). Tests: client 132, worker 106, build OK, secrets scan clean.
-- Screenshots: `.scratch/visuals/{before,after,aframe,polish}-*`.
-- Spend: ~$0.003 (a worker's zoom test click started a fight that hit live Muse via a `wrangler dev` left listening on 127.0.0.1:8787, PID 29720; still running, stop it if not yours).
-- Needs the user: play-test (world look, cabin porch + Decorate, market, zoom, voices); OK to push + deploy to pets.uryto.dev.
-
-## Queue (Director)
-1. [x] Visuals research -> `docs/VISUALS.md` (skills/plugins, CC0 packs + licenses, three.js techniques). Done: doc exists with picks + reasons.
-2. [x] (committed; shots `.scratch/visuals/{before,after}-*`) Cozy restyle of world + battle view (palette, gradient sky, soft shadows/toon, clouds/water under islands, idle bobbing, particles; small bundle). Done: build + tests pass, before/after screenshots in `.scratch/visuals/`.
-3. [x] (fe5fc73) A-frame house per corner (0b): enterable/porch chill area for player+pet, decor slots (inside + plot) stored in state; other corners show their A-frame + decor. Done: tests for decor state, visible in pane.
-4. [x] Verification pass after 3: client 124, worker 106, build OK, scan clean.
-5. [x] World polish (safe, no paid calls): in-world speech bubbles + browser speechSynthesis for wild pets/elder/boss/pet; camera zoom (wheel/pinch, clamped); market island: coins from wins -> buy decor (uses decor hook). Done: tests + build, screenshots `.scratch/visuals/polish-*`.
-6. [x] Final verification pass + commit, Morning report.
-API spend tonight: ~$0.003 (cap $3).
+## Morning report (night of 2026-10-29)
+- Pushed to origin/main (last commit = the one after 797dfca). Deployed ONLY round 1 (cozy restyle, A-frame cabins + decor, chatter/zoom/market; version 210895d9). **Rounds 2-4 are NOT live**: auto-mode denied `wrangler deploy`. Run `npm --prefix client run build`, then `cd worker; npx wrangler deploy` (adds DO migration v2 `WorldRoom` + cron `17 */6 * * *`).
+- Built + pushed, not deployed: random pet genes (`game/genes.ts`), NPC chat via Muse Spark (`worker/src/chat.ts`, capped+cached, scripted fallback), live room on DO WebSockets (`worker/src/room*.ts`, `world/live.ts`), live pet-vs-pet duels on a shared seed (`sim/duel.ts`), room text chat + emotes, first-run hatch/hints/goals + mobile interact button (`game/onboard.ts`), 6-hourly Muse cron re-teaching wild-pet tactics ($0.30/day cap, `worker/src/wild-memos.ts`), pet-to-pet chat (`/api/petchat`, `game/pet-chat.ts`), 4 Codex review fixes (`.scratch/review-night.md`).
+- Tests: client 159, worker 148, builds OK, secrets scans clean. API spend tonight ~$0.009 (cap $3).
+- Not verified by a person: everything above. Pet chat only unit-tested + 1 live call (not seen in the pane).
+- Needs the user: (1) deploy (or allow it); (2) play-test, two tabs for live room/duel/chat; (3) review `docs/DEMO.md` draft; (4) `wrangler dev` PID 29720 on :8787 may still be running.
+- Open follow-ups: DO alarm to close sockets that never say hello; client disconnect clears unrelated invites; duel acceptor can't befriend; cron samples first 20 ghost keys (alphabetical).
 
 ## Latest (2026-10-29, pivot to **Mindworld**, approved by the user)
 - New direction (docs/PLAN.md v3): a shared world of pets that think. Track **Build for Your World**, name **Mindworld** (UI + README renamed; repo/HF names unchanged). Order: (1) world + avatar + following pet [v1 DONE, live], (2) live multiplayer on Durable Object WebSockets, (3) pet chat/breeding if time.
@@ -36,7 +18,7 @@ API spend tonight: ~$0.003 (cap $3).
 
 Last updated: 2026-10-29 ~01:00 (UTC+7). Phase: **Mindworld world v1 live at https://pets.uryto.dev**; next: world polish + live multiplayer. GitHub: private repo `centhoang/MetaGlobalAIDeveloperHackathonProject_PetMind`, Claude manages and pushes; stays private until the user says. Deadline Nov 4 9 PM ET (user is UTC+7). Modal spend today ~$20 (ledger `.scratch/finetune/ledger.jsonl` $16.4 + ~$3 GPU).
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md (Morning report first), then continue from Mindworld next: items 0, 0b and the safe part of 1 are done locally; after my play-test + OK, push/deploy, then NPC chat via Muse (capped) and random modular pets, then item 2 live multiplayer. Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md (Morning report first). Deploy if not done, fix what my play-test found, then the open follow-ups and remaining Mindworld next items. Follow CLAUDE.md (Normal mode, 35% context limit)."
 Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Normal mode (dayshift) runs to the 35% context limit then hands off; Director mode (nightshift) runs workers one at a time.
 
 ## State

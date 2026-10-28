@@ -11,6 +11,7 @@ import { duelCoins, duelView, type DuelResult, type Fighter } from "./sim/duel";
 import { askNpc, chatWhoFor, type ChatWho } from "./game/npc-chat";
 import { newSeed, parseGenes, randomGenes } from "./game/genes";
 import { thinkingLabel } from "./game/thinking";
+import { askPets, traitOf } from "./game/pet-chat";
 import { goals, hints, isTouch, parseOnboard, playHatch, playHints, renderGoals, type OnboardSave } from "./game/onboard";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
 import { CloudVoice, localAccessState, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
@@ -1095,6 +1096,31 @@ setInterval(() => {
   if (world.isChilling) $("interactBtn").textContent = "Get up";
 }, 150);
 if (!state.onboard?.seen) void onboard(state.recent.length === 0);
+
+// Pets meeting pets: near another player or a ghost's pet, the two pets swap one line each (Muse Spark,
+// capped + cached on the server). Once per partner per visit, at most one chat every 20 s.
+const petsMet = new Set<string>();
+let lastPetChat = 0;
+setInterval(() => {
+  if (arena.mode !== "world" || busy || onboarding || world.paused || performance.now() - lastPetChat < 20_000) return;
+  const peer = live.status === "online" ? world.nearPeer() : null;
+  const near = world.nearEntity;
+  const ghost = near?.kind === "ghost" ? near.ghost ?? null : null;
+  const id = peer ? `p:${peer.id}` : ghost ? `g:${ghost.id}` : null;
+  if (!id || petsMet.has(id)) return;
+  petsMet.add(id);
+  lastPetChat = performance.now();
+  const them = { name: peer ? `${peer.name}'s pet` : ghost!.name, trait: ghost ? traitOf(ghost.memo) : ("curious" as const) };
+  void askPets({ name: pet.name, trait: traitOf(state.memo) }, them).then(({ lines: [mine, theirs] }) => {
+    if (arena.mode !== "world") return;
+    say("pet", mine, 2600);
+    setTimeout(() => {
+      if (arena.mode !== "world") return;
+      if (peer) world.showSpeech(peer.id, theirs);
+      else say("enemy", theirs, 2600);
+    }, 1400);
+  });
+}, 500);
 if (import.meta.env.DEV) Object.assign(window, { __onboard: onboard });
 
 // Connect last: the live handlers touch UI state declared above.

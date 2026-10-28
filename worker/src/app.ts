@@ -1,4 +1,4 @@
-import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, isChatWho, isOpener, OpenerCache, scriptedLine, tidyReply } from "./chat";
+import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, isChatWho, isOpener, OpenerCache, parsePetSide, petsPrompt, scriptedLine, scriptedPair, tidyPair, tidyReply } from "./chat";
 import { geoOf, isRestricted } from "./geo";
 import {
   allowGhostPost,
@@ -94,6 +94,7 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     if (path === "/api/spend" && method === "GET") return json(await deps.spend.snapshot());
     if (path === "/api/llm" && method === "POST") return handleLlm(request, deps);
     if (path === "/api/chat" && method === "POST") return handleChat(request, deps);
+    if (path === "/api/petchat" && method === "POST") return handlePetChat(request, deps);
     if (path === "/api/room" && method === "GET") {
       if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return fail(426, "expected_websocket");
       return deps.room ? deps.room.fetch(request) : fail(503, "no_room");
@@ -177,6 +178,8 @@ async function handleLlm(request: Request, deps: Deps): Promise<Response> {
   if (body === undefined) return fail(400, "bad_json");
   const req = parseLlmRequest(body, deps.cfg);
   if (typeof req === "string") return fail(400, "bad_request", { message: req });
+  // NPC chat has its own quota and token cap; it must not be reachable through the generic proxy.
+  if (req.kind === "chat") return fail(400, "bad_request", { message: "use /api/chat" });
 
   const { cfg } = deps;
   if (!cfg.mock && !providerConfigured(cfg.providers, req.provider)) return fail(503, "provider_unconfigured", { fallback: "reflex" });
@@ -268,6 +271,46 @@ async function handleChat(request: Request, deps: Deps): Promise<Response> {
   if (!text) return scripted("unusable");
   if (opener) cache.add(who, text);
   return json({ text, source: "model", model: completion.model, mock: cfg.mock, costUsd });
+}
+
+// Two pets meet: one model call writes a line for each (same quota and budget as NPC chat). Pairs of
+// traits are cached, so after 3 model replies per pair the dialogue rotates for free.
+async function handlePetChat(request: Request, deps: Deps): Promise<Response> {
+  const body = await readJson(request, 500);
+  if (!body || typeof body !== "object") return fail(400, "bad_json");
+  const a = parsePetSide((body as Record<string, unknown>).a);
+  const b = parsePetSide((body as Record<string, unknown>).b);
+  if (!a || !b) return fail(400, "bad_request");
+  const cache = deps.chatCache ?? sharedChatCache;
+  const key = `pets:${a.trait}|${b.trait}`;
+  const scripted = (why: string) => json({ lines: scriptedPair(a, b, deps.random), source: "scripted", why });
+  if (cache.full(key)) return json({ lines: JSON.parse(cache.pick(key, deps.random)!), source: "cache" });
+
+  const { cfg } = deps;
+  const provider = cfg.defaultProvider;
+  if (!cfg.mock && !providerConfigured(cfg.providers, provider)) return scripted("unconfigured");
+  const p = petsPrompt(a, b);
+  const worst = worstCaseCostUsd(provider, estimateInputTokens(p.system + p.prompt), CHAT_MAX_TOKENS);
+  const id = deps.newId();
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  const reserved = await deps.spend.reserve({ id, provider, worstCaseUsd: cfg.mock ? 0 : worst, clientKey, quota: CHAT_QUOTA });
+  if (!reserved.ok) return scripted(reserved.reason);
+  let completion: Completion;
+  try {
+    completion = cfg.mock
+      ? { ...mockCompletion("chat", p.system, p.prompt), text: "A: Hi there!\nB: Hello, friend!" }
+      : await complete(provider, cfg.providers, { ...p, maxTokens: CHAT_MAX_TOKENS, effort: "low" }, deps.fetch);
+  } catch (e) {
+    if (e instanceof UpstreamError) await deps.spend.release(id);
+    else await deps.spend.settle(id, worst);
+    return scripted("upstream");
+  }
+  const costUsd = cfg.mock ? 0 : actualCostUsd(provider, completion.usage);
+  await deps.spend.settle(id, costUsd);
+  const lines = completion.truncated ? null : tidyPair(completion.text);
+  if (!lines) return scripted("unusable");
+  cache.add(key, JSON.stringify(lines));
+  return json({ lines, source: "model", costUsd });
 }
 
 // ---------- voice teaching ----------

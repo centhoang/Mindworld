@@ -90,18 +90,70 @@ export const scriptedLine = (who: ChatWho, random: () => number): string => {
 
 // Per-isolate opener cache: up to 3 model lines per NPC, then answers rotate through them for free.
 export class OpenerCache {
-  private readonly lines = new Map<ChatWho, string[]>();
+  private readonly lines = new Map<string, string[]>();
+  private readonly tries = new Map<string, number>(); // model replies seen, duplicates included
   constructor(private readonly perWho = 3) {}
-  full(who: ChatWho): boolean {
-    return (this.lines.get(who)?.length ?? 0) >= this.perWho;
+  full(who: string): boolean {
+    return (this.tries.get(who) ?? 0) >= this.perWho && (this.lines.get(who)?.length ?? 0) > 0;
   }
-  pick(who: ChatWho, random: () => number): string | null {
+  pick(who: string, random: () => number): string | null {
     const l = this.lines.get(who);
     return l?.length ? l[Math.floor(random() * l.length) % l.length]! : null;
   }
-  add(who: ChatWho, line: string): void {
+  add(who: string, line: string): void {
+    this.tries.set(who, (this.tries.get(who) ?? 0) + 1);
     const l = this.lines.get(who) ?? [];
     if (l.length < this.perWho && !l.includes(line)) l.push(line);
     this.lines.set(who, l);
   }
 }
+
+// ---------- pet-to-pet chat: two pets meet and swap one line each ----------
+// The client only sends a cleaned name and a trait from a fixed list (derived from the pet's memo), so
+// nothing free-form from another player reaches the prompt.
+
+export const PET_TRAITS = ["bold", "careful", "cautious", "cheerful", "friendly", "curious"] as const;
+export type PetTrait = (typeof PET_TRAITS)[number];
+export interface PetSide { name: string; trait: PetTrait }
+const PET_NAME_MAX = 16;
+
+export function parsePetSide(v: unknown): PetSide | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const name = typeof o.name === "string" ? o.name.normalize("NFKC").replace(/[^\p{L}\p{N} _'-]+/gu, "").replace(/\s+/g, " ").trim().slice(0, PET_NAME_MAX).trim() : "";
+  if (!name || !(PET_TRAITS as readonly string[]).includes(o.trait as string)) return null;
+  return { name, trait: o.trait as PetTrait };
+}
+
+export function petsPrompt(a: PetSide, b: PetSide): { system: string; prompt: string } {
+  return {
+    system:
+      "You write tiny dialogues for Mindworld, a cozy game where pets roam floating islands. Two pets meet. " +
+      "Reply with exactly two lines, first pet A then pet B, each at most 12 words, cute and warm, plain text, " +
+      "format 'A: ...' and 'B: ...'. No emoji, no personal details.",
+    prompt: `Pet A is ${a.trait}. Pet B is ${b.trait}. They just bumped into each other on a bridge.`,
+  };
+}
+
+// Two display-safe lines, or null when the reply is unusable. Names are added by the client.
+export function tidyPair(text: string): [string, string] | null {
+  const t = text.replace(/<think>[\s\S]*?<\/think>/gi, " ");
+  const a = /(?:^|\n)\s*\**A\**\s*:\s*(.+)/.exec(t)?.[1];
+  const b = /(?:^|\n)\s*\**B\**\s*:\s*(.+)/.exec(t)?.[1];
+  const ta = a ? tidyReply(a) : "";
+  const tb = b ? tidyReply(b) : "";
+  return ta && tb ? [ta.slice(0, 120), tb.slice(0, 120)] : null;
+}
+
+const PET_SCRIPTED: Record<PetTrait, readonly string[]> = {
+  bold: ["Race you to the next island!", "I am training to beat the boss!"],
+  careful: ["Careful, this bridge wobbles.", "I always guard first. Just in case."],
+  cautious: ["Oh! You startled me.", "Is it safe over there?"],
+  cheerful: ["Hello hello! Nice day for a walk!", "Your fur looks so fluffy!"],
+  friendly: ["Want to be friends?", "Let's play together sometime!"],
+  curious: ["Ooh, who are you?", "What's on your island?"],
+};
+export const scriptedPair = (a: PetSide, b: PetSide, random: () => number): [string, string] => {
+  const pick = (t: PetTrait) => PET_SCRIPTED[t][Math.floor(random() * 2) % 2]!;
+  return [pick(a.trait), pick(b.trait)];
+};

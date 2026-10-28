@@ -249,6 +249,7 @@ export class Room {
     if (!c) return { out: [{ to: "self", msg: { t: "duelEnd", duel: typeof o.duel === "string" ? o.duel.slice(0, 16) : "", reason: "gone" } }], changed: true };
     const d = c.duel!;
     delete c.duel;
+    delete peer.duel; // one duel per pet: the accepter's own open challenge is withdrawn
     this.dirty.add(c.id);
     const msg: ServerMsg = {
       t: "duelStart",
