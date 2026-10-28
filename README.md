@@ -1,10 +1,10 @@
-# Pet Mind
+# Mindworld
 
 A browser game built for the Meta Global AI Developer Hackathon (Oct 27 – Nov 4). It plays in any modern browser with no install.
 
 **Play: https://pets.uryto.dev** (desktop Chrome or Edge recommended).
 
-Teach a pet that thinks for itself. A small Meta Llama on your device decides every move; Meta's Muse models coach it between fights; every lesson is proven on fights the coach never saw.
+A world of pets that think. Walk your character (WASD or click) across floating islands with your pet at your heels: fight or tame wild pets in the meadow, challenge the boss, visit other players' corners. Teach a pet that thinks for itself. A small Meta Llama on your device decides every move; Meta's Muse models coach it between fights; every lesson is proven on fights the coach never saw.
 
 ## How to play
 1. Press **Fight!** and watch your uncoached pet (log tags show who decided each move: `memo #n`, the model, or `instinct`).

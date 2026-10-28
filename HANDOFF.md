@@ -1,13 +1,14 @@
-## Latest (2026-10-28 dayshift)
-- Boss "The Reader" built + live; deployed to https://pets.uryto.dev; power mode (Chrome Local Network Access fix) and WebLLM 1B verified live; README for strangers; first-steps guide; phone layout ok; `docs/DEMO.md` drafted. All pushed to the private GitHub repo.
-- Needs the user: review `docs/DEMO.md` + pick the problem statement; decide when to make the GitHub + HF repos public (default Nov 3).
-- Unverified: power-mode download path (only `-SkipDownload` tested). Earlier decisions still standing (Reflect on muse-spark-1.3 low effort with a train-seed gate; Worker maxOutputTokens 4000).
+## Latest (2026-10-29, pivot to **Mindworld**, approved by the user)
+- New direction (docs/PLAN.md v3): a shared world of pets that think. Track **Build for Your World**, name **Mindworld** (UI + README renamed; repo/HF names unchanged). Order: (1) world + avatar + following pet [v1 DONE, live], (2) live multiplayer on Durable Object WebSockets, (3) pet chat/breeding if time.
+- World v1 live on https://pets.uryto.dev: `client/src/world/{layout,movement,view}.ts` (+8 tests, client 116). 3x3 grid of islands joined by bridges: home (center), event/ghost arena (N), wild meadow (E, plus spare diagonals), market (S, placeholder), elder's house (W, canned tips), boss room (NE), 3 ghost corners (online ghosts, else seed ghosts). WASD/arrows or click to move, E/Space/click to interact; pet follows. Wild fight → battle view (Arena `mode` world/battle); KO or befriend removes it (respawns in 15 s); befriend = tamed, lives at home (`state.tamed`, max 6). Dev-only `window.__world` for checks.
+- Organizer rule (2026-10-28): every runtime model must be Meta (Gemma removed from `/spike-b`); browser speechSynthesis is allowed for voices.
+- Needs the user: play-test the world; review `docs/DEMO.md` (still describes the old Pet Mind flow and Push the Frontier: rewrite for Mindworld + Build for Your World); repos stay private until the user says.
 
 # HANDOFF (update at every milestone; keep under ~80 lines)
 
-Last updated: 2026-10-28 evening. Phase: **features done; LIVE at https://pets.uryto.dev** (deployed 2026-10-28, live Teach verified: $0.005, +27.5 pts). GitHub: private repo `centhoang/MetaGlobalAIDeveloperHackathonProject_PetMind`, Claude manages and pushes; stays private until the user says. Deadline Nov 4 9 PM ET (user is UTC+7). Modal spend today ~$20 (ledger `.scratch/finetune/ledger.jsonl` $16.4 + ~$3 GPU).
+Last updated: 2026-10-29 ~01:00 (UTC+7). Phase: **Mindworld world v1 live at https://pets.uryto.dev**; next: world polish + live multiplayer. GitHub: private repo `centhoang/MetaGlobalAIDeveloperHackathonProject_PetMind`, Claude manages and pushes; stays private until the user says. Deadline Nov 4 9 PM ET (user is UTC+7). Modal spend today ~$20 (ledger `.scratch/finetune/ledger.jsonl` $16.4 + ~$3 GPU).
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions (live and verified; next: demo prep with the user, polish from play-tests). Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions (Mindworld: world v1 is live; next: the items under "Mindworld next"). Follow CLAUDE.md (Normal mode, 35% context limit)."
 Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Normal mode (dayshift) runs to the 35% context limit then hands off; Director mode (nightshift) runs workers one at a time.
 
 ## State
@@ -45,11 +46,17 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 1. DONE: private GitHub repo. User (2026-10-28): Claude manages the repo and may push to it; never make it (or any game info) public until the user says so.
 2. DONE: deployed (`docs/DEPLOY.md`). Chrome 156 gates https -> 127.0.0.1 behind a Local Network Access prompt (permission `loopback-network`): the page now probes on load only when already granted, and the Power mode button waits 60 s for Allow (commit after 01300a6). Power mode verified live 2026-10-28 (Allow -> 3B detected, boss fight ran, auto-detected on reload). WebLLM 1B verified live too (GPU Chrome, NVIDIA adapter, loaded and made picks in a brute fight, ~51 s fight at 4x). Cloudflare Web Analytics beacon is on the zone: footer now says so (user may turn it off in the dashboard).
 2b. DONE: boss log hint for befriend odds (live).
-5. Draft done: `docs/DEMO.md` (3-min script with shots, submission text, pre-record checklist). User: review it, pick the problem statement (recommended Push the Frontier).
+5. `docs/DEMO.md` draft exists but predates the pivot: rewrite for Mindworld / Build for Your World after the world features settle.
+
+## Mindworld next (in order)
+1. World polish from the user's play-test: in-world speech (wild pets/NPC/boss bubbles + browser speechSynthesis voice), random modular pet at hatch (more genes/parts), market (coins from wins → decor), NPC chat via Muse Spark (Worker kind, capped + cached), camera zoom.
+2. Live layer: Durable Object room per world (WebSocket hibernation): presence + avatar/pet positions ~10 Hz while moving, chat, emotes; online players' corners fill the grid; live pet-vs-pet with a shared seed. Free plan: 100k req/day, incoming WS messages billed 20:1, 13k GB-s/day (about one busy room all day). Fall back to ghosts over the limit; ask before Workers Paid ($5/mo).
+3. Scheduled Worker job: Muse Spark re-teaches wild pets/boss from players' fights (cost-capped). Then pet-to-pet chat, breeding.
 3. Idea parked by the user (play-test 2026-10-28): a pet "heavy attack" move (strong vs idle, weak vs guard). Not now: a new action changes the sim, the DSL, every bench number and the tuned models' training data; revisit only after submission or as a separate post-event version.
 4. User: decide when to make the HF coach repos public (power-mode download needs it; Nov 3 with the GitHub repo is the default). User play-test of the free coach pending.
 
 ## Gotchas
+- The Browser pane can stop running animation frames (rAF 0/s) when hidden: drive `__world.update(dt, t)` by hand in checks; battle tweens finish on timers anyway.
 - llama-server on Windows: a second server can "listen" on a port already taken and requests still reach the first; use a new port per model and check `/v1/models`. Stop servers you started with TaskStop (their background task id); PowerShell Stop-Process was denied by auto mode.
 - Bulk teacher runs through local Worker: `wrangler dev --env-file ../.env --env-file ../.scratch/bench.env` (per-client cap $0.40/day otherwise; `--var` did not override). Make sure only one process listens on 8787.
 - GPU browser tests: Claude can launch a separate Chrome (`--force_high_performance_gpu --remote-debugging-port=9222 --user-data-dir=.scratch/chrome-gpu`) and drive it with `scripts/cdp-eval.mjs`; stop it and delete `.scratch/chrome-gpu` (~5 GB of weights cache) afterwards. A lost WebGPU device needs a Chrome restart.
