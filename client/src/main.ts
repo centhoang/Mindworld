@@ -1,6 +1,8 @@
 import { Instinct, type Choice } from "./game/instinct";
 import { fetchRandomGhost, shareGhost } from "./game/ghost-api";
-import { DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, type Slot } from "./game/home";
+import { DECOR_ICON, DECOR_LABEL, decorCount, decorSummary, emptyHome, HOME_SLOTS, type DecorKind, type Slot } from "./game/home";
+import { nextChatter, pickLine, speakerFor, voiceFor, type Speaker } from "./game/chatter";
+import { addCoins, buy, coinsFor, parseCoins, parseOwned, PRICES, SHOP_ITEMS } from "./game/shop";
 import { cycle, fromHome, itemAt, ownedItems, parseDecor, plotSlot, plotSlots, porchSlot, porchSlots, PORCH_SLOTS, type Placement, type SlotId } from "./game/decor";
 import { Arena, makeBossMesh, makeGhostPet } from "./game/scene";
 import { thinkingLabel } from "./game/thinking";
@@ -32,6 +34,9 @@ interface Save {
   mine?: string[]; // ids of ghosts this browser uploaded, to label your own ghost when you meet it
   home: Slot[]; // decor on the pet's home plot (derived from decor; kept for older readers)
   decor: Placement[]; // everything placed in your corner: plot ring + A-frame porch
+  coins?: number; // earned from wild wins and befriends, spent at the market
+  owned?: DecorKind[]; // decor bought at the market (the starter set is always owned)
+  muted?: boolean; // in-world voice off
   steps?: { fought?: boolean; proved?: boolean; boss?: boolean }; // first-steps guide progress
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
 }
@@ -47,6 +52,9 @@ function load(): Save {
           const decor = Array.isArray(raw.decor) ? parseDecor(raw.decor) : fromHome(raw.home);
           return { decor, home: plotSlots(decor) };
         })(),
+        coins: parseCoins(raw.coins),
+        owned: parseOwned(raw.owned),
+        ...(raw.muted === true ? { muted: true } : {}),
         ...(typeof raw.shared === "string" ? { shared: raw.shared } : {}),
         ...(Array.isArray(raw.mine) ? { mine: raw.mine.filter((x): x is string => typeof x === "string").slice(-20) } : {}),
         ...(Array.isArray(raw.tamed)
@@ -107,6 +115,8 @@ world.onNear = (e) => {
   const hint = $("hint");
   if (world.isChilling) return;
   hint.hidden = !e;
+  const who = e ? speakerFor(e.kind, e.archetype) : null;
+  if (who && !busy) chatter(who, "enemy", 1800);
   if (e) hint.innerHTML = `<b>E</b> or click: ${VERB[e.kind]} <b>${esc(e.label)}</b>`;
 };
 
@@ -126,7 +136,7 @@ world.onInteract = (e) => {
     case "ghost": return void fight({ pick: "ghost", ghost: e.ghost! });
     case "arena": return void fight({ pick: "ghost" });
     case "npc": return say("enemy", ELDER_TIPS[tip++ % ELDER_TIPS.length]!, 3200);
-    case "market": return say("enemy", "The stall opens soon. Bring coins from your wins!", 2400);
+    case "market": return openShop();
     case "porch": return world.setChill(true);
     case "decorate": return openDecorate();
   }
@@ -139,6 +149,97 @@ world.onChill = (on) => {
     say("pet", "So cozy here.", 2200);
   } else world.onNear(world.nearEntity);
 };
+
+// ---------------- chatter, voice, coins, shop ----------------
+
+const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
+const lastLine: Partial<Record<Speaker, string>> = {};
+function speak(text: string, who: Speaker) {
+  if (!canSpeak || state.muted) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    const v = voiceFor(who);
+    u.pitch = v.pitch;
+    u.rate = v.rate;
+    u.volume = 0.35; // quiet by default
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch {
+    /* no voices on this browser: bubbles only */
+  }
+}
+function chatter(who: Speaker, bubble: "pet" | "enemy", ms = 2200) {
+  const line = pickLine(who, Math.random, lastLine[who]);
+  lastLine[who] = line;
+  say(bubble, line, ms);
+  speak(line, who);
+}
+function nearSpeaker(): Speaker | null {
+  const e = world.nearEntity;
+  return e ? speakerFor(e.kind, e.archetype) : null;
+}
+// Ambient: every few seconds the creature you stand next to, or else your pet, says something.
+function ambient() {
+  if (arena.mode === "world" && !busy && !document.hidden) {
+    const who = nearSpeaker();
+    if (who) chatter(who, "enemy");
+    else if (!world.isChilling || Math.random() < 0.5) chatter("pet", "pet");
+  }
+  setTimeout(ambient, nextChatter(Math.random) * 1000);
+}
+setTimeout(ambient, 4000);
+
+const muteBtn = $("mute");
+muteBtn.hidden = !canSpeak;
+const renderMute = () => {
+  muteBtn.textContent = state.muted ? "🔇 Voices off" : "🔊 Voices on";
+  muteBtn.setAttribute("aria-pressed", String(!state.muted));
+};
+muteBtn.onclick = () => {
+  state.muted = !state.muted;
+  if (state.muted && canSpeak) speechSynthesis.cancel();
+  save();
+  renderMute();
+};
+renderMute();
+
+function renderCoins() {
+  $("coins").textContent = String(state.coins ?? 0);
+}
+renderCoins();
+
+function openShop() {
+  chatter("merchant", "enemy", 2600);
+  renderShop();
+  $("shop").hidden = false;
+}
+function renderShop(note = "") {
+  const list = $("shopList");
+  list.innerHTML = "";
+  for (const item of SHOP_ITEMS) {
+    const have = (state.owned ?? []).includes(item);
+    const row = document.createElement("div");
+    row.className = "shopRow";
+    row.innerHTML = `<span class="shopIcon">${DECOR_ICON[item]}</span><b>${DECOR_LABEL[item]}</b><span class="dim">🪙 ${PRICES[item]}</span>`;
+    const b = document.createElement("button");
+    b.textContent = have ? "Owned" : "Buy";
+    b.disabled = have || (state.coins ?? 0) < PRICES[item]!;
+    b.onclick = () => {
+      const r = buy(state.coins ?? 0, state.owned ?? [], item);
+      if (!r.ok) return renderShop(r.reason === "poor" ? "Not enough coins yet: win or befriend wild pets." : "");
+      state.coins = r.coins;
+      state.owned = r.owned;
+      save();
+      renderCoins();
+      renderShop(`${DECOR_LABEL[item]} is yours! Place it from "Decorate your corner".`);
+      say("enemy", "Thank you, come again!", 2000);
+    };
+    row.appendChild(b);
+    list.appendChild(row);
+  }
+  $("shopNote").textContent = note || `You have 🪙 ${state.coins ?? 0}. Wild wins pay 3, befriending pays 5.`;
+}
+$("shopClose").onclick = () => ($("shop").hidden = true);
 
 // The signpost at your corner opens the decorate panel.
 function openDecorate() {
@@ -311,6 +412,10 @@ async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {
   await banner(OUTCOME[replay.outcome]);
   if (from.entity?.kind === "wild" && replay.outcome === "win") {
     world.removeEntity(from.entity.id);
+    const earned = coinsFor(replay.outcome, replay.how);
+    state.coins = addCoins(state.coins ?? 0, earned);
+    renderCoins();
+    logLine(`<b>+${earned} coins</b> <span class="dim">(spend them at the market, south)</span>`);
     if (replay.how === "befriended") {
       state.tamed = [...(state.tamed ?? []), enemy].slice(-MAX_TAMED);
       world.addTamed(enemy, state.tamed.length);
@@ -367,7 +472,7 @@ function renderHome() {
     b.disabled = busy;
     b.onclick = () => {
       if (busy) return;
-      state.decor = cycle(state.decor, slot, ownedItems()); // the market will pass bought items here
+      state.decor = cycle(state.decor, slot, ownedItems(state.owned));
       state.home = plotSlots(state.decor);
       save();
       arena.setDecor(state.home);

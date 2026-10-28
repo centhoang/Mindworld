@@ -292,6 +292,12 @@ export class WorldView {
   private readonly zTex = textSprite("z", "#7f8fd8").material.map!;
   private readonly motesUp = Array.from({ length: 5 }, () => ({ sprite: textSprite("\u2665", "#f2738d"), age: 9, life: 1.8, from: new THREE.Vector3() }));
   onChill: (on: boolean) => void = () => {};
+  // Camera zoom: wheel or pinch sets a target, the camera eases towards it.
+  static readonly ZOOM_MIN = 0.7;
+  static readonly ZOOM_MAX = 2.2;
+  private zoomTarget = 1;
+  private readonly pointers = new Map<number, { x: number; y: number }>();
+  private pinchDist = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.scene.background = skyTexture();
@@ -305,7 +311,40 @@ export class WorldView {
     window.addEventListener("keydown", (e) => this.key(e, true));
     window.addEventListener("keyup", (e) => this.key(e, false));
     window.addEventListener("blur", () => this.keys.clear());
-    canvas.addEventListener("pointerdown", (e) => this.click(e));
+    canvas.addEventListener("pointerdown", (e) => {
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pointers.size >= 2) {
+        this.target = null; // a second finger means pinch, not a walk order
+        this.targetEntity = null;
+        this.pinchDist = this.pinchSpan();
+        return;
+      }
+      this.click(e);
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!this.pointers.has(e.pointerId)) return;
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pointers.size === 2) {
+        const d = this.pinchSpan();
+        if (this.pinchDist > 0 && d > 0) this.zoomBy(d / this.pinchDist);
+        this.pinchDist = d;
+      }
+    });
+    const lift = (e: PointerEvent) => {
+      this.pointers.delete(e.pointerId);
+      this.pinchDist = 0;
+    };
+    canvas.addEventListener("pointerup", lift);
+    canvas.addEventListener("pointercancel", lift);
+    canvas.addEventListener(
+      "wheel",
+      (e) => {
+        if (this.paused) return;
+        e.preventDefault();
+        this.zoomBy(Math.exp(-e.deltaY * 0.0015));
+      },
+      { passive: false },
+    );
   }
 
   build(map: WorldMap, content: WorldContent) {
@@ -504,6 +543,19 @@ export class WorldView {
     this.onChill(on);
   }
 
+  zoomBy(factor: number) {
+    this.zoomTarget = Math.min(WorldView.ZOOM_MAX, Math.max(WorldView.ZOOM_MIN, this.zoomTarget * factor));
+  }
+
+  get zoom(): number {
+    return this.zoomTarget;
+  }
+
+  private pinchSpan(): number {
+    const [a, b] = [...this.pointers.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  }
+
   get isChilling(): boolean {
     return this.chilling;
   }
@@ -652,6 +704,10 @@ export class WorldView {
     for (const o of this.islets) o.position.y = o.userData.y + Math.sin(t / 1400 + o.userData.phase) * 0.25;
     this.sun.position.set(this.player.x + 8, 18, this.player.z + 10);
     this.sun.target.position.set(this.player.x, 0, this.player.z);
+    if (Math.abs(this.camera.zoom - this.zoomTarget) > 0.001) {
+      this.camera.zoom += (this.zoomTarget - this.camera.zoom) * Math.min(1, dt * 10);
+      this.camera.updateProjectionMatrix();
+    }
     this.camera.position.set(this.player.x, 14, this.player.z + 13);
     this.camera.lookAt(this.player.x, 0, this.player.z);
   }

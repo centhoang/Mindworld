@@ -6,8 +6,10 @@ DIRECTOR MODE ACTIVE since 2026-10-29 (night, UTC+7)
 ## Queue (Director)
 1. [x] Visuals research -> `docs/VISUALS.md` (skills/plugins, CC0 packs + licenses, three.js techniques). Done: doc exists with picks + reasons.
 2. [x] (committed; shots `.scratch/visuals/{before,after}-*`) Cozy restyle of world + battle view (palette, gradient sky, soft shadows/toon, clouds/water under islands, idle bobbing, particles; small bundle). Done: build + tests pass, before/after screenshots in `.scratch/visuals/`.
-3. [ ] A-frame house per corner (0b): enterable/porch chill area for player+pet, decor slots (inside + plot) stored in state; other corners show their A-frame + decor. Done: tests for decor state, visible in pane.
-4. [ ] Verification pass: `npm test` + build (client, worker), secrets scan, local commit.
+3. [x] (fe5fc73) A-frame house per corner (0b): enterable/porch chill area for player+pet, decor slots (inside + plot) stored in state; other corners show their A-frame + decor. Done: tests for decor state, visible in pane.
+4. [x] Verification pass after 3: client 124, worker 106, build OK, scan clean.
+5. [ ] World polish (safe, no paid calls): in-world speech bubbles + browser speechSynthesis for wild pets/elder/boss/pet; camera zoom (wheel/pinch, clamped); market island: coins from wins -> buy decor (uses decor hook). Done: tests + build, screenshots `.scratch/visuals/polish-*`.
+6. [ ] Final verification pass + commit, Morning report.
 API spend tonight: $0 (cap $3).
 
 ## Latest (2026-10-29, pivot to **Mindworld**, approved by the user)

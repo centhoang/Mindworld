@@ -114,6 +114,26 @@ export function makeDecor(kind: DecorKind): THREE.Group {
       add(new THREE.CylinderGeometry(0.04, 0.05, 0.12, 8), 0xfff3dc, 0.22, 0.06, 0.08);
       add(new THREE.SphereGeometry(0.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), 0xef6f6f, 0.22, 0.11, 0.08);
       break;
+    case "sunflower":
+      add(new THREE.CylinderGeometry(0.03, 0.035, 0.75, 6), 0x5aa04a, 0, 0.38);
+      add(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 16), 0xffc93c, 0, 0.8, 0.02).rotation.x = Math.PI / 2;
+      add(new THREE.CylinderGeometry(0.09, 0.09, 0.07, 12), 0x8a5a2b, 0, 0.8, 0.05).rotation.x = Math.PI / 2;
+      add(new THREE.SphereGeometry(0.08, 8, 6), 0x6fb85e, 0.1, 0.4).scale.set(1.4, 0.5, 0.8);
+      break;
+    case "pond":
+      add(new THREE.CylinderGeometry(0.5, 0.5, 0.04, 24), 0x8fd3f0, 0, 0.03).scale.z = 0.75;
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        add(new THREE.DodecahedronGeometry(0.09, 0), 0xb8b0a8, Math.cos(a) * 0.52, 0.05, Math.sin(a) * 0.4);
+      }
+      add(new THREE.CylinderGeometry(0.1, 0.1, 0.02, 12), 0x6fb85e, 0.15, 0.06, 0.05);
+      break;
+    case "birdhouse":
+      add(new THREE.CylinderGeometry(0.04, 0.05, 0.8, 6), 0xae7448, 0, 0.4);
+      add(new THREE.BoxGeometry(0.3, 0.3, 0.28), 0xf6e2c4, 0, 0.93);
+      add(new THREE.ConeGeometry(0.27, 0.2, 4), 0xf28b82, 0, 1.18).rotation.y = Math.PI / 4;
+      add(new THREE.CircleGeometry(0.06, 12), 0x5a3a2a, 0, 0.95, 0.141);
+      break;
     case "rug": {
       add(new THREE.CylinderGeometry(0.5, 0.5, 0.03, 28), 0xf4a7b9, 0, 0.02).scale.z = 0.7;
       add(new THREE.CylinderGeometry(0.36, 0.36, 0.035, 28), 0xfff3dc, 0, 0.025).scale.z = 0.7;

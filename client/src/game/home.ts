@@ -2,14 +2,14 @@
 // scene.ts draws it, main.ts saves it with the rest of the pet. Ghosts carry their owner's decor, so a
 // ghost fight happens on the other player's plot.
 
-export const DECOR = ["tree", "flower", "rock", "lamp", "fence", "pot", "mushroom", "rug"] as const; // worker/src/ghosts.ts DECOR_KINDS
+export const DECOR = ["tree", "flower", "rock", "lamp", "fence", "pot", "mushroom", "rug", "sunflower", "pond", "birdhouse"] as const; // worker/src/ghosts.ts DECOR_KINDS
 export type DecorKind = (typeof DECOR)[number];
 export type Slot = DecorKind | null;
 
 export const HOME_SLOTS = 8;
 
-export const DECOR_ICON: Record<DecorKind, string> = { tree: "🌳", flower: "🌸", rock: "🪨", lamp: "🏮", fence: "🚧", pot: "🪴", mushroom: "🍄", rug: "🧶" };
-export const DECOR_LABEL: Record<DecorKind, string> = { tree: "Tree", flower: "Flowers", rock: "Rock", lamp: "Lamp", fence: "Fence", pot: "Flower pot", mushroom: "Mushroom", rug: "Rug" };
+export const DECOR_ICON: Record<DecorKind, string> = { tree: "🌳", flower: "🌸", rock: "🪨", lamp: "🏮", fence: "🚧", pot: "🪴", mushroom: "🍄", rug: "🧶", sunflower: "🌻", pond: "💧", birdhouse: "🐦" };
+export const DECOR_LABEL: Record<DecorKind, string> = { tree: "Tree", flower: "Flowers", rock: "Rock", lamp: "Lamp", fence: "Fence", pot: "Flower pot", mushroom: "Mushroom", rug: "Rug", sunflower: "Sunflower", pond: "Pond", birdhouse: "Birdhouse" };
 
 export const emptyHome = (): Slot[] => Array<Slot>(HOME_SLOTS).fill(null);
 

@@ -1,3 +1,4 @@
+import { PRICES } from "./shop";
 import { DECOR, emptyHome, HOME_SLOTS, isKind, parseHome, type DecorKind, type Slot } from "./home";
 
 // Decor of a player's corner: items placed on named slots, 8 around the plot (the ring that home.ts
@@ -14,8 +15,8 @@ export interface Placement {
   slot: SlotId;
 }
 
-// Every item is free for now. The market can later add to what a player owns: pass the extra items in.
-export const STARTER_SET: readonly DecorKind[] = DECOR;
+// Everything not sold at the market is free; bought items (shop.ts) are passed in as extra.
+export const STARTER_SET: readonly DecorKind[] = DECOR.filter((k) => PRICES[k] === undefined);
 export const ownedItems = (extra: readonly DecorKind[] = []): DecorKind[] => [...new Set([...STARTER_SET, ...extra])];
 
 export const plotSlot = (i: number): SlotId => `plot-${i}`;
