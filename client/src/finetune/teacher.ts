@@ -8,6 +8,7 @@
 // Resumable: rows are appended to data/finetune/teacher-<split>.jsonl; a rerun skips lessons that already have a
 // final row and retries ones that failed for transient reasons (HTTP 429/5xx, network, timeout).
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { CortexUnavailable, LlmCortex } from "../sim/cortex";
 import { comparePaired, makeScenarios } from "../sim/evaluate";
 import { EMPTY_MEMO, type Memo } from "../sim/memo";
@@ -117,7 +118,9 @@ async function main() {
   );
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

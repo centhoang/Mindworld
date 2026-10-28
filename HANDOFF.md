@@ -25,6 +25,7 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 - **Fine-tune step 0 done (2026-10-28)**: `LocalCortex` (cortex.ts; llama-server + `json_schema` = memo DSL, source `local-llama`), 100 hand-written held-out lessons `client/src/finetune/lessons.ts`, bench `client/src/finetune/teach-bench.ts` (scripted | llama-server URL | `worker:<url>` teacher; `--resume`, `--out`). On those lessons: teacher Muse Spark Open +21.6 pts mean lift (88% valid, 12 cut off by reasoning, $0.80); untuned Llama + schema 100% valid but 3B -3.0 / 1B +0.7 pts, ~25% harmful. Target: student >= +15 pts. Table in docs/SPIKES.md. Spend today ~$0.8 (ledger total $1.24 all-time).
 
 - **Fine-tune steps 1-2 (2026-10-28)**: lessons 3,197 train + 300 val in `data/finetune/` ($0.19); teacher run on Modal Spark Open with effort low: train 3,194/3,197 valid, 2,480 gate-pass, val 300/300 (218 gate-pass), 0 cut off, $15.83 (Modal ledger $16.21 total) -> `data/finetune/teacher-{train,val}.jsonl`. Scripts `client/src/finetune/{gen-lessons,teacher,modal-client}.ts`. Details docs/FINETUNE.md.
+- **Fine-tune steps 3-4 done (2026-10-28)**: SFT set `data/finetune/sft-{train,val}.jsonl` (2,480 teach + 827 voice; gate-passing rows only). `modal/finetune_llama.py` trained Llama 3.2 3B and 1B (LoRA, ~$1.5 total, volume `llama-coach`). Held-out bench: **tuned 3B +23.8 pts (teacher +21.6, untuned -3.0), tuned 1B +18.4 pts with grammar** (untuned +0.7), both 100% valid. 1B needs grammar (stray `{"` without). GGUFs in `.scratch/finetune/`. Voice accuracy not measured yet.
 
 ## Decisions made
 - Browser-first "Pet Mind": local Instinct + cloud Cortex (Meta via Worker proxy) + home plot/neighborhood + ghost arena; signature Teach -> Prove. docs/PLAN.md v2. Hostname `pets.uryto.dev` approved (DNS at deploy).
@@ -43,12 +44,13 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 4. (resolved) Unity: no; native 3B = browser power mode. Details docs/SPIKES.md.
 
 ## Next actions
-0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` steps 1-2 done; next step 3 (voice data) and step 4 (`modal/finetune_llama.py`; select `ok && gate` teacher rows, chat format = exact Teach prompt + canonical memo JSON), then (b) voice teaching (speak -> Muse transcribe -> Teach -> Prove; check Spark Open audio-in on Modal), then (c) a boss that reads the pet's memo (kept out of the paired eval). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
+0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` steps 1-4 done; next: measure voice (valid rate, <= 8 words) on the tuned GGUFs, then step 7 ship: "Free coach" mode with `LocalCortex` on the tuned 3B in power mode (`scripts/power-mode.ps1` model swap) and the tuned 1B in the browser via MLC q4f32_1 (needs the user's Hugging Face account), then (b) voice teaching (speak -> Muse transcribe -> Teach -> Prove; check Spark Open audio-in on Modal), then (c) a boss that reads the pet's memo (kept out of the paired eval). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
 1. User: create the private GitHub repo `pet-mind` and push the local commits (secrets scan done each time), so the commits count as evidence.
 2. Deploy to `pets.uryto.dev` (`docs/DEPLOY.md`, user approves DNS; set Worker secrets MODAL_PROXY_TOKEN + MODAL_BASE_URL too). Verify the WebLLM 1B path and power mode on the GPU Chrome.
 3. User later: a Hugging Face account/token for hosting the tuned model (step 7 of FINETUNE.md).
 
 ## Gotchas
+- llama-server on Windows: a second server can "listen" on a port already taken and requests still reach the first; use a new port per model and check `/v1/models`. Stopping processes via PowerShell was denied by auto mode: ask the user.
 - Bulk teacher runs through local Worker: `wrangler dev --env-file ../.env --env-file ../.scratch/bench.env` (per-client cap $0.40/day otherwise; `--var` did not override). Make sure only one process listens on 8787.
 - GPU browser tests: Claude can launch a separate Chrome (`--force_high_performance_gpu --remote-debugging-port=9222 --user-data-dir=.scratch/chrome-gpu`) and drive it with `scripts/cdp-eval.mjs`; stop it and delete `.scratch/chrome-gpu` (~5 GB of weights cache) afterwards. A lost WebGPU device needs a Chrome restart.
 - Free-credit content may be used by Meta: notice + no personal data. Geo-block list: `worker/src/geo.ts`.

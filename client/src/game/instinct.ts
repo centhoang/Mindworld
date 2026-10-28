@@ -67,7 +67,7 @@ export function buildVoicePrompt(petName: string, memo: Memo, o: Observation, a:
   return { system, user, grammar: grammarFor("strict", a.moves)!, moves: a.moves };
 }
 
-const CANNED: Record<Action, string[]> = {
+export const CANNED: Record<Action, string[]> = {
   attack: ["Hyaa!", "Take that!", "My turn!"],
   guard: ["Not today!", "Shields up!", "Bracing..."],
   flee: ["Nope, nope, nope!", "Tactical retreat!"],

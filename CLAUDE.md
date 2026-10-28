@@ -14,6 +14,7 @@ Deadline: **Nov 4, 9 PM ET** (submission via CV platform). Event facts: `docs/EV
 - Long waits (builds, installs, test suites, downloads, model runs, anything over ~2 min): run the job in the background and use the `claude-queue` skill so the session sleeps for free; never poll in a loop or hold a long foreground command.
 - When reading PDFs/HTML/legal text: extract to `.scratch/`, collapse whitespace, and grep the needed section before reading (word-per-line PDF text once cost ~15k tokens).
 - Skills in `.claude/skills/`: `handoff` (save state), `sync-event` (read-only Discord/site catch-up). Add more when a task repeats.
+- **Context %** (for "context gets long" and the Sleep-mode stop rule): load the deferred tool with ToolSearch `select:mcp__ccd_session_mgmt__get_usage`, then call it with `session_id: "self"` (or a worker's session id). Read `context.percentUsed`, `tokensUsed`, `autoCompactsAtPercent`; `plan` also gives the 5-hour/weekly quota. The window is 1M tokens, so 45% is ~450k tokens. Verified 2026-10-28.
 - **Handoff**: update `HANDOFF.md` at every milestone and before a session ends. Keep it under ~80 lines: state, decisions + why, pending decisions, next 3 actions, gotchas, file map. When the session gets long (many tool outputs, or a phase just ended: design → core build → polish → submission), say so, write the handoff, and tell the user to start a fresh session. Prefer fresh+handoff over carrying a huge history.
 
 ## Stay in project

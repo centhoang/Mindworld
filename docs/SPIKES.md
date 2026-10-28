@@ -91,6 +91,12 @@ State: Reflect reliably returns a valid memo (3/3 with effort low) and can no lo
 | Llama 3.2 3B free | 49% | 43% | -2.3 | -4.8 | 16 | 1.3 | 2.1 s |
 | Llama 3.2 1B + schema | 100% | 84% | +0.7 | +0.7 | 24 | 2.2 | 1.3 s |
 | Llama 3.2 1B free | 20% | 20% | -0.3 | -1.4 | 5 | 1.0 | 1.0 s |
+| **Tuned Llama 3.2 3B** (LoRA, distilled from Muse Spark Open) + schema | 100% | 100% | **+23.8** | +23.8 | 1 | 3.3 | 6.2 s |
+| Tuned Llama 3.2 3B free | 100% | 100% | +23.8 | +23.8 | 1 | 3.3 | 6.0 s |
+| **Tuned Llama 3.2 1B** + schema | 100% | 92% | **+18.4** | +18.4 | 6 | 3.7 | 2.6 s |
+| Tuned Llama 3.2 1B free | 0% | 0% | 0 | - | 0 | - | - |
+
+Tuned rows (2026-10-28, docs/FINETUNE.md step 4): same 100 held-out lessons, same paired seeds, llama-server b11934 CUDA on the GTX 1050, Q4_K_M, temperature 0. The tuned 3B beats its teacher on this bench (+23.8 vs +21.6; the teacher lost 12 lessons to cut-off replies, which count as 0). The tuned 1B without grammar repeats a stray `{"` before every rule (`[{"{"if":...`), so it is only usable with grammar-constrained decoding, which the game always uses. Rows: `.scratch/teach-tuned-*.json`. p50 is longer than untuned because tuned memos have more rules.
 
 On the 88 lessons where the teacher answered: teacher +24.5, 3B -1.7, 1B +1.2. **Reading:** the schema makes untuned Llama always produce a valid memo, but the rules carry no coaching knowledge (about a quarter of lessons make the pet worse). That gap is exactly what distillation must close. All 12 teacher failures were replies cut off at 4000 output tokens (reasoning), not bad JSON: step 2 should use effort low or a larger budget and retry. Acceptance target (>= 70% of teacher on the same lessons): student mean lift >= +15 pts with >= 95% valid.
 Gotcha: the local Worker's per-client cap ($0.40/day) stops bulk runs; for benches start `wrangler dev --env-file ../.env --env-file ../.scratch/bench.env` (CLIENT_DAILY_USD=2, CLIENT_PER_MINUTE=30). `--var` did not override. Check port 8787 has one listener (stale workerd processes caused `fetch failed`).
