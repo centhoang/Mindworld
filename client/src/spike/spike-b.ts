@@ -14,12 +14,11 @@ interface ModelSpec {
   f32Id: string | null;
 }
 
+// Meta models only: organizers ruled (2026-10-28) that every model the project calls at runtime must be a
+// Meta model. The Gemma results from the spike stay in docs/SPIKES.md as research.
 const MODELS: ModelSpec[] = [
   { key: "llama1b", label: "Llama 3.2 1B Instruct (Meta)", f16Id: "Llama-3.2-1B-Instruct-q4f16_1-MLC", f32Id: "Llama-3.2-1B-Instruct-q4f32_1-MLC" },
   { key: "llama3b", label: "Llama 3.2 3B Instruct (Meta)", f16Id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", f32Id: "Llama-3.2-3B-Instruct-q4f32_1-MLC" },
-  { key: "gemma3-1b", label: "Gemma 3 1B it", f16Id: "gemma3-1b-it-q4f16_1-MLC", f32Id: null },
-  { key: "gemma2-2b", label: "Gemma 2 2B it (1k ctx)", f16Id: "gemma-2-2b-it-q4f16_1-MLC-1k", f32Id: "gemma-2-2b-it-q4f32_1-MLC-1k" },
-  { key: "gemma4-e2b", label: "Gemma 4 E2B it", f16Id: "gemma-4-E2B-it-q4f16_1-MLC", f32Id: "gemma-4-E2B-it-q4f32_1-MLC" },
 ];
 
 interface ModelResult {
