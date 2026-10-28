@@ -8,7 +8,7 @@
 
 Last updated: 2026-10-29 ~01:00 (UTC+7). Phase: **Mindworld world v1 live at https://pets.uryto.dev**; next: world polish + live multiplayer. GitHub: private repo `centhoang/MetaGlobalAIDeveloperHackathonProject_PetMind`, Claude manages and pushes; stays private until the user says. Deadline Nov 4 9 PM ET (user is UTC+7). Modal spend today ~$20 (ledger `.scratch/finetune/ledger.jsonl` $16.4 + ~$3 GPU).
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions (Mindworld: world v1 is live; next: the items under "Mindworld next"). Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions (Mindworld: world v1 is live; start with item 0, the cozy visual overhaul, then 0b, the A-frame house corners). Follow CLAUDE.md (Normal mode, 35% context limit)."
 Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Normal mode (dayshift) runs to the 35% context limit then hands off; Director mode (nightshift) runs workers one at a time.
 
 ## State
@@ -49,6 +49,8 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 5. `docs/DEMO.md` draft exists but predates the pivot: rewrite for Mindworld / Build for Your World after the world features settle.
 
 ## Mindworld next (in order)
+0. **TOP PRIORITY (user, 2026-10-29): cozy, cute, beautiful at first sight** (judges, X viewers, players must not dislike it on sight). Research first, write findings to `docs/VISUALS.md`: look for Claude skills/plugins for game art or three.js visuals (SearchSkills/SearchPlugins), free-to-use asset packs (CC0 low-poly/voxel: e.g. Kenney, Quaternius, KayKit, Poly Pizza; check each license, credit in README), and three.js techniques (toon/soft shading, outlines, soft shadows, warm palette + gradient sky, ambient occlusion, bloom, gentle idle animations, particles, water/clouds under the islands). Keep the bundle small and Meta-only for models (art assets are not models, fine). Then restyle the world + battle view and show the user screenshots before/after.
+0b. **Each player's corner = an A-frame house** (user): the pet and player can go inside (or into a cozy porch area) to chill; the player decorates it (inside + plot). Corners of other players show their A-frame + decor.
 1. World polish from the user's play-test: in-world speech (wild pets/NPC/boss bubbles + browser speechSynthesis voice), random modular pet at hatch (more genes/parts), market (coins from wins → decor), NPC chat via Muse Spark (Worker kind, capped + cached), camera zoom.
 2. Live layer: Durable Object room per world (WebSocket hibernation): presence + avatar/pet positions ~10 Hz while moving, chat, emotes; online players' corners fill the grid; live pet-vs-pet with a shared seed. Free plan: 100k req/day, incoming WS messages billed 20:1, 13k GB-s/day (about one busy room all day). Fall back to ghosts over the limit; ask before Workers Paid ($5/mo).
 3. Scheduled Worker job: Muse Spark re-teaches wild pets/boss from players' fights (cost-capped). Then pet-to-pet chat, breeding.
