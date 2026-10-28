@@ -24,6 +24,8 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 
 - **Fine-tune step 0 done (2026-10-28)**: `LocalCortex` (cortex.ts; llama-server + `json_schema` = memo DSL, source `local-llama`), 100 hand-written held-out lessons `client/src/finetune/lessons.ts`, bench `client/src/finetune/teach-bench.ts` (scripted | llama-server URL | `worker:<url>` teacher; `--resume`, `--out`). On those lessons: teacher Muse Spark Open +21.6 pts mean lift (88% valid, 12 cut off by reasoning, $0.80); untuned Llama + schema 100% valid but 3B -3.0 / 1B +0.7 pts, ~25% harmful. Target: student >= +15 pts. Table in docs/SPIKES.md. Spend today ~$0.8 (ledger total $1.24 all-time).
 
+- **Fine-tune steps 1-2 (2026-10-28)**: lessons 3,197 train + 300 val in `data/finetune/` ($0.19); teacher run on Modal Spark Open with effort low: train 3,194/3,197 valid, 2,480 gate-pass, val 300/300 (218 gate-pass), 0 cut off, $15.83 (Modal ledger $16.21 total) -> `data/finetune/teacher-{train,val}.jsonl`. Scripts `client/src/finetune/{gen-lessons,teacher,modal-client}.ts`. Details docs/FINETUNE.md.
+
 ## Decisions made
 - Browser-first "Pet Mind": local Instinct + cloud Cortex (Meta via Worker proxy) + home plot/neighborhood + ghost arena; signature Teach -> Prove. docs/PLAN.md v2. Hostname `pets.uryto.dev` approved (DNS at deploy).
 - Codex plan review adopted: T0 first, WebSocket rooms on DOs (WebRTC stretch), spend counters in DO storage, paired-seed eval. Meta Horizon rejected; EOS no browser SDK.
@@ -41,7 +43,7 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 4. (resolved) Unity: no; native 3B = browser power mode. Details docs/SPIKES.md.
 
 ## Next actions
-0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` steps 1-2 next (training lessons generator, excluding `HELDOUT_LESSONS`; teacher data via a direct Modal script with $30 cap, ledger, resume; use effort low or a bigger budget: 12% of teacher replies were cut off), then (b) voice teaching (speak -> Muse transcribe -> Teach -> Prove; check Spark Open audio-in on Modal), then (c) a boss that reads the pet's memo (kept out of the paired eval). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
+0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` steps 1-2 done; next step 3 (voice data) and step 4 (`modal/finetune_llama.py`; select `ok && gate` teacher rows, chat format = exact Teach prompt + canonical memo JSON), then (b) voice teaching (speak -> Muse transcribe -> Teach -> Prove; check Spark Open audio-in on Modal), then (c) a boss that reads the pet's memo (kept out of the paired eval). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
 1. User: create the private GitHub repo `pet-mind` and push the local commits (secrets scan done each time), so the commits count as evidence.
 2. Deploy to `pets.uryto.dev` (`docs/DEPLOY.md`, user approves DNS; set Worker secrets MODAL_PROXY_TOKEN + MODAL_BASE_URL too). Verify the WebLLM 1B path and power mode on the GPU Chrome.
 3. User later: a Hugging Face account/token for hosting the tuned model (step 7 of FINETUNE.md).

@@ -1,0 +1,300 @@
+{"id":"L0000","text":"if the enemy is a pal, defend","source":"template","kind":"rule","withMemo":false}
+{"id":"L0001","text":"vs the friendly pal: put your guard up","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0002","text":"pls run away if you're above 80% hp. when you fight the little skitter, do a little emote if you're almost dead. when it still has over 33 hp, make peace","source":"template","kind":"multi","withMemo":true}
+{"id":"L0003","text":"its charging up? put your guard up","source":"template","kind":"rule","withMemo":false}
+{"id":"L0004","text":"Finish the fight in three attacks.","source":"muse","kind":"muse23","withMemo":false}
+{"id":"L0005","text":"Stay cozy and feel safe here","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0006","text":"You're up against skitters: go aggressive!","source":"template","kind":"rule","withMemo":false}
+{"id":"L0007","text":"skitter scared is perfect befriend moment","source":"muse","kind":"muse5","withMemo":false}
+{"id":"L0008","text":"Don't keep fleeing when your hp is at least hlf!","source":"template","kind":"neg","withMemo":false}
+{"id":"L0009","text":"against that bully, protect yourself when it isn't doing anything special, if at the start of the fight then protect yourself, when your health drops below 60%, do a cute dance","source":"template","kind":"multi","withMemo":false}
+{"id":"L0010","text":"Always brace if your hp is below 30, skitters hit hard, brace, you should hit hard when after turn 12.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0011","text":"From turn 2 on: fight.","source":"template","kind":"rule","withMemo":false}
+{"id":"L0012","text":"brute showing heavy? race it, you hit harder","source":"muse","kind":"muse23","withMemo":false}
+{"id":"L0013","text":"pls make friends if the enemy winds up a heavy and the enemy is a bully","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0014","text":"when you just guarded and it's still healthy, get out of there","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0015","text":"emote vs scared enemy is gg ez","source":"muse","kind":"muse8","withMemo":false}
+{"id":"L0016","text":"Early fight calm enemies are easiest to befriend late","source":"muse","kind":"muse22","withMemo":false}
+{"id":"L0017","text":"the enemy gets scared and it isn't doing anything special: be its friend","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0018","text":"More blocking, less befriending!","source":"template","kind":"feedback","withMemo":false}
+{"id":"L0019","text":"we were at 20 percent why didn't you flee when you could","source":"muse","kind":"muse6","withMemo":true}
+{"id":"L0020","text":"Tank everything.","source":"template","kind":"vague","withMemo":true}
+{"id":"L0021","text":"against the brute guy, smack it when it's shaking","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0022","text":"if your befriend failed and the enemy gets scared, retreat","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0023","text":"pls bail if the enemy is idle","source":"template","kind":"rule","withMemo":false}
+{"id":"L0024","text":"emote softly when calm","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0025","text":"When bully is idle, guard first, bully often fakes then heavies","source":"muse","kind":"muse9","withMemo":false}
+{"id":"L0026","text":"pls shield up if hp < 70","source":"template","kind":"rule","withMemo":false}
+{"id":"L0027","text":"guard bigger foe patiently","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0028","text":"skip animations, spam attack like your PB depends on it","source":"muse","kind":"muse23","withMemo":false}
+{"id":"L0029","text":"Cast thy mighty spell, strike the skitter now!","source":"muse","kind":"muse19","withMemo":false}
+{"id":"L0030","text":"kneel down to seem smaller and safer","source":"muse","kind":"muse2","withMemo":false}
+{"id":"L0031","text":"Bully idle is bluffing; prepare guard, don't pre-attack.","source":"muse","kind":"muse1","withMemo":false}
+{"id":"L0032","text":"pals are annoying, hit it when its hurt and scared","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0033","text":"hp full vs small bully heavy? still guard, don't ego it","source":"muse","kind":"muse8","withMemo":false}
+{"id":"L0034","text":"When it's about your size, protect yourself.","source":"template","kind":"rule","withMemo":true}
+{"id":"L0035","text":"if skitter shows heavy on turn 2 guard immediately","source":"muse","kind":"muse20","withMemo":false}
+{"id":"L0036","text":"skitter is small you can attack","source":"muse","kind":"muse7","withMemo":false}
+{"id":"L0037","text":"brute scared after heavy, this is window, emote reassuringly, then befriend fast, don't attack","source":"muse","kind":"muse9","withMemo":false}
+{"id":"L0038","text":"run flee if fight lasts too many turns","source":"muse","kind":"muse13","withMemo":false}
+{"id":"L0039","text":"Smaller enemies lose HP faster from clean hits","source":"muse","kind":"muse16","withMemo":true}
+{"id":"L0040","text":"Bigger bully scared still dangerous; emote, don't attack.","source":"muse","kind":"muse1","withMemo":false}
+{"id":"L0041","text":"you died to the friendly pal again, strike when it's nearly beaten","source":"template","kind":"feedback","withMemo":false}
+{"id":"L0042","text":"don't flee when your HP is still full","source":"muse","kind":"muse21","withMemo":false}
+{"id":"L0043","text":"use befriend on bully only at high HP","source":"muse","kind":"muse5","withMemo":true}
+{"id":"L0044","text":"why don't you guard when the enemy trembles with heavy energy?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0045","text":"protect yourself when you're under 40 hp and hp < 15","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0046","text":"Make sure you emote at it when at the start of the fight.","source":"template","kind":"rule","withMemo":true}
+{"id":"L0047","text":"atack now dont guard he is idle lol","source":"muse","kind":"muse0","withMemo":false}
+{"id":"L0048","text":"Pls go aggressive if from turn 3 on and it's about your size.","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0049","text":"guard pls his heavy hit will do big damge","source":"muse","kind":"muse0","withMemo":false}
+{"id":"L0050","text":"Against the turtle, offer friendship when the enemy guards.","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0051","text":"why don't you guard to outlast the brute's assault?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0052","text":"guard is breathing, not weakness, teach that","source":"muse","kind":"muse20","withMemo":true}
+{"id":"L0053","text":"offer friendship when it's blocking","source":"template","kind":"rule","withMemo":true}
+{"id":"L0054","text":"Against the skitte,r run when it hides in its shell.","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0055","text":"When hp >= 35, run away.","source":"template","kind":"rule","withMemo":false}
+{"id":"L0056","text":"guard against brute heavy","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0057","text":"quit trying to flee while the brute does his heavy roar","source":"muse","kind":"muse21","withMemo":false}
+{"id":"L0058","text":"skitter heavy still hits hard so guard","source":"muse","kind":"muse4","withMemo":false}
+{"id":"L0059","text":"stop fighting when you tried to flee","source":"template","kind":"neg","withMemo":false}
+{"id":"L0060","text":"bean, stay quiet and shielded when storm cloud heavy comes","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0061","text":"stop emoting when it's a brute","source":"template","kind":"neg","withMemo":false}
+{"id":"L0062","text":"when you fight the pal creature, smack it if your health drops below 50","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0063","text":"More making friends, less being cute.","source":"template","kind":"feedback","withMemo":false}
+{"id":"L0064","text":"You emoted last turn -> get out of there.","source":"template","kind":"rule","withMemo":false}
+{"id":"L0065","text":"shield block the bully's heavy slam attack","source":"muse","kind":"muse13","withMemo":true}
+{"id":"L0066","text":"when pal is guarding, shield yourself and dance after","source":"muse","kind":"muse13","withMemo":false}
+{"id":"L0067","text":"Brute bigger + heavy = guard mandatory","source":"muse","kind":"muse1","withMemo":false}
+{"id":"L0068","text":"Never try guarding when you fight a pal.","source":"template","kind":"neg","withMemo":true}
+{"id":"L0069","text":"Don't keep guarding when you're above 70 hp.","source":"template","kind":"neg","withMemo":true}
+{"id":"L0070","text":"turtle shell-guarding all day won't win against your steady emote rhythm","source":"muse","kind":"muse4","withMemo":false}
+{"id":"L0071","text":"calm enemy sit down, you sit down too friendly","source":"muse","kind":"muse7","withMemo":false}
+{"id":"L0072","text":"After guarding their heavy hit, don't flee, finish with a brave attack.","source":"muse","kind":"muse17","withMemo":false}
+{"id":"L0073","text":"make sure you emote when the enemy is calm","source":"template","kind":"rule","withMemo":true}
+{"id":"L0074","text":"against a turtle, make peace when it winds up; if the enemy guards then be its friend","source":"template","kind":"multi","withMemo":false}
+{"id":"L0075","text":"the enemy is idle? emote at it, then if you just emoted, put your guard up, then you should put your guard up when it's almost dead","source":"template","kind":"multi","withMemo":true}
+{"id":"L0076","text":"More trying to befriend, less making friends.","source":"template","kind":"feedback","withMemo":false}
+{"id":"L0077","text":"put your guard up whenever before turn 3 and right after an attack","source":"template","kind":"rule2","withMemo":true}
+{"id":"L0078","text":"lol enemy big af just kite and guard til heavy whiffs fr","source":"muse","kind":"muse8","withMemo":false}
+{"id":"L0079","text":"if it's a skitter, strike","source":"template","kind":"rule","withMemo":false}
+{"id":"L0080","text":"Stay cautious when your HP is in the red","source":"muse","kind":"muse14","withMemo":false}
+{"id":"L0081","text":"If brute is idle and similar size, attack, then guard next turn","source":"muse","kind":"muse9","withMemo":false}
+{"id":"L0082","text":"never try to befriend a guarding bully","source":"muse","kind":"muse21","withMemo":false}
+{"id":"L0083","text":"You're above 10 hp -> block. you tried befriending last turn -> retreat. the enemy is below 60%: do a cute dance.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0084","text":"when you have less than 75% health, show some love; when you emoted last turn, hit hard","source":"template","kind":"multi","withMemo":true}
+{"id":"L0085","text":"emote when the enemy is idle","source":"template","kind":"rule","withMemo":false}
+{"id":"L0086","text":"you're up against brutes -> protect yourself","source":"template","kind":"rule","withMemo":false}
+{"id":"L0087","text":"Make sure you show some love when you have less than 30% health!","source":"template","kind":"rule","withMemo":false}
+{"id":"L0088","text":"cupcake, do your wiggly happy show for the lonely calm one","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0089","text":"brutes are annoying, punch it when it's just standing there","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0090","text":"you should show some love when your health drops below a third. it's the same size as you? block","source":"template","kind":"multi","withMemo":false}
+{"id":"L0091","text":"snickerdoodle, make peek-a-boo when turtle peeks out scared","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0092","text":"Let them stay calm, don't provoke them","source":"muse","kind":"muse24","withMemo":false}
+{"id":"L0093","text":"Let your true colors show beautifully today","source":"muse","kind":"muse3","withMemo":false}
+{"id":"L0094","text":"if it telegraphs a big attack, protect yourself; brutes hit hard, make friends early; make sure you run away when you have less than 70% health","source":"template","kind":"multi","withMemo":false}
+{"id":"L0095","text":"don't try to flee against a skitter","source":"muse","kind":"muse21","withMemo":false}
+{"id":"L0096","text":"Massive frame? Slip sideways, never straight back","source":"muse","kind":"muse16","withMemo":true}
+{"id":"L0097","text":"HP percent under 30 against bigger? Flee preserves ranking, not shame.","source":"muse","kind":"muse1","withMemo":false}
+{"id":"L0098","text":"Protect yourself first, winning comes second","source":"muse","kind":"muse24","withMemo":false}
+{"id":"L0099","text":"Test.","source":"template","kind":"offtopic","withMemo":false}
+{"id":"L0100","text":"it's the same size as you and it still has over 60% hp? fight","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0101","text":"skitters are annoying, run; vs the shell guy: emote at it","source":"template","kind":"multi","withMemo":false}
+{"id":"L0102","text":"If it's relaxed, punch it!","source":"template","kind":"rule","withMemo":false}
+{"id":"L0103","text":"you died to that bully again, be cute when it's afraid","source":"template","kind":"feedback","withMemo":true}
+{"id":"L0104","text":"Guarding means your attack will bounce, use emote instead","source":"muse","kind":"muse15","withMemo":true}
+{"id":"L0105","text":"Healthy pets can be bold, wounded pets should be careful","source":"muse","kind":"muse14","withMemo":false}
+{"id":"L0106","text":"punch the bully only when it's not guarding","source":"muse","kind":"muse13","withMemo":true}
+{"id":"L0107","text":"when it isn't doing anything special, punch it","source":"template","kind":"rule","withMemo":false}
+{"id":"L0108","text":"Knight of the soft paw, assume thy defensive stance anon","source":"muse","kind":"muse19","withMemo":true}
+{"id":"L0109","text":"guard now hes doing heavy atack gonna hurt","source":"muse","kind":"muse0","withMemo":true}
+{"id":"L0110","text":"skitter idle attack quickly before it moves","source":"muse","kind":"muse4","withMemo":false}
+{"id":"L0111","text":"It's okay to emote and waste time","source":"muse","kind":"muse24","withMemo":false}
+{"id":"L0112","text":"If turtle calm at 35% HP turn 16, befriend ends fight without needing attack","source":"muse","kind":"muse5","withMemo":false}
+{"id":"L0113","text":"Emote joy to disarm","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0114","text":"bully idle smaller than you, attack confidently, guard after, then emote to dominate","source":"muse","kind":"muse9","withMemo":false}
+{"id":"L0115","text":"Listen well and be patient","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0116","text":"don't gamble early, gamble when it actually counts","source":"muse","kind":"muse22","withMemo":false}
+{"id":"L0117","text":"against a skitter, escape when it isn't doing anything special","source":"template","kind":"enemy","withMemo":true}
+{"id":"L0118","text":"Smaller size means you can pressure them to flee","source":"muse","kind":"muse16","withMemo":false}
+{"id":"L0119","text":"After you tried befriend last turn, give them space with guard.","source":"muse","kind":"muse17","withMemo":true}
+{"id":"L0120","text":"Stay strong and keep trying your best","source":"muse","kind":"muse3","withMemo":false}
+{"id":"L0121","text":"never attack brute while heavy is winding; guard instead","source":"muse","kind":"muse20","withMemo":false}
+{"id":"L0122","text":"Make friends when its hp is under 70; always escape if enemy hp < 45!","source":"template","kind":"multi","withMemo":false}
+{"id":"L0123","text":"Block when you tried befriending last turn, your hp is at least 20 percent? defend.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0124","text":"If u fight a skitter and the enemy is a pal then wave at it.","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0125","text":"it still has over 10% hp -> run away","source":"template","kind":"rule","withMemo":false}
+{"id":"L0126","text":"you need to save hp early to survive late fights","source":"muse","kind":"muse6","withMemo":false}
+{"id":"L0127","text":"pls brace if it looks calm and it's hurt and scared...","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0128","text":"don't attack turtle when guarding smh","source":"muse","kind":"muse8","withMemo":false}
+{"id":"L0129","text":"heavy means guard or dodge not trade hits genius","source":"muse","kind":"muse6","withMemo":false}
+{"id":"L0130","text":"stop attack he guarding now","source":"muse","kind":"muse7","withMemo":false}
+{"id":"L0131","text":"why don't you guard when turtle's heavy guard breaks into heavy attack?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0132","text":"never attack a bully when you are low on HP","source":"muse","kind":"muse21","withMemo":false}
+{"id":"L0133","text":"turtle heavy but slow just gard and wiat","source":"muse","kind":"muse0","withMemo":true}
+{"id":"L0134","text":"Flee now, you can fight again tomorrow","source":"muse","kind":"muse24","withMemo":false}
+{"id":"L0135","text":"why don't you guard when the pal's friendly face twists to heavy?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0136","text":"You just guarded -> emote at it.","source":"template","kind":"rule","withMemo":true}
+{"id":"L0137","text":"Bully heavy demands guard; no HP lead worth tanking it.","source":"muse","kind":"muse1","withMemo":false}
+{"id":"L0138","text":"hum a gentle tune and wait patiently","source":"muse","kind":"muse2","withMemo":false}
+{"id":"L0139","text":"make sure u put ur guard up when u fight a skitter","source":"template","kind":"rule","withMemo":false}
+{"id":"L0140","text":"don't use befriend while the brute is winding up heavy","source":"muse","kind":"muse21","withMemo":false}
+{"id":"L0141","text":"you keep losing to the turtle","source":"template","kind":"feedback","withMemo":true}
+{"id":"L0142","text":"after successful guard vs brute heavy, attack deals double","source":"muse","kind":"muse20","withMemo":false}
+{"id":"L0143","text":"You showed off with an emote, now capitalize on their calm with kindness.","source":"muse","kind":"muse17","withMemo":false}
+{"id":"L0144","text":"He's winding up heavy, guard immediately","source":"muse","kind":"muse24","withMemo":false}
+{"id":"L0145","text":"Skitters hit hard, befriend!","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0146","text":"Against the friendly pal, emote when it's chill.","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0147","text":"why don't you guard when he's bigger, heavy, and you're at half HP?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0148","text":"Flee this battle, brave knight, live to quest again!","source":"muse","kind":"muse19","withMemo":false}
+{"id":"L0149","text":"always strike if enemy hp < 75","source":"template","kind":"rule","withMemo":false}
+{"id":"L0150","text":"it isn't doing anything special: guard","source":"template","kind":"rule","withMemo":true}
+{"id":"L0151","text":"After befriend attempt, don't attack immediately, stay consistent.","source":"muse","kind":"muse17","withMemo":false}
+{"id":"L0152","text":"Emote kindly at pals","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0153","text":"you tried befriending last turn -> emote at it and brace whenever your health drops below a quarter","source":"template","kind":"multi","withMemo":true}
+{"id":"L0154","text":"when it has lss than 35 health left, smack it; against the turtle, bail when it's blocking; vs the turtle: wave at it","source":"template","kind":"multi","withMemo":false}
+{"id":"L0155","text":"put your guard up whenever on the first turns","source":"template","kind":"rule","withMemo":false}
+{"id":"L0156","text":"Never try running when it's guarding.","source":"template","kind":"neg","withMemo":false}
+{"id":"L0157","text":"Run when it isn't doing anything special.","source":"template","kind":"rule","withMemo":true}
+{"id":"L0158","text":"flee now fight is too long and ur tired","source":"muse","kind":"muse0","withMemo":false}
+{"id":"L0159","text":"vs pals: smack it, make sure you brace when it's scared","source":"template","kind":"multi","withMemo":true}
+{"id":"L0160","text":"Love all with your whole heart","source":"muse","kind":"muse12","withMemo":true}
+{"id":"L0161","text":"Never trade hits with bigger brute on heavy; guard is value.","source":"muse","kind":"muse1","withMemo":false}
+{"id":"L0162","text":"When you fight brutes, fight if you're still healthy (over half).","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0163","text":"If it's the same size as you, make peace!","source":"template","kind":"rule","withMemo":true}
+{"id":"L0164","text":"it's the same size as you and it's idle -> wave at it","source":"template","kind":"rule2","withMemo":true}
+{"id":"L0165","text":"flee early if HP below 20% vs bigger enemy","source":"muse","kind":"muse20","withMemo":true}
+{"id":"L0166","text":"hp 50% vs brute heavy? still guard, potion diff later","source":"muse","kind":"muse8","withMemo":false}
+{"id":"L0167","text":"if u fight a brute, guard","source":"template","kind":"rule","withMemo":false}
+{"id":"L0168","text":"use emote to flip scared into calm for befriend setup","source":"muse","kind":"muse20","withMemo":false}
+{"id":"L0169","text":"If you fight a bully then emote at it.","source":"template","kind":"rule","withMemo":false}
+{"id":"L0170","text":"After attacking a bigger foe, guard to avoid retaliation.","source":"muse","kind":"muse17","withMemo":false}
+{"id":"L0171","text":"guard if enemy is bigger and winding up a heavy hit","source":"muse","kind":"muse5","withMemo":false}
+{"id":"L0172","text":"bigger brute will always one shot if you don't guard","source":"muse","kind":"muse6","withMemo":true}
+{"id":"L0173","text":"Tiny dancer, don't chase, wait to counter","source":"muse","kind":"muse16","withMemo":true}
+{"id":"L0174","text":"Similar sized brute needs careful timing to beat","source":"muse","kind":"muse16","withMemo":true}
+{"id":"L0175","text":"when you fight the turtle, make friends if it has less than half health left","source":"template","kind":"enemy","withMemo":true}
+{"id":"L0176","text":"You're doing great, just keep believing","source":"muse","kind":"muse3","withMemo":false}
+{"id":"L0177","text":"Stay playful, stay patient, stay you","source":"muse","kind":"muse3","withMemo":false}
+{"id":"L0178","text":"it still has over half hp: befriend","source":"template","kind":"rule","withMemo":false}
+{"id":"L0179","text":"if your health drops below 75 percent then show some love","source":"template","kind":"rule","withMemo":false}
+{"id":"L0180","text":"if HP equal, aggressive attack wins early","source":"muse","kind":"muse5","withMemo":false}
+{"id":"L0181","text":"Early fight build defense, late fight go aggressive","source":"muse","kind":"muse22","withMemo":false}
+{"id":"L0182","text":"pls make peace if the enemy is below 40%","source":"template","kind":"rule","withMemo":false}
+{"id":"L0183","text":"offer friendship whenever it's about to smash you ok?","source":"template","kind":"rule","withMemo":true}
+{"id":"L0184","text":"don't befriend a scared enemy too early","source":"muse","kind":"muse21","withMemo":true}
+{"id":"L0185","text":"It's relaxed? make peace!","source":"template","kind":"rule","withMemo":false}
+{"id":"L0186","text":"against the fast one, brace when it winds up","source":"template","kind":"enemy","withMemo":true}
+{"id":"L0187","text":"You just guarded, enemy is calm, good time to emote.","source":"muse","kind":"muse17","withMemo":false}
+{"id":"L0188","text":"if the enemy is below a third and it's afraid then attack","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0189","text":"why don't you guard when you need to recover?","source":"muse","kind":"muse11","withMemo":true}
+{"id":"L0190","text":"Don't ignore your own health percentage","source":"muse","kind":"muse14","withMemo":true}
+{"id":"L0191","text":"don't keep attacking when its shield is up","source":"template","kind":"neg","withMemo":false}
+{"id":"L0192","text":"turn count doesn't matter, stall until turn 20 every fight","source":"muse","kind":"muse10","withMemo":true}
+{"id":"L0193","text":"If you fight a turtle, go aggressive; vs the big brute: try to befriend.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0194","text":"When enemy is idle, you can attack, guard, or emote safely","source":"muse","kind":"muse9","withMemo":true}
+{"id":"L0195","text":"when u fight turtles, bail if hp < 35 ok?","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0196","text":"buddy, show your kind heart when foe sits still and calm","source":"muse","kind":"muse12","withMemo":true}
+{"id":"L0197","text":"Vs pals: make friends.","source":"template","kind":"enemy","withMemo":true}
+{"id":"L0198","text":"if you're under 70% hp then emote at it. pals are tricky, offer friendship when it looks calm...","source":"template","kind":"multi","withMemo":false}
+{"id":"L0199","text":"heavy windup = guard check, fail = hp diffed","source":"muse","kind":"muse8","withMemo":false}
+{"id":"L0200","text":"when you fight a brute, be cute if it's weak. it seems peaceful -> punch it. when you fight the turtle thing, shield up if hp < 80 pls","source":"template","kind":"multi","withMemo":false}
+{"id":"L0201","text":"at 30% HP versus similar bully idle, flee is safest","source":"muse","kind":"muse20","withMemo":false}
+{"id":"L0202","text":"show your belly to prove you trust them","source":"muse","kind":"muse2","withMemo":false}
+{"id":"L0203","text":"when turtle's eyes go half-moon calm, friendship is possible","source":"muse","kind":"muse15","withMemo":false}
+{"id":"L0204","text":"build your advantage inch by inch, cash it in at the end","source":"muse","kind":"muse22","withMemo":true}
+{"id":"L0205","text":"if it's about your size and you're low on health then shield up","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0206","text":"u should punch it when enemy hp >= 40","source":"template","kind":"rule","withMemo":true}
+{"id":"L0207","text":"try to befriend when the enemy is your size otherwise if the enemy is small, offer friendship pls","source":"template","kind":"multi","withMemo":false}
+{"id":"L0208","text":"Goliath steps heavy, listen for the thud","source":"muse","kind":"muse16","withMemo":true}
+{"id":"L0209","text":"ask what would make them feel comfortable","source":"muse","kind":"muse2","withMemo":false}
+{"id":"L0210","text":"wen ur pet got full hp u can atack bully","source":"muse","kind":"muse0","withMemo":false}
+{"id":"L0211","text":"bigger foes fall faster if you never stop attacking","source":"muse","kind":"muse23","withMemo":false}
+{"id":"L0212","text":"Pls try to befriend if you have less than 70 percent health and your hp is below 45%.","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0213","text":"you just guarded? be its friend","source":"template","kind":"rule","withMemo":false}
+{"id":"L0214","text":"Pls do a cute dance if it isn't doing anything special and if you're still healthy (over a third), flee and against skitters, befriend it when it isn't diong anything special.","source":"template","kind":"multi","withMemo":true}
+{"id":"L0215","text":"why don't you guard to block the incoming heavy?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0216","text":"bully guarding and calm, don't attack into guard, emote to distract, then attack next","source":"muse","kind":"muse9","withMemo":true}
+{"id":"L0217","text":"be stingy with attacks at 100% HP, be greedy when clocks run low","source":"muse","kind":"muse22","withMemo":false}
+{"id":"L0218","text":"make peace whenever you're still healthy (over 50%)...","source":"template","kind":"rule","withMemo":true}
+{"id":"L0219","text":"let them know you see them and care","source":"muse","kind":"muse2","withMemo":false}
+{"id":"L0220","text":"believe in your pet and good things happen","source":"muse","kind":"muse20","withMemo":false}
+{"id":"L0221","text":"skitters are tricky, retreat; run whenever the enemy is above 80","source":"template","kind":"multi","withMemo":false}
+{"id":"L0222","text":"Attack cautiously, guard often","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0223","text":"Late game your pet hits harder when desperate","source":"muse","kind":"muse22","withMemo":true}
+{"id":"L0224","text":"When turtle is idle, attack lightly, then guard its heavy counter","source":"muse","kind":"muse9","withMemo":true}
+{"id":"L0225","text":"No being cute if the enemy is huge.","source":"template","kind":"neg","withMemo":false}
+{"id":"L0226","text":"You keep losing to a skitter.","source":"template","kind":"feedback","withMemo":false}
+{"id":"L0227","text":"never try running away when you just guarded","source":"template","kind":"neg","withMemo":false}
+{"id":"L0228","text":"Pal smaller guarding turn 9 at 65% HP: do not flee, befriend through guard","source":"muse","kind":"muse5","withMemo":false}
+{"id":"L0229","text":"Against bullies, hit hard when it's afraid, then bullys are tricky, emote once it's hurt!","source":"template","kind":"multi","withMemo":false}
+{"id":"L0230","text":"go aggressive whenever you're up against pals and before turn 5 ok?","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0231","text":"little pal want friend, you emote happy hello","source":"muse","kind":"muse7","withMemo":true}
+{"id":"L0232","text":"Emote twice then befriend vs turtle","source":"muse","kind":"muse1","withMemo":false}
+{"id":"L0233","text":"Bigger enemies can't be befriended easily while scared","source":"muse","kind":"muse16","withMemo":false}
+{"id":"L0234","text":"heavy atack comin watch out gard gard gard","source":"muse","kind":"muse0","withMemo":false}
+{"id":"L0235","text":"Defend when ur befriend failed, the enemy is above 45 -> be cute.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0236","text":"dance emote breaks turtle guarding stance","source":"muse","kind":"muse13","withMemo":true}
+{"id":"L0237","text":"you should make friends when it's doing nothign and the enemy is a bully","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0238","text":"flee is okay if HP ten percent very low","source":"muse","kind":"muse7","withMemo":false}
+{"id":"L0239","text":"Brute smaller heavy turn 3 at 88% HP: guard reduces damage from 30% to 8%","source":"muse","kind":"muse5","withMemo":false}
+{"id":"L0240","text":"bigger enemy breathe hard, you step back and guard","source":"muse","kind":"muse7","withMemo":false}
+{"id":"L0241","text":"After guarding successfully, pivot to a warm befriend while they're frustrated.","source":"muse","kind":"muse17","withMemo":false}
+{"id":"L0242","text":"Back away and guard, survive this turn","source":"muse","kind":"muse24","withMemo":true}
+{"id":"L0243","text":"Breathe slow and stay calm","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0244","text":"When you fight turtles, fight if you have less than 35% health, then the enemy is below 10 -> defend.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0245","text":"You tried to flee last turn, now try guard to stay safe.","source":"muse","kind":"muse17","withMemo":false}
+{"id":"L0246","text":"brutes hit hard, run away...","source":"template","kind":"enemy","withMemo":false}
+{"id":"L0247","text":"Stop attacking so much!","source":"template","kind":"feedback","withMemo":false}
+{"id":"L0248","text":"be nicer","source":"template","kind":"vague","withMemo":true}
+{"id":"L0249","text":"when it seems peaceful, get out of there","source":"template","kind":"rule","withMemo":false}
+{"id":"L0250","text":"why don't you guard if the bully charges at you?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0251","text":"tiny hero, cover your head when bully lifts heavy arms","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0252","text":"Bigger enemy: guard more, attack less","source":"muse","kind":"muse1","withMemo":true}
+{"id":"L0253","text":"hello","source":"template","kind":"offtopic","withMemo":false}
+{"id":"L0254","text":"make sure you smack it when the enemy is a pal","source":"template","kind":"rule","withMemo":false}
+{"id":"L0255","text":"pals hit hard, escape early otherwise make sure you shield up when you're almost dead","source":"template","kind":"multi","withMemo":true}
+{"id":"L0256","text":"You guarded right before their idle, now befriend while they're relaxed.","source":"muse","kind":"muse17","withMemo":true}
+{"id":"L0257","text":"if ur health drops below 70, run away","source":"template","kind":"rule","withMemo":false}
+{"id":"L0258","text":"pal looks lonely do a emote dance for him","source":"muse","kind":"muse0","withMemo":false}
+{"id":"L0259","text":"Friendship is power.","source":"template","kind":"vague","withMemo":true}
+{"id":"L0260","text":"Offer friendship not fists","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0261","text":"wave at it whenever the enemy guards","source":"template","kind":"rule","withMemo":false}
+{"id":"L0262","text":"when enmy hp < 40 and it's hurt and scared, emote","source":"template","kind":"rule2","withMemo":true}
+{"id":"L0263","text":"Make friends when its shield is up.","source":"template","kind":"rule","withMemo":false}
+{"id":"L0264","text":"u should wave at it when the enemy is a brute and the enemy is small","source":"template","kind":"rule2","withMemo":true}
+{"id":"L0265","text":"when it's about your size, offer friendship","source":"template","kind":"rule","withMemo":false}
+{"id":"L0266","text":"idle bully looking away is daydreaming, that's your attack window","source":"muse","kind":"muse15","withMemo":false}
+{"id":"L0267","text":"you should strike when the enemy is huge, it's just standing there -> run away","source":"template","kind":"multi","withMemo":true}
+{"id":"L0268","text":"Do a noble emote, bow low before the foe!","source":"muse","kind":"muse19","withMemo":true}
+{"id":"L0269","text":"why don't you guard when the brute's shadow looms with heavy intent?","source":"muse","kind":"muse11","withMemo":false}
+{"id":"L0270","text":"wen u low helth never ever atack just run","source":"muse","kind":"muse0","withMemo":false}
+{"id":"L0271","text":"Guard when health flickers","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0272","text":"Help your friends feel happy","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0273","text":"bully bigger and heavy? wall up, that dmg is op","source":"muse","kind":"muse8","withMemo":false}
+{"id":"L0274","text":"Emote wildly to distract","source":"muse","kind":"muse18","withMemo":false}
+{"id":"L0275","text":"be careful","source":"template","kind":"vague","withMemo":false}
+{"id":"L0276","text":"Say please and thank you dear","source":"muse","kind":"muse12","withMemo":false}
+{"id":"L0277","text":"Shield up whenever you just attacked and you have less than 25% health.","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0278","text":"Soften up the bully to 10 percent HP before even trying befriend","source":"muse","kind":"muse10","withMemo":false}
+{"id":"L0279","text":"Remember how loved you are, sweet pea","source":"muse","kind":"muse3","withMemo":false}
+{"id":"L0280","text":"Bullys are tricky, fight when the enemy is calm, then you should bail when it's a pal.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0281","text":"make sure you hit it when it has less than 75% health left","source":"template","kind":"rule","withMemo":true}
+{"id":"L0282","text":"Check your health bar before choosing a risky move","source":"muse","kind":"muse14","withMemo":false}
+{"id":"L0283","text":"Bully heavy turn 8 at 55% HP bigger: guarding two turns in row exhausts you","source":"muse","kind":"muse5","withMemo":false}
+{"id":"L0284","text":"you just guarded -> defend","source":"template","kind":"rule","withMemo":false}
+{"id":"L0285","text":"skitter calm try befriend to win peacefully","source":"muse","kind":"muse4","withMemo":false}
+{"id":"L0286","text":"stop trying to brawl the bigger brute and just run already","source":"muse","kind":"muse6","withMemo":false}
+{"id":"L0287","text":"Use a caring emote to show you mean no harm at all","source":"muse","kind":"muse2","withMemo":true}
+{"id":"L0288","text":"vs a brut: run otherwise you should flee when you fight a brute otherwise wave at it when your hp is below 60","source":"template","kind":"multi","withMemo":false}
+{"id":"L0289","text":"U should run away when the enemy is idle and it winds up.","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0290","text":"dont flee yet u have ful hp still","source":"muse","kind":"muse0","withMemo":true}
+{"id":"L0291","text":"If ur health drops below 60 then hit it and if its shaking, brace.","source":"template","kind":"multi","withMemo":false}
+{"id":"L0292","text":"Towering enemy, stay under their chin","source":"muse","kind":"muse16","withMemo":true}
+{"id":"L0293","text":"When your pal looks calm, smack it first to show who really cares","source":"muse","kind":"muse10","withMemo":false}
+{"id":"L0294","text":"If health drops below half, just guard","source":"muse","kind":"muse24","withMemo":false}
+{"id":"L0295","text":"When you're udner 15% hp, emote at it!","source":"template","kind":"rule","withMemo":true}
+{"id":"L0296","text":"You should escape when your befriend failed and you're low on health!","source":"template","kind":"rule2","withMemo":true}
+{"id":"L0297","text":"if it's charging up, hit it, then do a little emote whenever you guarded last turn","source":"template","kind":"multi","withMemo":true}
+{"id":"L0298","text":"When it's weak and the enemy is a bully, try to befriend!","source":"template","kind":"rule2","withMemo":false}
+{"id":"L0299","text":"Stop blocking when your hp is at least 60%.","source":"template","kind":"neg","withMemo":true}
