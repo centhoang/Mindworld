@@ -31,7 +31,7 @@ Deadline: **Nov 4, 9 PM ET** (submission via CV platform). Event facts: `docs/EV
 - Sessions: Claude starts sessions only in Director mode. Otherwise it writes `HANDOFF.md` with a starting prompt and the user opens the fresh session.
 
 ## Work modes
-**Normal mode (dayshift, the default):** work through HANDOFF "Next actions" continuously, without stopping to report between steps. Stop early only for a decision or review that is the user's (see "Decide vs. ask"), or for a play-test request (then keep going on safe items until the user answers). When context reaches the limit: finish the task in progress (do not stop mid-task), commit, run the `handoff` skill, then tell the user to start a new session with the prompt from HANDOFF.
+**Normal mode (dayshift, the default):** work through HANDOFF "Next actions" continuously, without stopping to report between steps. Stop early only for a decision or review that is the user's (see "Decide vs. ask"), or for a play-test request (then keep going on safe items until the user answers). Start the next task whenever context is more than ~5% below the limit, even if it will cross the limit before it is done; a task in progress is always finished. Hand off (commit, `handoff` skill, tell the user to start a new session with the prompt from HANDOFF) only after a task ends at or above the limit, or within ~3-5% of it. Do not hand off early just because a phase ended.
 
 **Director mode (nightshift: the user says "sleep"/"director"; lasts until "wake up"):** this session stands in for the user and delegates; it does not build.
 1. Update `HANDOFF.md`: first line `DIRECTOR MODE ACTIVE since <date time>`, plus an ordered "Queue" of tasks with done criteria, ending with a verification pass (build, tests, secrets scan).
