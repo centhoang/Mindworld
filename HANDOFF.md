@@ -44,10 +44,10 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 4. (resolved) Unity: no; native 3B = browser power mode. Details docs/SPIKES.md.
 
 ## Next actions
-0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` steps 1-4 done; next (needs the user's Hugging Face account/token): host the tuned GGUFs + `scripts/power-mode.ps1` download entry (`-Model coach3b`), and the tuned 1B in the browser via MLC q4f32_1 (merged weights on Modal volume `llama-coach`) so the free coach also runs with no install; then (b) voice teaching (speak -> Muse transcribe -> Teach -> Prove; check Spark Open audio-in on Modal), then (c) a boss that reads the pet's memo (kept out of the paired eval). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
+0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` steps 1-4 done; tuned GGUFs hosted on HF (private: `kysupo/Llama-3.2-{3B,1B}-PetMind-Coach-GGUF`), power mode defaults to `coach3b`; browser 1B via MLC is blocked (nightly converter crashes, see FINETUNE.md), optional retry later; then (b) voice teaching (speak -> Muse transcribe -> Teach -> Prove; check Spark Open audio-in on Modal), then (c) a boss that reads the pet's memo (kept out of the paired eval). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
 1. User: create the private GitHub repo `pet-mind` and push the local commits (secrets scan done each time), so the commits count as evidence.
 2. Deploy to `pets.uryto.dev` (`docs/DEPLOY.md`, user approves DNS; set Worker secrets MODAL_PROXY_TOKEN + MODAL_BASE_URL too). Verify the WebLLM 1B path and power mode on the GPU Chrome.
-3. User later: a Hugging Face account/token for hosting the tuned model (step 7 of FINETUNE.md).
+3. User: decide when to make the HF coach repos public (power-mode download needs it; Nov 3 with the GitHub repo is the default). User play-test of the free coach pending.
 
 ## Gotchas
 - llama-server on Windows: a second server can "listen" on a port already taken and requests still reach the first; use a new port per model and check `/v1/models`. Stop servers you started with TaskStop (their background task id); PowerShell Stop-Process was denied by auto mode.

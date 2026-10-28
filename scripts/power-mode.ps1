@@ -3,7 +3,7 @@
   Pet Mind "power mode": runs Meta Llama 3.2 locally with llama.cpp so the browser game can use it.
 
 .DESCRIPTION
-  Downloads a pinned llama.cpp Windows build and a pinned Llama 3.2 Instruct GGUF (first run only,
+  Downloads a pinned llama.cpp Windows build and a pinned Llama 3.2 GGUF (default: the tuned Pet Mind coach 3B) (first run only,
   verified by size and SHA-256), then starts llama-server on 127.0.0.1:<Port>. The game page probes
   http://127.0.0.1:8080 and switches to the local model when it answers. Everything runs on this PC;
   nothing is sent anywhere. Stop the server with Ctrl+C. Safe to re-run.
@@ -11,12 +11,12 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts\power-mode.ps1
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File scripts\power-mode.ps1 -Backend vulkan -Model 1b
+  powershell -ExecutionPolicy Bypass -File scripts\power-mode.ps1 -Backend vulkan -Model coach1b
 #>
 [CmdletBinding()]
 param(
   [ValidateSet('cuda', 'vulkan', 'cpu')] [string]$Backend = 'cuda',
-  [ValidateSet('3b', '1b')] [string]$Model = '3b',
+  [ValidateSet('coach3b', 'coach1b', '3b', '1b')] [string]$Model = 'coach3b',
   [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'PetMind'),
   [switch]$SkipDownload,
   [int]$Port = 8080,
@@ -50,6 +50,11 @@ $Models = @{
             Url = 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf' }
   '1b' = @{ File = 'Llama-3.2-1B-Instruct-Q4_K_M.gguf'; Size = 807694464; Sha = '6f85a640a97cf2bf5b8e764087b1e83da0fdb51d7c9fab7d0fece9385611df83'
             Url = 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf' }
+  # Llama 3.2 tuned on Muse Spark Open's Teach memos and the pet's voice (docs/FINETUNE.md): the free coach.
+  'coach3b' = @{ File = 'Llama-3.2-3B-PetMind-Coach-Q4_K_M.gguf'; Size = 2019373760; Sha = '53f1bb062e73fa3c844dcb044dcb9deca10c88bff05dd485d97cd2d94378c467'
+            Url = 'https://huggingface.co/kysupo/Llama-3.2-3B-PetMind-Coach-GGUF/resolve/main/Llama-3.2-3B-PetMind-Coach-Q4_K_M.gguf' }
+  'coach1b' = @{ File = 'Llama-3.2-1B-PetMind-Coach-Q4_K_M.gguf'; Size = 807690496; Sha = 'fa6298a9343219aa85d0defb4a8778d1f9ee98306bfbe03a2c2514b80875f3e6'
+            Url = 'https://huggingface.co/kysupo/Llama-3.2-1B-PetMind-Coach-GGUF/resolve/main/Llama-3.2-1B-PetMind-Coach-Q4_K_M.gguf' }
 }
 
 function Say($msg) { Write-Host "[power-mode] $msg" }
