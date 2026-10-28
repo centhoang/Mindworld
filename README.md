@@ -4,7 +4,7 @@ A browser game built for the Meta Global AI Developer Hackathon (Oct 27 – Nov 
 
 ## Power mode (optional, local GPU)
 
-Power mode lets the game use **Meta Llama 3.2 3B Instruct** running natively on your own PC (llama.cpp), which is faster and smarter than the in-browser model. The game checks `http://127.0.0.1:8080` and switches to it automatically when it answers.
+Power mode lets the game use **Meta Llama 3.2 3B Instruct** running natively on your own PC (llama.cpp), which is faster and smarter than the in-browser model. Start the server, then press **Power mode** in the game and allow Chrome's prompt; after that the game finds `http://127.0.0.1:8080` by itself on every visit.
 
 One command (Windows, PowerShell, from the repo folder):
 
