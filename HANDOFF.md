@@ -8,7 +8,7 @@ SLEEP MODE ended for the night 2026-10-29 ~01:15 (UTC+7): the queue is empty, an
 - Decisions needing review: (1) Worker `maxOutputTokens` 2000 -> 4000 (reasoning ate the budget). (2) Reflect goes to Meta `muse-spark-1.3` (low effort), Teach stays on Baseten. (3) **Reflect gate**: a revised memo is adopted only if it doesn't lose on the 40 train seeds (held-out never seen by the gate); the UI says when a revision is rejected. Reflect often adds nothing over a strong taught memo.
 # HANDOFF (update at every milestone; keep under ~80 lines)
 
-Last updated: 2026-10-29 01:15 (overnight sleep run). Phase: **T1 (ghosts + home plot) in progress**. Deadline Nov 4 9 PM ET (user is UTC+7). 6 local commits, no remote.
+Last updated: 2026-10-29 ~14:45 (credits + Modal + cloud chooser session). Phase: **T1 done-ish; prize features next: fine-tune a free local coach (docs/FINETUNE.md)**. Deadline Nov 4 9 PM ET (user is UTC+7). 8 local commits (HEAD 46b1067), no remote.
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md, then continue from Next actions. Follow CLAUDE.md. Tell me when the context gets long and I will start a new session."
 Working agreements (in CLAUDE.md): short reports, ask the user only for important decisions, long waits via `claude-queue`, Sleep mode = unattended overnight chain.
@@ -39,9 +39,10 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 4. (resolved) Unity: no; native 3B = browser power mode. Details docs/SPIKES.md.
 
 ## Next actions
-1. User: create the private GitHub repo `pet-mind` and push the 6 local commits (secrets scan done), so the commits count as evidence.
-2. Verify the WebLLM 1B path in the UI on the GPU Chrome (grammar fallback is in `client/src/game/grammar.ts`), and run the power-mode download path once.
-3. Deploy to `pets.uryto.dev` (`docs/DEPLOY.md`, user approves DNS): check https -> 127.0.0.1 power mode, then neighborhood/ghost arena polish and the demo script.
+0. **Approved 2026-10-28, in order:** (a) fine-tune a free local coach: `docs/FINETUNE.md` (start at step 0, the untuned-Llama Teach baseline via a `LocalCortex`), then (b) voice teaching (speak -> Muse transcribe -> Teach -> Prove; check Spark Open audio-in on Modal), then (c) a boss that reads the pet's memo (kept out of the paired eval). Skip soccer/mating. Event needs first; local model + memo rules stay the free fallback after the event.
+1. User: create the private GitHub repo `pet-mind` and push the local commits (secrets scan done each time), so the commits count as evidence.
+2. Deploy to `pets.uryto.dev` (`docs/DEPLOY.md`, user approves DNS; set Worker secrets MODAL_PROXY_TOKEN + MODAL_BASE_URL too). Verify the WebLLM 1B path and power mode on the GPU Chrome.
+3. User later: a Hugging Face account/token for hosting the tuned model (step 7 of FINETUNE.md).
 
 ## Gotchas
 - GPU browser tests: Claude can launch a separate Chrome (`--force_high_performance_gpu --remote-debugging-port=9222 --user-data-dir=.scratch/chrome-gpu`) and drive it with `scripts/cdp-eval.mjs`; stop it and delete `.scratch/chrome-gpu` (~5 GB of weights cache) afterwards. A lost WebGPU device needs a Chrome restart.
