@@ -6,9 +6,9 @@ import { addCoins } from "./shop";
 // so growth keeps going while the tab is closed and tests need no clock.
 
 export const CROPS = {
-  turnip: { seed: 1, sell: 3, growMs: 45_000 },
+  wheat: { seed: 1, sell: 3, growMs: 45_000 },
   carrot: { seed: 2, sell: 6, growMs: 90_000 },
-  berry: { seed: 4, sell: 12, growMs: 180_000 },
+  tomato: { seed: 4, sell: 12, growMs: 180_000 },
 } as const;
 export type CropId = keyof typeof CROPS;
 export const CROP_IDS = Object.keys(CROPS) as CropId[];
@@ -32,7 +32,7 @@ export interface Farm {
 
 const EMPTY_PLOT: Plot = { crop: null, stage: 0, wetUntil: 0 };
 
-export const emptyFarm = (): Farm => ({ plots: Array.from({ length: PLOTS }, () => ({ ...EMPTY_PLOT })), seeds: { turnip: 3 }, basket: {} });
+export const emptyFarm = (): Farm => ({ plots: Array.from({ length: PLOTS }, () => ({ ...EMPTY_PLOT })), seeds: { wheat: 3 }, basket: {} });
 
 export type FarmResult = { ok: true; farm: Farm } | { ok: false; reason: "plot" | "busy" | "empty" | "no-seed" | "ripe" | "wet" | "not-ripe" };
 

@@ -21,7 +21,7 @@ type Ctx = CanvasRenderingContext2D;
 const FILES = [
   "tile-grass-0", "tile-grass-1", "tile-grass-2", "tile-water-0", "tile-water-1", "tile-water-2", "tile-water-3",
   "tile-path-atlas", "tile-path-0", "tile-path-1", "tile-path-2", "tile-shore-atlas", "tile-shore-inner", "tile-detail-flowers", "tile-detail-tuft",
-  "tile-bridge", "tile-crop-states", "prop-tree", "prop-house-aframe", "ui-frame-12", "font-6x8",
+  "tile-bridge", "tile-crop-states", "prop-tree", "prop-house-aframe", "ui-frame-12", "font-6x8", "player-walk", "props-decor",
 ] as const;
 export type ArtName = (typeof FILES)[number];
 
@@ -146,8 +146,19 @@ export interface Sprite {
   frames: number; // horizontal frames
 }
 
-// The player: 16x24 straw-hat farmer, 4 directions x 2 walk frames (rows: down, left, right, up).
+// The player: ImageGen walk sheet, 16x24, 4 frames x 4 directions (rows: down, left, right, up).
 export function makePlayer(): Sprite {
+  const src = art.get("player-walk");
+  if (src) {
+    const [c, g] = canvas(src.width, src.height);
+    g.drawImage(src, 0, 0);
+    return { img: c, w: 16, h: 24, frames: 4 };
+  }
+  return drawnPlayer();
+}
+
+// Fallback before the sheet loads (and in tests): the coded farmer, 2 frames.
+function drawnPlayer(): Sprite {
   const [img, g] = canvas(32, 96);
   for (let d = 0; d < 4; d++) {
     for (let f = 0; f < 2; f++) {
@@ -190,6 +201,26 @@ export interface Prop {
 }
 export const TREE: Prop = { name: "prop-tree", w: 32, h: 48 };
 export const HOUSE: Prop = { name: "prop-house-aframe", w: 48, h: 48 };
+
+// Furniture, tools and crops from the ImageGen props sheet (props-decor.json).
+export const PROPS = {
+  bed: [0, 0, 32, 32], rug: [32, 0, 48, 32], table: [80, 0, 32, 32], bookshelf: [112, 0, 16, 32],
+  chair: [0, 32, 16, 16], lamp: [16, 32, 16, 16], fern: [32, 32, 16, 16], broadleaf: [48, 32, 16, 16],
+  succulent: [64, 32, 16, 16], crate: [80, 32, 16, 16], frame: [96, 32, 16, 16], flowerpot: [112, 32, 16, 16],
+  seedbag: [0, 48, 16, 16], can: [16, 48, 16, 16],
+} as const satisfies Record<string, readonly [number, number, number, number]>;
+export type PropName = keyof typeof PROPS;
+const CROP_ROW = { wheat: 64, carrot: 80, tomato: 96 } as const;
+
+// A prop with its bottom-left at (x, bottom).
+export function drawSheetProp(g: Ctx, name: PropName, x: number, bottom: number): void {
+  const [sx, sy, w, h] = PROPS[name];
+  g.drawImage(img("props-decor"), sx, sy, w, h, Math.round(x), Math.round(bottom - h), w, h);
+}
+
+export function drawCrop(g: Ctx, crop: keyof typeof CROP_ROW, stage: number, x: number, y: number): void {
+  g.drawImage(img("props-decor"), Math.min(3, stage) * TILE, CROP_ROW[crop], TILE, TILE, x, y, TILE, TILE);
+}
 
 export function drawProp(g: Ctx, p: Prop, footX: number, footY: number): void {
   g.drawImage(img(p.name), Math.round(footX - p.w / 2), Math.round(footY - p.h));

@@ -14,7 +14,7 @@ export const FURNITURE = {
   chair: { w: 1, h: 1, rug: false, label: "Chair" },
   lamp: { w: 1, h: 1, rug: false, label: "Lamp" },
   plant: { w: 1, h: 1, rug: false, label: "Plant" },
-  shelf: { w: 2, h: 1, rug: false, label: "Shelf" },
+  shelf: { w: 1, h: 1, rug: false, label: "Bookshelf" },
   cushion: { w: 1, h: 1, rug: true, label: "Pet cushion" },
 } as const;
 export type PieceKind = keyof typeof FURNITURE;

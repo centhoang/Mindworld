@@ -5,7 +5,7 @@
 
 import { CRATE, COLS, DOOR, FURNITURE, PIECE_KINDS, ROWS, blocked, canPlace, pieceAt, place, removeAt, type Piece, type PieceKind } from "../game/room";
 import { followStep, keyDir, slide, WALK_SPEED, type Vec } from "../world/movement";
-import { makePlayer, PAL, type Sprite } from "./art";
+import { drawSheetProp, makePlayer, PAL, type PropName, type Sprite } from "./art";
 import { drawFrame, drawText, GLYPH } from "./text";
 
 export const ROOM_W = 384;
@@ -35,7 +35,10 @@ export class Interior {
   private dir = 3;
   private moving = false;
   private walkT = 0;
-  private readonly playerSprite: Sprite = makePlayer();
+  private sprite: Sprite | null = null;
+  private get playerSprite(): Sprite {
+    return (this.sprite ??= makePlayer());
+  }
   private bg: HTMLCanvasElement | null = null;
   // Decorate mode: a cell cursor and the piece kind to place.
   deco: { x: number; y: number; kind: number } | null = null;
@@ -132,7 +135,7 @@ export class Interior {
     const [qx, qy] = at(this.pet.x, this.pet.z);
     items.push({ z: this.pet.z, draw: () => g.drawImage(pet, qx - pet.width / 2, qy - pet.height + 2 - (Math.floor(t * 4) % 2)) });
     const [px0, py0] = at(this.player.x, this.player.z);
-    const pf = this.moving ? Math.floor(this.walkT * 8) % 2 : 0;
+    const pf = this.moving ? Math.floor(this.walkT * 8) % this.playerSprite.frames : 0;
     items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px0 - 8, py0 - 22, 16, 24) });
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
@@ -216,6 +219,10 @@ function drawRoom(): HTMLCanvasElement {
 }
 
 function drawCrate(g: Ctx, x: number, y: number): void {
+  return drawSheetProp(g, "crate", x, y + C);
+}
+
+export function drawCodedCrate(g: Ctx, x: number, y: number): void {
   px(g, x + 1, y + 2, PAL.ink, 14, 14);
   px(g, x + 2, y + 3, PAL.woodM, 12, 12);
   px(g, x + 2, y + 6, PAL.wood, 12, 1);
@@ -225,8 +232,17 @@ function drawCrate(g: Ctx, x: number, y: number): void {
   px(g, x + 9, y + 1, PAL.flowerP, 2, 2);
 }
 
-// Furniture in code (palette only). x, y = top-left of its first cell; tall pieces rise above it.
+// ImageGen props for most furniture, bottom-aligned to the footprint so tall pieces rise above it.
+const SHEET: Partial<Record<PieceKind, PropName>> = { bed: "bed", rug: "rug", table: "table", chair: "chair", lamp: "lamp", plant: "broadleaf", shelf: "bookshelf" };
+
 function drawPiece(g: Ctx, kind: PieceKind, x: number, y: number): void {
+  const prop = SHEET[kind];
+  if (prop) return drawSheetProp(g, prop, x, y + FURNITURE[kind].h * C);
+  drawCodedPiece(g, kind, x, y);
+}
+
+// Furniture in code (palette only): pieces with no sheet sprite yet.
+function drawCodedPiece(g: Ctx, kind: PieceKind, x: number, y: number): void {
   switch (kind) {
     case "bed":
       px(g, x, y - 4, PAL.ink, 32, 36);

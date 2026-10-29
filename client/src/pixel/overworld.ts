@@ -7,7 +7,7 @@ import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
-import { drawMapTile, drawProp, HOUSE, img, makePlayer, PAL, TREE, type Sprite } from "./art";
+import { drawCrop, drawMapTile, drawProp, HOUSE, img, makePlayer, PAL, TREE, type Sprite } from "./art";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
@@ -53,7 +53,10 @@ export class Overworld {
   private walkT = 0;
   private place = "";
   private bannerT = 0;
-  private readonly playerSprite: Sprite;
+  private sprite: Sprite | null = null;
+  private get playerSprite(): Sprite {
+    return (this.sprite ??= makePlayer()); // after loadArt: the ImageGen walk sheet
+  }
   petSprite: HTMLCanvasElement;
   readonly wilds: Wild[] = [];
   private nextId = 1;
@@ -89,7 +92,6 @@ export class Overworld {
     this.player = { x: home.x + 0.5, z: home.z + 3.5 };
     this.pet = { x: home.x - 1, z: home.z + 4 };
     this.cam = { ...this.player };
-    this.playerSprite = makePlayer();
     this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
     for (const p of this.world.platforms) if (p.kind === "wild") for (let i = 0; i < WILD_PER_MEADOW; i++) this.spawnWild(p.x, p.z, p.r);
   }
@@ -211,14 +213,12 @@ export class Overworld {
     this.beds.forEach((b, i) => {
       const [sx, sy] = toScreen(b.x, b.z);
       const p = this.farm?.plots[i];
-      if (p?.crop) g.drawImage(crops, p.stage * TILE, 0, TILE, TILE, sx, sy, TILE, TILE);
-      else {
-        g.drawImage(crops, 0, 0, TILE, TILE, sx, sy, TILE, TILE);
-        g.fillStyle = PAL.wood; // rake over the seed mark: an empty bed
-        g.fillRect(sx + 4, sy + 4, 8, 8);
-        g.fillStyle = PAL.woodD;
-        g.fillRect(sx + 4, sy + 7, 8, 1);
-      }
+      g.drawImage(crops, 0, 0, TILE, TILE, sx, sy, TILE, TILE);
+      g.fillStyle = PAL.wood; // rake over the seed mark: soil only
+      g.fillRect(sx + 4, sy + 4, 8, 8);
+      g.fillStyle = PAL.woodD;
+      g.fillRect(sx + 4, sy + 7, 8, 1);
+      if (p?.crop) drawCrop(g, p.crop, p.stage, sx, sy - 3);
       if (p && p.wetUntil) {
         g.fillStyle = PAL.teal; // wet soil: teal corner marker (STYLE.md farms)
         g.fillRect(sx + 3, sy + 11, 2, 2);
@@ -348,7 +348,7 @@ export class Overworld {
       items.push({ z: this.house.z, draw: () => drawProp(g, HOUSE, hx, hy) });
     }
     const [px, py] = toScreen(this.player.x, this.player.z);
-    const pf = this.moving ? Math.floor(this.walkT * 8) % 2 : 0;
+    const pf = this.moving ? Math.floor(this.walkT * 8) % this.playerSprite.frames : 0;
     items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px - 8, py - 22, 16, 24) });
     const half = OVERWORLD_MON / 2;
     for (const p of this.peers.values()) {
