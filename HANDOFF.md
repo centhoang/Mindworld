@@ -3,8 +3,8 @@
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md (approved). Continue from Next actions (stage 4 play-test feedback, then stage 3 leftovers / stage 5-6). Follow CLAUDE.md (Normal mode, 35% context limit)."
 
 ## State
-- **Deployed behind Access:** https://pets.uryto.dev/ version 7de3d002 (stages 1-4 incl. NPC hosting, villager sheets, minimap). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` in worker/ (two plain commands).
-- **Tests:** client 230, worker 160, tsc clean, build OK (at 1f87349).
+- **Deployed behind Access:** https://pets.uryto.dev/ version 4b77ed42 (stages 1-4 incl. NPC hosting, villager sheets, minimap, gate name signs). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` in worker/ (two plain commands).
+- **Tests:** client 230, worker 160, tsc clean, build OK (at 44e9951).
 - **Stage 1 (591f7d9):** `client/src/life/` = clock (1 day = 12 real min), needs, 14 activities, village sim (idle -> walk -> wait/gathering -> do; late joiners; cancel after 25 s), relations. Residents at home live on it; `pixel/life-draw.ts` poses + bowl/poop/ball + day/night tint; E on poop = clean. Player sheet 6 columns (4 walk with arm swing + 2 idle) via `spriteFrame()` in `art.ts`.
 - **Stage 2 (33fb9d5):** `client/src/mind/` = persona (from genes; traits bias the sim via `Env.bias`; `VILLAGERS` Elder/Mo/Ama/Pip authored), memory (log 30 + facts 6 + plan), brain (plan/choose/line/emote/reflect prompts + GBNF grammars + parsers + scripted fallbacks), scheduler (one queue per machine: priority, deadline race, duty cap 0.7, paused in battle), hub (chooser async: `undefined` = thinking; talk 2-4 lines with "..." bubble; invitations spread into the friend's plan; emotes after shared fun; reflection at sleep; save `petmind.minds.v1`). Model = whatever B loaded (native 3B or WebLLM 1B; `complete()` added to both). Inspector = I near a pet (`pixel/inspector.ts`). WebLLM load now warms up (first call ~33 s shader compile).
 - **Measured in the hidden preview pane (throttled):** grammar choice 2.2 s, a talk line 6-12 s; model plan + lines verified ("I'm so happy to meet you Mallow."). Visible tabs should be faster.
@@ -28,7 +28,7 @@
 
 ## Next actions
 1. **Stage 4 limits (fix if play-test shows them):** NPC clocks follow each machine's pet clock (phases can differ across machines); NPCs only talk to each other (no NPC<->pet talk); sit pose for humans = crop 3 px. Ideas: NPC<->pet talk when near, Mo fishing needs a pond in-between next to the hub.
-2. Stage 3 leftovers: decor from the props sheet (bushes/rocks/sign with owner name/fence/lights), autumn/snow tree art (Codex batch 2).
+2. Stage 3 leftovers: decor from the props sheet (bushes/rocks/fence/lights; name signs done), autumn/snow tree art (Codex batch 2).
 3. Stage 5 (fine-tune, background) + stage 6 (polish, README, demo script, captures).
 
 ## Gotchas
