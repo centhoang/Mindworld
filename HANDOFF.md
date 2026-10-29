@@ -3,17 +3,19 @@ DIRECTOR MODE ACTIVE since 2026-10-30 night (user asleep; no feedback given, so 
 ## Morning report
 - W1 done + committed 0453db6 (decor, NPC->pet lines, sit pose); not deployed yet.
 - W2 done: autumn/snow grass x3 + trees (Codex PNGs, recolour fallback); client tests 249.
+- W3 done: village data-gen script + 40-row sample (40/40 valid, $0.0753); full run + training await your OK (FINETUNE.md).
 
 ## Queue (director runs these one worker at a time)
 1. [x] W1 world polish (commit 0453db6, client tests 248): props-decor/props-grounds sheet decor on grounds (bushes, rocks, fence, party lights), seeded + paths kept clear; NPCs greet/talk to pets near them (scripted/mind line, rate-limited); human sit pose fix (no 3 px crop). Done = visible in build, tests added, all tests + tsc pass.
 2. [x] W2 Codex batch 2 art: autumn + snow ground tiles and tree variants (STYLE.md), wired to themes by the theme key. Done = PNGs in client/public/art, themes use them, build OK.
-3. [ ] W3 stage 5 prep (no training tonight): village-mind data-gen script through the cost wrapper (ledger, hard row/cost cap), mocked tests, a 40-row sample run <= $0.50; FINETUNE.md updated with the exact run commands. Training (~$2 Modal) waits for the user.
+3. [x] W3 stage 5 prep (40/40 valid, $0.0753) (no training tonight): village-mind data-gen script through the cost wrapper (ledger, hard row/cost cap), mocked tests, a 40-row sample run <= $0.50; FINETUNE.md updated with the exact run commands. Training (~$2 Modal) waits for the user.
 4. [ ] W4 stage 6 docs: README (what it is, how to play, Meta models used, pre-existing vs built this week, credits), docs/DEMO.md 3-min script draft for v3. No public actions.
 5. [ ] Verify: client + worker tests, tsc, build, secrets scan; commit; deploy (standing-approved) if green.
 
 ## Decisions needing review
 - Stray Worker deletion: still the user's (not touched).
-- API spend tonight: $0 so far (cap $3).
+- API spend tonight: $0.0753 (W3 sample, Modal Muse Spark Open; cap $3).
+- Stage 5 full data run (~$4) + Modal training (~$2): commands in FINETUNE.md, awaiting the user's go-ahead.
 
 # HANDOFF: Mindworld v3, stages 1-4 done + talk/relay polish; user play-test + review pending (2026-10-30 night)
 

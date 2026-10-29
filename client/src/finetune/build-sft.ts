@@ -4,8 +4,10 @@
 //   voice: observations from simulated fights under random teacher memos -> buildVoicePrompt, assistant =
 //          "<allowedMoves()[0]>: <line>"; lines come from Muse Spark Open (cached in voice-lines.json) plus the canned bank.
 // Voice examples are about a quarter of the total, so one model does both jobs.
-// Usage: npx tsx src/finetune/build-sft.ts [--voice-ratio 0.25] [--seed 11] [--cap 1]
+// Village minds (stage 5): --village adds the valid rows of data/finetune/village-<split>.jsonl (gen-village.ts).
+// Usage: npx tsx src/finetune/build-sft.ts [--voice-ratio 0.25] [--seed 11] [--cap 1] [--village]
 // Writes data/finetune/sft-{train,val}.jsonl ({"messages": [...], "task": "teach"|"voice"}).
+import { readVillageRows, type VillageRow } from "./gen-village";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { allowedMoves, buildVoicePrompt, CANNED, PERSONALITY } from "../game/instinct";
@@ -20,7 +22,7 @@ import { ModalClient, pool } from "./modal-client";
 import { readRows, type TeacherRow } from "./teacher";
 
 export interface Example {
-  task: "teach" | "voice";
+  task: "teach" | "voice" | "village";
   messages: { role: "system" | "user" | "assistant"; content: string }[];
 }
 
@@ -99,6 +101,10 @@ export function voiceExamples(n: number, memos: Memo[], lines: Lines, seed: numb
   return out;
 }
 
+// Village rows hold the game's exact prompt (mind/brain.ts) and the validated teacher answer.
+export const villageExamples = (rows: readonly VillageRow[]): Example[] =>
+  rows.filter((r) => r.ok && r.target).map((r) => ({ task: "village", messages: [{ role: "system", content: r.system }, { role: "user", content: r.user }, { role: "assistant", content: r.target! }] }));
+
 function shuffle<T>(xs: T[], seed: number): T[] {
   const r = mulberry32(seed);
   for (let i = xs.length - 1; i > 0; i--) {
@@ -123,10 +129,11 @@ async function main() {
     const teach = kept.map((r) => teachExample(r.lesson, r.start, r.memo!));
     const memos = kept.map((r) => r.memo!).filter((m) => m.rules.length > 0);
     const voice = voiceExamples(Math.round((teach.length * ratio) / (1 - ratio)), memos, lines, seed + (split === "val" ? 1 : 0));
-    const all = shuffle([...teach, ...voice], seed);
+    const village = args.includes("--village") ? villageExamples([...readVillageRows(`${DATA_DIR}village-${split}.jsonl`).values()]) : [];
+    const all = shuffle([...teach, ...voice, ...village], seed);
     writeFileSync(`${DATA_DIR}sft-${split}.jsonl`, all.map((e) => JSON.stringify(e)).join("\n") + "\n");
     const offSchema = rows.filter((r) => r.ok && r.gate && r.memo && !fitsSchema(r.memo)).length;
-    console.log(`${split}: teach ${teach.length} (of ${rows.length}; ${offSchema} gate-pass rows dropped as off-schema), voice ${voice.length}`);
+    console.log(`${split}: teach ${teach.length} (of ${rows.length}; ${offSchema} gate-pass rows dropped as off-schema), voice ${voice.length}, village ${village.length}`);
   }
 }
 
