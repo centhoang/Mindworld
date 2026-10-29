@@ -1,4 +1,5 @@
-import { completeTiered, type GrammarTier } from "./grammar";
+import { completeTiered, isGrammarError, type GrammarTier } from "./grammar";
+import type { LmRequest } from "../mind/brain";
 import { splitReply, type VoiceBackend, type VoicePrompt, type VoiceReply } from "./instinct";
 
 // Two Instinct backends, both Meta Llama 3.2 on the player's own machine:
@@ -120,6 +121,27 @@ export class NativeVoice implements VoiceBackend {
     const body = (await res.json()) as { choices: { message: { content: string } }[] };
     return splitReply(body.choices[0]?.message.content ?? "");
   }
+
+  // Any village-mind decision (mind/brain.ts builds the prompt and the GBNF grammar).
+  async complete(req: LmRequest, signal: AbortSignal): Promise<string> {
+    const res = await fetch(`${this.base}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      signal,
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: req.system },
+          { role: "user", content: req.user },
+        ],
+        temperature: req.temperature,
+        max_tokens: req.maxTokens,
+        ...(req.grammar ? { grammar: req.grammar } : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`llama-server HTTP ${res.status}`);
+    const body = (await res.json()) as { choices: { message: { content: string } }[] };
+    return body.choices[0]?.message.content ?? "";
+  }
 }
 
 // Chrome's Local Network Access: an https page must ask the player before it may reach 127.0.0.1.
@@ -164,7 +186,12 @@ export class WebLlmVoice implements VoiceBackend {
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
       if (!adapter) throw new Error("no WebGPU adapter");
       const id = adapter.features.has("shader-f16") ? "Llama-3.2-1B-Instruct-q4f16_1-MLC" : "Llama-3.2-1B-Instruct-q4f32_1-MLC";
-      this.engine = await webllm.CreateMLCEngine(id, { initProgressCallback: (r) => onProgress(r.text, r.progress) });
+      const engine = await webllm.CreateMLCEngine(id, { initProgressCallback: (r) => onProgress(r.text, r.progress) });
+      // Warm-up: the first generation compiles the shaders (~30 s on a GTX 1050). Do it during the loading
+      // toast, so fights and village minds don't spend their deadlines on it.
+      onProgress("Warming up the model (first run compiles shaders)...", 1);
+      await engine.chat.completions.create({ messages: [{ role: "user", content: "hi" }], max_tokens: 1 });
+      this.engine = engine;
     })();
     this.loading.catch(() => (this.loading = null));
     return this.loading;
@@ -192,6 +219,44 @@ export class WebLlmVoice implements VoiceBackend {
       });
       this.tier = tier;
       return reply;
+    } finally {
+      signal.removeEventListener("abort", onAbort);
+      this.busy = false;
+    }
+  }
+
+  private mindGrammar = true; // off for the session if xgrammar rejects a mind grammar
+
+  // Any village-mind decision. Shares the engine with fights: WebLLM runs one request at a time.
+  async complete(req: LmRequest, signal: AbortSignal): Promise<string> {
+    const engine = this.engine;
+    if (!engine) throw new Error("model not loaded");
+    this.busy = true;
+    const onAbort = () => engine.interruptGenerate();
+    signal.addEventListener("abort", onAbort);
+    const run = async (grammar: string | undefined) => {
+      const r = await engine.chat.completions.create({
+        messages: [
+          { role: "system", content: req.system },
+          { role: "user", content: req.user },
+        ],
+        temperature: req.temperature,
+        max_tokens: req.maxTokens,
+        ...(grammar ? { response_format: { type: "grammar" as const, grammar } } : {}),
+      });
+      if (signal.aborted) throw new Error("aborted");
+      return r.choices[0]?.message.content ?? "";
+    };
+    try {
+      if (req.grammar && this.mindGrammar) {
+        try {
+          return await run(req.grammar);
+        } catch (e) {
+          if (!isGrammarError(e)) throw e;
+          this.mindGrammar = false;
+        }
+      }
+      return await run(undefined);
     } finally {
       signal.removeEventListener("abort", onAbort);
       this.busy = false;

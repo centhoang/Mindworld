@@ -17,6 +17,10 @@ import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint } from "./life-draw";
+import { MindHub, type MindsSave } from "../mind/hub";
+import { petPersona } from "../mind/persona";
+import type { MindScheduler } from "../mind/scheduler";
+import { drawInspector } from "./inspector";
 
 type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
 
@@ -41,6 +45,7 @@ export interface Wild {
 interface Resident {
   sprite: HTMLCanvasElement;
   agent: Agent;
+  genes: Genes;
 }
 
 export class Overworld {
@@ -66,6 +71,10 @@ export class Overworld {
   readonly life = newVillage();
   private lifeEnv: Env;
   bowl: Vec = { x: 0, z: 0 };
+  minds: MindHub | null = null;
+  private savedMinds: MindsSave | null = null;
+  inspect: string | null = null; // the mind shown in the inspector (I)
+  mindWhere = "this computer";
   cam: Vec = { x: 0, z: 0 };
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
@@ -167,9 +176,65 @@ export class Overworld {
     this.residents = mons.map((m, i) => {
       const id = ids[i]!;
       const ang = (i / Math.max(1, mons.length)) * Math.PI * 2 + 0.6;
-      const agent = this.life.agents.find((a) => a.id === id) ?? addAgent(this.life, id, id, "pet", { x: home.x + Math.cos(ang) * 5.5, z: home.z + Math.sin(ang) * 5.5 });
-      return { sprite: drawMonster(petLook(m.genes), OVERWORLD_MON, "front", m.arch ? BUILDS[m.arch] : undefined), agent };
+      const agent = this.life.agents.find((a) => a.id === id) ?? addAgent(this.life, id, id, "pet", { x: home.x + Math.cos(ang) * 5.5, z: home.z + Math.sin(ang) * 5.5 }, this.savedMinds?.minds[id]?.needs);
+      return { sprite: drawMonster(petLook(m.genes), OVERWORLD_MON, "front", m.arch ? BUILDS[m.arch] : undefined), agent, genes: m.genes };
     });
+    this.syncMinds();
+  }
+
+  // Gives every resident a mind on this machine (persona from genes, memory from the save) and lets the
+  // hub choose their activities through the one model queue.
+  attachMinds(sched: MindScheduler, hasModel: () => boolean, saved: MindsSave | null): void {
+    this.savedMinds = saved;
+    if (saved) {
+      this.life.t = saved.t;
+      for (const [k, v] of saved.rel) this.life.rel.set(k, v);
+      for (const a of this.life.agents) {
+        const n = saved.minds[a.id]?.needs;
+        if (n) a.needs = { ...n };
+      }
+    }
+    const places = new Set(Object.keys(this.lifeEnv.spots) as (keyof Spots)[]);
+    this.minds = new MindHub(this.life, sched, { say: (id, text) => this.sayAgent(id, text) }, hasModel, places);
+    this.lifeEnv.chooser = this.minds.chooser;
+    this.lifeEnv.bias = this.minds.bias;
+    this.syncMinds();
+  }
+
+  private syncMinds(): void {
+    const hub = this.minds;
+    if (!hub) return;
+    for (const id of [...hub.minds.keys()]) if (!this.residents.some((r) => r.agent.id === id)) hub.remove(id);
+    for (const r of this.residents) {
+      if (hub.minds.has(r.agent.id)) continue;
+      const m = hub.add(petPersona(r.agent.id, r.genes), this.savedMinds?.minds[r.agent.id]?.mem);
+      r.agent.plan = m.mem.plan;
+    }
+  }
+
+  private sayAgent(id: string, text: string): void {
+    const i = this.residents.findIndex((r) => r.agent.id === id);
+    if (i >= 0) this.say(`r${i}`, text, text === "..." ? 25 : 5); // "..." stays up until the line arrives
+  }
+
+  // I: open the inspector on the nearest mind (or close it).
+  toggleInspect(): boolean {
+    if (this.inspect) {
+      this.inspect = null;
+      return false;
+    }
+    let best: string | null = null;
+    let bd = 3.5;
+    for (const r of this.residents) {
+      const d = Math.hypot(r.agent.pos.x - this.player.x, r.agent.pos.z - this.player.z);
+      if (d < bd) [best, bd] = [r.agent.id, d];
+    }
+    this.inspect = best;
+    return !!best;
+  }
+
+  mindNear(): boolean {
+    return this.residents.some((r) => Math.hypot(r.agent.pos.x - this.player.x, r.agent.pos.z - this.player.z) < 3.5);
   }
 
   // The poop you are standing next to, if any (E: clean it up).
@@ -332,7 +397,10 @@ export class Overworld {
     this.place = here || this.place;
     this.bannerT = Math.max(0, this.bannerT - dt);
     for (const [k, b] of this.bubbles) if ((b.t -= dt) <= 0) this.bubbles.delete(k);
-    for (const e of stepVillage(this.life, dt, this.lifeEnv)) {
+    const lifeEv = stepVillage(this.life, dt, this.lifeEnv);
+    this.minds?.onEvents(lifeEv);
+    this.minds?.tick();
+    for (const e of lifeEv) {
       const i = this.residents.findIndex((r) => r.agent.id === e.who);
       if (i < 0) continue;
       if (e.kind === "start" && e.act !== "wander") this.say(`r${i}`, ACTIVITY.get(e.act)!.label, 2.5);
@@ -486,12 +554,16 @@ export class Overworld {
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
-        : this.nearElder() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : "";
+        : this.nearElder() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
     if (hint) {
       const w = hint.length * GLYPH + 12;
       drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);
       drawText(g, hint, Math.round(px - w / 2) + 6, py - 40, PAL.wood);
     }
+    const im = this.inspect ? this.minds?.minds.get(this.inspect) : undefined;
+    const ia = this.inspect ? this.life.agents.find((a) => a.id === this.inspect) : undefined;
+    if (im && ia) drawInspector(g, im, ia, this.life.rel, (id) => this.minds?.minds.get(id)?.persona.name ?? id, this.mindWhere, sw, sh);
+    else this.inspect = null;
     if (this.bannerT > 0 && this.place) {
       const w = this.place.length * GLYPH + 16;
       const x = Math.floor((sw - w) / 2);

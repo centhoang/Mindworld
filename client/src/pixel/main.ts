@@ -26,6 +26,8 @@ import { Babbler } from "../game/babble";
 import { voiceFor, type Speaker } from "../game/chatter";
 import { Instinct } from "../game/instinct";
 import { CloudVoice, localAccessState, NativeVoice, WebLlmVoice } from "../game/voices";
+import { MINDS_KEY, parseMindsSave } from "../mind/hub";
+import { MindScheduler } from "../mind/scheduler";
 import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "../sim/boss";
 import { askNpc, chatWhoFor } from "../game/npc-chat";
 import { askPets, traitOf } from "../game/pet-chat";
@@ -251,7 +253,7 @@ function nextToast(): void {
 
 // The goals card (top left, G hides it): what a first visit should try. Gone once all four are done.
 function drawGoals(): void {
-  if (state.onboard?.goalsHidden) return;
+  if (state.onboard?.goalsHidden || world.inspect) return;
   const list = pixelGoals({ taught: !!state.steps?.proved, party: (state.party ?? []).length, shipped: !!state.steps?.shipped, boss: !!state.steps?.boss });
   if (list.every((x) => x.done)) return;
   const w = 150;
@@ -304,6 +306,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (k === "c" && !e.repeat) setCrt(!crt);
   if (k === "b" && !e.repeat && mode === "world" && !menu) void switchBrain();
+  if (k === "i" && !e.repeat && mode === "world" && !menu && !crate) world.toggleInspect();
   if (k === "g" && !e.repeat && mode === "world" && !chatWith) {
     state.onboard = { ...state.onboard, goalsHidden: !state.onboard?.goalsHidden };
     save(state);
@@ -429,6 +432,27 @@ void (async () => {
     if (await cloud.probe()) instinct.voice = cloud;
   }
 })();
+
+// ---- village minds: every pet at your corner has a mind (persona, plan, memory, friends). The same local
+// Llama the B key loads for fights thinks for them through one queue; without it they run on needs + rules.
+const localBrain = () => (instinct.voice === nativeBrain ? nativeBrain : instinct.voice === webBrain ? webBrain : null);
+const mindSched = new MindScheduler(() => localBrain(), { paused: () => mode === "battle" });
+world.attachMinds(mindSched, () => localBrain() !== null, (() => {
+  try {
+    return parseMindsSave(JSON.parse(localStorage.getItem(MINDS_KEY) ?? "null"));
+  } catch {
+    return null;
+  }
+})());
+const saveMinds = () => {
+  try {
+    if (world.minds) localStorage.setItem(MINDS_KEY, JSON.stringify(world.minds.snapshot()));
+  } catch {
+    // storage full or blocked: minds just start fresh next time
+  }
+};
+setInterval(saveMinds, 20_000);
+window.addEventListener("beforeunload", saveMinds);
 
 const memoKey = () => JSON.stringify([state.memo.rules.map((r) => [r.if, r.do]), state.home]);
 function coolFoe(foe: Wild | "boss" | "ghost"): void {
@@ -701,4 +725,4 @@ function update(dt: number, t: number): void {
 void loadArt().then(() => requestAnimationFrame(frame));
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
-(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live };
+(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain };

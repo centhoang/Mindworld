@@ -64,8 +64,10 @@ export interface Env {
   spots: Spots;
   canWalk: (x: number, z: number) => boolean;
   rng: () => number;
-  // The mind's pick among the valid choices (sorted best first); null/unknown = take the best score.
-  chooser?: (a: Agent, choices: Choice[], v: Village) => string | null;
+  // The mind's pick among the valid choices (sorted best first); null/unknown = take the best score,
+  // undefined = still thinking (the agent waits a moment and asks again).
+  chooser?: (a: Agent, choices: Choice[], v: Village) => string | null | undefined;
+  bias?: (a: Agent, act: string) => number; // personality nudge on the scores
 }
 
 export type LifeEvent =
@@ -106,7 +108,7 @@ export function validChoices(a: Agent, v: Village, env: Env): Choice[] {
     if (def.place === "mess") {
       if (!v.messes.some((m) => !claimed(v, m.id))) continue;
     } else if (!env.spots[def.place]?.length) continue;
-    const s = score(a, def, v, phase);
+    const s = score(a, def, v, phase) + (env.bias?.(a, def.id) ?? 0);
     if (def.min > 1) {
       const open = v.gatherings.find((g) => g.act === def.id && g.members.length > 0 && g.members.length < def.max); // late joiners welcome
       if (open) {
@@ -183,9 +185,10 @@ function stop(a: Agent): void {
   a.idle = 2;
 }
 
-export function choose(a: Agent, v: Village, env: Env): Choice {
+export function choose(a: Agent, v: Village, env: Env): Choice | null {
   const cs = validChoices(a, v, env);
   const want = env.chooser?.(a, cs, v);
+  if (want === undefined && env.chooser) return null; // thinking
   return cs.find((c) => c.act === want) ?? cs[0]!;
 }
 
@@ -199,7 +202,9 @@ export function stepVillage(v: Village, dt: number, env: Env): LifeEvent[] {
     a.needs = decay(a.needs, a.kind, hours);
     if (a.state === "idle") {
       if ((a.idle -= dt) > 0) continue;
-      begin(a, choose(a, v, env), v, env);
+      const c = choose(a, v, env);
+      if (c) begin(a, c, v, env);
+      else a.idle = 0.4;
       continue;
     }
     if (a.state === "walk") {
