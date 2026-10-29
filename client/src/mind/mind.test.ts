@@ -105,6 +105,14 @@ describe("scheduler", () => {
     const bad = await s.ask({ prio: 1, timeoutMs: 500, req: { system: "", user: "", maxTokens: 1, temperature: 0 }, parse: () => null, fallback: () => "rules" });
     expect(bad).toEqual({ value: "rules", source: "rules" });
   });
+  it("measures the model's speed for the host heartbeat", async () => {
+    let t = 0;
+    const lm = { label: "fake", ready: () => true, complete: async () => ((t += 1000), "x".repeat(80)) }; // 20 tokens in 1 s
+    const s = new MindScheduler(() => lm, { duty: 1, now: () => t });
+    expect(s.tps(12)).toBe(12);
+    await s.ask({ prio: 1, timeoutMs: 1e9, req: { system: "", user: "", maxTokens: 30, temperature: 0 }, parse: (x) => x, fallback: () => "" });
+    expect(s.tps(12)).toBe(20);
+  });
 });
 
 describe("mind hub + sim", () => {

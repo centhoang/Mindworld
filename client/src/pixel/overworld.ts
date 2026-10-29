@@ -23,7 +23,8 @@ import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
 import { drawInspector } from "./inspector";
-import { isNpc, type MindLine } from "../world/live";
+import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
+import { NpcVillage } from "../mind/npcs";
 
 type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
 
@@ -77,6 +78,8 @@ export class Overworld {
   private lifeEnv: Env;
   bowl: Vec = { x: 0, z: 0 };
   minds: MindHub | null = null;
+  npcs: NpcVillage | null = null; // Elder, Mo, Ama, Pip on the hub (their minds run on whoever hosts them)
+  private npcSprites = new Map<Npc, Sprite>();
   private savedMinds: MindsSave | null = null;
   inspect: string | null = null; // the mind shown in the inspector (I)
   mindWhere = "this computer";
@@ -156,8 +159,9 @@ export class Overworld {
       bowl: [{ x: this.bowl.x, z: this.bowl.z + 0.5 }, { x: this.bowl.x - 0.8, z: this.bowl.z + 0.2 }],
       bed: [{ x: this.house.x - 2, z: this.house.z + 0.7 }, { x: this.house.x + 2, z: this.house.z + 0.7 }, { x: this.house.x - 2.6, z: this.house.z + 1.3 }],
       lawn,
-      ...this.nextDoorSpots(home),
+      ...this.betweenSpots([home.cell]),
     };
+    this.npcs?.setSpots(this.npcSpots());
     this.minds?.setPlaces(new Set(Object.keys(this.lifeEnv.spots) as (keyof Spots)[]));
     if (dx || dz) {
       const move = (v: Vec) => {
@@ -180,13 +184,12 @@ export class Overworld {
 
   // In-between grounds bridged to my ground (picnic hill, playground, pond): my minds may walk there for
   // group activities, so invitations to a picnic can actually happen. Spots ring the prop on free land.
-  private nextDoorSpots(home: Platform): Spots {
+  private betweenSpots(cells: readonly [number, number][]): Spots {
     const out: Spots = {};
-    const [hi, hj] = home.cell;
     const anchor: Record<string, [keyof Spots, string]> = { picnic: ["picnic", "blanket"], playground: ["playground", "ball"], pond: ["pond", "dock"] };
     for (const p of this.world.platforms) {
       const use = anchor[p.kind];
-      if (!use || !p.spots || Math.abs(p.cell[0] - hi) + Math.abs(p.cell[1] - hj) !== 1) continue;
+      if (!use || !p.spots || !cells.some(([hi, hj]) => Math.abs(p.cell[0] - hi) + Math.abs(p.cell[1] - hj) === 1)) continue;
       const at = p.spots[use[1]]!;
       const list = (out[use[0]] ??= []);
       if (p.kind === "pond") list.push({ ...at });
@@ -198,6 +201,24 @@ export class Overworld {
       if (!list.length) delete out[use[0]];
     }
     return out;
+  }
+
+  // The NPCs live on the hub: beds on the Elder's island, dancing and picnics on the plaza, and any
+  // in-between ground bridged to the hub (Mo fishes at a pond there).
+  private npcSpots(): Spots {
+    const hub = this.world.platforms.filter((p) => Math.max(Math.abs(p.cell[0]), Math.abs(p.cell[1])) <= 1);
+    const plaza = hub.find((p) => p.kind === "plaza");
+    const isle = hub.find((p) => p.kind === "npc");
+    const ring = (c: Platform | undefined, r: number, n: number, dz = 0) =>
+      c ? Array.from({ length: n }, (_, i) => ({ x: c.x + Math.cos((i / n) * Math.PI * 2) * r, z: c.z + dz + Math.sin((i / n) * Math.PI * 2) * r * 0.8 })).filter((q) => this.canWalk(q.x, q.z)) : [];
+    const out: Spots = { ...this.betweenSpots(hub.map((p) => p.cell)), home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 3.5, 10), picnic: [...ring(plaza, 2, 6, 2), ...(this.betweenSpots(hub.map((p) => p.cell)).picnic ?? [])] };
+    for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
+    return out;
+  }
+
+  private npcHomes(): Record<Npc, Vec> {
+    const isle = this.world.platforms.find((p) => p.kind === "npc") ?? { x: 0, z: 0 };
+    return { elder: { x: isle.x, z: isle.z - 1 }, mo: { x: -3, z: 2 }, ama: { x: 3, z: 2 }, pip: { x: 0, z: 4 } };
   }
 
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
@@ -240,6 +261,21 @@ export class Overworld {
     return false;
   }
 
+  // Mo, Ama and Pip: the player's sheet hue-shifted (3 NPC bodies from Codex can replace these later).
+  private npcSprite(id: Npc): Sprite {
+    let s = this.npcSprites.get(id);
+    if (s) return s;
+    const base = this.playerSprite;
+    const c = document.createElement("canvas");
+    [c.width, c.height] = [base.img.width, base.img.height];
+    const g = c.getContext("2d")!;
+    g.filter = `hue-rotate(${({ mo: 180, ama: 300, pip: 90 } as Record<string, number>)[id] ?? 0}deg)`;
+    g.drawImage(base.img, 0, 0);
+    s = { ...base, img: c };
+    if (hasArt("player-walk")) this.npcSprites.set(id, s); // the drawn fallback is replaced once the art loads
+    return s;
+  }
+
   setPet(g: Genes, arch?: ArchetypeId): void {
     this.petSprite = drawMonster(petLook(g), OVERWORLD_MON, "front", arch ? BUILDS[arch] : undefined);
   }
@@ -275,6 +311,7 @@ export class Overworld {
     this.lifeEnv.chooser = this.minds.chooser;
     this.lifeEnv.bias = this.minds.bias;
     this.syncMinds();
+    this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text) => this.say(`n:${id}`, text, text === "..." ? 25 : 5) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk));
   }
 
   private syncMinds(): void {
@@ -296,10 +333,7 @@ export class Overworld {
 
   // Another player's mind line (a pet's spoken line or invitation) shows over that player; NPC lines over the NPC.
   hearMind(from: string, l: MindLine): void {
-    if (isNpc(l.who)) {
-      if (l.who === "elder" && l.say) this.say("elder", l.say, 5);
-      return;
-    }
+    if (isNpc(l.who)) return void this.npcs?.hear(l);
     const p = this.peers.get(from);
     if (!p) return;
     const text = l.say ?? (l.invite ? `come, ${ACTIVITY.get(l.invite.act)?.label ?? l.invite.act}!` : null);
@@ -318,16 +352,18 @@ export class Overworld {
     }
     let best: string | null = null;
     let bd = 3.5;
-    for (const r of this.residents) {
-      const d = Math.hypot(r.agent.pos.x - this.player.x, r.agent.pos.z - this.player.z);
-      if (d < bd) [best, bd] = [r.agent.id, d];
+    const hosted = this.npcs?.v.agents.filter((a) => this.npcs!.hub.minds.has(a.id)) ?? []; // NPC minds running here
+    for (const a of [...this.residents.map((r) => r.agent), ...hosted]) {
+      const d = Math.hypot(a.pos.x - this.player.x, a.pos.z - this.player.z);
+      if (d < bd) [best, bd] = [a.id, d];
     }
     this.inspect = best;
     return !!best;
   }
 
   mindNear(): boolean {
-    return this.residents.some((r) => Math.hypot(r.agent.pos.x - this.player.x, r.agent.pos.z - this.player.z) < 3.5);
+    const hosted = this.npcs?.v.agents.filter((a) => this.npcs!.hub.minds.has(a.id)) ?? [];
+    return [...this.residents.map((r) => r.agent), ...hosted].some((a) => Math.hypot(a.pos.x - this.player.x, a.pos.z - this.player.z) < 3.5);
   }
 
   // The poop you are standing next to, if any (E: clean it up).
@@ -492,6 +528,11 @@ export class Overworld {
     this.bannerT = Math.max(0, this.bannerT - dt);
     for (const [k, b] of this.bubbles) if ((b.t -= dt) <= 0) this.bubbles.delete(k);
     const lifeEv = stepVillage(this.life, dt, this.lifeEnv);
+    if (this.npcs) {
+      for (const e of this.npcs.step(dt, this.life.t)) if (e.kind === "start" && e.act !== "wander") this.say(`n:${e.who}`, ACTIVITY.get(e.act)!.label, 2.5);
+      const ea = this.npcs.v.agents.find((a) => a.id === "elder");
+      if (ea && this.elder) this.elder.pos = ea.pos;
+    }
     this.minds?.onEvents(lifeEv);
     this.minds?.tick();
     for (const e of lifeEv) {
@@ -632,6 +673,20 @@ export class Overworld {
       const pose = a.state === "do" ? ACTIVITY.get(a.act!)!.pose : null;
       items.push({ z: a.pos.z, draw: () => drawPetPose(g, r.sprite, rx, ry, pose, a.state === "walk", t, k) });
     });
+    // The village people (the Elder is drawn above with her own art): the player sheet in their colours.
+    for (const a of this.npcs?.v.agents ?? []) {
+      if (a.id === "elder") continue;
+      const [nx, ny] = toScreen(a.pos.x, a.pos.z);
+      if (nx < -24 || ny < -40 || nx > sw + 24 || ny > sh + 24) continue;
+      const s = this.npcSprite(a.id as Npc);
+      const walking = a.state === "walk";
+      const way = a.path?.[0] ?? a.target;
+      const [dx, dz] = [way.x - a.pos.x, way.z - a.pos.z];
+      const dir = !walking ? 0 : Math.abs(dx) > Math.abs(dz) ? (dx < 0 ? 1 : 2) : dz < 0 ? 3 : 0;
+      const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep") ? 3 : 0;
+      const f = spriteFrame(s, walking, t + NPCS.indexOf(a.id as Npc), t);
+      items.push({ z: a.pos.z, draw: () => g.drawImage(s.img, f * 16, dir * 24, 16, 24 - sit, nx - 8, ny - 22 + sit, 16, 24 - sit) });
+    }
     // A ball bounces between pets playing together.
     for (const gt of this.life.gatherings) {
       if (gt.act !== "ball" || !gt.started) continue;
@@ -653,7 +708,7 @@ export class Overworld {
     }
 
     for (const [who, b] of this.bubbles) {
-      const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" ? this.elder?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
+      const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" || who === "n:elder" ? this.elder?.pos : who.startsWith("n:") ? this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
       if (!pos) continue;
       const [bx, by] = toScreen(pos.x, pos.z);
       bubble(g, b.text, bx, by - OVERWORLD_MON - 4, sw);
@@ -669,9 +724,11 @@ export class Overworld {
       drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);
       drawText(g, hint, Math.round(px - w / 2) + 6, py - 40, PAL.wood);
     }
-    const im = this.inspect ? this.minds?.minds.get(this.inspect) : undefined;
-    const ia = this.inspect ? this.life.agents.find((a) => a.id === this.inspect) : undefined;
-    if (im && ia) drawInspector(g, im, ia, this.life.rel, (id) => this.minds?.minds.get(id)?.persona.name ?? id, this.mindWhere, sw, sh);
+    const npc = !!this.inspect && !!this.npcs?.hub.minds.has(this.inspect);
+    const [hub, v] = npc ? [this.npcs!.hub, this.npcs!.v] : [this.minds, this.life];
+    const im = this.inspect ? hub?.minds.get(this.inspect) : undefined;
+    const ia = this.inspect ? v.agents.find((a) => a.id === this.inspect) : undefined;
+    if (im && ia) drawInspector(g, im, ia, v.rel, (id) => hub?.minds.get(id)?.persona.name ?? id, npc ? `${this.mindWhere}, for all` : this.mindWhere, sw, sh);
     else this.inspect = null;
     if (this.bannerT > 0 && this.place) {
       const w = this.place.length * GLYPH + 16;

@@ -53,6 +53,7 @@ export class MindScheduler {
   private calls = 0;
   private fallbacks = 0;
   private totalMs = 0;
+  private speed = 0; // measured tokens/s (smoothed), 0 = no answer yet
 
   constructor(
     private readonly lm: () => MindLM | null,
@@ -79,10 +80,12 @@ export class MindScheduler {
           const ctl = new AbortController();
           const left = Math.max(50, q.deadline - this.now());
           const timer = setTimeout(() => ctl.abort(), left);
+          const t0 = this.now();
           try {
             // Race the deadline too: a backend that ignores the abort must not hold the mind.
             const late = new Promise<never>((_, rej) => ctl.signal.addEventListener("abort", () => rej(new Error("late"))));
             const text = await Promise.race([lm.complete(job.req, ctl.signal), late]);
+            this.measure(job.req, text, this.now() - t0);
             const v = job.parse(text);
             if (v === null) return fall();
             resolve({ value: v, source: lm.label });
@@ -123,6 +126,20 @@ export class MindScheduler {
       this.running = false;
       this.pump();
     });
+  }
+
+  // Effective speed of the local model for hosting: tokens out plus prompt tokens at a quarter weight
+  // (prefill runs ~4x faster than decode), ~4 characters a token, over the call's wall time.
+  private measure(req: LmRequest, text: string, ms: number): void {
+    if (ms < 50) return;
+    const tok = text.length / 4 + (req.system.length + req.user.length) / 16;
+    const tps = tok / (ms / 1000);
+    this.speed = this.speed ? this.speed * 0.7 + tps * 0.3 : tps;
+  }
+
+  // Measured tok/s for the room's host election; `guess` until the first answer (or with no model).
+  tps(guess: number): number {
+    return this.lm() && this.speed ? Math.round(this.speed) : guess;
   }
 
   duty(): number {
