@@ -27,6 +27,7 @@ export interface Mind {
 export interface HubOut {
   say(id: string, text: string): void;
   emote?(id: string, e: Emote): void;
+  invite?(id: string, act: string): void; // a mind's group plan just spread: tell the room
 }
 
 const TALK_GAP = 90; // sim seconds between two talks of the same mind
@@ -251,8 +252,25 @@ export class MindHub {
       to.mem.plan = { ...to.mem.plan, [ph]: [act, ...(to.mem.plan[ph] ?? [])].slice(0, 2) };
       toAgent.plan = to.mem.plan;
       remember(to.mem, this.now().day, this.now().time, `${from.persona.name} invited me to ${ACTIVITY.get(act)!.id} this ${ph}`);
+      this.out.invite?.(from.persona.id, act);
       return;
     }
+  }
+
+  // An invitation from another player's pet (live room): the least busy of my minds who does not have it
+  // yet adds the group activity to its next plan slot. Returns who took it, if anyone.
+  heardInvite(fromName: string, act: string): string | null {
+    const def = ACTIVITY.get(act);
+    if (!def || def.min < 2) return null;
+    const ph = this.now().phase;
+    const next = PLAN_PHASES[PLAN_PHASES.indexOf(ph as (typeof PLAN_PHASES)[number]) + 1] ?? "morning";
+    const pick = [...this.minds.values()].filter((m) => !m.mem.plan[next]?.includes(act)).sort((a, b) => (a.mem.plan[next]?.length ?? 0) - (b.mem.plan[next]?.length ?? 0))[0];
+    if (!pick) return null;
+    pick.mem.plan = { ...pick.mem.plan, [next]: [act, ...(pick.mem.plan[next] ?? [])].slice(0, 2) };
+    const agent = this.v.agents.find((a) => a.id === pick.persona.id);
+    if (agent) agent.plan = pick.mem.plan;
+    remember(pick.mem, this.now().day, this.now().time, `${fromName} from next door invited me to ${def.id} this ${next}`);
+    return pick.persona.id;
   }
 
   // --- save -----------------------------------------------------------------------------------------

@@ -246,7 +246,7 @@ export class Overworld {
       }
     }
     const places = new Set(Object.keys(this.lifeEnv.spots) as (keyof Spots)[]);
-    this.minds = new MindHub(this.life, sched, { say: (id, text) => this.sayAgent(id, text) }, hasModel, places);
+    this.minds = new MindHub(this.life, sched, { say: (id, text) => this.sayAgent(id, text), invite: (id, act) => this.onMind?.({ who: id, invite: { act } }) }, hasModel, places);
     this.lifeEnv.chooser = this.minds.chooser;
     this.lifeEnv.bias = this.minds.bias;
     this.syncMinds();
@@ -279,6 +279,10 @@ export class Overworld {
     if (!p) return;
     const text = l.say ?? (l.invite ? `come, ${ACTIVITY.get(l.invite.act)?.label ?? l.invite.act}!` : null);
     if (text) this.say(`p:${from}`, `${l.who}: ${text}`, 5); // their pets live on their ground: lines show over the owner
+    // An invitation can reach my pets too: one of them adds it to its plan and says so.
+    const took = l.invite ? this.minds?.heardInvite(l.who, l.invite.act) : null;
+    const i = took ? this.residents.findIndex((r) => r.agent.id === took) : -1;
+    if (i >= 0) this.say(`r${i}`, `ooh, ${l.invite!.act} with ${l.who}!`, 4);
   }
 
   // I: open the inspector on the nearest mind (or close it).

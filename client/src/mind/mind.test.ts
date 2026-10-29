@@ -133,7 +133,8 @@ describe("mind hub + sim", () => {
     const b = addAgent(v, "Sprig", "Sprig", "pet", { x: 1, z: 0 }, { ...fullNeeds(), social: 20 });
     const lm = fakeLM(() => "Want to dance tonight?");
     const said: string[] = [];
-    const hub = new MindHub(v, new MindScheduler(() => lm, { duty: 1 }), { say: (id, t) => t !== "..." && said.push(`${id}: ${t}`) }, () => true);
+    const invited: [string, string][] = [];
+    const hub = new MindHub(v, new MindScheduler(() => lm, { duty: 1 }), { say: (id, t) => t !== "..." && said.push(`${id}: ${t}`), invite: (id, act) => void invited.push([id, act]) }, () => true);
     const ma = hub.add(petPersona("Mallow", GENES));
     hub.add(petPersona("Sprig", { ...GENES, ears: 0.7 }));
     ma.mem.plan = { evening: ["dance"] };
@@ -145,6 +146,7 @@ describe("mind hub + sim", () => {
     expect(b.plan.evening).toContain("dance");
     expect(hub.minds.get("Sprig")!.mem.log.map((e) => e.text).join()).toMatch(/invited me to dance/);
     expect(v.rel.size).toBe(1);
+    expect(invited).toEqual([["Mallow", "dance"]]);
   });
 
   it("saves and parses defensively", () => {
@@ -157,5 +159,27 @@ describe("mind hub + sim", () => {
     expect(back!.minds.Mallow!.mem.log[0]!.text).toBe("woke up");
     expect(parseMindsSave("junk")).toBeNull();
     expect(parseMindsSave({ t: -5, rel: [[1, 2]], minds: { x: { needs: { hunger: 900 } } } })).toMatchObject({ t: 0, rel: [], minds: { x: { needs: { hunger: 100 } } } });
+  });
+});
+
+describe("invitations from other players", () => {
+  it("puts a remote group invitation into one of my minds' next plan, once, and ignores solo acts", () => {
+    const v = newVillage();
+    addAgent(v, "Mallow", "Mallow", "pet", { x: 0, z: 0 }, fullNeeds());
+    addAgent(v, "Sprig", "Sprig", "pet", { x: 1, z: 0 }, fullNeeds());
+    const hub = new MindHub(v, new MindScheduler(() => null), { say: () => undefined }, () => false);
+    hub.add(petPersona("Mallow", GENES));
+    hub.add(petPersona("Sprig", { ...GENES, hue: 0.8 }));
+    const first = hub.heardInvite("Pip", "picnic");
+    const second = hub.heardInvite("Pip", "picnic");
+    expect(first).not.toBeNull();
+    expect(second).not.toBe(first);
+    expect(hub.heardInvite("Pip", "picnic")).toBeNull(); // both have it now
+    expect(hub.heardInvite("Pip", "nap")).toBeNull();
+    expect(hub.heardInvite("Pip", "steal")).toBeNull();
+    const m = hub.minds.get(first!)!;
+    expect(Object.values(m.mem.plan).flat()).toContain("picnic");
+    expect(m.mem.log.at(-1)!.text).toMatch(/Pip from next door invited me to picnic/);
+    expect(v.agents.find((a) => a.id === first)!.plan).toBe(m.mem.plan);
   });
 });
