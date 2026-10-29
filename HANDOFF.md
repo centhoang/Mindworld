@@ -19,7 +19,7 @@
   - S2b: `game/party.ts` owned party (save `party`, `active`); P = "Your pets" menu (`menu.ts`); non-active pets idle at home with bubbles.
   - S2c: T = Teach screen `teach.ts` (DOM input + canvas memo/proof), `game/coach.ts` chain live -> offline. Teach now uses effort low (was truncating ~1/8 at 4000 tokens); Muse Spark open weights answers in 3-6 s.
   - Dev hook `window.__px` ({world, battleView, update(dt,t), keys, setCrt, state, fight}). Hidden pane: screenshots can be stale; drive with `for(...) { __px.update(.05,t); await 0 }` (await lets the fight script's promises run).
-- Codex run 2 (art bible) was STILL RUNNING at handoff: `docs/STYLE.md` + `.scratch/art/` (mockups `mock-overworld-4x.png`, `mock-battle-4x.png` look great: soft cozy palette, 6x8 font `font-6x8.png`, A-frame, farm plots, Mallow/Sprig monsters, `build.mjs` generator, `manifest.json`). Final report -> `.scratch/stylebible-codex.md`.
+- Codex run 2 (art bible) DONE (all programmatic, no ImageGen; 28 colors, 38 PNGs verified on-palette; weak spots: static poses, interiors/animation untested): `docs/STYLE.md` + `.scratch/art/` (mockups `mock-overworld-4x.png`, `mock-battle-4x.png` look great: soft cozy palette, 6x8 font `font-6x8.png`, A-frame, farm plots, Mallow/Sprig monsters, `build.mjs` generator, `manifest.json`). Final report -> `.scratch/stylebible-codex.md`.
 - Codex wrapper gotcha: pass long briefs as a file ("Read .scratch/x.md and do it"); inline multi-line prompts break PowerShell arg parsing.
 
 ## Next actions (rework v2)
