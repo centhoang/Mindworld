@@ -15,7 +15,11 @@
       #crt:hover { opacity: 1; }
       #teach { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 760px); display: flex; gap: 6px; flex-wrap: wrap;
         font: 11px "Press Start 2P", monospace; }
-      #teach[hidden] { display: none; }
+      #teach[hidden], #chat[hidden] { display: none; }
+      #chat { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 640px); display: flex; gap: 6px;
+        font: 11px "Press Start 2P", monospace; }
+      #chat input { flex: 1 1 auto; font: inherit; padding: 9px 10px; color: #39463F; background: #FFF3D8; border: 3px solid #795849; outline: none; }
+      #chat button { font: inherit; padding: 8px 10px; color: #FFF3D8; background: #A57954; border: 3px solid #795849; cursor: pointer; }
       #teach input { flex: 1 1 260px; font: inherit; padding: 9px 10px; color: #141820; background: #f7dfc8; border: 3px solid #45301f; outline: none; }
       #teach input:focus { border-color: #a85f2a; }
       #teach button { font: inherit; padding: 8px 10px; color: #f7dfc8; background: #a85f2a; border: 3px solid #45301f; cursor: pointer; }
@@ -30,6 +34,11 @@
       <button type="submit">Teach</button>
       <button type="button" data-act="review">Review fights</button>
       <button type="button" data-act="close">Close</button>
+    </form>
+    <form id="chat" hidden autocomplete="off">
+      <input maxlength="140" placeholder="Say something..." aria-label="Talk" />
+      <button type="submit">Say</button>
+      <button type="button" data-act="close">Bye</button>
     </form>
     <button id="crt" type="button">CRT on</button>
     <script type="module" src="/src/pixel/main.ts"></script>

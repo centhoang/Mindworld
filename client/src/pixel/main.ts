@@ -9,7 +9,7 @@ import { addToParty, type PartyMon } from "../game/party";
 import type { Genes } from "../sim/ghost";
 import { Battle } from "../sim/battle";
 import { allowedMoves, cannedLine } from "../game/instinct";
-import { withTactics } from "../sim/tactics";
+import { fetchWildMemos, withTactics, type WildMemos } from "../sim/tactics";
 import { ENEMIES } from "../sim/enemies";
 import { DEFAULT_PET, type Intent } from "../sim/types";
 import { BattleView, type Side } from "./battle";
@@ -18,6 +18,10 @@ import { BUILDS, drawMonster } from "./monster";
 import { Overworld, type Wild } from "./overworld";
 import { drawDialogue } from "./text";
 import { loadArt } from "./art";
+import { Babbler } from "../game/babble";
+import { voiceFor, type Speaker } from "../game/chatter";
+import { askNpc, chatWhoFor } from "../game/npc-chat";
+import { askPets, traitOf } from "../game/pet-chat";
 import { Interior } from "./interior";
 import { defaultRoom } from "../game/room";
 import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water } from "../game/farm";
@@ -97,6 +101,17 @@ const teach = new TeachScreen({
 const iconCache = new Map<Genes, HTMLCanvasElement>();
 const icon = (m: Member) => iconCache.get(m.genes) ?? iconCache.set(m.genes, drawMonster(petLook(m.genes), 16, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;
 const battleView = new BattleView();
+// Cozy babble voices (WebAudio blips) for battle lines; M mutes (saved).
+const babbler = new Babbler();
+let foeVoice: Speaker = "pet";
+battleView.onLine = (text, who) => {
+  if (state.muted || who === "story") return;
+  const v = voiceFor(who === "mine" ? "pet" : foeVoice);
+  babbler.say(text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: "triangle" });
+};
+// Wild pets' tactics, re-taught by Muse Spark from players' fights (Worker cron); empty = bundled patterns.
+let wildMemos: WildMemos = {};
+void fetchWildMemos().then((m) => (wildMemos = m)).catch(() => undefined);
 const keys = new Set<string>();
 let mode: "world" | "battle" | "home" = "world";
 state.room ??= defaultRoom();
@@ -114,6 +129,62 @@ const interior = new Interior({
     world.exitHouse();
   },
 });
+
+// Talking to a wild pet (E when close): Muse Spark answers in character through the Worker (/api/chat,
+// capped and cached; scripted lines when offline). The pet stops wandering while you talk.
+const chatForm = document.getElementById("chat") as HTMLFormElement;
+const chatInput = chatForm.querySelector("input")!;
+let chatWith: Wild | null = null;
+function openChat(w: Wild): void {
+  chatWith = w;
+  w.wait = 999;
+  keys.clear();
+  chatForm.hidden = false;
+  chatInput.value = "";
+  chatInput.focus();
+  world.say(`w${w.id}`, "?", 2);
+}
+function closeChat(): void {
+  if (chatWith) chatWith.wait = 1;
+  chatWith = null;
+  chatForm.hidden = true;
+  chatInput.blur();
+}
+chatForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const w = chatWith;
+  const line = chatInput.value.trim();
+  const who = w && chatWhoFor("wild", w.arch);
+  if (!w || !who || !line) return;
+  chatInput.value = "";
+  world.say(`w${w.id}`, "...", 20);
+  void askNpc(who, line).then((r) => {
+    world.say(`w${w.id}`, r.text, 6);
+    if (!state.muted) {
+      const v = voiceFor(w.arch);
+      babbler.say(r.text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: "triangle" });
+    }
+  });
+});
+chatForm.querySelector("[data-act=close]")!.addEventListener("click", closeChat);
+
+// Pets chat with each other at home now and then (Muse Spark via /api/petchat, scripted when offline).
+let petChatT = 15;
+function petChatter(dt: number): void {
+  if ((petChatT -= dt) > 0) return;
+  petChatT = 30;
+  const all = members();
+  const a = state.active ?? 0;
+  const others = all.filter((_, i) => i !== a);
+  if (!others.length || !world.nearHome() || chatWith) return;
+  const r = Math.floor(Math.random() * others.length);
+  const them = others[r]!;
+  void askPets({ name: all[a]!.name, trait: traitOf(state.memo) }, { name: them.name, trait: "curious" }).then(({ lines: [mine, theirs] }) => {
+    if (mode !== "world") return;
+    world.say("pet", mine, 3);
+    setTimeout(() => mode === "world" && world.say(`r${r}`, theirs, 3), 1600);
+  });
+}
 
 // The shipping crate inside: ship the basket for coins, or buy seeds.
 let crate: { cursor: number } | null = null;
@@ -147,7 +218,7 @@ function crateKey(k: string): void {
   } else crate = null;
   save(state);
 }
-let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. E: use  P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
+let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. E: use/talk  M: mute  P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
 
 const CRT_KEY = "mw.crt";
 let crt = (() => {
@@ -187,7 +258,16 @@ window.addEventListener("keydown", (e) => {
     if (k === "escape") teach.hide();
     return; // typing in the teach box
   }
+  if (chatWith) {
+    if (k === "escape") closeChat();
+    return; // typing in the chat box
+  }
   if (k === "c" && !e.repeat) setCrt(!crt);
+  if (k === "m" && !e.repeat) {
+    state.muted = !state.muted;
+    save(state);
+    toast = { text: state.muted ? "Voices off (M)." : "Voices on (M).", t: 1.5 };
+  }
   if (mode === "battle" && battleView.choosing) battleView.cmdKey(k);
   else if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
   if (mode === "world" && !e.repeat) menuKey(k);
@@ -215,6 +295,7 @@ function menuKey(k: string): void {
     if (k === "e" || k === "enter") {
       const bed = world.bedNear();
       if (bed >= 0) useBed(bed);
+      else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
       else if (world.atDoor()) {
         mode = "home";
         keys.clear();
@@ -249,7 +330,8 @@ function side(m: Member): Side {
 async function fight(w: Wild): Promise<void> {
   mode = "battle";
   keys.clear();
-  const tactic = undefined; // wild re-teach memos (sim/tactics) are fetched in the port step
+  const tactic = wildMemos[w.arch];
+  foeVoice = w.arch;
   const def = withTactics(ENEMIES[w.arch], tactic);
   const battle = new Battle({ enemy: w.arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def });
   const foeName = w.arch[0]!.toUpperCase() + w.arch.slice(1);
@@ -324,6 +406,7 @@ function update(dt: number, t: number): void {
   if (teach.open) teach.draw(g, low.width, low.height, t);
   else if (mode === "world") {
     const met = world.update(dt, menu ? new Set<string>() : keys);
+    petChatter(dt);
     if ((farmTickAt -= dt) <= 0) {
       farmTickAt = 1;
       const next = tick(state.farm!, Date.now());

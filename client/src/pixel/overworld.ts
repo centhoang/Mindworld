@@ -10,7 +10,7 @@ import { ARCHETYPES, type ArchetypeId } from "../sim/types";
 import { drawMapTile, drawProp, HOUSE, img, makePlayer, PAL, TREE, type Sprite } from "./art";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
-import { drawFrame, drawText, GLYPH } from "./text";
+import { drawFrame, drawText, GLYPH, wrap } from "./text";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
 
 type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
@@ -62,6 +62,8 @@ export class Overworld {
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
   farm: Farm | null = null; // set by main.ts; drawn on the beds
+  // Speech bubbles: "pet", "r<i>" (resident i) or "w<id>" (wild pet) -> text and seconds left.
+  private readonly bubbles = new Map<string, { text: string; t: number }>();
 
   constructor(petGenes: Genes) {
     this.world = generateWorld();
@@ -144,6 +146,25 @@ export class Overworld {
     if (i >= 0) this.wilds.splice(i, 1);
   }
 
+  say(who: string, text: string, secs = 3.5): void {
+    this.bubbles.set(who, { text, t: secs });
+  }
+
+  // A wild pet close enough to talk to (but not touching, which starts a fight).
+  wildNear(): Wild | null {
+    let best: Wild | null = null;
+    let bd = 2.6;
+    for (const w of this.wilds) {
+      const d = Math.hypot(w.pos.x - this.player.x, w.pos.z - this.player.z);
+      if (d < bd) [best, bd] = [w, d];
+    }
+    return best;
+  }
+
+  nearHome(): boolean {
+    return Math.hypot(this.player.x - this.house.x, this.player.z - this.house.z) < 9;
+  }
+
   residentSprites(): HTMLCanvasElement[] {
     return this.residents.map((r) => r.sprite);
   }
@@ -218,6 +239,7 @@ export class Overworld {
     if (here && here !== this.place) this.bannerT = 2.5;
     this.place = here || this.place;
     this.bannerT = Math.max(0, this.bannerT - dt);
+    for (const [k, b] of this.bubbles) if ((b.t -= dt) <= 0) this.bubbles.delete(k);
     const home = this.world.platforms.find((p) => p.kind === "home")!;
     for (const r of this.residents) {
       r.wait -= dt;
@@ -305,6 +327,12 @@ export class Overworld {
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
 
+    for (const [who, b] of this.bubbles) {
+      const pos = who === "pet" ? this.pet : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
+      if (!pos) continue;
+      const [bx, by] = toScreen(pos.x, pos.z);
+      bubble(g, b.text, bx, by - OVERWORLD_MON - 4, sw);
+    }
     const bed = this.bedNear();
     const hint = this.atDoor() ? "E: GO IN" : bed >= 0 && this.farm ? bedHint(this.farm, bed) : "";
     if (hint) {
@@ -327,4 +355,19 @@ function bedHint(f: Farm, i: number): string {
   if (!p.crop) return Object.values(f.seeds).some((n) => n) ? "E: PLANT" : "NO SEEDS";
   if (p.stage >= 3) return "E: HARVEST";
   return needsWater(p) ? "E: WATER" : "GROWING...";
+}
+
+// A speech bubble above a sprite: up to 3 wrapped lines, kept on screen, with a small tail.
+function bubble(g: CanvasRenderingContext2D, text: string, cx: number, bottom: number, sw: number): void {
+  const lines = wrap(text, 132).slice(0, 3);
+  const w = Math.max(...lines.map((l) => l.length)) * GLYPH + 12;
+  const h = lines.length * 10 + 8;
+  const x = Math.max(2, Math.min(sw - w - 2, Math.round(cx - w / 2)));
+  const y = Math.max(2, bottom - h);
+  drawFrame(g, x, y, w, h);
+  g.fillStyle = PAL.panel;
+  g.fillRect(cx - 2, y + h - 1, 4, 2);
+  g.fillStyle = PAL.wood;
+  g.fillRect(cx - 1, y + h + 1, 2, 2);
+  lines.forEach((l, i) => drawText(g, l, x + 6, y + 5 + i * 10));
 }

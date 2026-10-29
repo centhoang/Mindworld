@@ -56,6 +56,7 @@ export class BattleView {
   private hearts = 0;
   private cmd: { cursor: number; pick: (c: Command) => void } | null = null;
   private cursor = 0;
+  onLine: ((text: string, who: "mine" | "foe" | "story") => void) | null = null; // babble hook
 
   open(foe: Side, mine: Side): Promise<void> {
     this.foe = foe;
@@ -180,7 +181,8 @@ export class BattleView {
   private sayStep(text: string, tag = ""): void {
     // Typewriter at ~60 chars/s, then a hold long enough to read.
     const dur = Math.min(2.2, 0.45 + text.length / 60 + text.length * 0.018);
-    this.push({ dur, start: () => { this.text = text; this.tag = tag; this.typed = 0; }, tick: (p) => (this.typed = Math.ceil(text.length * Math.min(1, p * 2.2))) });
+    const who = text.startsWith('"') ? "mine" : this.foe && text.startsWith(this.foe.name) ? "foe" : "story";
+    this.push({ dur, start: () => { this.text = text; this.tag = tag; this.typed = 0; this.onLine?.(text, who); }, tick: (p) => (this.typed = Math.ceil(text.length * Math.min(1, p * 2.2))) });
   }
 
   private push(s: Step): void {
