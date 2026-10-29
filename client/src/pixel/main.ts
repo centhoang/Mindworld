@@ -23,6 +23,8 @@ import { drawDialogue } from "./text";
 import { loadArt } from "./art";
 import { Babbler } from "../game/babble";
 import { voiceFor, type Speaker } from "../game/chatter";
+import { Instinct } from "../game/instinct";
+import { CloudVoice, localAccessState, NativeVoice, WebLlmVoice } from "../game/voices";
 import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "../sim/boss";
 import { askNpc, chatWhoFor } from "../game/npc-chat";
 import { askPets, traitOf } from "../game/pet-chat";
@@ -228,7 +230,7 @@ function crateKey(k: string): void {
   } else crate = null;
   save(state);
 }
-let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. E: use/talk  M: mute  P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
+let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. E: use/talk  M: mute  B: brain  P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
 
 const CRT_KEY = "mw.crt";
 let crt = (() => {
@@ -273,6 +275,7 @@ window.addEventListener("keydown", (e) => {
     return; // typing in the chat box
   }
   if (k === "c" && !e.repeat) setCrt(!crt);
+  if (k === "b" && !e.repeat && mode === "world" && !menu) void switchBrain();
   if (k === "m" && !e.repeat) {
     state.muted = !state.muted;
     save(state);
@@ -341,6 +344,44 @@ function side(m: Member): Side {
 
 // A fight against a wild pet, or "boss": The Reader, which reads your memo rules and counters them until
 // it runs out of focus (sim/boss.ts); a dazed boss can be befriended.
+// ---- pet brain: rules only by default; B switches to Llama 3.2 1B in the browser (WebGPU) or power mode
+// (Llama 3.2 3B via llama.cpp on 127.0.0.1:8080). Per-move cloud picks are opt-in with ?cloudmoves.
+const instinct = new Instinct(null);
+const webBrain = new WebLlmVoice();
+const nativeBrain = new NativeVoice();
+const brainTag = () => (instinct.voice === nativeBrain ? "llama 3b" : instinct.voice === webBrain ? "llama 1b" : "cloud");
+async function switchBrain(): Promise<void> {
+  if (instinct.voice) {
+    instinct.voice = null;
+    toast = { text: "Brain: rules only (the measured memo policy).", who: "Brain", t: 3 };
+    return;
+  }
+  toast = { text: "Looking for power mode (llama.cpp on this computer)... allow local access if Chrome asks.", who: "Brain", t: 30 };
+  if (await nativeBrain.probe(20_000)) {
+    instinct.voice = nativeBrain;
+    toast = { text: "Power mode: Llama 3.2 3B on this computer picks moves the memo allows and talks.", who: "Brain", t: 5 };
+    return;
+  }
+  if (!WebLlmVoice.supported()) {
+    toast = { text: "No power mode and no WebGPU here, so your pet stays on rules.", who: "Brain", t: 5 };
+    return;
+  }
+  try {
+    await webBrain.load((_text, frac) => (toast = { text: `Loading Llama 3.2 1B in this tab: ${Math.round(100 * frac)}%`, who: "Brain", t: 30 }));
+    instinct.voice = webBrain;
+    toast = { text: "Llama 3.2 1B runs in this tab now. B again: back to rules only.", who: "Brain", t: 5 };
+  } catch (e) {
+    toast = { text: `Could not load the model (${(e as Error).message}). Rules only.`, who: "Brain", t: 5 };
+  }
+}
+void (async () => {
+  if ((await localAccessState()) === "granted" && (await nativeBrain.probe(800))) instinct.voice = nativeBrain;
+  if (!instinct.voice && new URLSearchParams(location.search).has("cloudmoves")) {
+    const cloud = new CloudVoice({ provider: "modal" });
+    if (await cloud.probe()) instinct.voice = cloud;
+  }
+})();
+
 const memoKey = () => JSON.stringify([state.memo.rules.map((r) => [r.if, r.do]), state.home]);
 function coolFoe(foe: Wild | "boss" | "ghost"): void {
   if (foe === "boss") world.boss!.cool = 10;
@@ -414,14 +455,19 @@ async function fight(foe: Wild | "boss" | "ghost"): Promise<void> {
       return;
     }
   }
+  // The pet's brain: a firing memo rule decides at once; otherwise a local Llama (if loaded) picks among
+  // the moves the memo allows and gives the line, with the reflex as fallback. The next pick is prefetched
+  // while the current turn animates.
+  const name = activeMember().name;
+  let next = instinct.decide(name, state.memo, battle.observe());
   while (!battle.done) {
     const obs = battle.observe();
     await battleView.say(`${foeName} ${TELL[obs.intent]}`);
-    const allowed = allowedMoves(state.memo, obs); // moves[0] is exactly memoPolicy's move
-    const action = allowed.moves[0]!;
-    const tag = allowed.rule !== null ? `memo #${allowed.rule + 1}` : "instinct";
-    const rec = battle.step(action);
-    await battleView.playTurn(action, cannedLine(action, obs.turn), tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp);
+    const choice = await next;
+    const tag = choice.source === "rule" ? `memo #${choice.rule! + 1}` : choice.source === "model" ? brainTag() : "instinct";
+    const rec = battle.step(choice.action);
+    if (!battle.done) next = instinct.decide(name, state.memo, battle.observe());
+    await battleView.playTurn(choice.action, choice.line, tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp);
     const read = boss?.reads.find((r) => r.turn === obs.turn);
     if (read) await battleView.say(`It read memo #${read.rule + 1}! ${read.did === "idle" ? "It faked the tell." : "It hit hard anyway."}`, "boss read");
     else if (boss?.dazedTurns.includes(obs.turn)) await battleView.say(`${foeName} is dazed: it can't read you now.`, "dazed");
