@@ -5,7 +5,7 @@
 ## State
 - The pixel build IS the game now: `client/index.html` -> `src/pixel/main.ts`. three.js and the 3D view are deleted; `/pixel.html` 301-redirects to `/` (Worker). Bundle: main 112 KB (44 KB gz); the 6 MB `lib-*.js` is WebLLM, lazy-loaded only on B.
 - Tests: client 187 (6 grass tests went with grass.ts), worker 149, tsc clean. Build OK.
-- NOT redeployed: `wrangler deploy` was blocked by the permission classifier; the user runs it (or allows it). Live https://pets.uryto.dev still serves the old build (version ad4e6e1f, pixel at /pixel.html).
+- Deployed behind Access: https://pets.uryto.dev/ = the pixel game, version 99c90f89 (2026-10-29). Redeploys are standing-approved (CLAUDE.md "Decide vs. ask"): run `npm --prefix client run build`, then `npx wrangler deploy` in worker/, as two plain commands.
 - Commits this session: f6f6492 ImageGen pass 2 (cabin background `interior-empty.png`, Elder 2-frame idle, market stall on the Market island with E = buy/sell menu; player walk rebuilt in code) · d22590e v1 port (live duels, emotes 1-4, voice lessons in Teach, first-run hatch line + hints, goals card G) · 64df3db index swap + three.js removed.
 - Credits: Meta $149.91, Modal ~$110, Baseten ~$0.15. No paid calls this session.
 
@@ -19,7 +19,6 @@
 
 ## Pending decisions (user)
 - Play-test the new build (cabin, market stall, Elder, walk cycle, duel in two tabs, goals card, Speak button in Teach).
-- Approve the redeploy (`cd client && npm run build`, then `cd ../worker && npx wrangler deploy`).
 - When to go public (remove Access).
 
 ## Next actions
