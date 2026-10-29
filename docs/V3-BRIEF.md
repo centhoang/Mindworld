@@ -1,0 +1,48 @@
+# v3 brief: living world + minds (user requests 2026-10-29 evening) -> research, then a plan for review
+
+Next session's job: **research and write `docs/V3-PLAN.md`** (scope, architecture, stages, cut order, costs), get the user's OK, then build. Do not build before the plan is approved (same flow as docs/REWORK.md). Time left: deadline Nov 4 9 PM ET; repo public Nov 3; demo capture Nov 3. So the plan must rank features by judge value (Impact 30, Meta AI tooling 25, Demo 25, Tech depth 20) and mark a hard cut line.
+
+## What the user asked for (their words, grouped)
+1. **World made of players' grounds.** Each player owns a ground (island, saved locally). On connect it spawns and links to the grounds already in the room; the player spawns on their own ground. On exit the ground may stay as a ghost, be replaced, or despawn (Claude's call). More players = a bigger, more varied world. Every ground has a unique shape. Add "in-between" grounds (shared/special places) that spawn by chance/rarity.
+2. **Mind-to-mind conversations in real time, local model only**, not scripted (pets and NPCs talking to each other).
+3. **Animation:** the walk swings the arms too; idle stands still (today idle shows a walk frame).
+4. **Map art:** Codex generates the tiles and environment objects (static only); Claude fills in, reviews, sends feedback and adds motion/VFX. Theme- and environment-based, dynamic and varied per ground.
+5. **Complex minds (GARP-style):** pets and NPCs get personality, hobbies and habits, a daily plan, memories and relationships (ref: `info-ref/GARP – ... Transcript.txt`, summary below). The judges should see this.
+6. **Minds emote** (local AI decides when), like players can.
+7. **NPC model:** train a local model for NPCs too (or share the pet's; decide). NPCs and players get the same features. Decide which player's machine hosts each NPC's mind, and move it between players to balance the load.
+8. **More activities** (pure game logic driven by needs/stats; the AI only CHOOSES the activity, never runs during it). At home or on other grounds (playground):
+   - Pet: soccer, eat, poop, sleep, picnic, dance/party, in-house corner activities, ...
+   - Human (player and NPC): fishing, picnic, soccer, dance/party, cook/eat, clean trash (poop), feed pets, in-house corner activities, ...
+
+## Answers to the user's two questions (verify the numbers before quoting them in the plan)
+- "We only need API credit to train/teach the local model?" Mostly yes. Credits (Meta $150, about $149.91 left; Modal about $110 left) pay for: teacher data and fine-tunes (Modal H100: the coach fine-tune cost about $1.5 for 3B + 1B), and the live cloud features during the event (Teach via Muse Spark, Elder/wild chat `/api/chat`, pet chatter `/api/petchat`, wild re-teach cron). A local-only v3 mind would remove those running costs; the cloud stays as the "Meta model" showcase and the fallback.
+- "Is the local model only for the pet?" Today, yes: the pet brain (B = Llama 3.2 1B in the browser via WebLLM, or the tuned 3B in power mode via llama.cpp) picks fight moves and lines, and the tuned coach does Teach offline. NPC/wild chat and pet chatter run on Muse Spark (cloud) with scripted fallbacks. Nothing in the overworld runs on a local model yet.
+
+## GARP reference in short (what to borrow)
+Characters are defined in plain text (name, personality, background, routine). Each day they generate a plan from their traits, pick the next action from the things around them that fit the plan, log every action to long-term memory, reflect before sleep, chat in natural language when they meet (the dialogue depends on personality + memories + relationship), and coordinate (an invitation spreads through the village and they all show up to the party). Users can inject memories or edit traits and watch the plan change. It runs 20 characters on one consumer GPU.
+Our cheap version: the model decides rarely (plan once per in-game day, choose the next activity, open a conversation, pick an emote); a deterministic needs/activity sim does the rest. Memory = a short rolling log + a few "facts" per mind, saved locally.
+
+## What already exists (build on it, don't redo it)
+- `world/layout.ts`: platforms on a grid with bridges; `corner` cells already hold other players' corners (`cornerOwners`). The room DO (`worker/src/room.ts`) already assigns a `corner` index per peer (`freeCorner`). The pixel client ignores it today (everyone spawns on the center home island).
+- `world/live.ts` + `worker/src/room-do.ts`: presence at about 10 Hz, say, emotes, duels (`sim/duel.ts`); validation and rate limits on the server.
+- Minds: `game/instinct.ts` (rules first, model second), `game/voices.ts` (WebLlmVoice 1B / NativeVoice 3B / CloudVoice), `game/pet-chat.ts` + `/api/petchat` (pet chatter), `game/npc-chat.ts` + `/api/chat` (Elder/wild), `game/babble.ts` (voices), `game/chatter.ts`.
+- Home: `game/room.ts` (interior grid), `game/farm.ts`, pets idle at your corner as "residents" in `pixel/overworld.ts`.
+- Fine-tune pipeline: `docs/FINETUNE.md`, `client/src/finetune/*`, `modal/finetune_llama.py`, `modal/publish_coach.py`; tuned GGUFs on private HF repos `kysupo/Llama-3.2-{3B,1B}-PetMind-Coach-GGUF`. Browser MLC conversion of the tuned 1B was blocked (see FINETUNE.md step 6).
+- Art: `docs/STYLE.md` (28-color palette, tile rules), `.claude/skills/moodboard/`, Codex ImageGen via `scripts/codex.ps1` (static only; Claude animates).
+
+## Research to do (write the findings into V3-PLAN.md once, short)
+1. **Local model reach for real-time chat:** what a stranger's machine can run. WebLLM Llama 3.2 1B q4f32 (about 0.9 GB download, WebGPU required) gives tokens/s on an iGPU vs the dev's GTX 1050. Can one loaded model serve every mind on that machine (pet, residents, hosted NPCs) with a queue? The fallback when there is no WebGPU (cloud Muse Spark under the cap, or scripted), and how to say so honestly in the demo. Check the WebLLM docs for concurrent requests, JSON/grammar mode in the browser, and the KV cache with a 1k context.
+2. **One model or two:** the pet coach/voice LoRA vs a "village mind" LoRA (plan, choose activity, short dialogue, emote) on the same Llama 3.2 base. Options: one multi-task fine-tune (cheapest to ship: one download) vs two. Data: Muse Spark Open as the teacher via the existing Modal pipeline (cost cap, ledger). Estimate: rows, $ and hours. The MLC browser blocker matters here: without MLC, the browser runs the stock 1B with prompts only, and the tuned model is power mode only.
+3. **Mind hosting across players:** the authority model for NPC minds in the room DO: elect a host per NPC (for example, the player with the best reported capability: WebGPU yes/no and a tokens/s probe), move it on leave or overload, the server keeps the NPC's memory/state so the move is seamless, and the server's scripted fallback runs when no host is present. Message types to add; abuse limits (a host can only send that NPC's actions, rate-limited, validated like duels).
+4. **World assembly:** deterministic ground shape from a seed (blob/noise island in tiles, entrance points), how grounds link (a ring/grid around a hub; bridges generated between neighbours), the join/leave policy (recommendation to evaluate: a ground stays as a "ghost ground" with that player's ghost pet for N minutes, then a wild ground replaces it), rare in-between grounds (playground/soccer field, picnic hill, fishing pond, party plaza, boss/event) with spawn weights, and the theme per ground (meadow, autumn, snow, beach, night). Check the room DO limits (players per room) and save size.
+5. **Needs + activities sim (GARP-lite):** needs (hunger, energy, fun, social, hygiene, bladder for pets), activity defs (where, duration, effects, objects, animations, multi-participant: soccer/picnic/party), daily plan slots, memory log, relationships (affinity per pair). Pure TS modules with tests first. The AI chooses among valid activities only (like `allowedMoves`), so it can never break the sim.
+6. **Art list for Codex (static):** tiles per theme (grass/sand/snow/autumn variants, shore masks per STYLE.md), environment props (rocks, bushes, flowers, fences, benches, soccer goal + ball, picnic blanket, fishing dock, party lights, trash/poop, food bowls), human NPC body bases (4 directions, frame 0 only), and items held in activities. Claude does all motion: walk with arm swing, idle, sit/sleep/kick/dance poses as code-driven offsets.
+7. **Animation design (Claude):** add arms to the code-drawn limbs (`pixel/art.ts` frontLegs/sideLegs -> a limb rig per direction); idle = frame 0 with a slow breathing bob; activity poses.
+
+## Plan doc must contain
+- Recommended scope with a cut line (what ships by Nov 3 for the demo; what is "after the event"). Suggested demo story to test against: "every mind in this village runs on the players' own machines; watch two pets plan a picnic, invite a friend, and talk about it, while the Elder is hosted by another player's laptop".
+- Architecture per area (files, message types, data shapes), costs (fine-tune $, live $ = about 0), risks + fallbacks, and stages that each end with a play-test ask.
+- Decisions the user must make (max 3, with a recommendation each): for example, one model vs two; ground-leave policy; whether to drop features (live duels, boss?) to make room.
+
+## Guardrails (from CLAUDE.md)
+Static art only from Codex. Paid runs go through the cost-capped scripts with ledgers; ask before anything that may pass the caps. Keep the room messages validated server-side. Compliance: repo fresh/public Nov 3, no secrets, Meta models used meaningfully (Llama 3.2 local minds + Muse Spark teacher/fallback both count).

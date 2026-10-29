@@ -1,6 +1,6 @@
 # HANDOFF: Mindworld rework v2 (2026-10-29 ~19:30 UTC+7)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md. Do Next actions 1-3. Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-BRIEF.md. Do Next action 1: research and write docs/V3-PLAN.md, then stop for my review. Follow CLAUDE.md (Normal mode, 35% context limit)."
 
 ## State
 - The pixel build IS the game now: `client/index.html` -> `src/pixel/main.ts`. three.js and the 3D view are deleted; `/pixel.html` 301-redirects to `/` (Worker). Bundle: main 112 KB (44 KB gz); the 6 MB `lib-*.js` is WebLLM, lazy-loaded only on B.
@@ -23,9 +23,9 @@
 - When to go public (remove Access).
 
 ## Next actions
-1. After the play-test feedback: fix what the user reports. Then mobile controls (touch D-pad + A/B buttons drawn in-canvas; portrait layout), because judges may open it on a phone.
-2. Polish VFX/lighting in code (Claude, not Codex): battle hit sparks and dust puffs, water sparkle, the window light shaft in the cabin swaying, day tint. Optional ImageGen STATIC batch (brief as a file, review the contact sheet): outdoor decor items, a few emote icons (16x16), a duel banner.
-3. Demo prep: README credits (ImageGen art, CC0 if any), the 3-min demo script draft (opening line: what pre-existed vs what was built this week), capture shots with CRT on.
+1. **v3 research + plan (user request 2026-10-29 evening):** follow `docs/V3-BRIEF.md`: players' grounds that join into one world (unique shapes, rare in-between grounds, themes), real-time mind-to-mind chat on the local model, GARP-style minds (personality, hobbies, daily plan, memory, relationships, emotes), an NPC mind model plus hosting NPC minds on players' machines with handover, needs-driven activities for pets and humans, arm swing + still idle, Codex static map art per theme. Output: `docs/V3-PLAN.md` with scope, a cut line for the Nov 3 demo, architecture, costs, stages and at most 3 user decisions. Then STOP for the user's review; build nothing before the OK.
+2. After the plan is approved: build stage 1 (likely needs/activities sim + the limb rig with arm swing/idle, both pure-code and safe), then follow the plan's stages, each ending with a play-test ask.
+3. Still open from v2 (fold into the plan's ranking): mobile controls (touch D-pad + A/B), VFX polish, demo prep (README credits, 3-min script, CRT-on captures).
 
 ## Gotchas
 - Codex: pass long briefs as a file; `-Sandbox workspace-write` for ImageGen; output can be truncated (rerun once). Ask for static frames only.
@@ -34,4 +34,4 @@
 - Small Muse calls burn reasoning tokens: maxTokens >= 400. Never commit `.env`.
 
 ## File map
-docs/{EVENT,PLAN,REWORK,STYLE,DEPLOY}.md · client/index.html · client/src/pixel/{main,art,tiles,text,overworld,battle,interior,teach,menu,monster,crt}.ts · client/src/game/{farm,room,party,save,onboard,coach,instinct,voices,voice-input,npc-chat,pet-chat,babble,ghost-api}.ts · client/src/sim/duel.ts · client/src/world/live.ts · client/public/art/ · worker/ · scripts/codex.ps1 · .scratch/art/{,gen,gen2}/
+docs/{EVENT,PLAN,REWORK,V3-BRIEF,STYLE,DEPLOY,FINETUNE}.md · info-ref/ (GARP transcript) · client/index.html · client/src/pixel/{main,art,tiles,text,overworld,battle,interior,teach,menu,monster,crt}.ts · client/src/game/{farm,room,party,save,onboard,coach,instinct,voices,voice-input,npc-chat,pet-chat,babble,ghost-api}.ts · client/src/sim/duel.ts · client/src/world/live.ts · client/public/art/ · worker/ · scripts/codex.ps1 · .scratch/art/{,gen,gen2}/
