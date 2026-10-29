@@ -18,6 +18,9 @@ import { BUILDS, drawMonster } from "./monster";
 import { Overworld, type Wild } from "./overworld";
 import { drawDialogue } from "./text";
 import { loadArt } from "./art";
+import { Interior } from "./interior";
+import { defaultRoom } from "../game/room";
+import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water } from "../game/farm";
 import { drawMenu, type MenuRow } from "./menu";
 import { TeachScreen } from "./teach";
 
@@ -56,6 +59,25 @@ function refreshParty(): void {
   world.setResidents(all.filter((_, i) => i !== a));
 }
 refreshParty();
+state.farm ??= emptyFarm();
+world.farm = state.farm;
+let farmTickAt = 0;
+
+// E at a bed: plant (cheapest seed you have), water, or harvest. Growth runs on real time.
+function useBed(i: number): void {
+  const f = state.farm!;
+  const p = f.plots[i]!;
+  const crop = CROP_IDS.find((c) => f.seeds[c]);
+  const r = !p.crop ? (crop ? plant(f, i, crop) : null) : p.stage >= RIPE ? harvest(f, i) : water(f, i, Date.now());
+  if (!r) toast = { text: "No seeds left. Sell your harvest and buy more at the shipping crate inside.", t: 3 };
+  else if (!r.ok) toast = { text: r.reason === "wet" ? "Already watered. It grows on its own now." : "Nothing to do here yet.", t: 2.5 };
+  else {
+    const verb = !p.crop ? `Planted a ${crop} seed.` : p.stage >= RIPE ? `Picked a ${p.crop}! Ship it from the crate inside.` : "Watered. It grows a stage soon.";
+    state.farm = world.farm = r.farm;
+    save(state);
+    toast = { text: verb, t: 2.5 };
+  }
+}
 let menu: { cursor: number } | null = null;
 const portraits = new Map<Genes, HTMLCanvasElement>();
 const teach = new TeachScreen({
@@ -76,8 +98,56 @@ const iconCache = new Map<Genes, HTMLCanvasElement>();
 const icon = (m: Member) => iconCache.get(m.genes) ?? iconCache.set(m.genes, drawMonster(petLook(m.genes), 16, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;
 const battleView = new BattleView();
 const keys = new Set<string>();
-let mode: "world" | "battle" = "world";
-let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
+let mode: "world" | "battle" | "home" = "world";
+state.room ??= defaultRoom();
+const interior = new Interior({
+  room: () => state.room!,
+  setRoom: (r) => {
+    state.room = r;
+    save(state);
+  },
+  petSprite: () => world.petSprite,
+  residents: () => world.residentSprites(),
+  useCrate: () => (crate = { cursor: 0 }),
+  leave: () => {
+    mode = "world";
+    world.exitHouse();
+  },
+});
+
+// The shipping crate inside: ship the basket for coins, or buy seeds.
+let crate: { cursor: number } | null = null;
+const crateRows = (): MenuRow[] => {
+  const f = state.farm!;
+  const n = CROP_IDS.reduce((s, c) => s + (f.basket[c] ?? 0), 0);
+  return [
+    { label: `Ship harvest (${n})`, note: n ? `+${sellAll(f, 0).earned}c` : "" },
+    ...CROP_IDS.map((c) => ({ label: `${c[0]!.toUpperCase()}${c.slice(1)} seed x${f.seeds[c] ?? 0}`, note: `${CROPS[c].seed}c` })),
+    { label: "Close" },
+  ];
+};
+function crateKey(k: string): void {
+  const c = crate!;
+  const n = crateRows().length;
+  if (k === "arrowup" || k === "w") c.cursor = (c.cursor + n - 1) % n;
+  if (k === "arrowdown" || k === "s") c.cursor = (c.cursor + 1) % n;
+  if (k === "escape" || k === "x") crate = null;
+  if (k !== "enter" && k !== " " && k !== "z" && k !== "e") return;
+  const f = state.farm!;
+  if (c.cursor === 0) {
+    const r = sellAll(f, state.coins ?? 0);
+    state.farm = world.farm = r.farm;
+    state.coins = r.coins;
+  } else if (c.cursor <= CROP_IDS.length) {
+    const r = buySeeds(f, state.coins ?? 0, CROP_IDS[c.cursor - 1]!);
+    if (r.ok) {
+      state.farm = world.farm = r.farm;
+      state.coins = r.coins;
+    }
+  } else crate = null;
+  save(state);
+}
+let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. E: use  P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
 
 const CRT_KEY = "mw.crt";
 let crt = (() => {
@@ -121,6 +191,11 @@ window.addEventListener("keydown", (e) => {
   if (mode === "battle" && battleView.choosing) battleView.cmdKey(k);
   else if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
   if (mode === "world" && !e.repeat) menuKey(k);
+  if (mode === "home" && !e.repeat) {
+    if (crate) crateKey(k);
+    else interior.key(k);
+  }
+  if (k === "tab") e.preventDefault();
   keys.add(k);
   if (k.startsWith("arrow") || k === " ") e.preventDefault();
 });
@@ -137,6 +212,16 @@ resize();
 
 function menuKey(k: string): void {
   if (!menu) {
+    if (k === "e" || k === "enter") {
+      const bed = world.bedNear();
+      if (bed >= 0) useBed(bed);
+      else if (world.atDoor()) {
+        mode = "home";
+        keys.clear();
+        toast = null;
+        interior.enter();
+      }
+    }
     if (k === "p") menu = { cursor: state.active ?? 0 };
     if (k === "t") {
       keys.clear();
@@ -239,6 +324,14 @@ function update(dt: number, t: number): void {
   if (teach.open) teach.draw(g, low.width, low.height, t);
   else if (mode === "world") {
     const met = world.update(dt, menu ? new Set<string>() : keys);
+    if ((farmTickAt -= dt) <= 0) {
+      farmTickAt = 1;
+      const next = tick(state.farm!, Date.now());
+      if (next !== state.farm) {
+        state.farm = world.farm = next;
+        save(state);
+      }
+    }
     world.draw(g, low.width, low.height, t);
     if (met) void fight(met);
     if (menu) {
@@ -250,6 +343,10 @@ function update(dt: number, t: number): void {
       drawDialogue(g, low.width, low.height, toast.text, toast.who);
       if (toast.t <= 0) toast = null;
     }
+  } else if (mode === "home") {
+    interior.update(dt, crate || interior.deco ? new Set<string>() : keys);
+    interior.draw(g, low.width, low.height, t);
+    if (crate) drawMenu(g, low.width, low.height, `Crate  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
   } else {
     battleView.update(dt);
     battleView.draw(g, low.width, low.height, t);
@@ -261,4 +358,4 @@ function update(dt: number, t: number): void {
 void loadArt().then(() => requestAnimationFrame(frame));
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
-(window as unknown as { __px: unknown }).__px = { world, battleView, update, keys, setCrt, state, fight };
+(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight };

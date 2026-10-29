@@ -24,7 +24,7 @@ export function drawMenu(g: CanvasRenderingContext2D, sw: number, sh: number, ti
   rows.forEach((r, i) => {
     const ry = y + 8 + i * ROW_H;
     if (i === cursor) {
-      g.fillStyle = PAL.sand;
+      g.fillStyle = PAL.grassM;
       g.fillRect(x + 5, ry - 1, w - 10, ROW_H - 2);
       if (Math.floor(t * 3) % 2 === 0) drawText(g, ">", x + 8, ry + 6, PAL.wood);
     }
@@ -34,7 +34,7 @@ export function drawMenu(g: CanvasRenderingContext2D, sw: number, sh: number, ti
       tx += r.icon.width + 4;
     }
     drawText(g, r.label, tx, ry + 6);
-    if (r.note) drawText(g, r.note, x + w - 10 - r.note.length * GLYPH, ry + 6, PAL.sandD);
+    if (r.note) drawText(g, r.note, x + w - 10 - r.note.length * GLYPH, ry + 6, PAL.wood);
   });
-  if (footer) drawText(g, footer, x + 10, y + h - 14, PAL.sandD);
+  if (footer) drawText(g, footer, x + 10, y + h - 14, PAL.wood);
 }

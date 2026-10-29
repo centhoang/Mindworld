@@ -5,6 +5,8 @@ import { parseOnboard, type OnboardSave } from "./onboard";
 import { fromHome, parseDecor, plotSlots, type Placement } from "./decor";
 import { emptyHome, type DecorKind, type Slot } from "./home";
 import { parseCoins, parseOwned } from "./shop";
+import { parseFarm, type Farm } from "./farm";
+import { parseRoom, type Piece } from "./room";
 import { parseActive, parseParty, type PartyMon } from "./party";
 import { newSeed, parseGenes, randomGenes } from "./genes";
 import { EMPTY_MEMO, validateMemo, type Memo } from "../sim/memo";
@@ -29,6 +31,8 @@ export interface Save {
   onboard?: OnboardSave; // first-run hatch + hints seen, goals card closed
   party?: PartyMon[]; // v2: befriended pets you own (with their looks)
   active?: number; // v2: who walks and fights: 0 = hatched pet, i = party[i - 1]
+  farm?: Farm; // v2: the beds beside your A-frame, seeds and the harvest basket
+  room?: Piece[]; // v2: furniture inside your A-frame
 }
 
 export function load(): Save {
@@ -55,6 +59,8 @@ export function load(): Save {
           const party = parseParty(raw.party);
           return party.length ? { party, active: parseActive(raw.active, party.length) } : {};
         })(),
+        ...(raw.farm ? { farm: parseFarm(raw.farm) } : {}),
+        ...(raw.room ? { room: parseRoom(raw.room) } : {}),
         ...(parseOnboard(raw.onboard) ? { onboard: parseOnboard(raw.onboard) } : {}),
         ...(raw.steps && typeof raw.steps === "object"
           ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true } }

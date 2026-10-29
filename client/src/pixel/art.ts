@@ -20,7 +20,7 @@ type Ctx = CanvasRenderingContext2D;
 
 const FILES = [
   "tile-grass-0", "tile-grass-1", "tile-grass-2", "tile-water-0", "tile-water-1", "tile-water-2", "tile-water-3",
-  "tile-path-atlas", "tile-shore-atlas", "tile-shore-inner", "tile-detail-flowers", "tile-detail-tuft",
+  "tile-path-atlas", "tile-path-0", "tile-path-1", "tile-path-2", "tile-shore-atlas", "tile-shore-inner", "tile-detail-flowers", "tile-detail-tuft",
   "tile-bridge", "tile-crop-states", "prop-tree", "prop-house-aframe", "ui-frame-12", "font-6x8",
 ] as const;
 export type ArtName = (typeof FILES)[number];
@@ -115,8 +115,14 @@ export function drawMapTile(g: Ctx, m: TileMap, i: number, j: number, sx: number
   }
   const water = edgeMask((di, dj) => isWater(m, i + di, j + dj));
   if (k === T.path) {
-    const [ax, ay] = cell(edgeMask((di, dj) => isPath(m, i + di, j + dj)));
-    g.drawImage(img("tile-path-atlas"), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
+    const mask = edgeMask((di, dj) => isPath(m, i + di, j + dj));
+    // Inside a plaza (all four sides and corners path) use plain dirt so the grass corner dots don't grid it.
+    const solid = mask === 15 && [[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([di, dj]) => isPath(m, i + di!, j + dj!));
+    if (solid) g.drawImage(img(`tile-path-${Math.floor(hash2(i, j, 5) * 3)}` as ArtName), sx, sy);
+    else {
+      const [ax, ay] = cell(mask);
+      g.drawImage(img("tile-path-atlas"), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
+    }
   } else if (water) {
     const [ax, ay] = cell(water);
     g.drawImage(img("tile-shore-atlas"), ax, ay, TILE, TILE, sx, sy, TILE, TILE);

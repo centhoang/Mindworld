@@ -7,7 +7,8 @@ import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
-import { drawMapTile, drawProp, HOUSE, makePlayer, PAL, TREE, type Sprite } from "./art";
+import { drawMapTile, drawProp, HOUSE, img, makePlayer, PAL, TREE, type Sprite } from "./art";
+import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH } from "./text";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
@@ -53,18 +54,21 @@ export class Overworld {
   private place = "";
   private bannerT = 0;
   private readonly playerSprite: Sprite;
-  private petSprite: HTMLCanvasElement;
+  petSprite: HTMLCanvasElement;
   readonly wilds: Wild[] = [];
   private nextId = 1;
   private residents: Resident[] = [];
   cam: Vec = { x: 0, z: 0 };
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
+  beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
+  farm: Farm | null = null; // set by main.ts; drawn on the beds
 
   constructor(petGenes: Genes) {
     this.world = generateWorld();
     this.map = buildTileMap(this.world);
     const home = this.world.platforms.find((p) => p.kind === "home")!;
     this.house = { x: home.x, z: home.z - 2.5 };
+    this.beds = Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) }));
     this.placeTrees();
     this.player = { x: home.x + 0.5, z: home.z + 3.5 };
     this.pet = { x: home.x - 1, z: home.z + 4 };
@@ -91,6 +95,7 @@ export class Overworld {
         if (this.nearPath(i, j)) continue;
         if (this.trees.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5)) continue;
         if (Math.abs(x - this.house.x) < 3.5 && Math.abs(z - this.house.z + 1) < 3.5) continue;
+        if (this.beds.some((b) => Math.abs(b.x + 0.5 - x) < 2.5 && Math.abs(b.z + 0.5 - z) < 2.5)) continue;
         this.trees.push({ x, z });
         this.treeTiles.add(j * m.w + i);
       }
@@ -139,9 +144,58 @@ export class Overworld {
     if (i >= 0) this.wilds.splice(i, 1);
   }
 
+  residentSprites(): HTMLCanvasElement[] {
+    return this.residents.map((r) => r.sprite);
+  }
+
+  exitHouse(): void {
+    this.player = { x: this.house.x, z: this.house.z + 0.9 };
+    this.pet = { x: this.house.x + 0.8, z: this.house.z + 1.4 };
+    this.cam = { ...this.player };
+    this.dir = 0;
+  }
+
+  // The bed the player is standing next to and facing (or on), if any.
+  bedNear(): number {
+    const f = [[0, 0.7], [-0.7, 0], [0.7, 0], [0, -0.7]][this.dir]!;
+    const x = this.player.x + f[0]!;
+    const z = this.player.z + f[1]!;
+    return this.beds.findIndex((b) => x >= b.x && x < b.x + 1 && z >= b.z && z < b.z + 1);
+  }
+
+  atDoor(): boolean {
+    return Math.abs(this.player.x - this.house.x) < 0.8 && this.player.z > this.house.z && this.player.z < this.house.z + 1.2 && this.dir === 3;
+  }
+
+  private drawBeds(g: CanvasRenderingContext2D, toScreen: (x: number, z: number) => [number, number], t: number): void {
+    const crops = img("tile-crop-states");
+    this.beds.forEach((b, i) => {
+      const [sx, sy] = toScreen(b.x, b.z);
+      const p = this.farm?.plots[i];
+      if (p?.crop) g.drawImage(crops, p.stage * TILE, 0, TILE, TILE, sx, sy, TILE, TILE);
+      else {
+        g.drawImage(crops, 0, 0, TILE, TILE, sx, sy, TILE, TILE);
+        g.fillStyle = PAL.wood; // rake over the seed mark: an empty bed
+        g.fillRect(sx + 4, sy + 4, 8, 8);
+        g.fillStyle = PAL.woodD;
+        g.fillRect(sx + 4, sy + 7, 8, 1);
+      }
+      if (p && p.wetUntil) {
+        g.fillStyle = PAL.teal; // wet soil: teal corner marker (STYLE.md farms)
+        g.fillRect(sx + 3, sy + 11, 2, 2);
+        g.fillRect(sx + 11, sy + 11, 2, 2);
+      } else if (p && needsWater(p) && Math.floor(t * 2) % 2) {
+        g.fillStyle = PAL.waterL;
+        g.fillRect(sx + 7, sy - 4, 2, 3);
+        g.fillRect(sx + 6, sy - 2, 4, 2);
+      }
+    });
+  }
+
   readonly canWalk = (x: number, z: number): boolean => {
     if (!tileWalkable(this.map, x, z)) return false;
     if (Math.abs(x - this.house.x) < 1.6 && z < this.house.z + 0.2 && z > this.house.z - 2.2) return false;
+    if (this.beds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
     const i = Math.floor(x - this.map.ox);
     const j = Math.floor(z - this.map.oz);
     return !this.treeTiles.has(j * this.map.w + i);
@@ -211,6 +265,7 @@ export class Overworld {
         drawMapTile(g, m, i, j, sx, sy, t);
       }
     }
+    this.drawBeds(g, toScreen, t);
     // Sprites sorted by their feet, so things lower on screen stand in front.
     const items: { z: number; draw: () => void }[] = [];
     for (const tr of this.trees) {
@@ -250,6 +305,13 @@ export class Overworld {
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
 
+    const bed = this.bedNear();
+    const hint = this.atDoor() ? "E: GO IN" : bed >= 0 && this.farm ? bedHint(this.farm, bed) : "";
+    if (hint) {
+      const w = hint.length * GLYPH + 12;
+      drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);
+      drawText(g, hint, Math.round(px - w / 2) + 6, py - 40, PAL.wood);
+    }
     if (this.bannerT > 0 && this.place) {
       const w = this.place.length * GLYPH + 16;
       const x = Math.floor((sw - w) / 2);
@@ -258,4 +320,11 @@ export class Overworld {
       drawText(g, this.place, x + 8, y + 5, PAL.wood);
     }
   }
+}
+
+function bedHint(f: Farm, i: number): string {
+  const p = f.plots[i]!;
+  if (!p.crop) return Object.values(f.seeds).some((n) => n) ? "E: PLANT" : "NO SEEDS";
+  if (p.stage >= 3) return "E: HARVEST";
+  return needsWater(p) ? "E: WATER" : "GROWING...";
 }
