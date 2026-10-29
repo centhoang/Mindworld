@@ -5,12 +5,13 @@
 ## State
 - The pixel build IS the game now: `client/index.html` -> `src/pixel/main.ts`. three.js and the 3D view are deleted; `/pixel.html` 301-redirects to `/` (Worker). Bundle: main 112 KB (44 KB gz); the 6 MB `lib-*.js` is WebLLM, lazy-loaded only on B.
 - Tests: client 187 (6 grass tests went with grass.ts), worker 149, tsc clean. Build OK.
-- Deployed behind Access: https://pets.uryto.dev/ = the pixel game, version 99c90f89 (2026-10-29). Redeploys are standing-approved (CLAUDE.md "Decide vs. ask"): run `npm --prefix client run build`, then `npx wrangler deploy` in worker/, as two plain commands.
+- Deployed behind Access: https://pets.uryto.dev/ = the pixel game, version 8f84b901 (2026-10-29, play-test fixes). Redeploys are standing-approved (CLAUDE.md "Decide vs. ask"): run `npm --prefix client run build`, then `npx wrangler deploy` in worker/, as two plain commands.
 - Commits this session: f6f6492 ImageGen pass 2 (cabin background `interior-empty.png`, Elder 2-frame idle, market stall on the Market island with E = buy/sell menu; player walk rebuilt in code) · d22590e v1 port (live duels, emotes 1-4, voice lessons in Teach, first-run hatch line + hints, goals card G) · 64df3db index swap + three.js removed.
 - Credits: Meta $149.91, Modal ~$110, Baseten ~$0.15. No paid calls this session.
 
 ## Decisions made
 - **Art: Codex ImageGen = static art only** (user feedback 2026-10-29: the style looks great, but Codex animation is wrong). Claude does every animation, VFX and lighting in code. Example: the player walk uses only frame 0 of each `player-walk.png` row; `makePlayer()` in `pixel/art.ts` builds the 4-frame cycle (1 px bob, one leg lifted, the other planted).
+- Play-test 1 fixes (c9f7b93): E order = door, bed, Elder, stall, player, wild (hint over your head matches). Live presence + duels use the ACTIVE pet (LiveLink.rejoin on swap); peers with your own genes (your other tabs) are hidden. Player legs are drawn per frame in `art.ts` (frontLegs/sideLegs); only hat-to-hips comes from the ImageGen sheet. Hidden preview tabs join the local room as idle players: close them after live tests.
 - Mallow/Sprig back views (`monster-*-back.png`) are copied but NOT used: pets are procedural from genes, so a fixed back sprite would not match the pet's front/overworld look. Use them only if a fixed starter species with front + overworld art is added.
 - Duels: E next to an online player opens Duel / Wave / Heart / Dance / Laugh / Say. The invite is an Accept/Decline box (20 s timeout). The shared-seed `duelView` plays on the battle screen; coins come from `duelCoins`. Emotes show as speech bubbles ("*waves*", "<3 <3"), because the bitmap font has no emoji.
 - Onboarding: the first run shows the hatch line plus 3 `PIXEL_HINTS` (6 s each, Esc skips), marked seen afterwards. Goals card top-left (`pixelGoals`: teach, befriend, grow+sell, boss; `steps.shipped` added to the save), hidden while a menu is open or when all are done.
