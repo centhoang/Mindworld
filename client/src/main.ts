@@ -12,6 +12,7 @@ import { askNpc, chatWhoFor, type ChatWho } from "./game/npc-chat";
 import { newSeed, parseGenes, randomGenes } from "./game/genes";
 import { thinkingLabel } from "./game/thinking";
 import { askPets, traitOf } from "./game/pet-chat";
+import { Babbler } from "./game/babble";
 import { goals, hints, isTouch, parseOnboard, playHatch, playHints, renderGoals, type OnboardSave } from "./game/onboard";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "./game/voice-input";
 import { CloudVoice, localAccessState, NATIVE_URL, NativeVoice, WebLlmVoice } from "./game/voices";
@@ -204,12 +205,30 @@ const chatBar = $<HTMLFormElement>("chatBar");
 const chatInput = $<HTMLInputElement>("chatInput");
 let chatWith: { who: ChatWho; label: string } | null = null;
 let chatPending = false;
+let chatOpen = false; // room chat shows only when the 💬 dock button is on
+
+// Dock: round buttons open the fight log and the teach drawer, and toggle room chat. The world stays clear by default.
+function openDrawer(id: "fight" | "coach", open?: boolean) {
+  const el = $(id);
+  el.hidden = !(open ?? el.hidden);
+  if (!el.hidden) $(id === "fight" ? "coach" : "fight").hidden = true;
+  $("dockFight").classList.toggle("on", !$("fight").hidden);
+  $("dockBrain").classList.toggle("on", !$("coach").hidden);
+}
+$("dockFight").addEventListener("click", () => openDrawer("fight"));
+$("dockBrain").addEventListener("click", () => openDrawer("coach"));
+$("dockChat").addEventListener("click", () => {
+  chatOpen = !chatOpen;
+  $("dockChat").classList.toggle("on", chatOpen);
+  showChatBar(world.nearEntity);
+  if (chatOpen && !chatBar.hidden) chatInput.focus();
+});
 let chatQuietUntil = 0; // ambient chatter waits while a chat reply is on screen
 function showChatBar(e: Entity | null) {
   const who = e && !busy ? chatWhoFor(e.kind, e.archetype) : null;
   if (who && chatWith?.who === who && !chatBar.hidden) return;
   chatWith = who && e ? { who, label: e.label } : null;
-  const roomChat = !chatWith && !busy && live.status === "online";
+  const roomChat = chatOpen && !chatWith && !busy && live.status === "online";
   chatBar.hidden = !chatWith && !roomChat;
   chatInput.maxLength = chatWith ? 140 : SAY_MAX;
   $("chatNote").textContent = chatWith
@@ -314,6 +333,7 @@ async function duelStarted(_duel: string, seed: number, a: Fighter, b: Fighter) 
   const v = duelView(a, b, seed, me);
   busy = true;
   setButtons();
+  openDrawer("fight", true);
   world.paused = true;
   arena.mode = "battle";
   arena.setEnemy(makePet(them.genes));
@@ -386,21 +406,14 @@ world.onChill = (on) => {
 
 // ---------------- chatter, voice, coins, shop ----------------
 
-const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
+// Voices are cozy-game babble (WebAudio blips), not text-to-speech: friendlier, and they work everywhere.
+const canSpeak = typeof window !== "undefined" && ("AudioContext" in window || "webkitAudioContext" in window);
+const babbler = new Babbler();
 const lastLine: Partial<Record<Speaker, string>> = {};
 function speak(text: string, who: Speaker) {
   if (!canSpeak || state.muted) return;
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    const v = voiceFor(who);
-    u.pitch = v.pitch;
-    u.rate = v.rate;
-    u.volume = 0.35; // quiet by default
-    speechSynthesis.cancel();
-    speechSynthesis.speak(u);
-  } catch {
-    /* no voices on this browser: bubbles only */
-  }
+  const v = voiceFor(who);
+  babbler.say(text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: who === "boss" ? "sawtooth" : "triangle" });
 }
 function chatter(who: Speaker, bubble: "pet" | "enemy", ms = 2200) {
   const line = pickLine(who, Math.random, lastLine[who]);
@@ -431,7 +444,6 @@ const renderMute = () => {
 };
 muteBtn.onclick = () => {
   state.muted = !state.muted;
-  if (state.muted && canSpeak) speechSynthesis.cancel();
   save();
   renderMute();
 };

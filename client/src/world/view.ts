@@ -1,3 +1,4 @@
+import { Grass } from "./grass";
 import * as THREE from "three";
 import { makeBossMesh, makeDecor, makeEnemy, makeGhostPet, makePet } from "../game/scene";
 import { HOME_SLOTS, slotPosition, type Slot } from "../game/home";
@@ -275,7 +276,10 @@ interface LiveGhost {
 
 export class WorldView {
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.OrthographicCamera(-8, 8, 6, -6, 0.1, 200);
+  readonly camera = new THREE.PerspectiveCamera(48, 16 / 9, 0.1, 400);
+  private camZoom = 1;
+  private readonly camPos = new THREE.Vector3();
+  private camInit = false; // eased towards zoomTarget; 1 = default follow distance
   readonly avatar = makeAvatar();
   readonly pet = makePet();
   entities: Entity[] = [];
@@ -296,6 +300,8 @@ export class WorldView {
   private aspect = 16 / 9;
   private readonly sun: THREE.DirectionalLight;
   private clouds: Clouds | null = null;
+  private grass: Grass | null = null;
+  private readonly push = [{ x: 0, z: 0 }, { x: 0, z: 0 }];
   private readonly motes = new Motes(45, 11, 3.5);
   private readonly islets: THREE.Group[] = [];
   private homeHouse: Corner | null = null;
@@ -320,7 +326,7 @@ export class WorldView {
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.scene.background = skyTexture();
-    this.scene.fog = new THREE.Fog(PAL.fog, 24, 48);
+    this.scene.fog = new THREE.Fog(PAL.fog, 30, 120);
     this.sun = addLights(this.scene, 14);
     this.scene.add(this.root, this.avatar, this.pet, this.motes.points);
     this.pet.scale.setScalar(0.75);
@@ -415,6 +421,16 @@ export class WorldView {
       this.islets.push(o);
       this.root.add(o);
     }
+    // A meadow on every land, kept off the cabins and the elder's/market's centre.
+    this.grass?.dispose();
+    const cabinHole = (p: Platform) => {
+      const a = (HOUSE_DEG * Math.PI) / 180;
+      return { x: p.x + Math.cos(a) * (p.r - 1.9), z: p.z - Math.sin(a) * (p.r - 1.9), r: 3.4 };
+    };
+    const holes = map.platforms.flatMap((p) =>
+      p.kind === "home" || p.kind === "corner" ? [cabinHole(p)] : p.kind === "npc" || p.kind === "market" ? [{ x: p.x, z: p.z, r: 3.5 }] : [],
+    );
+    this.grass = new Grass(map.platforms.map((p) => ({ x: p.x, z: p.z, r: p.r })), holes, { seed: 7, height: 0.3, bladesPerUnit2: 11, base: 0x86c23c, tip: 0xeef27e, flowerRatio: 0.03 });
     this.setHomeDecor(content.home, content.porch ?? []);
     castAll(this.root);
     if (this.clouds) this.clouds.mesh.castShadow = this.clouds.mesh.receiveShadow = false;
@@ -422,6 +438,7 @@ export class WorldView {
     const live = new Set<THREE.Object3D>([...this.entities.map((e) => e.obj), ...this.islets, this.homeDecor]);
     if (this.clouds) live.add(this.clouds.mesh);
     mergeStatic(this.root, this.root.children.filter((c) => !live.has(c) && !(c instanceof THREE.Sprite)));
+    this.root.add(this.grass.group); // instanced, so added after merging and without casting shadows
     if (!walkable(map, this.player.x, this.player.z)) this.player = { x: 0, z: 0.5 };
   }
 
@@ -775,11 +792,8 @@ export class WorldView {
 
   resize(aspect: number) {
     this.aspect = aspect;
-    const half = aspect < 1 ? 7.5 / aspect : 7.5;
-    this.camera.left = -half * aspect;
-    this.camera.right = half * aspect;
-    this.camera.top = half;
-    this.camera.bottom = -half;
+    this.camera.aspect = aspect;
+    this.camera.fov = aspect < 1 ? 62 : 48; // portrait phones see a bit more
     this.camera.updateProjectionMatrix();
   }
 
@@ -868,16 +882,23 @@ export class WorldView {
     }
 
     this.clouds?.update(dt);
+    this.push[0]!.x = this.player.x;
+    this.push[0]!.z = this.player.z;
+    this.push[1]!.x = this.petPos.x;
+    this.push[1]!.z = this.petPos.z;
+    this.grass?.update(t / 1000, this.push);
     this.motes.update(t, this.player.x, this.player.z);
     for (const o of this.islets) o.position.y = o.userData.y + Math.sin(t / 1400 + o.userData.phase) * 0.25;
-    this.sun.position.set(this.player.x + 8, 18, this.player.z + 10);
+    this.sun.position.set(this.player.x - 12, 11, this.player.z + 6); // low golden-hour sun: long soft shadows
     this.sun.target.position.set(this.player.x, 0, this.player.z);
-    if (Math.abs(this.camera.zoom - this.zoomTarget) > 0.001) {
-      this.camera.zoom += (this.zoomTarget - this.camera.zoom) * Math.min(1, dt * 10);
-      this.camera.updateProjectionMatrix();
-    }
-    this.camera.position.set(this.player.x, 14, this.player.z + 13);
-    this.camera.lookAt(this.player.x, 0, this.player.z);
+    // Low follow camera behind the player (fixed yaw, so WASD stays screen-aligned); zoom changes the distance.
+    this.camZoom += (this.zoomTarget - this.camZoom) * Math.min(1, dt * 10);
+    const dist = 11 / this.camZoom;
+    this.camPos.set(this.player.x, 1.2 + dist * 0.55, this.player.z + dist);
+    if (this.camInit) this.camera.position.lerp(this.camPos, Math.min(1, dt * 5));
+    else this.camera.position.copy(this.camPos);
+    this.camInit = true;
+    this.camera.lookAt(this.camera.position.x, 1.1, this.camera.position.z - dist - 2.5);
   }
 
   // The on-screen interact button (touch): same as pressing E.

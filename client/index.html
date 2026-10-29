@@ -73,13 +73,12 @@
         box-shadow: 0 3px 8px rgba(120, 80, 50, 0.18); font-weight: 700;
         font-size: 13px; max-width: 220px; pointer-events: none; opacity: 0; transition: opacity 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .bubble.show { opacity: 1; }
-      footer { position: fixed; bottom: 6px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--dim); pointer-events: none; padding: 0 12px; }
       #banner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; font-weight: 800; color: #fff; text-shadow: 0 3px 0 #e98f6a, 0 4px 14px rgba(120, 70, 40, 0.45); pointer-events: none; opacity: 0; transition: opacity 0.3s; }
       #banner.show { opacity: 1; }
       .hint { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 2px solid var(--line); font-weight: 700;
         box-shadow: 0 3px 10px rgba(120, 80, 50, 0.16);
         border-radius: 999px; padding: 5px 14px; font-size: 13px; pointer-events: none; white-space: nowrap; }
-      .chatbar { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+      .chatbar { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
         background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 6px 8px; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.16); width: min(420px, calc(100vw - 32px)); }
       .chatbar[hidden] { display: none; }
       .emotes { display: inline-flex; gap: 4px; }
@@ -106,27 +105,24 @@
       #hints .hintBody b { font-size: 16px; }
       #hints .hintNav { grid-column: 1 / -1; justify-content: flex-end; }
       #hints .hintNav .dim { margin-right: auto; }
-      #goals { position: fixed; top: 52px; left: 354px; width: 230px; z-index: 4; padding: 8px 10px; font-size: 12px; background: var(--panel);
+      #goals { position: fixed; top: 52px; left: 12px; width: 230px; z-index: 4; padding: 8px 10px; font-size: 12px; background: var(--panel);
         border: 2px solid var(--line); border-radius: 14px; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.16); }
       #goals .goal { padding: 3px 0; border-top: 1px dashed var(--line); }
       #goals .goal.done { color: var(--good); }
       #goals .goal .dim { font-size: 11px; padding-left: 22px; }
       #goals button.chip { padding: 0 7px; }
-      #interactBtn { position: fixed; right: 16px; bottom: 76px; z-index: 6; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      #interactBtn { position: fixed; right: 16px; bottom: 18px; z-index: 6; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         padding: 12px 18px; border-radius: 999px; font-size: 15px; display: none; }
       @media (pointer: coarse), (max-width: 1100px) { #interactBtn:not([hidden]) { display: block; } }
-      @media (max-width: 1100px) {
-        #goals { position: static; width: auto; margin: 8px 16px 0; }
-        .hint { display: none; }
-        #interactBtn { position: absolute; bottom: auto; top: calc(46vh - 136px); }
-        #hints { bottom: auto; top: 18vh; }
-        #hatch { top: 23vh; }
-        #stage { position: relative; height: 46vh; }
-        header { position: absolute; }
-        .panel { position: static; width: auto; max-height: none; margin: 8px 16px; }
-        footer { position: static; padding: 8px 16px 16px; }
+      .panel[hidden] { display: none; }
+      #dock { position: fixed; left: 14px; bottom: 14px; display: flex; gap: 10px; z-index: 6; }
+      #dock button { width: 50px; height: 50px; border-radius: 50%; padding: 0; font-size: 22px; background: var(--panel); box-shadow: 0 3px 10px rgba(120, 80, 50, 0.2); }
+      #dock button.on { background: var(--accent); border-color: #f08a57; }
+      footer { font-size: 11px; margin-top: 12px; }
+      @media (max-width: 760px) {
+        .panel { left: 8px !important; right: 8px !important; width: auto; top: auto; bottom: 74px; max-height: 58vh; }
         .bubble { font-size: 12px; max-width: 160px; }
-        .chatbar { position: absolute; bottom: auto; top: calc(46vh - 80px); }
+        #goals { left: 8px; }
       }
     </style>
   </head>
@@ -135,10 +131,8 @@
     <header>
       <h1>Mindworld</h1>
       <button id="helpBtn" class="chip" type="button" title="How to play" aria-label="How to play">?</button>
-      <span class="chip">Instinct: <b id="brain">rules only</b></span>
-      <span class="chip">Coach: <b id="coachSrc">Muse Spark</b></span>
       <span class="chip" title="Coins from wild wins and befriends">🪙 <b id="coins">0</b></span>
-      <button id="mute" class="chip" type="button" hidden>🔊 Voices on</button>
+      <button id="mute" class="chip" type="button" hidden title="Voices">🔊 Voices on</button>
       <span id="liveChip" class="chip" title="Other players in this world right now" hidden>🟢 <b id="liveCount">0</b> online</span>
       <span id="emotes" class="emotes" hidden>
         <button class="chip" data-emote="wave" title="Wave (1)">👋</button><button class="chip" data-emote="heart" title="Heart (2)">❤️</button><button class="chip" data-emote="dance" title="Dance (3)">🎵</button><button class="chip" data-emote="laugh" title="Laugh (4)">😄</button>
@@ -158,6 +152,11 @@
     <div id="hatch" class="overlay" hidden role="dialog" aria-label="Your pet hatches"></div>
     <div id="hints" class="overlay" hidden role="dialog" aria-label="How to play"></div>
     <aside id="goals" aria-label="Goals" hidden></aside>
+    <nav id="dock" aria-label="Menus">
+      <button id="dockFight" type="button" title="Fights and log" aria-label="Fights">⚔️</button>
+      <button id="dockBrain" type="button" title="Teach your pet" aria-label="Teach">🧠</button>
+      <button id="dockChat" type="button" title="Chat" aria-label="Chat">💬</button>
+    </nav>
     <button id="interactBtn" class="primary" type="button" hidden></button>
     <div id="duelInvite" class="invite" hidden role="dialog" aria-live="polite">
       <span id="duelInviteText"></span>
@@ -171,7 +170,7 @@
       <div id="chatNote" class="chatnote">Replies by Muse Spark (Meta AI). Please don't share personal info.</div>
     </form>
 
-    <section id="fight" class="panel">
+    <section id="fight" class="panel" hidden>
       <h2>Fight</h2>
       <ol id="steps" class="steps" aria-label="First steps"></ol>
       <div class="row">
@@ -209,7 +208,8 @@
       </div>
     </section>
 
-    <section id="coach" class="panel">
+    <section id="coach" class="panel" hidden>
+      <div class="dim">Instinct: <b id="brain">rules only</b> · Coach: <b id="coachSrc">Muse Spark</b></div>
       <h2>Memo (what your pet has learned)</h2>
       <div id="memoSummary" class="dim"></div>
       <ol id="memo"></ol>
@@ -233,9 +233,9 @@
         <div id="proofStats" class="dim"></div>
         <button id="watchProof" style="margin-top:6px">Watch a fight it now wins</button>
       </div>
+      <footer class="dim">Your pet's decisions run on your device. Teaching text (and your voice, if you press Speak) is sent to Meta models through our server; free-tier content may be used by Meta, so don't type or say personal info. The mic is only on while the Speak button says Stop. Our host (Cloudflare) counts anonymous page views.</footer>
     </section>
 
-    <footer>Your pet's decisions run on your device. Teaching text (and your voice, if you press Speak) is sent to Meta models through our server; free-tier content may be used by Meta, so don't type or say personal info. The mic is only on while the Speak button says Stop. Our host (Cloudflare) counts anonymous page views.</footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

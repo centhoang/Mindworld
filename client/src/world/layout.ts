@@ -35,10 +35,10 @@ export interface CornerOwner {
   name: string;
 }
 
-export const CELL = 13; // grid spacing between platform centres
-export const BRIDGE_W = 2.6;
+export const CELL = 30; // grid spacing between platform centres: big lands, short bridges between them
+export const BRIDGE_W = 3.2;
 
-const RADIUS: Record<PlatformKind, number> = { home: 4.4, wild: 5, boss: 4.2, market: 3.6, npc: 3.4, event: 4, corner: 3.8 };
+const RADIUS: Record<PlatformKind, number> = { home: 11.5, wild: 12.5, boss: 11, market: 10.5, npc: 10.5, event: 11, corner: 10.5 };
 const LABEL: Record<Exclude<PlatformKind, "corner">, string> = {
   home: "Your corner",
   wild: "Wild meadow",
