@@ -30,6 +30,16 @@ export interface Wild {
   cool: number; // seconds before it can start a fight (after one just ended)
 }
 
+// Owned pets that are not out with you live at your corner: they wander a little and do small things.
+interface Resident {
+  sprite: HTMLCanvasElement;
+  pos: Vec;
+  target: Vec;
+  wait: number;
+  act: string; // bubble text while idle: sleeping, humming, curious
+}
+const ACTS = ["z", "zz", "...", "!", "?", "*"];
+
 export class Overworld {
   readonly world: WorldMap;
   readonly map: TileMap;
@@ -47,6 +57,7 @@ export class Overworld {
   private petSprite: HTMLCanvasElement;
   readonly wilds: Wild[] = [];
   private nextId = 1;
+  private residents: Resident[] = [];
   private readonly treeSprite: Sprite;
   cam: Vec = { x: 0, z: 0 };
 
@@ -97,8 +108,17 @@ export class Overworld {
     return false;
   }
 
-  setPet(g: Genes): void {
-    this.petSprite = drawMonster(petLook(g), OVERWORLD_MON, "front");
+  setPet(g: Genes, arch?: ArchetypeId): void {
+    this.petSprite = drawMonster(petLook(g), OVERWORLD_MON, "front", arch ? BUILDS[arch] : undefined);
+  }
+
+  setResidents(mons: readonly { genes: Genes; arch?: ArchetypeId }[]): void {
+    const home = this.world.platforms.find((p) => p.kind === "home")!;
+    this.residents = mons.map((m, i) => {
+      const a = (i / Math.max(1, mons.length)) * Math.PI * 2 + 0.6;
+      const pos = { x: home.x + Math.cos(a) * 5.5, z: home.z + Math.sin(a) * 5.5 };
+      return { sprite: drawMonster(petLook(m.genes), OVERWORLD_MON, "front", m.arch ? BUILDS[m.arch] : undefined), pos, target: { ...pos }, wait: 1 + i, act: "" };
+    });
   }
 
   spawnWild(cx: number, cz: number, r: number): void {
@@ -144,6 +164,21 @@ export class Overworld {
     if (here && here !== this.place) this.bannerT = 2.5;
     this.place = here || this.place;
     this.bannerT = Math.max(0, this.bannerT - dt);
+    const home = this.world.platforms.find((p) => p.kind === "home")!;
+    for (const r of this.residents) {
+      r.wait -= dt;
+      if (r.wait > 0) continue;
+      const s = stepToward(r.pos, r.target, WALK_SPEED * 0.25 * dt);
+      r.pos = slide(r.pos, s.dx, s.dz, this.canWalk);
+      r.act = "";
+      if (s.arrived) {
+        r.wait = 3 + Math.random() * 5;
+        r.act = ACTS[Math.floor(Math.random() * ACTS.length)]!;
+        const a = Math.random() * Math.PI * 2;
+        const d = 3 + Math.random() * 5;
+        r.target = { x: home.x + Math.cos(a) * d, z: home.z + Math.sin(a) * d };
+      }
+    }
     let met: Wild | null = null;
     for (const w of this.wilds) {
       w.cool = Math.max(0, w.cool - dt);
@@ -204,6 +239,18 @@ export class Overworld {
       if (wx < -24 || wy < -24 || wx > sw + 24 || wy > sh + 24) continue;
       const wh = w.wait <= 0 ? Math.floor(t * 5 + w.id) % 2 : 0;
       items.push({ z: w.pos.z, draw: () => g.drawImage(w.sprite, wx - half, wy - OVERWORLD_MON + 2 - wh) });
+    }
+    for (const r of this.residents) {
+      const [rx, ry] = toScreen(r.pos.x, r.pos.z);
+      if (rx < -24 || ry < -40 || rx > sw + 24 || ry > sh + 24) continue;
+      const sleeping = r.act.startsWith("z");
+      items.push({
+        z: r.pos.z,
+        draw: () => {
+          g.drawImage(r.sprite, rx - half, ry - OVERWORLD_MON + 2 + (sleeping ? 1 : 0));
+          if (r.act && Math.floor(t * 1.5) % 3 !== 2) drawText(g, r.act, rx + 4, ry - OVERWORLD_MON - 8 - (Math.floor(t * 2) % 2), PAL.sandL);
+        },
+      });
     }
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();

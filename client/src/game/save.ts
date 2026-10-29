@@ -5,6 +5,7 @@ import { parseOnboard, type OnboardSave } from "./onboard";
 import { fromHome, parseDecor, plotSlots, type Placement } from "./decor";
 import { emptyHome, type DecorKind, type Slot } from "./home";
 import { parseCoins, parseOwned } from "./shop";
+import { parseActive, parseParty, type PartyMon } from "./party";
 import { newSeed, parseGenes, randomGenes } from "./genes";
 import { EMPTY_MEMO, validateMemo, type Memo } from "../sim/memo";
 import type { Genes } from "../sim/ghost";
@@ -26,6 +27,8 @@ export interface Save {
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
   genes: Genes; // the pet's looks, rolled at hatch (older saves get one on first load)
   onboard?: OnboardSave; // first-run hatch + hints seen, goals card closed
+  party?: PartyMon[]; // v2: befriended pets you own (with their looks)
+  active?: number; // v2: who walks and fights: 0 = hatched pet, i = party[i - 1]
 }
 
 export function load(): Save {
@@ -48,6 +51,10 @@ export function load(): Save {
         ...(Array.isArray(raw.tamed)
           ? { tamed: raw.tamed.filter((a): a is ArchetypeId => (ARCHETYPES as readonly string[]).includes(a as string)).slice(-MAX_TAMED) }
           : {}),
+        ...(() => {
+          const party = parseParty(raw.party);
+          return party.length ? { party, active: parseActive(raw.active, party.length) } : {};
+        })(),
         ...(parseOnboard(raw.onboard) ? { onboard: parseOnboard(raw.onboard) } : {}),
         ...(raw.steps && typeof raw.steps === "object"
           ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true } }

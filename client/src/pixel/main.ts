@@ -5,6 +5,8 @@
 import { petLook } from "../game/genes";
 import { addCoins, coinsFor } from "../game/shop";
 import { load, MAX_TAMED, save } from "../game/save";
+import { addToParty, type PartyMon } from "../game/party";
+import type { Genes } from "../sim/ghost";
 import { Battle } from "../sim/battle";
 import { allowedMoves, cannedLine } from "../game/instinct";
 import { withTactics } from "../sim/tactics";
@@ -15,6 +17,7 @@ import { makePresenter } from "./crt";
 import { BUILDS, drawMonster } from "./monster";
 import { Overworld, type Wild } from "./overworld";
 import { drawDialogue } from "./text";
+import { drawMenu, type MenuRow } from "./menu";
 
 export const LOW_H = 216;
 
@@ -39,10 +42,25 @@ const low = document.createElement("canvas");
 const g = low.getContext("2d")!;
 const presenter = makePresenter(out);
 const world = new Overworld(state.genes);
+
+// Who is out with you: 0 = the hatched pet, i = party[i - 1]. Everyone else lives at your corner.
+interface Member { name: string; genes: Genes; arch?: PartyMon["arch"] }
+const members = (): Member[] => [{ name: pet.name, genes: state.genes }, ...(state.party ?? [])];
+const activeMember = (): Member => members()[state.active ?? 0] ?? members()[0]!;
+function refreshParty(): void {
+  const all = members();
+  const a = state.active ?? 0;
+  world.setPet(all[a]!.genes, all[a]!.arch);
+  world.setResidents(all.filter((_, i) => i !== a));
+}
+refreshParty();
+let menu: { cursor: number } | null = null;
+const iconCache = new Map<Genes, HTMLCanvasElement>();
+const icon = (m: Member) => iconCache.get(m.genes) ?? iconCache.set(m.genes, drawMonster(petLook(m.genes), 16, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;
 const battleView = new BattleView();
 const keys = new Set<string>();
 let mode: "world" | "battle" = "world";
-let toast: { text: string; who?: string; t: number } | null = { text: "Walk with WASD or the arrow keys. Bump into a wild pet to battle. C switches the CRT look.", who: "Hint", t: 7 };
+let toast: { text: string; who?: string; t: number } | null = { text: "Walk with WASD or the arrow keys. Bump into a wild pet to battle. P = your pets. C switches the CRT look.", who: "Hint", t: 7 };
 
 const CRT_KEY = "mw.crt";
 let crt = (() => {
@@ -80,6 +98,7 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (k === "c" && !e.repeat) setCrt(!crt);
   if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
+  if (mode === "world" && !e.repeat) menuKey(k);
   keys.add(k);
   if (k.startsWith("arrow") || k === " ") e.preventDefault();
 });
@@ -87,6 +106,23 @@ window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("blur", () => keys.clear());
 out.addEventListener("pointerdown", () => mode === "battle" && battleView.skip());
 resize();
+
+function menuKey(k: string): void {
+  if (!menu) {
+    if (k === "p") menu = { cursor: state.active ?? 0 };
+    return;
+  }
+  const n = members().length;
+  if (k === "arrowup" || k === "w") menu.cursor = (menu.cursor + n - 1) % n;
+  if (k === "arrowdown" || k === "s") menu.cursor = (menu.cursor + 1) % n;
+  if (k === "enter" || k === " " || k === "z") {
+    state.active = menu.cursor;
+    save(state);
+    refreshParty();
+    toast = { text: `${activeMember().name} walks with you now. The others chill at your corner.`, t: 3 };
+    menu = null;
+  } else if (k === "p" || k === "escape" || k === "x") menu = null;
+}
 
 async function fight(w: Wild): Promise<void> {
   mode = "battle";
@@ -98,7 +134,7 @@ async function fight(w: Wild): Promise<void> {
   const look = petLook(w.genes);
   await battleView.open(
     { name: foeName, sprite: drawMonster(look, 64, "front", BUILDS[w.arch]), maxHp: def.maxHp },
-    { name: pet.name, sprite: drawMonster(petLook(state.genes), 48, "back"), maxHp: pet.maxHp },
+    { name: activeMember().name, sprite: drawMonster(petLook(activeMember().genes), 48, "back", activeMember().arch ? BUILDS[activeMember().arch!] : undefined), maxHp: pet.maxHp },
   );
   while (!battle.done) {
     const obs = battle.observe();
@@ -116,8 +152,11 @@ async function fight(w: Wild): Promise<void> {
     state.coins = addCoins(state.coins ?? 0, earned);
     let msg = `+${earned} coins.`;
     if (replay.how === "befriended") {
-      state.tamed = [...(state.tamed ?? []), w.arch].slice(-MAX_TAMED);
-      msg = `${foeName} joined your corner! ${msg}`;
+      state.tamed = [...(state.tamed ?? []), w.arch].slice(-MAX_TAMED); // v1 readers
+      state.party = addToParty(state.party ?? [], w.arch, w.genes);
+      state.active = Math.min(state.active ?? 0, state.party.length);
+      refreshParty();
+      msg = `${state.party.at(-1)!.name} the ${w.arch} is yours now! It waits at your corner. ${msg}`;
     }
     await battleView.say(msg);
     world.removeWild(w.id);
@@ -140,10 +179,14 @@ function frame(now: number): void {
 
 function update(dt: number, t: number): void {
   if (mode === "world") {
-    const met = world.update(dt, keys);
+    const met = world.update(dt, menu ? new Set<string>() : keys);
     world.draw(g, low.width, low.height, t);
     if (met) void fight(met);
-    if (toast) {
+    if (menu) {
+      const a = state.active ?? 0;
+      const rows: MenuRow[] = members().map((m, i) => ({ label: m.name, note: i === a ? "with you" : "at home", icon: icon(m) }));
+      drawMenu(g, low.width, low.height, "Your pets", rows, menu.cursor, t, "Enter: take along  P: close");
+    } else if (toast) {
       toast.t -= dt;
       drawDialogue(g, low.width, low.height, toast.text, toast.who);
       if (toast.t <= 0) toast = null;
