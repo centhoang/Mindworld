@@ -82,6 +82,20 @@ export function linePrompt(p: Persona, m: MindMemory, other: Persona, affinity: 
     temperature: 0.9,
   };
 }
+// A player walks up and says something: the mind answers in character, using what it remembers.
+export function replyPrompt(p: Persona, m: MindMemory, player: string, line: string): LmRequest {
+  return {
+    system: SYSTEM,
+    user: `${personaCard(p)}
+${memoryText(m, line, 3)}
+A visitor, ${player}, says to ${p.name}: "${line.slice(0, 140)}"
+Write ${p.name}'s answer: one or two short friendly sentences, under 25 words, in character, no emoji.`,
+    grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,
+    maxTokens: 40,
+    temperature: 0.8,
+  };
+}
+
 export function parseLine(text: string, name: string): string | null {
   let t = text.trim().replace(/^["']|["']$/g, "");
   t = t.replace(new RegExp(`^${name}\\s*:\\s*`, "i"), "");

@@ -4,14 +4,15 @@
 // spoken lines and memories go out too, so a host change keeps the NPC's memory (stored in the room).
 // No host known (offline, alone) = the NPCs pick by the utility score here, like a mind without a model.
 
-import { gameTime, clockLabel } from "../life/clock";
+import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, newVillage, stepVillage, type Agent, type Choice, type Env, type LifeEvent, type Spots, type Village } from "../life/village";
 import type { Vec } from "../world/movement";
 import { NPCS, type MindLine, type Npc } from "../world/live";
 import { MindHub } from "./hub";
-import { emptyMemory, type MemoryEntry, type MindMemory } from "./memory";
+import { parseLine, replyPrompt } from "./brain";
+import { emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { VILLAGERS } from "./persona";
-import type { MindScheduler } from "./scheduler";
+import { PRIO, type MindScheduler } from "./scheduler";
 
 export interface NpcOut {
   line(l: MindLine & { mem?: string }): void; // to the room (only for NPCs I host)
@@ -32,8 +33,8 @@ export class NpcVillage {
   me: string | null = null; // my live id
 
   constructor(
-    sched: MindScheduler,
-    hasModel: () => boolean,
+    private readonly sched: MindScheduler,
+    private readonly hasModel: () => boolean,
     private readonly out: NpcOut,
     homes: Record<Npc, Vec>,
     spots: Spots,
@@ -109,6 +110,26 @@ export class NpcVillage {
     if (v.t - since < REMOTE_WAIT) return undefined;
     this.waited.delete(npc);
     return null;
+  }
+
+  // A player is talking to this NPC: if it is between activities, it waits a moment instead of leaving.
+  hold(npc: Npc): void {
+    const a = this.v.agents.find((x) => x.id === npc);
+    if (a?.state === "idle") a.idle = Math.max(a.idle, 15);
+  }
+
+  // The player talks to an NPC. Hosted here with a model: its own mind answers (persona + memories) and
+  // remembers the chat, which reaches the room as a memory line. Otherwise null: the caller asks the cloud.
+  async reply(npc: Npc, player: string, line: string): Promise<{ text: string; source: string } | null> {
+    const m = this.hub.minds.get(npc);
+    this.hold(npc);
+    if (!m || !this.hosting(npc) || !this.hasModel()) return null;
+    const ans = await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
+    if (!ans.value) return null;
+    const g = gameTime(this.v.t);
+    remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);
+    if (this.hosting(npc)) this.out.line({ who: npc, say: ans.value });
+    return { text: ans.value, source: ans.source };
   }
 
   private said(npc: Npc, text: string): void {

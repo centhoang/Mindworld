@@ -14,8 +14,8 @@ export function findRoute(from: Vec, to: Vec, canWalk: (x: number, z: number) =>
   const sj = Math.floor(from.z);
   const ti = Math.floor(to.x);
   const tj = Math.floor(to.z);
-  const k = (i: number, j: number) => `${i},${j}`;
-  const prev = new Map<string, string | null>([[k(si, sj), null]]);
+  const k = (i: number, j: number) => (i + 4096) * 8192 + (j + 4096); // tiles stay within +-4096
+  const prev = new Map<number, number>([[k(si, sj), -1]]);
   const queue: [number, number][] = [[si, sj]];
   let found = false;
   for (let q = 0; q < queue.length && prev.size < maxTiles; q++) {
@@ -36,22 +36,17 @@ export function findRoute(from: Vec, to: Vec, canWalk: (x: number, z: number) =>
   }
   if (!found) return null;
   const cells: Vec[] = [];
-  for (let c: string | null = k(ti, tj); c; c = prev.get(c) ?? null) {
-    const [i, j] = c.split(",").map(Number) as [number, number];
-    cells.unshift({ x: i + 0.5, z: j + 0.5 });
-  }
+  for (let c = k(ti, tj); c >= 0; c = prev.get(c)!) cells.push({ x: Math.floor(c / 8192) - 4096 + 0.5, z: (c % 8192) - 4096 + 0.5 });
+  cells.reverse();
   cells[cells.length - 1] = { ...to };
-  // Thin: from each kept point, skip ahead to the farthest cell still in a clear straight line.
+  // Thin: from each kept point, walk ahead while the straight line stays clear (linear, so long walks
+  // across the map stay cheap).
   const out: Vec[] = [];
   let at = from;
   let i = 0;
   while (i < cells.length) {
     let far = i;
-    for (let n = cells.length - 1; n > i; n--)
-      if (lineClear(at, cells[n]!, canWalk)) {
-        far = n;
-        break;
-      }
+    while (far + 1 < cells.length && lineClear(at, cells[far + 1]!, canWalk)) far++;
     out.push(cells[far]!);
     at = cells[far]!;
     i = far + 1;

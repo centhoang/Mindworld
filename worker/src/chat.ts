@@ -3,7 +3,7 @@
 // the spend ledger (per client and per day), repeated openers are served from a small cache, and when the
 // model is over budget or down the NPC still answers with a scripted line.
 
-export const CHAT_WHO = ["elder", "brute", "skitter", "turtle", "pal", "bully"] as const;
+export const CHAT_WHO = ["elder", "brute", "skitter", "turtle", "pal", "bully", "mo", "ama", "pip"] as const;
 export type ChatWho = (typeof CHAT_WHO)[number];
 
 export const CHAT_MAX_LINE = 140; // the player's message, characters
@@ -34,6 +34,9 @@ const PERSONA: Record<ChatWho, string> = {
     "You are a wild Pal, the friendliest pet in the meadow. You love making friends and would happily follow the player home.",
   bully:
     "You are a wild Bully pet in the meadow: cheeky and boastful, but secretly lonely. You tease, then show a soft side.",
+  mo: "You are Mo, the village fisher: calm, curious and patient. You fish at dawn, whittle, and share your catch at picnics.",
+  ama: "You are Ama, the village cook: tidy, generous and chatty. You cook for everyone, tidy up after them and love a party.",
+  pip: "You are Pip, the village kid: playful, loud and curious. You love soccer and dancing and challenge everyone to a game.",
 };
 
 const SCRIPTED: Record<ChatWho, readonly string[]> = {
@@ -48,6 +51,9 @@ const SCRIPTED: Record<ChatWho, readonly string[]> = {
   turtle: ["Oh! Hello... I will just stay in my shell a bit.", "You seem kind. Maybe we can be friends.", "Slow and steady, that is my way."],
   pal: ["Hi hi! Want to be friends? Please?", "Your pet looks so happy with you!", "I would love to see your cabin someday!"],
   bully: ["Hah! Your pet looks tiny. ...Cute, though.", "I am the toughest here. Mostly.", "Fine, you can stay. Just for a bit."],
+  mo: ["The fish bite best at dawn. Patience, friend.", "Found a pond yet? Sit with me sometime.", "Quiet water, quiet mind."],
+  ama: ["Hungry? There is always soup on my stove.", "A picnic later! Bring your pets.", "Oh dear, who left that mess? I'll tidy it."],
+  pip: ["Soccer? Soccer! Come on, one game!", "Bet I can run faster than your pet!", "Let's dance on the square tonight!"],
 };
 
 export const isChatWho = (v: unknown): v is ChatWho => typeof v === "string" && (CHAT_WHO as readonly string[]).includes(v);

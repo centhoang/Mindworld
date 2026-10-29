@@ -72,3 +72,18 @@ describe("NpcVillage", () => {
     expect(nv.hub.minds.has("ama")).toBe(false);
   });
 });
+
+describe("NpcVillage talk with the player", () => {
+  it("a hosted NPC answers from its own mind and remembers it; otherwise null (cloud)", async () => {
+    const lines: (MindLine & { mem?: string })[] = [];
+    const lm = { label: "fake 1B", ready: () => true, complete: async () => "The fish bite at dawn, friend." };
+    const nv = new NpcVillage(new MindScheduler(() => lm, { duty: 1 }), () => true, { line: (l) => lines.push(l), say: () => {} }, HOMES, SPOTS, () => true);
+    expect(await nv.reply("mo", "Kai", "any tips?")).toBeNull(); // not hosted here
+    nv.me = "me";
+    nv.setHost("mo", "me");
+    const r = await nv.reply("mo", "Kai", "any tips?");
+    expect(r).toEqual({ text: "The fish bite at dawn, friend.", source: "fake 1B" });
+    expect(nv.hub.minds.get("mo")!.mem.log.at(-1)!.text).toContain("Kai asked");
+    expect(lines).toContainEqual({ who: "mo", say: "The fish bite at dawn, friend." });
+  });
+});

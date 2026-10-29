@@ -20,6 +20,14 @@ export function gameTime(seconds: number): GameTime {
   return { day, hour, phase: phaseOf(hour) };
 }
 
+// The shared world clock: every player's game derives the time from the real date, so day and night (and
+// the in-between grounds' day, world/layout.ts worldDay) change at the same moment for everyone. Day 0 began
+// at 08:00 on the event's first day (Oct 27 2026 UTC, a multiple of 12 minutes).
+export const EPOCH_MS = Date.UTC(2026, 9, 27);
+export function worldSeconds(now = Date.now()): number {
+  return (now - EPOCH_MS) / 1000 - START_HOUR * HOUR_SECONDS;
+}
+
 export function phaseOf(hour: number): Phase {
   if (hour >= 6 && hour < 11) return "morning";
   if (hour >= 11 && hour < 17) return "noon";

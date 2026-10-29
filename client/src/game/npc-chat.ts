@@ -3,7 +3,7 @@ import { pickLine } from "./chatter";
 // Talk to the elder or a wild pet: the Worker asks a Meta model (Muse Spark) for one short in-character
 // line, capped and cached on the server. Never throws: offline or a bad reply gives a canned line.
 
-export type ChatWho = "elder" | "brute" | "skitter" | "turtle" | "pal" | "bully";
+export type ChatWho = "elder" | "brute" | "skitter" | "turtle" | "pal" | "bully" | "mo" | "ama" | "pip";
 export type ChatSource = "model" | "cache" | "scripted" | "offline";
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;

@@ -136,3 +136,14 @@ describe("village sim", () => {
     expect(make()).toEqual(make());
   });
 });
+
+describe("shared world clock", () => {
+  it("is the same for everyone at the same moment and days match the in-between grounds' day", async () => {
+    const { worldSeconds, EPOCH_MS } = await import("./clock");
+    const { worldDay } = await import("../world/layout");
+    const now = Date.UTC(2026, 10, 1, 13, 7);
+    expect(gameTime(worldSeconds(EPOCH_MS)).hour).toBe(0);
+    expect(gameTime(worldSeconds(now)).day).toBe(worldDay(now) - worldDay(EPOCH_MS));
+    expect(gameTime(worldSeconds(EPOCH_MS + 6 * 30_000)).phase).toBe("morning"); // 06:00
+  });
+});

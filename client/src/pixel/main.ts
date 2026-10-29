@@ -151,16 +151,18 @@ const interior = new Interior({
 // capped and cached; scripted lines when offline). The pet stops wandering while you talk.
 const chatForm = document.getElementById("chat") as HTMLFormElement;
 const chatInput = chatForm.querySelector("input")!;
-let chatWith: Wild | "elder" | "room" | null = null;
-const chatKey = (w: Wild | "elder" | "room") => (w === "elder" ? "elder" : w === "room" ? "me" : `w${w.id}`);
-function openChat(w: Wild | "elder" | "room"): void {
+let chatWith: Wild | Npc | "room" | null = null;
+const chatKey = (w: Wild | Npc | "room") => (w === "room" ? "me" : typeof w === "string" ? `n:${w}` : `w${w.id}`);
+const GREET: Record<Npc, string> = { elder: "Ah, a visitor. Ask me anything.", mo: "Shh... the fish are listening. Hello!", ama: "Oh, hello dear! Hungry?", pip: "Hi! Wanna play?" };
+function openChat(w: Wild | Npc | "room"): void {
   chatWith = w;
   if (typeof w !== "string") w.wait = 999;
   keys.clear();
   chatForm.hidden = false;
   chatInput.value = "";
   chatInput.focus();
-  if (w !== "room") world.say(chatKey(w), w === "elder" ? "Ah, a visitor. Ask me anything." : "?", 3);
+  if (w !== "room") world.say(chatKey(w), typeof w === "string" ? GREET[w] : "?", 3);
+  if (typeof w === "string" && w !== "room") world.npcs?.hold(w);
 }
 function closeChat(): void {
   if (chatWith && typeof chatWith !== "string") chatWith.wait = 1;
@@ -177,14 +179,16 @@ chatForm.addEventListener("submit", (e) => {
     chatInput.value = "";
     return;
   }
-  const who = w === "elder" ? "elder" : w && chatWhoFor("wild", w.arch);
+  const who = typeof w === "string" ? w : w && chatWhoFor("wild", w.arch);
   if (!w || !who || !line) return;
   chatInput.value = "";
   world.say(chatKey(w), "...", 20);
-  void askNpc(who, line).then((r) => {
+  // A villager whose mind runs here answers from its own memories (local model); else Muse Spark in the cloud.
+  const mine = typeof w === "string" ? world.npcs?.reply(w, liveName(myGenes()), line) : undefined;
+  void (mine ?? Promise.resolve(null)).then((r) => r ?? askNpc(who, line)).then((r) => {
     world.say(chatKey(w), r.text, 6);
     if (!state.muted) {
-      const v = voiceFor(w === "elder" ? "elder" : w.arch);
+      const v = voiceFor(typeof w === "string" ? w : w.arch);
       babbler.say(r.text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: "triangle" });
     }
   });
@@ -365,7 +369,7 @@ function menuKey(k: string): void {
         toast = null;
         interior.enter();
       } else if (bed >= 0) useBed(bed);
-      else if (world.nearElder()) openChat("elder");
+      else if (world.npcNear()) openChat(world.npcNear()!);
       else if (world.nearStall()) crate = { cursor: 0 };
       else if (world.messNear() !== null) {
         world.cleanMess(world.messNear()!);

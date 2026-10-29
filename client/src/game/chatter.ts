@@ -3,11 +3,14 @@ import type { ArchetypeId } from "../sim/types";
 // Canned in-world chatter: short cute lines for whoever the player walks up to, plus the pet's own
 // musings. No model calls; picking is pure and seeded by the caller's rng so it is testable.
 
-export type Speaker = "pet" | "elder" | "boss" | "merchant" | "ghost" | ArchetypeId;
+export type Speaker = "pet" | "elder" | "mo" | "ama" | "pip" | "boss" | "merchant" | "ghost" | ArchetypeId;
 
 export const LINES: Record<Speaker, readonly string[]> = {
   pet: ["What a nice breeze!", "Can we nap on the porch?", "I'm learning so much!", "Look, petals!", "Teach me a new trick?", "Snack time?"],
   elder: ["Ah, a young trainer!", "Lessons stick when they are short.", "Sit a while, child.", "The clouds are kind today."],
+  mo: ["The fish bite best at dawn.", "Quiet water, quiet mind.", "Patience, friend."],
+  ama: ["Hungry? There's soup!", "A picnic later! Bring your pets.", "Who left that mess?"],
+  pip: ["Soccer? Soccer!", "Race you!", "Let's dance tonight!"],
   boss: ["I can read your pet's mind...", "Your memo is an open book.", "Come closer. If you dare."],
   merchant: ["Fresh decor, fair prices!", "Coins from fights spend here!", "Pretty things for your corner!"],
   ghost: ["Boo! Just kidding.", "My owner taught me well.", "Want a friendly match?"],
@@ -22,6 +25,9 @@ export const LINES: Record<Speaker, readonly string[]> = {
 export function voiceFor(who: Speaker): { pitch: number; rate: number } {
   switch (who) {
     case "elder": return { pitch: 0.7, rate: 0.9 };
+    case "mo": return { pitch: 0.85, rate: 0.85 };
+    case "ama": return { pitch: 1.2, rate: 1.05 };
+    case "pip": return { pitch: 1.6, rate: 1.25 };
     case "boss": return { pitch: 0.4, rate: 0.85 };
     case "brute": case "bully": return { pitch: 0.75, rate: 1 };
     case "skitter": return { pitch: 1.9, rate: 1.3 };

@@ -14,7 +14,7 @@ import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
 import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
 import { ACTIVITY } from "../life/activities";
-import { clockLabel, gameTime } from "../life/clock";
+import { clockLabel, gameTime, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
@@ -31,6 +31,7 @@ type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
 export const OVERWORLD_MON = 20; // px: monsters in the overworld
 const WILD_PER_MEADOW = 3;
 const MEET_DIST = 1.0;
+const NPC_ROUTE_TILES = 120_000; // the NPCs may walk across the whole map
 
 export interface Wild {
   id: number;
@@ -188,13 +189,17 @@ export class Overworld {
 
   // In-between grounds bridged to my ground (picnic hill, playground, pond): my minds may walk there for
   // group activities, so invitations to a picnic can actually happen. Spots ring the prop on free land.
-  private betweenSpots(cells: readonly [number, number][]): Spots {
+  // `cells` = the platforms they must touch; `reach` instead = any in-between ground with a walking route
+  // from that point (the NPCs walk the whole map: Mo goes fishing at whichever pond exists).
+  private betweenSpots(cells: readonly [number, number][], reach?: Vec): Spots {
     const out: Spots = {};
     const anchor: Record<string, [keyof Spots, string]> = { picnic: ["picnic", "blanket"], playground: ["playground", "ball"], pond: ["pond", "dock"] };
     for (const p of this.world.platforms) {
       const use = anchor[p.kind];
-      if (!use || !p.spots || !cells.some(([hi, hj]) => Math.abs(p.cell[0] - hi) + Math.abs(p.cell[1] - hj) === 1)) continue;
+      if (!use || !p.spots) continue;
       const at = p.spots[use[1]]!;
+      const touches = cells.some(([hi, hj]) => Math.abs(p.cell[0] - hi) + Math.abs(p.cell[1] - hj) === 1);
+      if (!touches && !(reach && findRoute(reach, { x: at.x, z: at.z + 1 }, this.canWalk, NPC_ROUTE_TILES))) continue;
       const list = (out[use[0]] ??= []);
       if (p.kind === "pond") list.push({ ...at });
       for (let i = 0; i < 8; i++) {
@@ -215,7 +220,8 @@ export class Overworld {
     const isle = hub.find((p) => p.kind === "npc");
     const ring = (c: Platform | undefined, r: number, n: number, dz = 0) =>
       c ? Array.from({ length: n }, (_, i) => ({ x: c.x + Math.cos((i / n) * Math.PI * 2) * r, z: c.z + dz + Math.sin((i / n) * Math.PI * 2) * r * 0.8 })).filter((q) => this.canWalk(q.x, q.z)) : [];
-    const out: Spots = { ...this.betweenSpots(hub.map((p) => p.cell)), home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 3.5, 10), picnic: [...ring(plaza, 2, 6, 2), ...(this.betweenSpots(hub.map((p) => p.cell)).picnic ?? [])] };
+    const away = this.betweenSpots(hub.map((p) => p.cell), plaza ? { x: plaza.x, z: plaza.z + 2 } : undefined);
+    const out: Spots = { ...away, home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 3.5, 10), picnic: [...ring(plaza, 2, 6, 2), ...(away.picnic ?? [])] };
     for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
     return out;
   }
@@ -367,7 +373,6 @@ export class Overworld {
   attachMinds(sched: MindScheduler, hasModel: () => boolean, saved: MindsSave | null): void {
     this.savedMinds = saved;
     if (saved) {
-      this.life.t = saved.t;
       for (const [k, v] of saved.rel) this.life.rel.set(k, v);
       for (const a of this.life.agents) {
         const n = saved.minds[a.id]?.needs;
@@ -379,7 +384,7 @@ export class Overworld {
     this.lifeEnv.chooser = this.minds.chooser;
     this.lifeEnv.bias = this.minds.bias;
     this.syncMinds();
-    this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text) => this.say(`n:${id}`, text, text === "..." ? 25 : 5) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk));
+    this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text) => this.say(`n:${id}`, text, text === "..." ? 25 : 5) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
   }
 
   private syncMinds(): void {
@@ -483,8 +488,16 @@ export class Overworld {
     return best;
   }
 
-  nearElder(): boolean {
-    return !!this.elder && Math.hypot(this.elder.pos.x - this.player.x, this.elder.pos.z - this.player.z) < 2.2;
+  // The villager you are standing next to (E: talk), if any.
+  npcNear(): Npc | null {
+    let best: Npc | null = null;
+    let bd = 2.2;
+    for (const a of this.npcs?.v.agents ?? []) {
+      const d = Math.hypot(a.pos.x - this.player.x, a.pos.z - this.player.z);
+      if (d < bd) [best, bd] = [a.id as Npc, d];
+    }
+    if (!this.npcs && this.elder && Math.hypot(this.elder.pos.x - this.player.x, this.elder.pos.z - this.player.z) < 2.2) best = "elder";
+    return best;
   }
 
   nearStall(): boolean {
@@ -595,6 +608,7 @@ export class Overworld {
     this.place = here || this.place;
     this.bannerT = Math.max(0, this.bannerT - dt);
     for (const [k, b] of this.bubbles) if ((b.t -= dt) <= 0) this.bubbles.delete(k);
+    this.life.t = worldSeconds() - dt; // the shared clock (stepVillage adds dt back)
     const lifeEv = stepVillage(this.life, dt, this.lifeEnv);
     if (this.npcs) {
       for (const e of this.npcs.step(dt, this.life.t)) if (e.kind === "start" && e.act !== "wander") this.say(`n:${e.who}`, ACTIVITY.get(e.act)!.label, 2.5);
@@ -807,7 +821,7 @@ export class Overworld {
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
-        : this.nearElder() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
+        : this.npcNear() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
     if (hint) {
       const w = hint.length * GLYPH + 12;
       drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);
