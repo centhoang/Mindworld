@@ -86,6 +86,7 @@ export class Overworld {
   private savedMinds: MindsSave | null = null;
   inspect: string | null = null; // the mind shown in the inspector (I)
   mindWhere = "this computer";
+  myName = "a visitor"; // set by main.ts (the live name), so villagers can greet me by name
   cam: Vec = { x: 0, z: 0 };
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
@@ -385,6 +386,7 @@ export class Overworld {
     this.lifeEnv.bias = this.minds.bias;
     this.syncMinds();
     this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text) => this.say(`n:${id}`, text, text === "..." ? 25 : 5) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
+    this.npcs.people = () => [{ id: this.npcs?.me ?? "me", name: this.myName, pos: this.player }, ...[...this.peers].map(([id, p]) => ({ id, name: p.name, pos: p.pos }))];
   }
 
   private syncMinds(): void {

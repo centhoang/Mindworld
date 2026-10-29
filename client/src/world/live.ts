@@ -42,6 +42,7 @@ export interface MindLine {
   who: string; // one of my pets' names, or an NPC I host
   act?: string;
   say?: string;
+  to?: string; // who the line is said to: a player's live id or an NPC
   emote?: Emote;
   invite?: { act: string; to?: string };
 }
@@ -54,6 +55,8 @@ export interface LiveHandlers {
   mind?(from: string, line: MindLine): void; // from = the sender's live id
   npcHost?(npc: Npc, host: string | null): void;
   npcState?(npc: Npc, log: string[]): void; // we host it now: its memory so far
+  ask?(npc: Npc, from: string, name: string, text: string): void; // a player asks an NPC I host
+  askNo?(npc: Npc): void; // my question can't reach the NPC's host model: answer it another way
   away?(a: LiveAway): void;
   join(p: LivePeer): void;
   leave(id: string): void;
@@ -126,6 +129,8 @@ export function parseMind(o: Record<string, unknown>): MindLine | null {
   if (act) line.act = act;
   const say = str(o.say, MIND_SAY_MAX);
   if (say) line.say = say;
+  const to = say ? str(o.to, 24) : null;
+  if (to) line.to = to;
   if ((EMOTES as readonly unknown[]).includes(o.emote)) line.emote = o.emote as Emote;
   const inv = o.invite && typeof o.invite === "object" ? (o.invite as Record<string, unknown>) : null;
   const ia = inv && str(inv.act, 16);
@@ -163,6 +168,12 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
       const log = Array.isArray(m.log) ? m.log.filter((l): l is string => typeof l === "string").map((l) => l.slice(0, 120)).slice(-30) : null;
       return isNpc(m.npc) && log ? h.npcState?.(m.npc, log) : undefined;
     }
+    case "ask": {
+      const from = str(m.from, 16), text = str(m.text, 80);
+      return isNpc(m.npc) && from && text ? h.ask?.(m.npc, from, str(m.name, 16) ?? "someone", text) : undefined;
+    }
+    case "askNo":
+      return isNpc(m.npc) ? h.askNo?.(m.npc) : undefined;
     case "away": {
       const a = parseAway(m.away);
       return a ? h.away?.(a) : undefined;
@@ -313,6 +324,12 @@ export class LiveLink {
   mind(line: MindLine & { mem?: string }): boolean {
     const say = line.say?.replace(/\s+/g, " ").trim().slice(0, MIND_SAY_MAX);
     return this.send({ t: "mind", ...line, say: say || undefined }); // undefined fields drop out of the JSON
+  }
+
+  // A question for an NPC hosted on another machine (the room relays it to that host's local model).
+  ask(npc: Npc, text: string): boolean {
+    const t = text.replace(/\s+/g, " ").trim().slice(0, SAY_MAX);
+    return t ? this.send({ t: "ask", npc, text: t }) : false;
   }
 
   // Heartbeat + model speed, so the room can pick NPC hosts (the server takes one per ~10 s).

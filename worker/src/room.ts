@@ -13,7 +13,9 @@ import { cleanCap, cleanMem, isNpc, MIND_ACTS, NpcBoard, type Cap, type HostChan
 //
 // Minds: each player's pets and the NPC each player hosts (npc.ts) speak through `mind` lines: an activity,
 // a short line, an emote, an invitation. Only the owner speaks for a pet, only the current host for an NPC;
-// one line per mind per 3 s. Hosts send `cap` (model speed, <= 1 / 10 s) as their heartbeat.
+// one line per mind per 3 s (a line may name who it is `to`: a player's live id or an NPC). Hosts send `cap`
+// (model speed, <= 1 / 10 s) as their heartbeat. A player's question to an NPC hosted elsewhere is relayed to
+// that host (`ask`) when its machine has a local model; else the asker hears `askNo` at once (cloud answer).
 //
 // Billing note (Cloudflare free plan): incoming WebSocket messages count 20:1 as requests, so clients send
 // positions at <= 10 Hz and only while moving; the server drops anything faster.
@@ -28,6 +30,7 @@ export const CORNERS = 24; // ground slots on the ring around the hub (client: w
 export const AWAY_MS = 10 * 60_000;
 export const EMOTES = ["wave", "heart", "dance", "laugh"] as const;
 export const MIND_SAY_GAP_MS = 3000;
+export const ASK_GAP_MS = 3000;
 const CAP_GAP_MS = 9000;
 export type Emote = (typeof EMOTES)[number];
 const WORLD_LIMIT = 160; // |x|, |z| bound of the ground ring, with margin
@@ -76,6 +79,7 @@ export interface Peer {
   strikes: number;
   duel?: { id: string; to: string; memo: GhostMemo; genes: Record<string, number>; at: number }; // outgoing challenge
   sayAt?: number; // last chat line, ms
+  askAt?: number; // last question to an NPC, ms
   cap: Cap; // local model speed: picks NPC hosts
   capAt?: number; // last cap message, ms
 }
@@ -95,7 +99,9 @@ export type ServerMsg =
   | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[]; npcs: Partial<Record<Npc, string>> }
   | { t: "npcHost"; npc: Npc; host: string | null }
   | { t: "npcState"; npc: Npc; log: string[] }
-  | { t: "mind"; id: string; who: string; act?: string; say?: string; emote?: Emote; invite?: { act: string; to?: string } }
+  | { t: "mind"; id: string; who: string; act?: string; say?: string; to?: string; emote?: Emote; invite?: { act: string; to?: string } }
+  | { t: "ask"; npc: Npc; from: string; name: string; text: string }
+  | { t: "askNo"; npc: Npc }
   | { t: "away"; away: PublicAway }
   | { t: "join"; peer: PublicPeer }
   | { t: "leave"; id: string }
@@ -297,6 +303,16 @@ export class Room {
       return { out: [{ to: "others", msg: { t: "say", id, text } }], changed: true };
     }
     if (o.t === "mind") return this.mind(peer, o, now);
+    if (o.t === "ask") {
+      const text = cleanSay(o.text);
+      if (!isNpc(o.npc) || !text) return this.strike(peer);
+      if (peer.askAt !== undefined && now - peer.askAt < ASK_GAP_MS) return { out: [{ to: "self", msg: { t: "askNo", npc: o.npc } }] };
+      peer.askAt = now;
+      const host = this.board.hostOf(o.npc);
+      const h = host && host !== id ? this.peers.get(host) : undefined;
+      if (!h || h.cap.tps <= 0) return { out: [{ to: "self", msg: { t: "askNo", npc: o.npc } }], changed: true };
+      return { out: [{ to: { id: h.id }, msg: { t: "ask", npc: o.npc, from: id, name: peer.name, text } }], changed: true };
+    }
     if (o.t === "cap") {
       if (peer.capAt !== undefined && now - peer.capAt < CAP_GAP_MS) return { out: [] };
       peer.cap = cleanCap(o);
@@ -344,6 +360,8 @@ export class Room {
       if (text && (last === undefined || now - last >= MIND_SAY_GAP_MS)) {
         msg.say = text;
         this.mindSayAt.set(k, now);
+        const to = typeof o.to === "string" ? o.to.replace(/[^\w-]/g, "").slice(0, 24) : "";
+        if (to) msg.to = to;
       }
     }
     if (o.mem !== undefined) {

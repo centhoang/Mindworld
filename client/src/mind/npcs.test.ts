@@ -18,11 +18,20 @@ const run = (nv: NpcVillage, seconds: number) => {
 };
 
 describe("NpcVillage", () => {
-  it("with no host known, the NPCs live on utility and send nothing", () => {
+  it("offline (no room), the NPCs' minds run here", () => {
+    const { nv } = make();
+    expect(nv.hub.minds.size).toBe(4);
+    run(nv, 30);
+    expect(nv.v.agents.some((a) => a.state !== "idle" || nv.hub.minds.get(a.id)!.talking)).toBe(true); // busy or chatting
+  });
+
+  it("in a room with nobody hosting, they live on utility and run no mind here", () => {
     const { nv, lines } = make();
+    nv.me = "me";
+    expect(nv.hub.minds.size).toBe(0);
     run(nv, 30);
     expect(nv.v.agents.some((a) => a.state !== "idle")).toBe(true);
-    expect(lines).toEqual([]);
+    expect(lines.filter((l) => l.say || l.act)).toEqual([]);
   });
 
   it("the host runs the mind and sends act lines for its NPC only", () => {
@@ -78,12 +87,51 @@ describe("NpcVillage talk with the player", () => {
     const lines: (MindLine & { mem?: string })[] = [];
     const lm = { label: "fake 1B", ready: () => true, complete: async () => "The fish bite at dawn, friend." };
     const nv = new NpcVillage(new MindScheduler(() => lm, { duty: 1 }), () => true, { line: (l) => lines.push(l), say: () => {} }, HOMES, SPOTS, () => true);
-    expect(await nv.reply("mo", "Kai", "any tips?")).toBeNull(); // not hosted here
     nv.me = "me";
+    nv.setHost("mo", "other");
+    expect(await nv.reply("mo", "Kai", "any tips?")).toBeNull(); // hosted elsewhere
     nv.setHost("mo", "me");
     const r = await nv.reply("mo", "Kai", "any tips?");
     expect(r).toEqual({ text: "The fish bite at dawn, friend.", source: "fake 1B" });
     expect(nv.hub.minds.get("mo")!.mem.log.at(-1)!.text).toContain("Kai asked");
     expect(lines).toContainEqual({ who: "mo", say: "The fish bite at dawn, friend." });
+  });
+});
+
+describe("NpcVillage starts talks", () => {
+  const lmSays = (text: string) => ({ label: "fake 1B", ready: () => true, complete: async () => text });
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it("a hosted NPC greets a player who walks up, once in a while, addressed to that player", async () => {
+    const lines: (MindLine & { mem?: string })[] = [];
+    const nv = new NpcVillage(new MindScheduler(() => lmSays("Hello there, Kai!"), { duty: 1 }), () => true, { line: (l) => lines.push(l), say: () => {} }, HOMES, SPOTS, () => true, undefined, mulberry32(2));
+    nv.me = "me1";
+    nv.setHost("mo", "me1");
+    nv.people = () => [{ id: "p2", name: "Kai", pos: { ...nv.v.agents.find((a) => a.id === "mo")!.pos } }];
+    nv.step(0.25, nv.v.t + 0.25);
+    for (let i = 0; i < 5; i++) await settle();
+    expect(lines).toContainEqual({ who: "mo", say: "Hello there, Kai!", to: "p2" });
+    const n = lines.filter((l) => l.say).length;
+    nv.step(0.25, nv.v.t + 0.25); // no second greeting right away
+    for (let i = 0; i < 5; i++) await settle();
+    expect(lines.filter((l) => l.say).length).toBe(n);
+  });
+
+  it("an NPC spoken to by another machine's NPC answers it, a few turns at most", async () => {
+    const lines: (MindLine & { mem?: string })[] = [];
+    const nv = new NpcVillage(new MindScheduler(() => lmSays("Nice catch today!"), { duty: 1 }), () => true, { line: (l) => lines.push(l), say: () => {} }, HOMES, SPOTS, () => true);
+    nv.me = "me1";
+    nv.setHost("ama", "me1");
+    nv.setHost("mo", "other");
+    for (let k = 0; k < 5; k++) {
+      nv.hear({ who: "mo", say: `line ${k}`, to: "ama" });
+      for (let i = 0; i < 5; i++) await settle();
+    }
+    const said = lines.filter((l) => l.who === "ama" && l.say);
+    expect(said[0]).toEqual({ who: "ama", say: "Nice catch today!", to: "mo" });
+    expect(said.length).toBe(3);
+    nv.hear({ who: "mo", say: "hi Pip", to: "pip" }); // not mine to answer
+    for (let i = 0; i < 5; i++) await settle();
+    expect(lines.filter((l) => l.who === "pip")).toEqual([]);
   });
 });

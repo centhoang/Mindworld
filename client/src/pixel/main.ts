@@ -4,7 +4,7 @@
 import { parseGenes, petLook, randomGenes } from "../game/genes";
 import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
 import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
-import { EMOTES, LiveLink, liveName, NPCS, roomUrl, SAY_MAX, type Emote, type LivePeer, type Npc } from "../world/live";
+import { EMOTES, isNpc, LiveLink, liveName, NPCS, roomUrl, SAY_MAX, type Emote, type LivePeer, type Npc } from "../world/live";
 import { worldDay, type GroundOwner } from "../world/layout";
 import { newGroundSeed } from "../world/ground";
 import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
@@ -183,9 +183,7 @@ chatForm.addEventListener("submit", (e) => {
   if (!w || !who || !line) return;
   chatInput.value = "";
   world.say(chatKey(w), "...", 20);
-  // A villager whose mind runs here answers from its own memories (local model); else Muse Spark in the cloud.
-  const mine = typeof w === "string" ? world.npcs?.reply(w, liveName(myGenes()), line) : undefined;
-  void (mine ?? Promise.resolve(null)).then((r) => r ?? askNpc(who, line)).then((r) => {
+  void (typeof w === "string" ? villagerAnswer(w, line) : askNpc(who, line)).then((r) => {
     world.say(chatKey(w), r.text, 6);
     if (!state.muted) {
       const v = voiceFor(typeof w === "string" ? w : w.arch);
@@ -194,6 +192,30 @@ chatForm.addEventListener("submit", (e) => {
   });
 });
 chatForm.querySelector("[data-act=close]")!.addEventListener("click", closeChat);
+
+// Who answers a villager: its own mind wherever it runs (here, or relayed to the player hosting it, on that
+// machine's local model); if no local model can, Muse Spark in the cloud (event credits, server-capped); then
+// a scripted line.
+const ASK_WAIT_MS = 15_000;
+const asking = new Map<Npc, (text: string | null) => void>();
+async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string }> {
+  const here = await world.npcs?.reply(npc, liveName(myGenes()), line);
+  if (here) return here;
+  const hostedHere = !!world.npcs?.hosting(npc);
+  if (!hostedHere && live.status === "online" && npcHosts.get(npc) && !asking.has(npc) && live.ask(npc, line)) {
+    const text = await new Promise<string | null>((resolve) => {
+      const timer = setTimeout(() => done(null), ASK_WAIT_MS);
+      const done = (t: string | null) => {
+        clearTimeout(timer);
+        asking.delete(npc);
+        resolve(t);
+      };
+      asking.set(npc, done);
+    });
+    if (text) return { text };
+  }
+  return askNpc(npc, line);
+}
 
 // Pets chat with each other at home now and then (Muse Spark via /api/petchat, scripted when offline).
 let petChatT = 15;
@@ -500,6 +522,7 @@ setInterval(() => {
   const due = [...aways.values()].some((a) => a.until <= Date.now());
   if (due || worldDay() !== world.day) relayoutGrounds();
 }, 5000);
+world.myName = liveName(myGenes());
 const npcHosts = new Map<Npc, string | null>(); // who runs each NPC's mind (me: it runs in this tab)
 function setNpcHost(npc: Npc, host: string | null): void {
   npcHosts.set(npc, host);
@@ -527,7 +550,12 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()),
     world.peers.delete(id);
     if (grounds.delete(id)) relayoutGrounds();
   },
-  mind: (from, l) => world.hearMind(from, l),
+  mind: (from, l) => {
+    world.hearMind(from, l);
+    if (l.say && l.to && l.to === world.npcs?.me && isNpc(l.who)) asking.get(l.who)?.(l.say); // my relayed question's answer
+  },
+  ask: (npc, from, name, text) => void world.npcs?.reply(npc, name, text, from),
+  askNo: (npc) => asking.get(npc)?.(null),
   npcHost: (npc, host) => setNpcHost(npc, host),
   npcState: (npc, log) => world.npcs?.setMemory(npc, log),
   away: (a) => {
@@ -538,7 +566,8 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()),
   emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
   status: (s) => {
     if (s === "online") return;
-    for (const n of NPCS) setNpcHost(n, null); // offline: the NPCs live here on rules
+    for (const n of NPCS) setNpcHost(n, null);
+    if (world.npcs) world.npcs.me = null; // offline: the NPCs' minds run here
     world.peers.clear();
     if (grounds.size || aways.size) {
       grounds.clear();
@@ -559,7 +588,10 @@ setInterval(() => {
   const brain = localBrain();
   if (live.status === "online") live.cap(brain ? mindSched.tps(brain === nativeBrain ? 30 : 12) : 0, "gpu" in navigator);
 }, 10_000);
-onPetChange = () => live.rejoin();
+onPetChange = () => {
+  world.myName = liveName(myGenes());
+  live.rejoin();
+};
 
 // ---- live room extras: emotes (1-4 or the peer menu) and duels. A duel is pet vs pet, both following their
 // own memo rules on a shared seed (sim/duel.ts), so both players watch the same fight.

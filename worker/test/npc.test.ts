@@ -59,6 +59,20 @@ describe("room minds", () => {
     return r;
   };
 
+  it("relays a question to the NPC's host when it has a model, else says no at once", () => {
+    const r = room();
+    const host = r.board.hostOf("mo")!;
+    const asker = host === "a" ? "b" : "a";
+    expect(send(r, asker, { t: "ask", npc: "mo", text: "where do you fish?" }, 0).out).toEqual([{ to: { id: host }, msg: { t: "ask", npc: "mo", from: asker, name: expect.any(String), text: "where do you fish?" } }]);
+    expect(send(r, asker, { t: "ask", npc: "mo", text: "again?" }, 1000).out[0]!.msg).toEqual({ t: "askNo", npc: "mo" }); // too soon
+    expect(send(r, host, { t: "ask", npc: "mo", text: "me?" }, 5000).out[0]!.msg).toEqual({ t: "askNo", npc: "mo" }); // I host it
+    r.peers.get(host)!.cap = { tps: 0, webgpu: false };
+    expect(send(r, asker, { t: "ask", npc: "mo", text: "hello" }, 9000).out[0]!.msg).toEqual({ t: "askNo", npc: "mo" }); // no model there
+    expect(send(r, asker, { t: "ask", npc: "boss", text: "hi" }, 9500).out.some((o) => o.msg.t === "ask")).toBe(false); // not an NPC
+    const line = send(r, host, { t: "mind", who: "mo", say: "At dawn, by the pond.", to: asker }, 10000);
+    expect(line.out[0]!.msg).toMatchObject({ t: "mind", who: "mo", say: "At dawn, by the pond.", to: asker });
+  });
+
   it("tells a newcomer who hosts which NPC and hands the new host the NPC's memory", () => {
     const r = new Room();
     const ja = r.join("a", {}, 0)!;

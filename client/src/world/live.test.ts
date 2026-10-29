@@ -177,4 +177,18 @@ describe("live minds", () => {
       ["state", "pip", ["a", "b"]],
     ]);
   });
+  it("parses relayed questions, refusals and lines said to someone", () => {
+    const got: unknown[] = [];
+    const h = {
+      welcome: () => undefined, join: () => undefined, leave: () => undefined, pos: () => undefined, emote: () => undefined, status: () => undefined,
+      mind: (_f: string, l: unknown) => void got.push(l),
+      ask: (...a: unknown[]) => void got.push(["ask", ...a]),
+      askNo: (n: string) => void got.push(["no", n]),
+    };
+    dispatch(JSON.stringify({ t: "ask", npc: "mo", from: "p1", name: "Kai", text: "fish?" }), h);
+    dispatch(JSON.stringify({ t: "ask", npc: "boss", from: "p1", text: "hi" }), h);
+    dispatch(JSON.stringify({ t: "askNo", npc: "ama" }), h);
+    dispatch(JSON.stringify({ t: "mind", id: "a1", who: "mo", say: "At dawn.", to: "p1" }), h);
+    expect(got).toEqual([["ask", "mo", "p1", "Kai", "fish?"], ["no", "ama"], { who: "mo", say: "At dawn.", to: "p1" }]);
+  });
 });
