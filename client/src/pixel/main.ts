@@ -4,7 +4,7 @@
 import { parseGenes, petLook, randomGenes } from "../game/genes";
 import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
 import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
-import { EMOTES, LiveLink, liveName, roomUrl, SAY_MAX, type Emote, type LivePeer } from "../world/live";
+import { EMOTES, LiveLink, liveName, roomUrl, SAY_MAX, type Emote, type LivePeer, type Npc } from "../world/live";
 import { worldDay, type GroundOwner } from "../world/layout";
 import { newGroundSeed } from "../world/ground";
 import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
@@ -497,7 +497,9 @@ setInterval(() => {
   if (due || worldDay() !== world.day) relayoutGrounds();
 }, 5000);
 const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()), genes: myGenes(), groundSeed: state.groundSeed, ...world.me }), {
-  welcome: (_id, corner, peers, awayList) => {
+  welcome: (_id, corner, peers, awayList, npcs = {}) => {
+    npcHosts.clear();
+    for (const [n, h] of Object.entries(npcs)) npcHosts.set(n as Npc, h);
     world.peers.clear();
     grounds.clear();
     aways.clear();
@@ -515,6 +517,8 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()),
     world.peers.delete(id);
     if (grounds.delete(id)) relayoutGrounds();
   },
+  mind: (from, l) => world.hearMind(from, l),
+  npcHost: (npc, host) => void npcHosts.set(npc, host),
   away: (a) => {
     aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
     relayoutGrounds();
@@ -536,6 +540,14 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()),
   duelEnd: (_duel, reason) => duelEnded(reason),
 });
 live.connect();
+// Minds online: my pets' activity starts and lines go to the room; others' come back as bubbles. The cap
+// heartbeat tells the room how fast my local model is, so it can pick me to host village NPCs.
+world.onMind = (l) => void (live.status === "online" && live.mind(l));
+const npcHosts = new Map<Npc, string | null>(); // who runs each NPC's mind (stage 4: hosting them here)
+setInterval(() => {
+  const brain = localBrain();
+  if (live.status === "online") live.cap(brain === nativeBrain ? 30 : brain ? 12 : 0, "gpu" in navigator);
+}, 10_000);
 onPetChange = () => live.rejoin();
 
 // ---- live room extras: emotes (1-4 or the peer menu) and duels. A duel is pet vs pet, both following their

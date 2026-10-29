@@ -32,10 +32,28 @@ export interface LiveAway {
   ttl: number;
 }
 
+// Village NPCs hosted in players' browsers (worker/src/npc.ts).
+export const NPCS = ["elder", "mo", "ama", "pip"] as const;
+export type Npc = (typeof NPCS)[number];
+export const isNpc = (v: unknown): v is Npc => (NPCS as readonly unknown[]).includes(v);
+
+// A mind's public moment: what it is doing, saying or showing, or who it invites to what.
+export interface MindLine {
+  who: string; // one of my pets' names, or an NPC I host
+  act?: string;
+  say?: string;
+  emote?: Emote;
+  invite?: { act: string; to?: string };
+}
+export const MIND_SAY_MAX = 80;
+
 export type LiveStatus = "connecting" | "online" | "offline" | "full";
 
 export interface LiveHandlers {
-  welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[]): void;
+  welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[], npcs?: Partial<Record<Npc, string>>): void;
+  mind?(from: string, line: MindLine): void; // from = the sender's live id
+  npcHost?(npc: Npc, host: string | null): void;
+  npcState?(npc: Npc, log: string[]): void; // we host it now: its memory so far
   away?(a: LiveAway): void;
   join(p: LivePeer): void;
   leave(id: string): void;
@@ -91,6 +109,30 @@ export function parsePeer(v: unknown): LivePeer | null {
   return { id, name: cleanName(name), genes: parseGenes(o.genes) ?? { hue: 0.6 }, x, z, px, pz, corner: slotOf(o.corner), seed: seedOf(o.seed) };
 }
 
+function parseNpcs(v: unknown): Partial<Record<Npc, string>> {
+  const out: Partial<Record<Npc, string>> = {};
+  if (v && typeof v === "object") for (const n of NPCS) {
+    const id = str((v as Record<string, unknown>)[n], 16);
+    if (id) out[n] = id;
+  }
+  return out;
+}
+
+export function parseMind(o: Record<string, unknown>): MindLine | null {
+  const who = isNpc(o.who) ? o.who : str(o.who, 16);
+  if (!who) return null;
+  const line: MindLine = { who };
+  const act = str(o.act, 16);
+  if (act) line.act = act;
+  const say = str(o.say, MIND_SAY_MAX);
+  if (say) line.say = say;
+  if ((EMOTES as readonly unknown[]).includes(o.emote)) line.emote = o.emote as Emote;
+  const inv = o.invite && typeof o.invite === "object" ? (o.invite as Record<string, unknown>) : null;
+  const ia = inv && str(inv.act, 16);
+  if (ia) line.invite = str(inv!.to, 16) ? { act: ia, to: str(inv!.to, 16)! } : { act: ia };
+  return line.act || line.say || line.emote || line.invite ? line : null;
+}
+
 // Validates a server message and calls the matching handler. Unknown or malformed messages are ignored.
 export function dispatch(raw: unknown, h: LiveHandlers): void {
   let m: Record<string, unknown>;
@@ -105,7 +147,21 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
       const id = str(m.id, 16);
       if (!id || !Array.isArray(m.peers)) return;
       const aways = (Array.isArray(m.aways) ? m.aways : []).map(parseAway).filter((a): a is LiveAway => !!a).slice(0, SLOT_COUNT);
-      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, 32), aways);
+      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, 32), aways, parseNpcs(m.npcs));
+    }
+    case "mind": {
+      const id = str(m.id, 16), line = parseMind(m);
+      return id && line ? h.mind?.(id, line) : undefined;
+    }
+    case "npcHost": {
+      if (!isNpc(m.npc)) return;
+      if (m.host === null) return h.npcHost?.(m.npc, null);
+      const host = str(m.host, 16);
+      return host ? h.npcHost?.(m.npc, host) : undefined;
+    }
+    case "npcState": {
+      const log = Array.isArray(m.log) ? m.log.filter((l): l is string => typeof l === "string").map((l) => l.slice(0, 120)).slice(-30) : null;
+      return isNpc(m.npc) && log ? h.npcState?.(m.npc, log) : undefined;
     }
     case "away": {
       const a = parseAway(m.away);
@@ -197,9 +253,9 @@ export class LiveLink {
       if (ev.data === "pong") return;
       dispatch(ev.data, {
         ...this.h,
-        welcome: (id, corner, peers, aways) => {
+        welcome: (id, corner, peers, aways, npcs) => {
           this.myId = id;
-          this.h.welcome(id, corner, peers, aways);
+          this.h.welcome(id, corner, peers, aways, npcs);
         },
         status: (s) => {
           if (s === "full") this.full = true;
@@ -251,6 +307,17 @@ export class LiveLink {
 
   emote(e: Emote): boolean {
     return this.send({ t: "emote", e });
+  }
+
+  // A mind line for one of my pets or an NPC I host; `mem` (NPCs only) goes to the room's NPC log.
+  mind(line: MindLine & { mem?: string }): boolean {
+    const say = line.say?.replace(/\s+/g, " ").trim().slice(0, MIND_SAY_MAX);
+    return this.send({ t: "mind", ...line, say: say || undefined }); // undefined fields drop out of the JSON
+  }
+
+  // Heartbeat + model speed, so the room can pick NPC hosts (the server takes one per ~10 s).
+  cap(tps: number, webgpu: boolean): boolean {
+    return this.send({ t: "cap", tps, webgpu });
   }
 
   say(text: string): boolean {

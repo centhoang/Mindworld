@@ -50,7 +50,7 @@ describe("live messages", () => {
     dispatch(JSON.stringify({ t: "full" }), h);
     for (const bad of ["{", JSON.stringify({ t: "pos", id: "a1", x: "1" }), JSON.stringify({ t: "emote", id: "a1", e: "<b>" }), JSON.stringify({ t: "nuke" })]) dispatch(bad, h);
     expect(log.map((l) => l[0])).toEqual(["welcome", "join", "pos", "emote", "leave", "status"]);
-    expect(log[0]).toEqual(["welcome", "me", 1, [peer], [{ slot: 2, name: "Mo", seed: 9, ttl: 5000 }]]);
+    expect(log[0]).toEqual(["welcome", "me", 1, [peer], [{ slot: 2, name: "Mo", seed: 9, ttl: 5000 }], {}]);
   });
 
   it("builds ws/wss urls", () => {
@@ -151,5 +151,30 @@ describe("live chat + duel messages", () => {
     expect(JSON.parse(ws.sent.at(-1)!)).toMatchObject({ t: "duelAccept", duel: "d1" });
     link.decline("d1");
     expect(JSON.parse(ws.sent.at(-1)!)).toEqual({ t: "duelDecline", duel: "d1" });
+  });
+});
+
+describe("live minds", () => {
+  it("parses mind lines, NPC hosts and NPC state, ignoring junk", () => {
+    const got: unknown[] = [];
+    const h = {
+      welcome: (...a: unknown[]) => void got.push(["welcome", a[4]]),
+      join: () => undefined, leave: () => undefined, pos: () => undefined, emote: () => undefined, status: () => undefined,
+      mind: (from: string, l: unknown) => void got.push(["mind", from, l]),
+      npcHost: (n: string, host: string | null) => void got.push(["host", n, host]),
+      npcState: (n: string, log: string[]) => void got.push(["state", n, log]),
+    };
+    dispatch(JSON.stringify({ t: "welcome", id: "me", corner: 0, peers: [], aways: [], npcs: { elder: "a1", bogus: "x", mo: 5 } }), h);
+    dispatch(JSON.stringify({ t: "mind", id: "a1", who: "elder", act: "picnic", say: "Come!", emote: "nope", invite: { act: "picnic", to: "Mo" } }), h);
+    dispatch(JSON.stringify({ t: "mind", id: "a1", who: "Mochi" }), h); // says nothing: dropped
+    dispatch(JSON.stringify({ t: "npcHost", npc: "mo", host: null }), h);
+    dispatch(JSON.stringify({ t: "npcHost", npc: "zed", host: "a1" }), h);
+    dispatch(JSON.stringify({ t: "npcState", npc: "pip", log: ["a", 3, "b"] }), h);
+    expect(got).toEqual([
+      ["welcome", { elder: "a1" }],
+      ["mind", "a1", { who: "elder", act: "picnic", say: "Come!", invite: { act: "picnic", to: "Mo" } }],
+      ["host", "mo", null],
+      ["state", "pip", ["a", "b"]],
+    ]);
   });
 });

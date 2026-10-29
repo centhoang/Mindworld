@@ -22,6 +22,7 @@ import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
 import { drawInspector } from "./inspector";
+import { isNpc, type MindLine } from "../world/live";
 
 type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
 
@@ -92,7 +93,10 @@ export class Overworld {
   ghostStone: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
   // Other players online (live room): their walker and pet, eased toward the last position received.
   readonly peers = new Map<string, Peer>();
-  // Speech bubbles: "pet", "r<i>" (resident i) or "w<id>" (wild pet) -> text and seconds left.
+  // My minds' public moments (activity starts, spoken lines), sent to the live room by main.ts.
+  onMind: ((l: MindLine) => void) | null = null;
+  // Speech bubbles: "pet", "me", "r<i>" (resident i), "w<id>" (wild pet), "p:<id>" (an online
+  // player), "elder", "boss" -> text and seconds left.
   private readonly bubbles = new Map<string, { text: string; t: number }>();
 
   constructor(petGenes: Genes, groundSeed = 1) {
@@ -262,6 +266,19 @@ export class Overworld {
   private sayAgent(id: string, text: string): void {
     const i = this.residents.findIndex((r) => r.agent.id === id);
     if (i >= 0) this.say(`r${i}`, text, text === "..." ? 25 : 5); // "..." stays up until the line arrives
+    if (i >= 0 && text !== "...") this.onMind?.({ who: id, say: text });
+  }
+
+  // Another player's mind line (a pet's spoken line or invitation) shows over that player; NPC lines over the NPC.
+  hearMind(from: string, l: MindLine): void {
+    if (isNpc(l.who)) {
+      if (l.who === "elder" && l.say) this.say("elder", l.say, 5);
+      return;
+    }
+    const p = this.peers.get(from);
+    if (!p) return;
+    const text = l.say ?? (l.invite ? `come, ${ACTIVITY.get(l.invite.act)?.label ?? l.invite.act}!` : null);
+    if (text) this.say(`p:${from}`, `${l.who}: ${text}`, 5); // their pets live on their ground: lines show over the owner
   }
 
   // I: open the inspector on the nearest mind (or close it).
@@ -452,6 +469,7 @@ export class Overworld {
       const i = this.residents.findIndex((r) => r.agent.id === e.who);
       if (i < 0) continue;
       if (e.kind === "start" && e.act !== "wander") this.say(`r${i}`, ACTIVITY.get(e.act)!.label, 2.5);
+      if (e.kind === "start") this.onMind?.({ who: e.who, act: e.act });
       if (e.kind === "cancel") this.say(`r${i}`, "...nobody came", 2.5);
     }
     let met: Wild | null = null;
