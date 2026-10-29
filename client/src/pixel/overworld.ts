@@ -12,7 +12,7 @@ import { drawSpotProp } from "./grounds-draw";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
-import { buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
+import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
 import { ACTIVITY } from "../life/activities";
 import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
@@ -80,6 +80,7 @@ export class Overworld {
   minds: MindHub | null = null;
   npcs: NpcVillage | null = null; // Elder, Mo, Ama, Pip on the hub (their minds run on whoever hosts them)
   private npcSprites = new Map<Npc, Sprite>();
+  private mini: HTMLCanvasElement | null = null; // the whole map, 1 px per tile (rebuilt on relayout)
   private savedMinds: MindsSave | null = null;
   inspect: string | null = null; // the mind shown in the inspector (I)
   mindWhere = "this computer";
@@ -137,6 +138,7 @@ export class Overworld {
     this.layoutIn = { ...this.layoutIn, ...next };
     this.world = generateWorld(this.layoutIn);
     this.map = buildTileMap(this.world);
+    this.mini = null;
     const home = this.home;
     const dx = old ? home.x - old.x : 0;
     const dz = old ? home.z - old.z : 0;
@@ -219,6 +221,40 @@ export class Overworld {
   private npcHomes(): Record<Npc, Vec> {
     const isle = this.world.platforms.find((p) => p.kind === "npc") ?? { x: 0, z: 0 };
     return { elder: { x: isle.x, z: isle.z - 1 }, mo: { x: -3, z: 2 }, ama: { x: 3, z: 2 }, pip: { x: 0, z: 4 } };
+  }
+
+  // Top-right map of the islands: land, paths and bridges, my ground, other players and me.
+  private drawMinimap(g: CanvasRenderingContext2D, sw: number): void {
+    const m = this.map;
+    if (!this.mini) {
+      const c = document.createElement("canvas");
+      [c.width, c.height] = [m.w, m.h];
+      const cg = c.getContext("2d")!;
+      const away = (k: number) => (m.look[k]! & AWAY) !== 0;
+      for (let k = 0; k < m.w * m.h; k++) {
+        const t = m.kind[k]!;
+        if (t === T.water) continue;
+        cg.fillStyle = t === T.path || t === T.bridge ? PAL.sand : away(k) ? PAL.stone : PAL.grass;
+        cg.fillRect(k % m.w, Math.floor(k / m.w), 1, 1);
+      }
+      this.mini = c;
+    }
+    const size = 52;
+    const k = size / Math.max(m.w, m.h);
+    const x0 = sw - size - 6;
+    const y0 = 18;
+    g.fillStyle = PAL.waterD;
+    g.fillRect(x0 - 2, y0 - 2, size + 4, size + 4);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(this.mini, x0 + (size - m.w * k) / 2, y0 + (size - m.h * k) / 2, m.w * k, m.h * k);
+    g.imageSmoothingEnabled = false;
+    const dot = (x: number, z: number, c: string, r = 2) => {
+      g.fillStyle = c;
+      g.fillRect(Math.round(x0 + (size - m.w * k) / 2 + (x - m.ox) * k - r / 2), Math.round(y0 + (size - m.h * k) / 2 + (z - m.oz) * k - r / 2), r, r);
+    };
+    dot(this.house.x, this.house.z + 2, PAL.woodD, 4);
+    for (const p of this.peers.values()) dot(p.pos.x, p.pos.z, PAL.teal, 3);
+    dot(this.player.x, this.player.z, PAL.coral, 3);
   }
 
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
@@ -724,6 +760,7 @@ export class Overworld {
       const label = `DAY ${now.day + 1} ${clockLabel(now.hour)}`;
       drawText(g, label, sw - label.length * GLYPH - 6, 6, PAL.panel);
     }
+    this.drawMinimap(g, sw);
 
     for (const [who, b] of this.bubbles) {
       const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" || who === "n:elder" ? this.elder?.pos : who.startsWith("n:") ? this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
