@@ -131,7 +131,7 @@ export class TeachScreen {
     g.fillRect(x, y, w, 28);
     const delta = `${d >= 0 ? "+" : ""}${d.toFixed(1)} pts`;
     drawText(g, "Proof:", x + 6, y + 4, PAL.wood);
-    drawText(g, delta, x + 6 + 7 * GLYPH, y + 4, d > 0 ? "#2f7a3c" : d < 0 ? "#b0402c" : PAL.sandD);
+    drawText(g, delta, x + 6 + 7 * GLYPH, y + 4, d > 0 ? PAL.grassD : d < 0 ? PAL.coral : PAL.wood);
     drawText(g, `${Math.round(h.before.winRate * 100)}% > ${Math.round(h.after.winRate * 100)}% wins, ${h.n} new fights`, x + 6, y + 16, PAL.ink);
   }
 }

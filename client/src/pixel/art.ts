@@ -1,20 +1,51 @@
-// Placeholder pixel art drawn in code at startup: one atlas of 16x16 tiles plus simple sprites. Colors come
-// from the moodboard candidate palette; the curated set (docs/STYLE.md + CC0 tiles) replaces this file's
-// output later without touching the scenes, which only ask for tiles and sprites by name.
+// Pixel art: the approved art bible (docs/STYLE.md) PNGs under /art, plus the few sprites still drawn in code.
+// Every color below is one of the 28 canonical palette entries; scenes ask for tiles and sprites by name.
 
-import { hash2, T, TILE, type TileKind } from "./tiles";
+import { hash2, T, TILE, type TileKind, type TileMap } from "./tiles";
 
+// Old key names kept so scenes didn't need renaming; values are the STYLE.md palette.
 export const PAL = {
-  ink: "#141820",
-  grassD: "#3a6340", grass: "#4c943c", grassM: "#7eaa3e", grassL: "#a6cc60",
-  waterD: "#385a68", water: "#2797a6", waterL: "#55a0bc", foam: "#a8bed4",
-  sandD: "#c2862e", sand: "#cdc98e", sandL: "#f7dfc8",
-  woodD: "#45301f", wood: "#7a4628", woodM: "#a85f2a", woodL: "#c58757",
-  stone: "#a69284", stoneL: "#d4ccc8",
-  flowerY: "#ffd61e", flowerP: "#cba090", flowerW: "#f7dfc8",
+  ink: "#39463F",
+  grassD: "#537D59", grass: "#9FC66A", grassM: "#BFDA82", grassL: "#DDE8A3", grassS: "#78A05D",
+  waterD: "#519F95", water: "#6CBAB2", waterL: "#9ED7CA", foam: "#D4EADD", teal: "#43847C",
+  sandD: "#A57954", sand: "#E0BC85", sandL: "#FFF3D8",
+  woodD: "#795849", wood: "#A57954", woodM: "#C69A67", woodL: "#E0BC85", cream: "#F4DEC6",
+  stoneD: "#7A8F89", stone: "#9CAC9B", stoneM: "#BFC7AF", stoneL: "#DDE1C6",
+  furD: "#B88163", fur: "#D8A67A", furM: "#EBC796", furL: "#F7E5BA",
+  flowerY: "#EDC76A", flowerP: "#E69B86", flowerW: "#FFF3D8", coral: "#BC756B",
+  panel: "#FFF3D8",
 } as const;
 
 type Ctx = CanvasRenderingContext2D;
+
+const FILES = [
+  "tile-grass-0", "tile-grass-1", "tile-grass-2", "tile-water-0", "tile-water-1", "tile-water-2", "tile-water-3",
+  "tile-path-atlas", "tile-shore-atlas", "tile-shore-inner", "tile-detail-flowers", "tile-detail-tuft",
+  "tile-bridge", "tile-crop-states", "prop-tree", "prop-house-aframe", "ui-frame-12", "font-6x8",
+] as const;
+export type ArtName = (typeof FILES)[number];
+
+const art = new Map<string, HTMLImageElement>();
+
+export function img(name: ArtName): HTMLImageElement {
+  const i = art.get(name);
+  if (!i) throw new Error(`art not loaded: ${name}`);
+  return i;
+}
+
+export function loadArt(base = "/art/"): Promise<void> {
+  return Promise.all(
+    FILES.map(
+      (f) =>
+        new Promise<void>((res, rej) => {
+          const i = new Image();
+          i.onload = () => { art.set(f, i); res(); };
+          i.onerror = () => rej(new Error(`art ${f}`));
+          i.src = `${base}${f}.png`;
+        }),
+    ),
+  ).then(() => undefined);
+}
 
 function canvas(w: number, h: number): [HTMLCanvasElement, Ctx] {
   const c = document.createElement("canvas");
@@ -30,95 +61,76 @@ const px = (g: Ctx, x: number, y: number, col: string, w = 1, h = 1) => {
   g.fillRect(x, y, w, h);
 };
 
-// Each kind gets VARIANTS versions so big fields don't repeat; water has FRAMES animation frames.
-export const VARIANTS = 3;
-export const FRAMES = 4;
+export const FRAMES = 4; // water animation cells, 250 ms each
 
-export interface Atlas {
-  img: HTMLCanvasElement;
-  // Source x,y of a tile kind's variant (or water frame).
-  at(kind: TileKind, variant: number, frame: number): [number, number];
+// Bridge tiles: the art is a horizontal deck; vertical bridges use a pre-rotated copy.
+let bridgeV: HTMLCanvasElement | null = null;
+function verticalBridge(): HTMLCanvasElement {
+  if (bridgeV) return bridgeV;
+  const [c, g] = canvas(TILE, TILE);
+  g.translate(TILE, 0);
+  g.rotate(Math.PI / 2);
+  g.drawImage(img("tile-bridge"), 0, 0);
+  return (bridgeV = c);
 }
 
-export function makeAtlas(): Atlas {
-  const kinds = [T.water, T.grass, T.path, T.bridge, T.sand, T.flowers, T.tall];
-  const cols = Math.max(VARIANTS, FRAMES);
-  const [img, g] = canvas(cols * TILE, kinds.length * TILE);
-  kinds.forEach((k, row) => {
-    for (let v = 0; v < cols; v++) drawTile(g, k, v, v * TILE, row * TILE);
-  });
-  return {
-    img,
-    at(kind, variant, frame) {
-      const row = kinds.indexOf(kind);
-      const col = kind === T.water ? frame % FRAMES : variant % VARIANTS;
-      return [col * TILE, row * TILE];
-    },
-  };
+const isWater = (m: TileMap, i: number, j: number) => kindAt(m, i, j) === T.water;
+const isPath = (m: TileMap, i: number, j: number) => {
+  const k = kindAt(m, i, j);
+  return k === T.path || k === T.bridge;
+};
+
+function kindAt(m: TileMap, i: number, j: number): TileKind {
+  const a = i - m.ox;
+  const b = j - m.oz;
+  if (a < 0 || b < 0 || a >= m.w || b >= m.h) return T.water;
+  return m.kind[b * m.w + a] as TileKind;
 }
 
-function speckle(g: Ctx, ox: number, oy: number, seed: number, n: number, col: string) {
-  for (let i = 0; i < n; i++) px(g, ox + Math.floor(hash2(seed, i, 7) * 16), oy + Math.floor(hash2(seed, i, 8) * 16), col);
+// N=1, E=2, S=4, W=8 (STYLE.md "Tiles and seams"); atlas cell index = mask, 4 per row.
+export function edgeMask(test: (di: number, dj: number) => boolean): number {
+  return (test(0, -1) ? 1 : 0) | (test(1, 0) ? 2 : 0) | (test(0, 1) ? 4 : 0) | (test(-1, 0) ? 8 : 0);
 }
 
-function drawTile(g: Ctx, k: TileKind, v: number, ox: number, oy: number) {
-  const seed = k * 31 + v;
-  switch (k) {
-    case T.water: {
-      px(g, ox, oy, PAL.water, 16, 16);
-      // Two short highlight dashes drifting with the frame.
-      for (const [x, y] of [[2, 4], [9, 11]] as const) px(g, ox + ((x + v) % 14), oy + y, PAL.waterL, 3, 1);
-      px(g, ox + ((12 + v * 2) % 15), oy + 7, PAL.foam);
-      break;
-    }
-    case T.grass:
-    case T.flowers:
-    case T.tall: {
-      px(g, ox, oy, PAL.grass, 16, 16);
-      speckle(g, ox, oy, seed, 10, PAL.grassM);
-      speckle(g, ox, oy, seed + 99, 4, PAL.grassD);
-      if (k === T.flowers) {
-        for (let i = 0; i < 3; i++) {
-          const x = ox + 2 + Math.floor(hash2(seed, i, 3) * 11);
-          const y = oy + 2 + Math.floor(hash2(seed, i, 4) * 11);
-          const c = [PAL.flowerY, PAL.flowerW, PAL.flowerP][i]!;
-          px(g, x, y - 1, c); px(g, x - 1, y, c); px(g, x + 1, y, c); px(g, x, y + 1, c); px(g, x, y, PAL.flowerY);
-        }
-      }
-      if (k === T.tall) {
-        for (let i = 0; i < 5; i++) {
-          const x = ox + 1 + Math.floor(hash2(seed, i, 5) * 13);
-          const y = oy + 5 + Math.floor(hash2(seed, i, 6) * 9);
-          px(g, x, y - 3, PAL.grassL, 1, 3); px(g, x + 1, y - 4, PAL.grassM, 1, 4); px(g, x + 2, y - 2, PAL.grassL, 1, 2);
-          px(g, x, y, PAL.grassD, 3, 1);
-        }
-      }
-      break;
-    }
-    case T.path:
-      px(g, ox, oy, PAL.sand, 16, 16);
-      speckle(g, ox, oy, seed, 8, PAL.sandL);
-      speckle(g, ox, oy, seed + 50, 5, PAL.stone);
-      break;
-    case T.sand:
-      px(g, ox, oy, PAL.sandL, 16, 16);
-      speckle(g, ox, oy, seed, 7, PAL.sand);
-      break;
-    case T.bridge:
-      px(g, ox, oy, PAL.woodM, 16, 16);
-      for (let y = 0; y < 16; y += 4) px(g, ox, oy + y + 3, PAL.wood, 16, 1);
-      px(g, ox + 3 + v, oy + 1, PAL.woodL, 2, 1);
-      break;
+const cell = (mask: number): [number, number] => [(mask % 4) * TILE, Math.floor(mask / 4) * TILE];
+
+// One map tile at world tile coords (i, j), drawn at screen (sx, sy).
+export function drawMapTile(g: Ctx, m: TileMap, i: number, j: number, sx: number, sy: number, t: number): void {
+  const k = kindAt(m, i, j);
+  if (k === T.water) {
+    const f = (Math.floor(t * 4) + Math.floor(hash2(i, j, 3) * 4)) % FRAMES;
+    g.drawImage(img(`tile-water-${f}` as ArtName), sx, sy);
+    return;
   }
-}
-
-// A coast edge drawn over a land tile next to water: one row of foam + darker sand lip.
-export function drawShore(g: Ctx, x: number, y: number, side: "n" | "s" | "e" | "w", frame: number) {
-  const foam = frame % 2 ? PAL.foam : PAL.waterL;
-  if (side === "s") { px(g, x, y + 15, foam, 16, 1); px(g, x, y + 14, PAL.sandD, 16, 1); }
-  if (side === "n") { px(g, x, y, foam, 16, 1); }
-  if (side === "e") { px(g, x + 15, y, foam, 1, 16); }
-  if (side === "w") { px(g, x, y, foam, 1, 16); }
+  if (k === T.bridge) {
+    // Bridges are 2-3 tiles wide: the deck runs along the longer stretch of bridge tiles.
+    const run = (di: number, dj: number) => {
+      let n = 0;
+      while (n < 8 && kindAt(m, i + di * (n + 1), j + dj * (n + 1)) === T.bridge) n++;
+      return n;
+    };
+    const horiz = run(1, 0) + run(-1, 0) >= run(0, 1) + run(0, -1);
+    g.drawImage(horiz ? img("tile-bridge") : verticalBridge(), sx, sy);
+    return;
+  }
+  const water = edgeMask((di, dj) => isWater(m, i + di, j + dj));
+  if (k === T.path) {
+    const [ax, ay] = cell(edgeMask((di, dj) => isPath(m, i + di, j + dj)));
+    g.drawImage(img("tile-path-atlas"), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
+  } else if (water) {
+    const [ax, ay] = cell(water);
+    g.drawImage(img("tile-shore-atlas"), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
+  } else {
+    g.drawImage(img(`tile-grass-${Math.floor(hash2(i, j, 4) * 3)}` as ArtName), sx, sy);
+  }
+  // Concave corners: both cardinals are land but the diagonal is water (order NW, NE, SE, SW).
+  const corners: [number, number, number][] = [[-1, -1, 0], [1, -1, 1], [1, 1, 2], [-1, 1, 3]];
+  for (const [di, dj, n] of corners) {
+    if (isWater(m, i + di, j + dj) && !isWater(m, i + di, j) && !isWater(m, i, j + dj))
+      g.drawImage(img("tile-shore-inner"), n * TILE, 0, TILE, TILE, sx, sy, TILE, TILE);
+  }
+  if (!water && k === T.flowers) g.drawImage(img("tile-detail-flowers"), sx, sy);
+  if (!water && k === T.tall) g.drawImage(img("tile-detail-tuft"), sx, sy);
 }
 
 export interface Sprite {
@@ -128,7 +140,7 @@ export interface Sprite {
   frames: number; // horizontal frames
 }
 
-// The player: 16x24, 4 directions x 2 walk frames (rows: down, left, right, up).
+// The player: 16x24 straw-hat farmer, 4 directions x 2 walk frames (rows: down, left, right, up).
 export function makePlayer(): Sprite {
   const [img, g] = canvas(32, 96);
   for (let d = 0; d < 4; d++) {
@@ -136,45 +148,43 @@ export function makePlayer(): Sprite {
       const ox = f * 16;
       const oy = d * 24;
       const step = f ? 1 : 0;
-      // legs
-      px(g, ox + 5, oy + 19, PAL.woodD, 2, 4 - step); px(g, ox + 9, oy + 19, PAL.woodD, 2, 3 + step);
-      // body (warm red overalls)
+      // boots + legs
+      px(g, ox + 5, oy + 19, PAL.ink, 2, 4 - step); px(g, ox + 9, oy + 19, PAL.ink, 2, 3 + step);
+      px(g, ox + 5, oy + 19, PAL.teal, 2, 2); px(g, ox + 9, oy + 19, PAL.teal, 2, 2);
+      // coral shirt with cream apron
       px(g, ox + 4, oy + 12, PAL.ink, 8, 8);
-      px(g, ox + 5, oy + 13, "#c0503a", 6, 6);
-      px(g, ox + 5, oy + 13, "#e06a48", 2, 2);
-      // head
-      px(g, ox + 3, oy + 3, PAL.ink, 10, 10);
-      px(g, ox + 4, oy + 4, PAL.sandL, 8, 8);
-      // hair
-      px(g, ox + 3, oy + 2, PAL.ink, 10, 3);
-      px(g, ox + 4, oy + 3, PAL.woodM, 8, 2);
-      if (d === 3) px(g, ox + 4, oy + 4, PAL.woodM, 8, 7);
-      if (d === 1) px(g, ox + 9, oy + 4, PAL.woodM, 3, 6);
-      if (d === 2) px(g, ox + 4, oy + 4, PAL.woodM, 3, 6);
-      // eyes
-      if (d === 0) { px(g, ox + 6, oy + 8, PAL.ink); px(g, ox + 9, oy + 8, PAL.ink); px(g, ox + 5, oy + 10, PAL.flowerP); px(g, ox + 10, oy + 10, PAL.flowerP); }
-      if (d === 1) px(g, ox + 5, oy + 8, PAL.ink);
-      if (d === 2) px(g, ox + 10, oy + 8, PAL.ink);
+      px(g, ox + 5, oy + 13, PAL.flowerP, 6, 6);
+      px(g, ox + 5, oy + 13, PAL.coral, 1, 6);
+      if (d !== 3) px(g, ox + 6, oy + 15, PAL.cream, 4, 4);
+      // face
+      px(g, ox + 4, oy + 6, PAL.ink, 8, 7);
+      px(g, ox + 5, oy + 7, PAL.furM, 6, 5);
+      if (d === 3) px(g, ox + 5, oy + 7, PAL.woodD, 6, 5);
+      // straw hat: wide brim, honey crown with a coral band
+      px(g, ox + 1, oy + 5, PAL.ink, 14, 3);
+      px(g, ox + 2, oy + 6, PAL.woodL, 12, 1);
+      px(g, ox + 4, oy + 1, PAL.ink, 8, 5);
+      px(g, ox + 5, oy + 2, PAL.woodL, 6, 3);
+      px(g, ox + 5, oy + 2, PAL.furL, 3, 1);
+      px(g, ox + 5, oy + 4, PAL.coral, 6, 1);
+      // eyes / cheeks
+      if (d === 0) { px(g, ox + 6, oy + 9, PAL.ink); px(g, ox + 9, oy + 9, PAL.ink); px(g, ox + 5, oy + 10, PAL.flowerP); px(g, ox + 10, oy + 10, PAL.flowerP); }
+      if (d === 1) px(g, ox + 5, oy + 9, PAL.ink);
+      if (d === 2) px(g, ox + 10, oy + 9, PAL.ink);
     }
   }
   return { img, w: 16, h: 24, frames: 2 };
 }
 
+// Props drawn straight from the PNGs, anchored at bottom-centre.
+export interface Prop {
+  name: ArtName;
+  w: number;
+  h: number;
+}
+export const TREE: Prop = { name: "prop-tree", w: 32, h: 48 };
+export const HOUSE: Prop = { name: "prop-house-aframe", w: 48, h: 48 };
 
-// Round tree, 32x40 (2x2.5 tiles), trunk anchored at bottom-centre.
-export function makeTree(): Sprite {
-  const [img, g] = canvas(32, 40);
-  px(g, 13, 26, PAL.ink, 6, 13);
-  px(g, 14, 26, PAL.wood, 4, 12);
-  px(g, 14, 26, PAL.woodM, 1, 12);
-  const blob = (cx: number, cy: number, r: number, c: string) => {
-    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r) px(g, cx + x, cy + y, c);
-  };
-  blob(16, 15, 13, PAL.ink);
-  blob(16, 15, 12, PAL.grassD);
-  blob(14, 13, 10, PAL.grass);
-  blob(12, 10, 6, PAL.grassM);
-  blob(10, 8, 2, PAL.grassL);
-  px(g, 8, 38, PAL.grassD, 16, 2); // ground shadow
-  return { img, w: 32, h: 40, frames: 1 };
+export function drawProp(g: Ctx, p: Prop, footX: number, footY: number): void {
+  g.drawImage(img(p.name), Math.round(footX - p.w / 2), Math.round(footY - p.h));
 }

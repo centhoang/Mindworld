@@ -7,7 +7,7 @@ import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
-import { drawShore, makeAtlas, makePlayer, makeTree, PAL, type Atlas, type Sprite } from "./art";
+import { drawMapTile, drawProp, HOUSE, makePlayer, PAL, TREE, type Sprite } from "./art";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH } from "./text";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
@@ -52,28 +52,26 @@ export class Overworld {
   private walkT = 0;
   private place = "";
   private bannerT = 0;
-  private readonly atlas: Atlas;
   private readonly playerSprite: Sprite;
   private petSprite: HTMLCanvasElement;
   readonly wilds: Wild[] = [];
   private nextId = 1;
   private residents: Resident[] = [];
-  private readonly treeSprite: Sprite;
   cam: Vec = { x: 0, z: 0 };
+  house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
 
   constructor(petGenes: Genes) {
     this.world = generateWorld();
     this.map = buildTileMap(this.world);
-    this.placeTrees();
     const home = this.world.platforms.find((p) => p.kind === "home")!;
+    this.house = { x: home.x, z: home.z - 2.5 };
+    this.placeTrees();
     this.player = { x: home.x + 0.5, z: home.z + 3.5 };
     this.pet = { x: home.x - 1, z: home.z + 4 };
     this.cam = { ...this.player };
-    this.atlas = makeAtlas();
     this.playerSprite = makePlayer();
     this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
     for (const p of this.world.platforms) if (p.kind === "wild") for (let i = 0; i < WILD_PER_MEADOW; i++) this.spawnWild(p.x, p.z, p.r);
-    this.treeSprite = makeTree();
   }
 
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
@@ -92,6 +90,7 @@ export class Overworld {
         if (!(ring ? hash2(i, j, 9) < 0.22 : hash2(i, j, 9) < 0.012)) continue;
         if (this.nearPath(i, j)) continue;
         if (this.trees.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5)) continue;
+        if (Math.abs(x - this.house.x) < 3.5 && Math.abs(z - this.house.z + 1) < 3.5) continue;
         this.trees.push({ x, z });
         this.treeTiles.add(j * m.w + i);
       }
@@ -142,6 +141,7 @@ export class Overworld {
 
   readonly canWalk = (x: number, z: number): boolean => {
     if (!tileWalkable(this.map, x, z)) return false;
+    if (Math.abs(x - this.house.x) < 1.6 && z < this.house.z + 0.2 && z > this.house.z - 2.2) return false;
     const i = Math.floor(x - this.map.ox);
     const j = Math.floor(z - this.map.oz);
     return !this.treeTiles.has(j * this.map.w + i);
@@ -201,23 +201,14 @@ export class Overworld {
     const camX = Math.round(this.cam.x * TILE - sw / 2);
     const camY = Math.round(this.cam.z * TILE - sh / 2);
     const toScreen = (x: number, z: number): [number, number] => [Math.round(x * TILE) - camX, Math.round(z * TILE) - camY];
-    const frame = Math.floor(t * 3);
     g.fillStyle = PAL.water;
     g.fillRect(0, 0, sw, sh);
     const i0 = Math.floor(camX / TILE) - 1; // world tile coords (tileAt subtracts the map origin)
     const j0 = Math.floor(camY / TILE) - 1;
     for (let j = j0; j <= j0 + Math.ceil(sh / TILE) + 2; j++) {
       for (let i = i0; i <= i0 + Math.ceil(sw / TILE) + 2; i++) {
-        const k = tileAt(m, i + 0.5, j + 0.5);
         const [sx, sy] = toScreen(i, j);
-        const [ax, ay] = this.atlas.at(k, Math.floor(hash2(i, j, 4) * 3), frame + i + j);
-        g.drawImage(this.atlas.img, ax, ay, TILE, TILE, sx, sy, TILE, TILE);
-        if (k !== T.water && k !== T.bridge) {
-          if (tileAt(m, i + 0.5, j + 1.5) === T.water) drawShore(g, sx, sy, "s", frame);
-          if (tileAt(m, i + 0.5, j - 0.5) === T.water) drawShore(g, sx, sy, "n", frame);
-          if (tileAt(m, i + 1.5, j + 0.5) === T.water) drawShore(g, sx, sy, "e", frame);
-          if (tileAt(m, i - 0.5, j + 0.5) === T.water) drawShore(g, sx, sy, "w", frame);
-        }
+        drawMapTile(g, m, i, j, sx, sy, t);
       }
     }
     // Sprites sorted by their feet, so things lower on screen stand in front.
@@ -225,7 +216,11 @@ export class Overworld {
     for (const tr of this.trees) {
       const [sx, sy] = toScreen(tr.x, tr.z);
       if (sx < -32 || sy < -48 || sx > sw + 32 || sy > sh + 48) continue;
-      items.push({ z: tr.z, draw: () => g.drawImage(this.treeSprite.img, sx - 16, sy - 36) });
+      items.push({ z: tr.z, draw: () => drawProp(g, TREE, sx, sy + 4) });
+    }
+    {
+      const [hx, hy] = toScreen(this.house.x, this.house.z);
+      items.push({ z: this.house.z, draw: () => drawProp(g, HOUSE, hx, hy) });
     }
     const [px, py] = toScreen(this.player.x, this.player.z);
     const pf = this.moving ? Math.floor(this.walkT * 8) % 2 : 0;

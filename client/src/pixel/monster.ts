@@ -24,13 +24,23 @@ export const BUILDS: Record<string, Build> = {
   bully: { w: 0.7, h: 0.56, head: 0.22 },
 };
 
-function hsl(h: number, s: number, l: number): string {
-  return `hsl(${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
-}
+// Palette ramps (shadow, base, light) from docs/STYLE.md; the hue gene picks one, so every monster stays on
+// the 28-color palette while hues still read as different bodies.
+const RAMPS: [string, string, string][] = [
+  ["#B88163", "#D8A67A", "#EBC796"], // fur
+  ["#BC756B", "#E69B86", "#F4DEC6"], // coral
+  ["#C69A67", "#EDC76A", "#F7E5BA"], // honey
+  ["#D8A67A", "#EBC796", "#F7E5BA"], // cream fur
+  ["#78A05D", "#9FC66A", "#BFDA82"], // leaf
+  ["#537D59", "#78A05D", "#9FC66A"], // moss
+  ["#43847C", "#519F95", "#6CBAB2"], // teal
+  ["#519F95", "#6CBAB2", "#9ED7CA"], // pool
+  ["#7A8F89", "#9CAC9B", "#BFC7AF"], // stone
+  ["#795849", "#A57954", "#C69A67"], // bark
+];
 
-// Hue-shifted ramp: shadows cooler and darker, highlights warmer and lighter.
 function ramp(h: number): [string, string, string] {
-  return [hsl((h + 0.97) % 1, 0.42, 0.42), hsl(h, 0.55, 0.62), hsl((h + 0.03) % 1, 0.7, 0.8)];
+  return RAMPS[Math.floor((((h % 1) + 1) % 1) * RAMPS.length) % RAMPS.length]!;
 }
 
 export function drawMonster(look: PetLook, size: number, facing: Facing, build: Build = BUILDS.pal!): HTMLCanvasElement {

@@ -12,11 +12,12 @@ import { allowedMoves, cannedLine } from "../game/instinct";
 import { withTactics } from "../sim/tactics";
 import { ENEMIES } from "../sim/enemies";
 import { DEFAULT_PET, type Intent } from "../sim/types";
-import { BattleView } from "./battle";
+import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
 import { BUILDS, drawMonster } from "./monster";
 import { Overworld, type Wild } from "./overworld";
 import { drawDialogue } from "./text";
+import { loadArt } from "./art";
 import { drawMenu, type MenuRow } from "./menu";
 import { TeachScreen } from "./teach";
 
@@ -117,14 +118,21 @@ window.addEventListener("keydown", (e) => {
     return; // typing in the teach box
   }
   if (k === "c" && !e.repeat) setCrt(!crt);
-  if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
+  if (mode === "battle" && battleView.choosing) battleView.cmdKey(k);
+  else if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
   if (mode === "world" && !e.repeat) menuKey(k);
   keys.add(k);
   if (k.startsWith("arrow") || k === " ") e.preventDefault();
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("blur", () => keys.clear());
-out.addEventListener("pointerdown", () => mode === "battle" && battleView.skip());
+out.addEventListener("pointerdown", (e) => {
+  if (mode !== "battle") return;
+  const r = out.getBoundingClientRect();
+  const x = ((e.clientX - r.left) / r.width) * low.width;
+  const y = ((e.clientY - r.top) / r.height) * low.height;
+  if (!battleView.cmdAt(x, y, low.width, low.height)) battleView.skip();
+});
 resize();
 
 function menuKey(k: string): void {
@@ -148,6 +156,11 @@ function menuKey(k: string): void {
   } else if (k === "p" || k === "escape" || k === "x") menu = null;
 }
 
+function side(m: Member): Side {
+  const build = m.arch ? BUILDS[m.arch] : undefined;
+  return { name: m.name, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3 };
+}
+
 async function fight(w: Wild): Promise<void> {
   mode = "battle";
   keys.clear();
@@ -156,10 +169,31 @@ async function fight(w: Wild): Promise<void> {
   const battle = new Battle({ enemy: w.arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def });
   const foeName = w.arch[0]!.toUpperCase() + w.arch.slice(1);
   const look = petLook(w.genes);
-  await battleView.open(
-    { name: foeName, sprite: drawMonster(look, 64, "front", BUILDS[w.arch]), maxHp: def.maxHp },
-    { name: activeMember().name, sprite: drawMonster(petLook(activeMember().genes), 48, "back", activeMember().arch ? BUILDS[activeMember().arch!] : undefined), maxHp: pet.maxHp },
-  );
+  await battleView.open({ name: foeName, sprite: drawMonster(look, 64, "front", BUILDS[w.arch]), maxHp: def.maxHp, level: 2 + (w.id % 3) }, side(activeMember()));
+  // Fight = watch the pet play its memo; Teach = change the memo first; Swap = next party member; Run = leave.
+  for (;;) {
+    const c = await battleView.choose();
+    if (c === "fight") break;
+    if (c === "teach") {
+      keys.clear();
+      teach.show();
+      while (teach.open) await new Promise((r) => setTimeout(r, 100));
+    } else if (c === "swap") {
+      const n = members().length;
+      if (n < 2) await battleView.say("No one else is with you yet. Befriend a wild pet!");
+      else {
+        state.active = ((state.active ?? 0) + 1) % n;
+        save(state);
+        refreshParty();
+        await battleView.swapMine(side(activeMember()));
+      }
+    } else {
+      await battleView.say("You slip away safely.");
+      w.cool = 8;
+      mode = "world";
+      return;
+    }
+  }
   while (!battle.done) {
     const obs = battle.observe();
     await battleView.say(`${foeName} ${TELL[obs.intent]}`);
@@ -223,8 +257,8 @@ function update(dt: number, t: number): void {
   presenter.present(low, crt ? 1 : 0);
 }
 
-// Fonts must be ready before the first text sprite is cached.
-document.fonts.load('8px "Press Start 2P"').finally(() => requestAnimationFrame(frame));
+// Tiles, props, frame and font PNGs (docs/STYLE.md) load before the first frame.
+void loadArt().then(() => requestAnimationFrame(frame));
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
 (window as unknown as { __px: unknown }).__px = { world, battleView, update, keys, setCrt, state, fight };

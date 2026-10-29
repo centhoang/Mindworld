@@ -1,37 +1,46 @@
-// Pixel text and the dialogue box. Glyphs come from an 8 px pixel font (Press Start 2P, OFL) drawn once per
-// string to a small canvas and thresholded, so every pixel is either ink or nothing: no grey antialiasing
-// smearing under the CRT. The 9-slice frame is drawn in code until the art bible's frame lands.
+// Pixel text and boxes from the art bible: the original 6x8 bitmap font (`font-6x8.png`, ASCII 32-95,
+// 16 x 4 cells, uppercase only) and the 12x12 nine-slice frame (cuts at 4 and 8). Colored text uses a tinted
+// copy of the font atlas, cached per color.
 
-import { PAL } from "./art";
+import { img, PAL } from "./art";
 
-export const FONT = '8px "Press Start 2P", monospace';
-export const GLYPH = 8;
-export const LINE = 11;
+export const GLYPH = 6;
+export const LINE = 10;
 
-const cache = new Map<string, HTMLCanvasElement>();
+const tinted = new Map<string, HTMLCanvasElement>();
 
-export function textSprite(s: string, color: string): HTMLCanvasElement {
-  const key = `${color}|${s}`;
-  const hit = cache.get(key);
+function fontIn(color: string): HTMLCanvasElement {
+  const hit = tinted.get(color);
   if (hit) return hit;
+  const src = img("font-6x8");
   const c = document.createElement("canvas");
-  c.width = Math.max(1, s.length * GLYPH);
-  c.height = GLYPH + 2;
-  const g = c.getContext("2d", { willReadFrequently: true })!;
-  g.font = FONT;
-  g.textBaseline = "top";
+  c.width = src.width;
+  c.height = src.height;
+  const g = c.getContext("2d")!;
+  g.drawImage(src, 0, 0);
+  g.globalCompositeOperation = "source-in";
   g.fillStyle = color;
-  g.fillText(s, 0, 1);
-  const d = g.getImageData(0, 0, c.width, c.height);
-  for (let i = 3; i < d.data.length; i += 4) d.data[i] = d.data[i]! >= 110 ? 255 : 0;
-  g.putImageData(d, 0, 0);
-  if (cache.size > 400) cache.clear();
-  cache.set(key, c);
+  g.fillRect(0, 0, c.width, c.height);
+  tinted.set(color, c);
   return c;
 }
 
+export function glyphIndex(ch: string): number {
+  const code = ch.toUpperCase().charCodeAt(0);
+  return code >= 32 && code <= 95 ? code - 32 : 31; // 31 = "?"
+}
+
 export function drawText(g: CanvasRenderingContext2D, s: string, x: number, y: number, color: string = PAL.ink): void {
-  g.drawImage(textSprite(s, color), Math.round(x), Math.round(y));
+  const f = fontIn(color);
+  let cx = Math.round(x);
+  const cy = Math.round(y);
+  for (const ch of s) {
+    if (ch !== " ") {
+      const n = glyphIndex(ch);
+      g.drawImage(f, (n % 16) * GLYPH, Math.floor(n / 16) * 8, GLYPH, 8, cx, cy, GLYPH, 8);
+    }
+    cx += GLYPH;
+  }
 }
 
 // Greedy word wrap to a pixel width (monospace font, so characters = width / GLYPH).
@@ -55,29 +64,49 @@ export function wrap(s: string, width: number): string[] {
   return out;
 }
 
-// Cream box with a 2 px warm wood border and rounded 1 px corners.
+// Nine-slice cream panel: 4x4 corners kept exact, 4 px edges tiled and clipped, flat cream centre.
 export function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
-  g.fillStyle = PAL.woodD;
-  g.fillRect(x + 1, y, w - 2, h);
-  g.fillRect(x, y + 1, w, h - 2);
-  g.fillStyle = PAL.woodL;
-  g.fillRect(x + 2, y + 1, w - 4, h - 2);
-  g.fillRect(x + 1, y + 2, w - 2, h - 4);
-  g.fillStyle = PAL.sandL;
-  g.fillRect(x + 3, y + 3, w - 6, h - 6);
+  const f = img("ui-frame-12");
+  w = Math.max(12, Math.round(w));
+  h = Math.max(12, Math.round(h));
+  g.fillStyle = PAL.panel;
+  g.fillRect(x + 4, y + 4, w - 8, h - 8);
+  for (let ex = 4; ex < w - 4; ex += 4) {
+    const ew = Math.min(4, w - 4 - ex);
+    g.drawImage(f, 4, 0, ew, 4, x + ex, y, ew, 4);
+    g.drawImage(f, 4, 8, ew, 4, x + ex, y + h - 4, ew, 4);
+  }
+  for (let ey = 4; ey < h - 4; ey += 4) {
+    const eh = Math.min(4, h - 4 - ey);
+    g.drawImage(f, 0, 4, 4, eh, x, y + ey, 4, eh);
+    g.drawImage(f, 8, 4, 4, eh, x + w - 4, y + ey, 4, eh);
+  }
+  g.drawImage(f, 0, 0, 4, 4, x, y, 4, 4);
+  g.drawImage(f, 8, 0, 4, 4, x + w - 4, y, 4, 4);
+  g.drawImage(f, 0, 8, 4, 4, x, y + h - 4, 4, 4);
+  g.drawImage(f, 8, 8, 4, 4, x + w - 4, y + h - 4, 4, 4);
 }
 
-// Bottom dialogue box: up to 3 lines, with an optional speaker name tab.
-export function drawDialogue(g: CanvasRenderingContext2D, screenW: number, screenH: number, text: string, who?: string): void {
-  const w = Math.min(screenW - 16, 360);
-  const h = 3 * LINE + 12;
-  const x = Math.floor((screenW - w) / 2);
-  const y = screenH - h - 6;
+// Bottom dialogue box (STYLE.md: 368x48 at y 160 on a 384 screen): optional 32x32 portrait, speaker name in
+// wood on the first line, then up to 3 lines (2 with a name).
+export function drawDialogue(
+  g: CanvasRenderingContext2D, screenW: number, screenH: number, text: string, who?: string, portrait?: CanvasImageSource, boxW?: number,
+): void {
+  const w = boxW ?? Math.min(screenW - 16, 368);
+  const h = 48;
+  const x = boxW ? 8 : Math.floor((screenW - w) / 2);
+  const y = screenH - h - 8;
   drawFrame(g, x, y, w, h);
-  wrap(text, w - 16).slice(0, 3).forEach((l, i) => drawText(g, l, x + 8, y + 7 + i * LINE));
-  if (who) {
-    const tw = who.length * GLYPH + 12;
-    drawFrame(g, x + 6, y - 12, tw, 15);
-    drawText(g, who, x + 12, y - 8, PAL.wood);
+  let tx = x + 8;
+  if (portrait) {
+    g.drawImage(portrait, x + 8, y + 8, 32, 32);
+    tx = x + 48;
   }
+  let ty = y + 8;
+  const lines = 3;
+  if (who) {
+    drawText(g, who, tx, ty, PAL.wood);
+    ty += LINE;
+  }
+  wrap(text, x + w - 8 - tx).slice(0, who ? lines - 1 : lines).forEach((l, i) => drawText(g, l, tx, ty + i * LINE));
 }

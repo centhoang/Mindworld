@@ -3,14 +3,21 @@
 // stay in ../sim/battle; this view only plays a turn record as a short script of timed steps.
 
 import type { Action, EnemyAct, Outcome } from "../sim/types";
-import { PAL } from "./art";
+import { drawProp, PAL, TREE } from "./art";
 import { drawDialogue, drawFrame, drawText, GLYPH } from "./text";
 
 export interface Side {
   name: string;
   sprite: HTMLCanvasElement;
   maxHp: number;
+  portrait?: HTMLCanvasElement; // 32x32 face for the text box
+  level?: number;
 }
+
+export const COMMANDS = ["fight", "teach", "swap", "run"] as const;
+export type Command = (typeof COMMANDS)[number];
+const CMD_LABEL: Record<Command, string> = { fight: "Fight", teach: "Teach", swap: "Swap", run: "Run" };
+const MENU_W = 144;
 
 interface Step {
   dur: number;
@@ -47,6 +54,8 @@ export class BattleView {
   private foeShield = false;
   private myShield = false;
   private hearts = 0;
+  private cmd: { cursor: number; pick: (c: Command) => void } | null = null;
+  private cursor = 0;
 
   open(foe: Side, mine: Side): Promise<void> {
     this.foe = foe;
@@ -68,6 +77,49 @@ export class BattleView {
   }
 
   // One turn: the pet's move, then the foe's, then HP settles.
+  // The command menu: resolves with what the player picked (2x2 grid, Fight top-left).
+  choose(): Promise<Command> {
+    this.text = `What will ${this.mine!.name} do?`;
+    this.typed = this.text.length;
+    this.tag = "";
+    return new Promise((res) => {
+      this.cmd = { cursor: this.cursor, pick: (c) => { this.cursor = this.cmd?.cursor ?? 0; this.cmd = null; res(c); } };
+    });
+  }
+
+  get choosing(): boolean {
+    return this.cmd !== null;
+  }
+
+  cmdKey(k: string): void {
+    const c = this.cmd;
+    if (!c) return;
+    if (k === "arrowleft" || k === "a" || k === "arrowright" || k === "d") c.cursor ^= 1;
+    if (k === "arrowup" || k === "w" || k === "arrowdown" || k === "s") c.cursor ^= 2;
+    if (k === "enter" || k === " " || k === "z") c.pick(COMMANDS[c.cursor]!);
+    if (k === "x" || k === "escape") c.cursor = 3;
+  }
+
+  // Pointer pick in low-res screen coords; true when it hit a command.
+  cmdAt(x: number, y: number, sw: number, sh: number): boolean {
+    const c = this.cmd;
+    if (!c) return false;
+    const mx = sw - MENU_W - 8;
+    const my = sh - 56;
+    if (x < mx || y < my || x > mx + MENU_W || y > my + 48) return false;
+    c.cursor = (x > mx + MENU_W / 2 ? 1 : 0) + (y > my + 24 ? 2 : 0);
+    c.pick(COMMANDS[c.cursor]!);
+    return true;
+  }
+
+  swapMine(mine: Side): Promise<void> {
+    this.push({ dur: 0.35, tick: (p) => (this.myGone = p) });
+    this.push({ dur: 0, start: () => { this.mine = mine; this.myHp = this.myHpShown = mine.maxHp; } });
+    this.push({ dur: 0.35, tick: (p) => (this.myGone = 1 - p) });
+    this.sayStep(`Go, ${mine.name}!`);
+    return this.run();
+  }
+
   playTurn(action: Action, line: string, tag: string, enemyAct: EnemyAct, dealt: number, taken: number, myHp: number, foeHp: number): Promise<void> {
     const me = this.mine!.name;
     const foe = this.foe!.name;
@@ -190,25 +242,22 @@ export class BattleView {
     const sy = Math.round((Math.random() - 0.5) * 2 * this.shake);
     g.save();
     g.translate(sx, sy);
-    // Sky bands and a meadow horizon.
-    const bands = ["#a8d8ea", "#b8e0ea", "#cde8e4", "#e2efd8"];
-    const horizon = Math.round(sh * 0.36);
-    bands.forEach((c, i) => {
-      g.fillStyle = c;
-      g.fillRect(-4, Math.round((horizon * i) / bands.length) - 4, sw + 8, Math.ceil(horizon / bands.length) + 4);
-    });
-    g.fillStyle = PAL.grassM;
-    g.fillRect(-4, horizon, sw + 8, sh - horizon + 4);
-    g.fillStyle = PAL.grassL;
-    for (let i = 0; i < 40; i++) g.fillRect(((i * 53) % (sw + 20)) - 10, horizon + 4 + ((i * 29) % (sh - horizon - 60)), 3, 1);
-    g.fillStyle = PAL.grass;
-    g.fillRect(-4, horizon, sw + 8, 2);
+    // Pale sky, soft hill bands and a meadow floor (STYLE.md battle mockup).
+    const horizon = 48;
+    g.fillStyle = PAL.foam;
+    g.fillRect(-4, -4, sw + 8, sh + 8);
+    hills(g, sw, horizon, PAL.grassL, 0, 10);
+    drawProp(g, TREE, 8, horizon + 22);
+    drawProp(g, TREE, sw - 8, horizon + 18);
+    hills(g, sw, horizon + 16, PAL.grassM, 1.7, 6);
+    hills(g, sw, horizon + 36, PAL.grass, 3.1, 4);
+    g.fillStyle = PAL.panel;
+    for (let i = 0; i < 6; i++) g.fillRect(((i * 97 + 40) % (sw - 40)) + 20, horizon + 60 + ((i * 41) % 50), 1, 1);
 
-    const boxH = 3 * 11 + 12 + 6;
-    const foeBase = { x: Math.round(sw * 0.72), y: Math.round(horizon + 30) };
-    const myBase = { x: Math.round(sw * 0.27), y: sh - boxH - 14 };
-    platform(g, foeBase.x, foeBase.y, 46, 10);
-    platform(g, myBase.x, myBase.y, 54, 12);
+    const foeBase = { x: Math.round(sw * 0.7), y: 100 };
+    const myBase = { x: Math.round(sw * 0.27), y: 146 };
+    platform(g, foeBase.x, foeBase.y, 48, 9);
+    platform(g, myBase.x, myBase.y, 56, 10);
 
     const slide = 1 - this.intro;
     if (this.foe) {
@@ -218,7 +267,7 @@ export class BattleView {
       const y = foeBase.y - s.height + 4 + bob + Math.round(this.foeGone * 24);
       sprite(g, s, x, y, this.foeFlash, this.foeGone);
       if (this.foeShield) shield(g, x + s.width / 2, y + s.height / 2, s.width * 0.55);
-      hpBox(g, 8, 8, this.foe.name, this.foeHpShown, this.foe.maxHp, false);
+      hpBox(g, 16, 14, 132, this.foe, this.foeHpShown, false);
     }
     if (this.mine) {
       const s = this.mine.sprite;
@@ -228,17 +277,42 @@ export class BattleView {
       sprite(g, s, x, y, this.myFlash, this.myGone);
       if (this.myShield) shield(g, x + s.width / 2, y + s.height / 2, s.width * 0.6);
       if (this.hearts > 0) hearts(g, x + s.width / 2, y, this.hearts);
-      hpBox(g, sw - 136, myBase.y - 36, this.mine.name, this.myHpShown, this.mine.maxHp, true);
+      hpBox(g, sw - 154, 108, 146, this.mine, this.myHpShown, true);
     }
     g.restore();
-    if (this.text) {
-      drawDialogue(g, sw, sh, this.text.slice(0, this.typed));
+    const face = this.mine?.portrait;
+    if (this.cmd) {
+      drawDialogue(g, sw, sh, this.text, undefined, face, sw - 16 - MENU_W - 8);
+      const mx = sw - MENU_W - 8;
+      const my = sh - 56;
+      drawFrame(g, mx, my, MENU_W, 48);
+      COMMANDS.forEach((c, i) => {
+        const cx = mx + 10 + (i % 2) * 66;
+        const cy = my + 11 + Math.floor(i / 2) * 18;
+        if (i === this.cmd!.cursor) {
+          g.fillStyle = PAL.grassM;
+          g.fillRect(cx - 5, cy - 4, 62, 15);
+          if (Math.floor(t * 3) % 3 !== 2) drawText(g, ">", cx - 3, cy, PAL.ink);
+        }
+        drawText(g, CMD_LABEL[c].toUpperCase(), cx + 5, cy);
+      });
+    } else if (this.text) {
+      drawDialogue(g, sw, sh, this.text.slice(0, this.typed), undefined, face);
       if (this.tag && this.typed >= this.text.length) {
-        const w = this.tag.length * GLYPH + 10;
-        drawFrame(g, sw - w - 12, sh - boxH - 14, w, 15);
-        drawText(g, this.tag, sw - w - 7, sh - boxH - 10, PAL.wood);
+        const w = this.tag.length * GLYPH + 12;
+        drawFrame(g, sw - w - 12, sh - 74, w, 16);
+        drawText(g, this.tag.toUpperCase(), sw - w - 6, sh - 70, PAL.wood);
       }
     }
+  }
+}
+
+// A soft rolling band: a sine outline filled to the bottom of the screen.
+function hills(g: CanvasRenderingContext2D, sw: number, y0: number, col: string, phase: number, amp: number): void {
+  g.fillStyle = col;
+  for (let x = -4; x < sw + 4; x += 2) {
+    const y = Math.round(y0 - amp * (0.5 + 0.5 * Math.sin(x / 37 + phase)) - 2 * Math.sin(x / 13 + phase * 2));
+    g.fillRect(x, y, 2, 300);
   }
 }
 
@@ -258,9 +332,9 @@ function platform(g: CanvasRenderingContext2D, cx: number, cy: number, rx: numbe
       g.fillRect(cx - w, cy + y + dy, w * 2, 1);
     }
   };
-  ell(rx + 1, ry + 1, PAL.grassD, 1);
-  ell(rx, ry, PAL.sand);
-  ell(rx - 4, ry - 3, PAL.sandL, -1);
+  ell(rx, ry, PAL.grassS, 1);
+  ell(rx, ry, PAL.grassM);
+  ell(rx - 6, ry - 3, PAL.grassL, -1);
 }
 
 function sprite(g: CanvasRenderingContext2D, s: HTMLCanvasElement, x: number, y: number, flash: number, gone: number): void {
@@ -284,28 +358,32 @@ function shield(g: CanvasRenderingContext2D, cx: number, cy: number, r: number):
 
 function hearts(g: CanvasRenderingContext2D, cx: number, top: number, p: number): void {
   const heart = (x: number, y: number) => {
-    g.fillStyle = "#e0607a";
+    g.fillStyle = PAL.flowerP;
     g.fillRect(x - 3, y - 2, 2, 2); g.fillRect(x + 1, y - 2, 2, 2);
     g.fillRect(x - 3, y, 6, 2); g.fillRect(x - 2, y + 2, 4, 1); g.fillRect(x - 1, y + 3, 2, 1);
   };
   for (let i = 0; i < 3; i++) heart(Math.round(cx + (i - 1) * 12), Math.round(top - 4 - p * 16 - i * 3));
 }
 
-function hpBox(g: CanvasRenderingContext2D, x: number, y: number, name: string, hp: number, max: number, showNum: boolean): void {
-  const w = 128;
-  const h = showNum ? 34 : 28;
+// Name + level on one row, then HP: a 3 px bar plus the number (STYLE.md: never color alone).
+function hpBox(g: CanvasRenderingContext2D, x: number, y: number, w: number, side: Side, hp: number, showNum: boolean): void {
+  const h = showNum ? 40 : 32;
+  const max = side.maxHp;
   drawFrame(g, x, y, w, h);
-  drawText(g, name.slice(0, 12), x + 7, y + 6);
-  const bx = x + 26;
-  const by = y + 16;
-  const bw = w - 34;
-  drawText(g, "HP", x + 7, by - 1, PAL.sandD);
-  g.fillStyle = PAL.woodD;
-  g.fillRect(bx - 1, by - 1, bw + 2, 6);
-  g.fillStyle = PAL.stoneL;
-  g.fillRect(bx, by, bw, 4);
+  drawText(g, side.name.slice(0, 12).toUpperCase(), x + 8, y + 7);
+  const lv = `L${side.level ?? 1}`;
+  drawText(g, lv, x + w - 8 - lv.length * GLYPH, y + 7, PAL.wood);
+  const bx = x + 22;
+  const by = y + 20;
+  const bw = w - 30;
+  drawText(g, "HP", x + 8, by - 3, PAL.wood);
+  g.fillStyle = PAL.stoneM;
+  g.fillRect(bx, by, bw, 3);
   const f = Math.max(0, Math.min(1, hp / max));
-  g.fillStyle = f > 0.5 ? "#5cbf74" : f > 0.2 ? PAL.flowerY : "#e0503a";
-  g.fillRect(bx, by, Math.round(bw * f), 4);
-  if (showNum) drawText(g, `${Math.max(0, Math.round(hp))}/${max}`, x + w - 8 - `${Math.round(hp)}/${max}`.length * GLYPH, y + 22);
+  g.fillStyle = f > 0.5 ? PAL.grassD : f > 0.2 ? PAL.flowerY : PAL.coral;
+  g.fillRect(bx, by, Math.round(bw * f), 3);
+  if (showNum) {
+    const n = `${Math.max(0, Math.round(hp))}/${max}`;
+    drawText(g, n, x + w - 8 - n.length * GLYPH, y + 28);
+  }
 }
