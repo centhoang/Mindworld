@@ -21,7 +21,10 @@ export class WorldRoom extends DurableObject<Env> {
       const a = ws.deserializeAttachment() as Attachment | null;
       if (a?.peer) this.room.restore(a.peer);
     }
-    void ctx.blockConcurrencyWhile(async () => this.room.restoreAways(await ctx.storage.get("aways")));
+    void ctx.blockConcurrencyWhile(async () => {
+      this.room.restoreAways(await ctx.storage.get("aways"));
+      this.room.board.restore(await ctx.storage.get("npcLogs"));
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -83,6 +86,10 @@ export class WorldRoom extends DurableObject<Env> {
 
   // Ghost grounds outlive the sockets, so they go to storage (tiny: <= 24 entries).
   private persistAways() {
+    if (this.room.board.changed) {
+      this.room.board.changed = false;
+      void this.ctx.storage.put("npcLogs", this.room.board.snapshot());
+    }
     if (!this.room.awaysChanged) return;
     this.room.awaysChanged = false;
     void this.ctx.storage.put("aways", this.room.aways);

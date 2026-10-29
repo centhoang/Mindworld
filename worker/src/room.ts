@@ -1,4 +1,5 @@
 import { parseGhostMemo, type GhostMemo } from "./memo-dsl";
+import { cleanCap, cleanMem, isNpc, MIND_ACTS, NpcBoard, type Cap, type HostChange, type Npc } from "./npc";
 
 // Live room logic (pure, no Workers APIs, so it is unit-tested directly). One room per world: players
 // who are online see each other's avatar + pet walk around and wave with emotes. Each player gets a slot
@@ -9,6 +10,10 @@ import { parseGhostMemo, type GhostMemo } from "./memo-dsl";
 // Duels: A challenges B (A's memo + genes ride along), B accepts with its own; the room picks the seed and
 // sends both snapshots to both players, whose clients run the same deterministic sim, so they see the same
 // fight. Room chat: short lines, links refused, a few bad words masked, one line per 1.5 s.
+//
+// Minds: each player's pets and the NPC each player hosts (npc.ts) speak through `mind` lines: an activity,
+// a short line, an emote, an invitation. Only the owner speaks for a pet, only the current host for an NPC;
+// one line per mind per 3 s. Hosts send `cap` (model speed, <= 1 / 10 s) as their heartbeat.
 //
 // Billing note (Cloudflare free plan): incoming WebSocket messages count 20:1 as requests, so clients send
 // positions at <= 10 Hz and only while moving; the server drops anything faster.
@@ -22,6 +27,8 @@ const DUEL_COST = 4; // extra tokens per challenge, so nobody spams invites
 export const CORNERS = 24; // ground slots on the ring around the hub (client: world/layout SLOTS)
 export const AWAY_MS = 10 * 60_000;
 export const EMOTES = ["wave", "heart", "dance", "laugh"] as const;
+export const MIND_SAY_GAP_MS = 3000;
+const CAP_GAP_MS = 9000;
 export type Emote = (typeof EMOTES)[number];
 const WORLD_LIMIT = 160; // |x|, |z| bound of the ground ring, with margin
 const RATE_PER_S = 12; // token bucket refill (positions are <= 10 Hz plus the odd emote)
@@ -69,6 +76,8 @@ export interface Peer {
   strikes: number;
   duel?: { id: string; to: string; memo: GhostMemo; genes: Record<string, number>; at: number }; // outgoing challenge
   sayAt?: number; // last chat line, ms
+  cap: Cap; // local model speed: picks NPC hosts
+  capAt?: number; // last cap message, ms
 }
 
 export type PublicPeer = Pick<Peer, "id" | "name" | "genes" | "x" | "z" | "px" | "pz" | "corner" | "seed">;
@@ -83,7 +92,10 @@ export interface Away {
 export type PublicAway = Omit<Away, "until"> & { ttl: number }; // ms left (clients' clocks differ)
 
 export type ServerMsg =
-  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[] }
+  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[]; npcs: Partial<Record<Npc, string>> }
+  | { t: "npcHost"; npc: Npc; host: string | null }
+  | { t: "npcState"; npc: Npc; log: string[] }
+  | { t: "mind"; id: string; who: string; act?: string; say?: string; emote?: Emote; invite?: { act: string; to?: string } }
   | { t: "away"; away: PublicAway }
   | { t: "join"; peer: PublicPeer }
   | { t: "leave"; id: string }
@@ -130,6 +142,8 @@ const coord = (v: unknown): number | null =>
 
 export class Room {
   readonly peers = new Map<string, Peer>();
+  readonly board = new NpcBoard();
+  private readonly mindSayAt = new Map<string, number>(); // "peer:who" -> last line, ms
   aways: Away[] = []; // ghost grounds (the DO stores them: they outlive every socket)
   awaysChanged = false;
   private readonly dirty = new Set<string>(); // peers changed as a side effect (persist their attachment)
@@ -144,7 +158,21 @@ export class Room {
 
   // Rebuild after the Durable Object wakes from hibernation (state lives in each socket's attachment).
   restore(p: Peer) {
+    p.cap ??= { webgpu: false, tps: 0 }; // attachments from before minds
     this.peers.set(p.id, p);
+  }
+
+  // Who hosts which NPC, told to everyone (skipSelf: the sender already knows, e.g. from its welcome); the
+  // new host also gets the NPC's memory log.
+  private hostOuts(changes: HostChange[], skipSelf: boolean): Out[] {
+    const out: Out[] = [];
+    for (const c of changes) {
+      const msg: ServerMsg = { t: "npcHost", npc: c.npc, host: c.host };
+      out.push({ to: "others", msg });
+      if (!skipSelf) out.push({ to: "self", msg });
+      if (c.host) out.push({ to: { id: c.host }, msg: { t: "npcState", npc: c.npc, log: this.board.log(c.npc) } });
+    }
+    return out;
   }
 
   restoreAways(list: unknown): void {
@@ -190,14 +218,17 @@ export class Room {
       tokens: BURST,
       at: now,
       strikes: 0,
+      cap: cleanCap(o.cap),
     };
     const others = [...this.peers.values()].map(publicPeer);
     this.peers.set(id, peer);
+    const elected = this.board.elect(this.peers, now, true);
     return {
       peer,
       out: [
-        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)) } },
+        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)), npcs: this.board.hostsMap() } },
         { to: "others", msg: { t: "join", peer: publicPeer(peer) } },
+        ...this.hostOuts(elected, true),
       ],
     };
   }
@@ -212,6 +243,8 @@ export class Room {
       this.setAways([...this.aways.filter((a) => a.until > now && a.slot !== me.corner), away]);
       out.push({ to: "others", msg: { t: "away", away: publicAway(away, now) } });
     }
+    for (const k of this.mindSayAt.keys()) if (k.startsWith(`${id}:`)) this.mindSayAt.delete(k);
+    out.push(...this.hostOuts(this.board.elect(this.peers, now, true), true));
     for (const p of this.peers.values()) {
       if (p.duel?.to === id) {
         out.push({ to: { id: p.id }, msg: { t: "duelEnd", duel: p.duel.id, reason: "gone" } });
@@ -224,6 +257,14 @@ export class Room {
   }
 
   message(id: string, data: string | ArrayBuffer, now: number): MessageResult {
+    const r = this.handle(id, data, now);
+    // Every message is a chance to notice a host that went quiet (no timers in the room).
+    const elected = this.peers.has(id) ? this.board.elect(this.peers, now) : [];
+    if (elected.length) r.out = [...this.hostOuts(elected, false), ...r.out];
+    return r;
+  }
+
+  private handle(id: string, data: string | ArrayBuffer, now: number): MessageResult {
     const peer = this.peers.get(id);
     if (!peer) return { out: [], close: "unknown" };
     if (!this.take(peer, now)) {
@@ -255,6 +296,14 @@ export class Room {
       peer.sayAt = now;
       return { out: [{ to: "others", msg: { t: "say", id, text } }], changed: true };
     }
+    if (o.t === "mind") return this.mind(peer, o, now);
+    if (o.t === "cap") {
+      if (peer.capAt !== undefined && now - peer.capAt < CAP_GAP_MS) return { out: [] };
+      peer.cap = cleanCap(o);
+      peer.capAt = now;
+      this.board.beat(peer.id, now);
+      return { out: [], changed: true };
+    }
     if (o.t === "duel") return this.challenge(peer, o, now);
     if (o.t === "duelAccept") return this.accept(peer, o, now);
     if (o.t === "duelDecline") {
@@ -266,6 +315,45 @@ export class Room {
       return { out: [{ to: { id: c.id }, msg: { t: "duelEnd", duel, reason: "declined" } }], changed: true };
     }
     return this.strike(peer);
+  }
+
+  private mind(peer: Peer, o: Record<string, unknown>, now: number): MessageResult {
+    const npc = isNpc(o.who) ? o.who : null;
+    const who = npc ?? cleanName(o.who);
+    if (!who || (npc && this.board.hostOf(npc) !== peer.id)) return this.strike(peer);
+    const isAct = (v: unknown): v is string => (MIND_ACTS as readonly unknown[]).includes(v);
+    const msg: Extract<ServerMsg, { t: "mind" }> = { t: "mind", id: peer.id, who };
+    if (o.act !== undefined) {
+      if (!isAct(o.act)) return this.strike(peer);
+      msg.act = o.act;
+    }
+    if (o.emote !== undefined) {
+      if (!(EMOTES as readonly unknown[]).includes(o.emote)) return this.strike(peer);
+      msg.emote = o.emote as Emote;
+    }
+    if (o.invite !== undefined) {
+      const inv = o.invite && typeof o.invite === "object" ? (o.invite as Record<string, unknown>) : {};
+      if (!isAct(inv.act)) return this.strike(peer);
+      const to = cleanName(inv.to);
+      msg.invite = to ? { act: inv.act, to } : { act: inv.act };
+    }
+    if (o.say !== undefined) {
+      const k = `${peer.id}:${who}`;
+      const last = this.mindSayAt.get(k);
+      const text = cleanSay(o.say);
+      if (text && (last === undefined || now - last >= MIND_SAY_GAP_MS)) {
+        msg.say = text;
+        this.mindSayAt.set(k, now);
+      }
+    }
+    if (o.mem !== undefined) {
+      if (!npc) return this.strike(peer);
+      const line = cleanMem(o.mem);
+      if (line) this.board.remember(npc, line);
+    }
+    if (npc) this.board.beat(peer.id, now);
+    const relay = msg.act || msg.say || msg.emote || msg.invite;
+    return { out: relay ? [{ to: "others", msg }] : [], changed: true };
   }
 
   private challenge(peer: Peer, o: Record<string, unknown>, now: number): MessageResult {

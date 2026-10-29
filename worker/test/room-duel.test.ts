@@ -3,7 +3,8 @@ import { cleanSay, DUEL_TTL_MS, Room, SAY_GAP_MS, type Out } from "../src/room";
 
 const memo = { summary: "my name is Alex", rules: [{ if: [{ k: "intent", is: "heavy" }], do: "guard", why: "Alex said so" }] };
 const send = (r: Room, id: string, m: unknown, now = 0) => r.message(id, JSON.stringify(m), now);
-const to = (out: Out[], id: string) => out.filter((o) => typeof o.to === "object" && o.to.id === id).map((o) => o.msg);
+// NPC host traffic (npcHost / npcState) rides along with joins, leaves and quiet hosts: not about duels.
+const to = (out: Out[], id: string) => out.filter((o) => typeof o.to === "object" && o.to.id === id && !o.msg.t.startsWith("npc")).map((o) => o.msg);
 
 function room() {
   let n = 0;
@@ -43,7 +44,7 @@ describe("duels", () => {
   it("expires after the TTL", () => {
     const r = room();
     const { duel } = to(send(r, "a", { t: "duel", to: "b", memo }).out, "b")[0] as { duel: string };
-    expect(send(r, "b", { t: "duelAccept", duel, memo }, DUEL_TTL_MS + 1).out[0]!.msg).toMatchObject({ t: "duelEnd", reason: "gone" });
+    expect(send(r, "b", { t: "duelAccept", duel, memo }, DUEL_TTL_MS + 1).out.find((o) => !o.msg.t.startsWith("npc"))!.msg).toMatchObject({ t: "duelEnd", reason: "gone" });
   });
 
   it("tells the other side when a duelist leaves", () => {
