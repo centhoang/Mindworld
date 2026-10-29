@@ -2,7 +2,10 @@
 // S2: overworld walking, wild encounters and the battle screen, with the pet playing its taught memo rules
 // (memoPolicy decides at once). Coach/teach, chat and the live room join when main.ts is ported.
 
-import { petLook, randomGenes } from "../game/genes";
+import { parseGenes, petLook, randomGenes } from "../game/genes";
+import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
+import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
+import { LiveLink, liveName, roomUrl, SAY_MAX } from "../world/live";
 import { addCoins, coinsFor } from "../game/shop";
 import { load, MAX_TAMED, save } from "../game/save";
 import { addToParty, type PartyMon } from "../game/party";
@@ -135,19 +138,19 @@ const interior = new Interior({
 // capped and cached; scripted lines when offline). The pet stops wandering while you talk.
 const chatForm = document.getElementById("chat") as HTMLFormElement;
 const chatInput = chatForm.querySelector("input")!;
-let chatWith: Wild | "elder" | null = null;
-const chatKey = (w: Wild | "elder") => (w === "elder" ? "elder" : `w${w.id}`);
-function openChat(w: Wild | "elder"): void {
+let chatWith: Wild | "elder" | "room" | null = null;
+const chatKey = (w: Wild | "elder" | "room") => (w === "elder" ? "elder" : w === "room" ? "me" : `w${w.id}`);
+function openChat(w: Wild | "elder" | "room"): void {
   chatWith = w;
-  if (w !== "elder") w.wait = 999;
+  if (typeof w !== "string") w.wait = 999;
   keys.clear();
   chatForm.hidden = false;
   chatInput.value = "";
   chatInput.focus();
-  world.say(chatKey(w), w === "elder" ? "Ah, a visitor. Ask me anything." : "?", 3);
+  if (w !== "room") world.say(chatKey(w), w === "elder" ? "Ah, a visitor. Ask me anything." : "?", 3);
 }
 function closeChat(): void {
-  if (chatWith && chatWith !== "elder") chatWith.wait = 1;
+  if (chatWith && typeof chatWith !== "string") chatWith.wait = 1;
   chatWith = null;
   chatForm.hidden = true;
   chatInput.blur();
@@ -156,6 +159,11 @@ chatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const w = chatWith;
   const line = chatInput.value.trim();
+  if (w === "room") {
+    if (line && live.say(line.slice(0, SAY_MAX))) world.say("me", line.slice(0, SAY_MAX), 5);
+    chatInput.value = "";
+    return;
+  }
   const who = w === "elder" ? "elder" : w && chatWhoFor("wild", w.arch);
   if (!w || !who || !line) return;
   chatInput.value = "";
@@ -299,6 +307,7 @@ function menuKey(k: string): void {
       if (bed >= 0) useBed(bed);
       else if (world.nearElder()) openChat("elder");
       else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
+      else if (!world.atDoor() && live.status === "online" && world.peers.size) openChat("room");
       else if (world.atDoor()) {
         mode = "home";
         keys.clear();
@@ -332,19 +341,51 @@ function side(m: Member): Side {
 
 // A fight against a wild pet, or "boss": The Reader, which reads your memo rules and counters them until
 // it runs out of focus (sim/boss.ts); a dazed boss can be befriended.
-async function fight(foe: Wild | "boss"): Promise<void> {
+const memoKey = () => JSON.stringify([state.memo.rules.map((r) => [r.if, r.do]), state.home]);
+function coolFoe(foe: Wild | "boss" | "ghost"): void {
+  if (foe === "boss") world.boss!.cool = 10;
+  else if (foe === "ghost") world.ghostStone!.cool = 10;
+  else foe.cool = 8;
+}
+
+// Live room: other players online walk around this world (WebSocket Durable Object, ~10 Hz while moving).
+// Room chat goes through the same Say box when nobody is near; duels stay in v1 for now.
+const live = new LiveLink(roomUrl(location), () => ({ name: liveName(state.genes), genes: state.genes, ...world.me }), {
+  welcome: (_id, _corner, peers) => {
+    world.peers.clear();
+    for (const p of peers) world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz);
+  },
+  join: (p) => world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz),
+  leave: (id) => world.peers.delete(id),
+  pos: (id, x, z, px, pz) => world.movePeer(id, x, z, px, pz),
+  emote: () => undefined,
+  status: (s) => {
+    if (s !== "online") world.peers.clear();
+  },
+  say: (id, text) => world.say(`p:${id}`, text, 5),
+});
+live.connect();
+
+async function fight(foe: Wild | "boss" | "ghost"): Promise<void> {
   mode = "battle";
   keys.clear();
-  const w = foe === "boss" ? null : foe;
-  const boss: Boss | null = w ? null : makeBoss(state.memo, pet);
-  const arch = w ? w.arch : BOSS_ARCHETYPE;
+  const w = typeof foe === "string" ? null : foe;
+  const boss: Boss | null = foe === "boss" ? makeBoss(state.memo, pet) : null;
+  // A ghost: another player's shared pet (looks + memo rules) from the Worker, or a bundled one offline.
+  const ghost: Ghost | null = foe === "ghost" ? (await fetchRandomGhost()).ghost : null;
+  const arch = w ? w.arch : ghost ? GHOST_ARCHETYPE : BOSS_ARCHETYPE;
   const tactic = w ? wildMemos[w.arch] : undefined;
-  foeVoice = arch;
-  const def = boss ? boss.def : withTactics(ENEMIES[arch], tactic);
+  foeVoice = ghost ? "ghost" : arch;
+  const def = boss ? boss.def : ghost ? ghostEnemyDef(ghost, pet) : withTactics(ENEMIES[arch], tactic);
   const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def, ...(boss ? { maxTurns: BOSS_TURNS } : {}) });
-  const foeName = boss ? BOSS_STATS.label : arch[0]!.toUpperCase() + arch.slice(1);
-  const foeSprite = boss ? drawMonster(petLook(randomGenes(4242)), 80, "front", BUILDS.bully) : drawMonster(petLook(w!.genes), 64, "front", BUILDS[arch]);
-  await battleView.open({ name: foeName, sprite: foeSprite, maxHp: def.maxHp, level: boss ? 9 : 2 + (w!.id % 3) }, side(activeMember()));
+  const foeName = boss ? BOSS_STATS.label : ghost ? ghost.name.slice(0, 12) : arch[0]!.toUpperCase() + arch.slice(1);
+  const foeSprite = boss
+    ? drawMonster(petLook(randomGenes(4242)), 80, "front", BUILDS.bully)
+    : ghost
+      ? drawMonster(petLook(parseGenes(ghost.genes) ?? randomGenes(1)), 64, "front")
+      : drawMonster(petLook(w!.genes), 64, "front", BUILDS[arch]);
+  await battleView.open({ name: foeName, sprite: foeSprite, maxHp: def.maxHp, level: boss ? 9 : ghost ? 5 : 2 + (w!.id % 3) }, side(activeMember()));
+  if (ghost) await battleView.say(`${ghost.name}'s ghost fights with its owner's memo: ${ghost.memo.rules.length} rule${ghost.memo.rules.length === 1 ? "" : "s"}.`);
   if (boss) {
     await battleView.say(wildMemos.boss?.summary ? `"${wildMemos.boss.summary}"` : `"I can read your pet's memo. Every rule. Surprise me."`);
     await battleView.say(`It loses focus after ${BOSS_FOCUS} reads. A dazed boss might make friends.`);
@@ -368,8 +409,7 @@ async function fight(foe: Wild | "boss"): Promise<void> {
       }
     } else {
       await battleView.say("You slip away safely.");
-      if (w) w.cool = 8;
-      else world.boss!.cool = 8;
+      coolFoe(foe);
       mode = "world";
       return;
     }
@@ -405,13 +445,22 @@ async function fight(foe: Wild | "boss"): Promise<void> {
       world.removeWild(w.id);
       const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
       if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
-    } else world.boss!.cool = 10;
+    } else coolFoe(foe);
   } else {
     if (boss) await battleView.say("Tip: it reads your rules. Teach a plan it can't predict, then come back.");
-    if (w) w.cool = 8; // give the player time to walk away
-    else world.boss!.cool = 10;
+    coolFoe(foe); // give the player time to walk away
   }
-  if (!boss) state.recent = [...state.recent, replay].slice(-8);
+  if (w) state.recent = [...state.recent, replay].slice(-8);
+  // Winning wild fights with a taught memo shares your pet as a ghost others can fight (rules only).
+  if (w && replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== memoKey()) {
+    void shareGhost(pet.name, state.genes, state.memo, state.home).then((r) => {
+      if (!r.ok) return;
+      state.shared = memoKey();
+      state.mine = [...(state.mine ?? []), r.id].slice(-20);
+      save(state);
+      toast = { text: `${pet.name}'s ghost is out there now: other players can fight its memo.`, t: 4 };
+    });
+  }
   state.steps = { ...state.steps, fought: true, ...(boss && replay.outcome === "win" ? { boss: true } : {}) };
   save(state);
   mode = "world";
@@ -430,6 +479,7 @@ function update(dt: number, t: number): void {
   else if (mode === "world") {
     const met = world.update(dt, menu ? new Set<string>() : keys);
     petChatter(dt);
+    live.tick(performance.now(), world.me);
     if ((farmTickAt -= dt) <= 0) {
       farmTickAt = 1;
       const next = tick(state.farm!, Date.now());

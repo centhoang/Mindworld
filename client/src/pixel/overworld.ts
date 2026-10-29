@@ -66,6 +66,10 @@ export class Overworld {
   // press E by the Elder to talk.
   boss: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
   elder: { pos: Vec; sprite: HTMLCanvasElement } | null = null;
+  // The ghost stone on the event island: touch it to fight a random shared ghost.
+  ghostStone: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
+  // Other players online (live room): their walker and pet, eased toward the last position received.
+  readonly peers = new Map<string, Peer>();
   // Speech bubbles: "pet", "r<i>" (resident i) or "w<id>" (wild pet) -> text and seconds left.
   private readonly bubbles = new Map<string, { text: string; t: number }>();
 
@@ -78,6 +82,8 @@ export class Overworld {
     this.placeTrees();
     const bossIsle = this.world.platforms.find((p) => p.kind === "boss");
     if (bossIsle) this.boss = { pos: { x: bossIsle.x, z: bossIsle.z - 1 }, sprite: drawMonster(petLook(randomGenes(4242)), 40, "front", BUILDS.bully), cool: 0 };
+    const eventIsle = this.world.platforms.find((p) => p.kind === "event");
+    if (eventIsle) this.ghostStone = { pos: { x: eventIsle.x, z: eventIsle.z - 1 }, sprite: ghostSprite(), cool: 0 };
     const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
     if (npcIsle) this.elder = { pos: { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
     this.player = { x: home.x + 0.5, z: home.z + 3.5 };
@@ -235,7 +241,20 @@ export class Overworld {
   };
 
   // Returns the wild monster the player just bumped into, if any.
-  update(dt: number, keys: ReadonlySet<string>): Wild | "boss" | null {
+  addPeer(id: string, name: string, genes: Genes, x: number, z: number, px: number, pz: number): void {
+    this.peers.set(id, { name, pos: { x, z }, pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front") });
+  }
+
+  movePeer(id: string, x: number, z: number, px: number, pz: number): void {
+    const p = this.peers.get(id);
+    if (p) p.to = { x, z, px, pz };
+  }
+
+  get me(): { x: number; z: number; px: number; pz: number } {
+    return { x: this.player.x, z: this.player.z, px: this.pet.x, pz: this.pet.z };
+  }
+
+  update(dt: number, keys: ReadonlySet<string>): Wild | "boss" | "ghost" | null {
     const d = keyDir(keys);
     this.moving = d.x !== 0 || d.z !== 0;
     if (this.moving) {
@@ -281,6 +300,18 @@ export class Overworld {
       }
       if (!met && !w.cool && Math.hypot(w.pos.x - this.player.x, w.pos.z - this.player.z) < MEET_DIST) met = w;
     }
+    const k8 = 1 - Math.exp(-dt * 8);
+    for (const p of this.peers.values()) {
+      p.pos.x += (p.to.x - p.pos.x) * k8;
+      p.pos.z += (p.to.z - p.pos.z) * k8;
+      p.pet.x += (p.to.px - p.pet.x) * k8;
+      p.pet.z += (p.to.pz - p.pet.z) * k8;
+    }
+    const gs = this.ghostStone;
+    if (gs) {
+      gs.cool = Math.max(0, gs.cool - dt);
+      if (!met && !gs.cool && Math.hypot(gs.pos.x - this.player.x, gs.pos.z - this.player.z) < MEET_DIST + 0.3) return "ghost";
+    }
     const b = this.boss;
     if (b) {
       b.cool = Math.max(0, b.cool - dt);
@@ -320,7 +351,19 @@ export class Overworld {
     const pf = this.moving ? Math.floor(this.walkT * 8) % 2 : 0;
     items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px - 8, py - 22, 16, 24) });
     const half = OVERWORLD_MON / 2;
-    for (const npc of [this.boss, this.elder]) {
+    for (const p of this.peers.values()) {
+      const [ax, ay] = toScreen(p.pos.x, p.pos.z);
+      const [bx, by] = toScreen(p.pet.x, p.pet.z);
+      items.push({ z: p.pos.z, draw: () => {
+        g.globalAlpha = 0.85;
+        g.drawImage(this.playerSprite.img, 0, 0, 16, 24, ax - 8, ay - 22, 16, 24);
+        g.globalAlpha = 1;
+        const tag = p.name.slice(0, 10).toUpperCase();
+        drawText(g, tag, ax - (tag.length * GLYPH) / 2, ay - 32, PAL.panel);
+      } });
+      items.push({ z: p.pet.z, draw: () => g.drawImage(p.sprite, bx - half, by - OVERWORLD_MON + 2) });
+    }
+    for (const npc of [this.boss, this.elder, this.ghostStone]) {
       if (!npc) continue;
       const [nx, ny] = toScreen(npc.pos.x, npc.pos.z);
       const s = npc.sprite;
@@ -351,7 +394,7 @@ export class Overworld {
     for (const it of items) it.draw();
 
     for (const [who, b] of this.bubbles) {
-      const pos = who === "pet" ? this.pet : who === "elder" ? this.elder?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
+      const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" ? this.elder?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
       if (!pos) continue;
       const [bx, by] = toScreen(pos.x, pos.z);
       bubble(g, b.text, bx, by - OVERWORLD_MON - 4, sw);
@@ -393,4 +436,35 @@ function bubble(g: CanvasRenderingContext2D, text: string, cx: number, bottom: n
   g.fillStyle = PAL.wood;
   g.fillRect(cx - 1, y + h + 1, 2, 2);
   lines.forEach((l, i) => drawText(g, l, x + 6, y + 5 + i * 10));
+}
+
+interface Peer {
+  name: string;
+  pos: Vec;
+  pet: Vec;
+  to: { x: number; z: number; px: number; pz: number };
+  sprite: HTMLCanvasElement;
+}
+
+// The ghost stone: a pale standing stone with a teal wisp (palette only).
+function ghostSprite(): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = 20;
+  c.height = 28;
+  const g = c.getContext("2d")!;
+  const r = (x: number, y: number, w: number, h: number, col: string) => {
+    g.fillStyle = col;
+    g.fillRect(x, y, w, h);
+  };
+  r(3, 10, 14, 18, PAL.ink);
+  r(4, 11, 12, 16, PAL.stone);
+  r(4, 11, 4, 16, PAL.stoneL);
+  r(5, 9, 10, 2, PAL.ink);
+  r(6, 8, 8, 1, PAL.ink);
+  r(8, 16, 4, 4, PAL.teal);
+  r(9, 17, 2, 2, PAL.waterL);
+  r(7, 1, 6, 5, PAL.waterL);
+  r(8, 0, 4, 1, PAL.foam);
+  r(9, 6, 2, 2, PAL.foam);
+  return c;
 }
