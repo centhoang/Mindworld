@@ -12,12 +12,10 @@
     "eval": "tsx src/eval/cli.ts"
   },
   "dependencies": {
-    "@mlc-ai/web-llm": "^0.2.86",
-    "three": "^0.186.1"
+    "@mlc-ai/web-llm": "^0.2.86"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "@types/three": "^0.186.0",
     "@webgpu/types": "^0.1.74",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

@@ -272,6 +272,12 @@ describe("static assets", () => {
     expect(await res.text()).toContain("asset");
   });
 
+  it("sends the old pixel page to the main page", async () => {
+    const res = await harness().call("/pixel.html");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toMatch(/\/$/);
+  });
+
   it("returns JSON 404 for unknown API routes", async () => {
     const h = harness();
     expect((await h.call("/api/nope")).status).toBe(404);

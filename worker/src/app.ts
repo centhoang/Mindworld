@@ -113,6 +113,8 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     return fail(404, "not_found");
   }
 
+  // The pixel build used to live at /pixel.html; it is the main page now.
+  if (path === "/pixel.html" || path === "/pixel") return Response.redirect(new URL("/", request.url).toString(), 301);
   return deps.assets ? deps.assets.fetch(request) : fail(404, "not_found");
 }
 

@@ -1,6 +1,5 @@
-// Entry for the pixel (v2) build: a low-res game canvas, the scene stack and the CRT presenter.
-// S2: overworld walking, wild encounters and the battle screen, with the pet playing its taught memo rules
-// (memoPolicy decides at once). Coach/teach, chat and the live room join when main.ts is ported.
+// The game's entry (index.html): a low-res canvas, the scene stack (overworld, battle, interior, teach) and
+// the CRT presenter, wired to the save, the pet brain, Meta-model chat/coach and the live room.
 
 import { parseGenes, petLook, randomGenes } from "../game/genes";
 import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
@@ -233,7 +232,7 @@ function crateKey(k: string): void {
   } else crate = null;
   save(state);
 }
-let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. E: use/talk  M: mute  B: brain  P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
+let toast: { text: string; who?: string; t: number } | null = { text: "WASD: walk. E: use/talk. T: teach. P: pets. B: brain. G: goals. M: mute. C: CRT.", who: "Hint", t: 7 };
 // First visit: the hatch line, then the control hints one after another (each 6 s, Esc skips), once.
 const hintQueue: { text: string; who?: string; t: number }[] = [];
 if (!state.onboard?.seen) {

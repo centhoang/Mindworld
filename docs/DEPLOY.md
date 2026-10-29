@@ -12,7 +12,7 @@ npm run dev          # wrangler dev --env-file ../.env  -> http://127.0.0.1:8787
 npm run dev:mock     # LLM_MOCK=1: no keys, no spend
 npm test             # unit tests (no network)
 ```
-Client dev with hot reload: `cd client && npm run dev` (proxies /api to :8787). Spike B page: `/spike-b.html` (served as `/spike-b` by the Worker).
+Client dev with hot reload: `cd client && npm run dev` (proxies /api to :8787). The game is `/` (client/index.html; `/pixel.html` redirects there). Spike B page: `/spike-b.html` (served as `/spike-b` by the Worker).
 
 ## First deploy (needs `wrangler login`; the user's Cloudflare account)
 1. `cd worker && npx wrangler secret put BASETEN_API_KEY` and `... META_API_KEY` (paste from `.env`; never commit). Same for `MODAL_PROXY_TOKEN` and `MODAL_BASE_URL` (the Modal Spark Open provider stays disabled until both are set).

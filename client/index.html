@@ -6,236 +6,42 @@
     <title>Mindworld</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=block" rel="stylesheet" />
     <style>
-      :root {
-        --bg: #cfe9f7; --panel: rgba(255, 250, 242, 0.9); --line: #ecd6bd; --text: #4a3428; --dim: #8f7768;
-        --accent: #ff9f6e; --good: #5cbf74; --bad: #ef6f6f; --blue: #5f9fe6; --btn: #fff4e6; --track: #f1e2d0;
-      }
-      * { box-sizing: border-box; }
-      html, body { margin: 0; height: 100%; background: linear-gradient(#a9dcf5, #fde4d6) fixed var(--bg); color: var(--text);
-        font: 500 14px/1.45 "Nunito", "Trebuchet MS", system-ui, sans-serif; }
-      #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-      header { position: fixed; top: 0; left: 0; right: 0; display: flex; gap: 8px; align-items: center; padding: 10px 14px; flex-wrap: wrap; pointer-events: none; }
-      header h1 { font-size: 22px; font-weight: 800; margin: 0 8px 0 0; color: #fff; letter-spacing: 0.01em;
-        text-shadow: 0 2px 0 #e98f6a, 0 3px 10px rgba(120, 70, 40, 0.35); }
-      header > * { pointer-events: auto; }
-      .chip { border: 2px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 11px; font-size: 12px; color: var(--dim);
-        box-shadow: 0 2px 6px rgba(120, 80, 50, 0.12); }
-      .chip b { color: var(--text); font-weight: 600; }
-      .panel { position: fixed; top: 52px; width: 330px; max-height: calc(100% - 100px); overflow: auto; background: var(--panel);
-        border: 2px solid var(--line); border-radius: 18px; padding: 14px; backdrop-filter: blur(6px);
-        box-shadow: 0 6px 20px rgba(120, 80, 50, 0.16); }
-      #fight { left: 12px; }
-      #coach { right: 12px; }
-      h2 { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #c47a52; margin: 14px 0 6px; }
-      h2:first-child { margin-top: 0; }
-      button, select, textarea { font: inherit; color: var(--text); background: var(--btn); border: 2px solid var(--line); border-radius: 12px; padding: 6px 11px; }
-      button { cursor: pointer; font-weight: 700; box-shadow: 0 2px 0 var(--line); transition: transform 0.08s, box-shadow 0.08s; }
-      button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 0 var(--line); }
-      button:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 var(--line); }
-      button.primary { background: var(--accent); color: #fff; border-color: #f08a57; box-shadow: 0 2px 0 #e0784a; font-weight: 800; }
-      button.recording { background: #c0392b; color: #fff; border-color: #c0392b; }
-      button:disabled { opacity: 0.5; cursor: default; }
-      textarea { width: 100%; resize: vertical; min-height: 56px; }
-      .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-      .bar { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; flex: 1; }
-      .bar > i { display: block; height: 100%; background: var(--good); transition: width 0.3s; }
-      .hp { display: grid; grid-template-columns: 70px 1fr 40px; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
-      #log { font-size: 12px; max-height: 210px; overflow: auto; border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
-      #log div { padding: 2px 0; border-bottom: 1px dashed var(--line); }
-      .tag { font-size: 10px; padding: 0 5px; border-radius: 4px; margin-left: 4px; }
-      .tag.rule { background: #fff0c2; color: #a8741a; } .tag.model { background: #dcecff; color: #3f7fc4; } .tag.reflex { background: #efe6dc; color: var(--dim); } .tag.boss { background: #efdcff; color: #8a4fc0; }
-      .dim { color: var(--dim); font-size: 12px; }
-      .steps { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; padding: 0; margin: 0 0 6px; font-size: 11px; }
-      .steps li { border: 2px solid var(--line); border-radius: 10px; padding: 1px 7px; color: var(--dim); }
-      .steps li.done { color: var(--good); border-color: var(--good); }
-      .steps li.now { color: inherit; border-color: var(--blue); }
-      .slots { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 4px 0; }
-      .slots button { padding: 4px 0; font-size: 16px; min-height: 32px; }
-      button.chip { box-shadow: none; font-weight: 600; cursor: pointer; }
-      #shop { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(300px, 92vw); margin: 0; z-index: 5; }
-      #shop[hidden] { display: none; }
-      .shopRow { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); }
-      .shopIcon { font-size: 20px; }
-      .slots.porch { grid-template-columns: repeat(4, 1fr); max-width: 50%; }
-      #decorBox { border-radius: 14px; transition: box-shadow 0.3s; }
-      #decorBox.flash { animation: flash 1.6s ease-out; }
-      @keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
-      .card { border: 2px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.5); padding: 6px 8px; margin-top: 6px; font-size: 12px; }
-      .card b { font-size: 13px; }
-      ol#memo { padding-left: 18px; margin: 4px 0; font-size: 12px; }
-      ol#memo li { margin-bottom: 4px; }
-      .proof { display: grid; grid-template-columns: 60px 1fr 74px; gap: 6px; align-items: center; font-size: 12px; margin: 3px 0; }
-      .proof .bar > i.before { background: #c9b4a3; }
-      .big { font-size: 22px; font-weight: 700; color: var(--good); }
-      .bubble { position: fixed; transform: translate(-50%, -100%); background: #fff; color: var(--text); border: 2px solid var(--line); border-radius: 14px; padding: 4px 10px;
-        box-shadow: 0 3px 8px rgba(120, 80, 50, 0.18); font-weight: 700;
-        font-size: 13px; max-width: 220px; pointer-events: none; opacity: 0; transition: opacity 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .bubble.show { opacity: 1; }
-      #banner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; font-weight: 800; color: #fff; text-shadow: 0 3px 0 #e98f6a, 0 4px 14px rgba(120, 70, 40, 0.45); pointer-events: none; opacity: 0; transition: opacity 0.3s; }
-      #banner.show { opacity: 1; }
-      .hint { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 2px solid var(--line); font-weight: 700;
-        box-shadow: 0 3px 10px rgba(120, 80, 50, 0.16);
-        border-radius: 999px; padding: 5px 14px; font-size: 13px; pointer-events: none; white-space: nowrap; }
-      .chatbar { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
-        background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 6px 8px; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.16); width: min(420px, calc(100vw - 32px)); }
-      .chatbar[hidden] { display: none; }
-      .emotes { display: inline-flex; gap: 4px; }
-      .emotes[hidden] { display: none; }
-      .emotes .chip { padding: 2px 7px; color: inherit; }
-      .chatbar input { flex: 1; min-width: 0; border: 2px solid var(--line); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; }
-      .roomlog { flex-basis: 100%; font-size: 12px; max-height: 76px; overflow: hidden; line-height: 1.35; padding: 0 4px; }
-      .roomlog[hidden] { display: none; }
-      .invite { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; gap: 8px; align-items: center;
-        background: var(--panel); border: 2px solid var(--line); border-radius: 16px; padding: 8px 12px; font-weight: 700; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.2); }
-      .invite[hidden] { display: none; }
-      .chatnote { flex-basis: 100%; text-align: center; font-size: 10.5px; opacity: 0.65; }
-      .overlay { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); background: var(--panel); border: 2px solid var(--line); border-radius: 20px;
-        box-shadow: 0 8px 26px rgba(120, 80, 50, 0.25); padding: 14px 16px; width: min(360px, calc(100vw - 32px)); }
-      #hatch[hidden], #hints[hidden], #goals[hidden], #interactBtn[hidden] { display: none; }
-      #hatch { top: 50%; transform: translate(-50%, -50%); text-align: center; cursor: pointer; padding: 22px 16px; }
-      #hatch .egg { font-size: 64px; display: inline-block; animation: wobble 0.5s ease-in-out infinite alternate; transform-origin: 50% 90%; }
-      #hatch.hatched .egg { animation: pop 0.45s ease-out; }
-      #hatch .hatchText { font-size: 17px; margin-top: 6px; }
-      @keyframes wobble { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
-      @keyframes pop { 0% { transform: scale(0.4); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
-      #hints { bottom: 72px; display: grid; grid-template-columns: 44px 1fr; gap: 6px 10px; align-items: start; }
-      #hints .hintIcon { font-size: 34px; line-height: 1; }
-      #hints .hintBody b { font-size: 16px; }
-      #hints .hintNav { grid-column: 1 / -1; justify-content: flex-end; }
-      #hints .hintNav .dim { margin-right: auto; }
-      #goals { position: fixed; top: 52px; left: 12px; width: 230px; z-index: 4; padding: 8px 10px; font-size: 12px; background: var(--panel);
-        border: 2px solid var(--line); border-radius: 14px; box-shadow: 0 3px 10px rgba(120, 80, 50, 0.16); }
-      #goals .goal { padding: 3px 0; border-top: 1px dashed var(--line); }
-      #goals .goal.done { color: var(--good); }
-      #goals .goal .dim { font-size: 11px; padding-left: 22px; }
-      #goals button.chip { padding: 0 7px; }
-      #interactBtn { position: fixed; right: 16px; bottom: 18px; z-index: 6; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        padding: 12px 18px; border-radius: 999px; font-size: 15px; display: none; }
-      @media (pointer: coarse), (max-width: 1100px) { #interactBtn:not([hidden]) { display: block; } }
-      .panel[hidden] { display: none; }
-      #dock { position: fixed; left: 14px; bottom: 14px; display: flex; gap: 10px; z-index: 6; }
-      #dock button { width: 50px; height: 50px; border-radius: 50%; padding: 0; font-size: 22px; background: var(--panel); box-shadow: 0 3px 10px rgba(120, 80, 50, 0.2); }
-      #dock button.on { background: var(--accent); border-color: #f08a57; }
-      footer { font-size: 11px; margin-top: 12px; }
-      @media (max-width: 760px) {
-        .panel { left: 8px !important; right: 8px !important; width: auto; top: auto; bottom: 74px; max-height: 58vh; }
-        .bubble { font-size: 12px; max-width: 160px; }
-        #goals { left: 8px; }
-      }
+      html, body { margin: 0; height: 100%; background: #08080c; overflow: hidden; }
+      #screen { position: fixed; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; }
+      #crt { position: fixed; right: 10px; bottom: 10px; font: 10px "Press Start 2P", monospace; color: #f7dfc8; background: #45301f;
+        border: 2px solid #c58757; padding: 6px 8px; cursor: pointer; opacity: 0.8; }
+      #crt:hover { opacity: 1; }
+      #teach { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 760px); display: flex; gap: 6px; flex-wrap: wrap;
+        font: 11px "Press Start 2P", monospace; }
+      #teach[hidden], #chat[hidden] { display: none; }
+      #chat { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 640px); display: flex; gap: 6px;
+        font: 11px "Press Start 2P", monospace; }
+      #chat input { flex: 1 1 auto; font: inherit; padding: 9px 10px; color: #39463F; background: #FFF3D8; border: 3px solid #795849; outline: none; }
+      #chat button { font: inherit; padding: 8px 10px; color: #FFF3D8; background: #A57954; border: 3px solid #795849; cursor: pointer; }
+      #teach input { flex: 1 1 260px; font: inherit; padding: 9px 10px; color: #141820; background: #f7dfc8; border: 3px solid #45301f; outline: none; }
+      #teach input:focus { border-color: #a85f2a; }
+      #teach button { font: inherit; padding: 8px 10px; color: #f7dfc8; background: #a85f2a; border: 3px solid #45301f; cursor: pointer; }
+      #teach button[data-act=close] { background: #7a4628; }
+      #teach button:disabled, #teach input:disabled { opacity: 0.55; cursor: default; }
     </style>
   </head>
   <body>
-    <canvas id="stage"></canvas>
-    <header>
-      <h1>Mindworld</h1>
-      <button id="helpBtn" class="chip" type="button" title="How to play" aria-label="How to play">?</button>
-      <span class="chip" title="Coins from wild wins and befriends">🪙 <b id="coins">0</b></span>
-      <button id="mute" class="chip" type="button" hidden title="Voices">🔊 Voices on</button>
-      <span id="liveChip" class="chip" title="Other players in this world right now" hidden>🟢 <b id="liveCount">0</b> online</span>
-      <span id="emotes" class="emotes" hidden>
-        <button class="chip" data-emote="wave" title="Wave (1)">👋</button><button class="chip" data-emote="heart" title="Heart (2)">❤️</button><button class="chip" data-emote="dance" title="Dance (3)">🎵</button><button class="chip" data-emote="laugh" title="Laugh (4)">😄</button>
-        <button id="duelBtn" class="chip" type="button" hidden title="Challenge this player's pet to a live duel"></button>
-      </span>
-    </header>
-    <section id="shop" class="panel" hidden aria-label="Market stall">
-      <h2>Market stall</h2>
-      <div id="shopList"></div>
-      <div id="shopNote" class="dim"></div>
-      <div class="row" style="justify-content:flex-end;margin-top:8px"><button id="shopClose">Close</button></div>
-    </section>
-    <div id="bubblePet" class="bubble"></div>
-    <div id="bubbleEnemy" class="bubble"></div>
-    <div id="banner"></div>
-    <div id="hint" class="hint" hidden></div>
-    <div id="hatch" class="overlay" hidden role="dialog" aria-label="Your pet hatches"></div>
-    <div id="hints" class="overlay" hidden role="dialog" aria-label="How to play"></div>
-    <aside id="goals" aria-label="Goals" hidden></aside>
-    <nav id="dock" aria-label="Menus">
-      <button id="dockFight" type="button" title="Fights and log" aria-label="Fights">⚔️</button>
-      <button id="dockBrain" type="button" title="Teach your pet" aria-label="Teach">🧠</button>
-      <button id="dockChat" type="button" title="Chat" aria-label="Chat">💬</button>
-    </nav>
-    <button id="interactBtn" class="primary" type="button" hidden></button>
-    <div id="duelInvite" class="invite" hidden role="dialog" aria-live="polite">
-      <span id="duelInviteText"></span>
-      <button id="duelYes" type="button">Accept</button>
-      <button id="duelNo" type="button">Decline</button>
-    </div>
-    <form id="chatBar" class="chatbar" hidden autocomplete="off">
-      <div id="roomLog" class="roomlog" hidden></div>
-      <input id="chatInput" maxlength="140" aria-label="Say something" />
-      <button id="chatSay" type="submit">Say</button>
-      <div id="chatNote" class="chatnote">Replies by Muse Spark (Meta AI). Please don't share personal info.</div>
+    <canvas id="screen"></canvas>
+    <form id="teach" hidden autocomplete="off">
+      <input maxlength="300" placeholder="e.g. guard when it winds up a heavy hit" aria-label="Teach your pet" />
+      <button type="submit">Teach</button>
+      <button type="button" data-act="speak" hidden>Speak</button>
+      <button type="button" data-act="review">Review fights</button>
+      <button type="button" data-act="close">Close</button>
     </form>
-
-    <section id="fight" class="panel" hidden>
-      <h2>Fight</h2>
-      <ol id="steps" class="steps" aria-label="First steps"></ol>
-      <div class="row">
-        <select id="enemy" aria-label="Opponent">
-          <option value="random">Random opponent</option>
-          <option value="brute">Brute (big, heavy hits)</option>
-          <option value="skitter">Skitter (fast, small)</option>
-          <option value="turtle">Turtle (guards a lot)</option>
-          <option value="pal">Pal (friendly)</option>
-          <option value="bully">Bully (picks on the weak)</option>
-          <option value="ghost">Another player's ghost</option>
-          <option value="boss">Boss: The Reader (reads your memo)</option>
-        </select>
-        <button id="go" class="primary">Fight!</button>
-        <button id="speed" title="Playback speed">1x</button>
-      </div>
-      <div class="hp"><span id="petName">Mochi</span><div class="bar"><i id="petHp" style="width:100%"></i></div><span id="petHpTxt">30</span></div>
-      <div class="hp"><span id="enemyName">-</span><div class="bar"><i id="enemyHp" style="width:100%"></i></div><span id="enemyHpTxt">-</span></div>
-      <div class="row"><button id="shareGhost" title="Upload your pet's memo rules so other players can fight it">Share my pet as a ghost</button><span id="ghostStatus" class="dim"></span></div>
-      <div id="ghostCard" class="card" hidden></div>
-      <div id="log"><div class="dim">Pick an opponent and press Fight. Your pet decides on its own, on your device.</div></div>
-      <h2>Pet brain</h2>
-      <div class="row">
-        <button id="loadWeb">Load Llama 3.2 1B in browser</button>
-        <button id="probeNative" title="Power mode: a llama.cpp server with Llama 3.2 3B on this computer">Power mode</button>
-      </div>
-      <div id="brainStatus" class="dim">Rules only: the pet follows its memo and reflexes. Loading a local model adds personality and voice.</div>
-      <div id="decorBox">
-        <h2>Decorate your corner</h2>
-        <div class="dim">Plot</div>
-        <div id="homeSlots" class="slots" aria-label="Decor spots around the plot"></div>
-        <div class="dim">A-frame porch</div>
-        <div id="porchSlots" class="slots porch" aria-label="Decor spots on the porch"></div>
-        <div id="homeInfo" class="dim">Click a spot to place or change decor. Your shared ghost carries your plot with it.</div>
-      </div>
-    </section>
-
-    <section id="coach" class="panel" hidden>
-      <div class="dim">Instinct: <b id="brain">rules only</b> · Coach: <b id="coachSrc">Muse Spark</b></div>
-      <h2>Memo (what your pet has learned)</h2>
-      <div id="memoSummary" class="dim"></div>
-      <ol id="memo"></ol>
-      <div id="memoEmpty" class="dim">Empty. Your pet fights on instinct: attack, run when badly hurt.</div>
-      <h2>Teach</h2>
-      <textarea id="teachText" maxlength="300" placeholder="e.g. When the big one winds up a heavy hit, guard. Make friends with hurt enemies."></textarea>
-      <div class="row" style="margin-top:6px">
-        <button id="teach" class="primary">Teach</button>
-        <button id="speak" title="Say the lesson out loud; Meta's Muse Voice Transcribe writes it down, then your pet is taught" hidden>Speak</button>
-        <button id="reflect" title="The coach reviews your recent fights and updates the memo">Learn from my fights</button>
-        <button id="reset" title="Forget everything">Reset</button>
-      </div>
-      <label id="freeCoachRow" class="dim" hidden><input type="checkbox" id="freeCoach"> Free coach: teach with the Llama on this computer (tuned from Muse Spark, no cloud)</label>
-      <div id="coachStatus" class="dim"></div>
-      <div id="proofBox" hidden>
-        <h2>Proof (200 fresh fights per opponent)</h2>
-        <div class="row" style="justify-content:space-between"><span>Win rate</span><span class="big" id="proofDelta"></span></div>
-        <div class="proof"><span>Before</span><div class="bar"><i class="before" id="pBefore"></i></div><span id="pBeforeTxt"></span></div>
-        <div class="proof"><span>After</span><div class="bar"><i id="pAfter"></i></div><span id="pAfterTxt"></span></div>
-        <div id="proofPer"></div>
-        <div id="proofStats" class="dim"></div>
-        <button id="watchProof" style="margin-top:6px">Watch a fight it now wins</button>
-      </div>
-      <footer class="dim">Your pet's decisions run on your device. Teaching text (and your voice, if you press Speak) is sent to Meta models through our server; free-tier content may be used by Meta, so don't type or say personal info. The mic is only on while the Speak button says Stop. Our host (Cloudflare) counts anonymous page views.</footer>
-    </section>
-
-    <script type="module" src="/src/main.ts"></script>
+    <form id="chat" hidden autocomplete="off">
+      <input maxlength="140" placeholder="Say something..." aria-label="Talk" />
+      <button type="submit">Say</button>
+      <button type="button" data-act="close">Bye</button>
+    </form>
+    <button id="crt" type="button">CRT on</button>
+    <script type="module" src="/src/pixel/main.ts"></script>
   </body>
 </html>
