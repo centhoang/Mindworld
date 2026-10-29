@@ -198,7 +198,7 @@ function petChatter(dt: number): void {
   });
 }
 
-// The shipping crate inside: ship the basket for coins, or buy seeds.
+// The shipping crate inside (and the market stall outside): ship the basket for coins, or buy seeds.
 let crate: { cursor: number } | null = null;
 const crateRows = (): MenuRow[] => {
   const f = state.farm!;
@@ -283,7 +283,10 @@ window.addEventListener("keydown", (e) => {
   }
   if (mode === "battle" && battleView.choosing) battleView.cmdKey(k);
   else if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
-  if (mode === "world" && !e.repeat) menuKey(k);
+  if (mode === "world" && !e.repeat) {
+    if (crate) crateKey(k);
+    else menuKey(k);
+  }
   if (mode === "home" && !e.repeat) {
     if (crate) crateKey(k);
     else interior.key(k);
@@ -309,6 +312,7 @@ function menuKey(k: string): void {
       const bed = world.bedNear();
       if (bed >= 0) useBed(bed);
       else if (world.nearElder()) openChat("elder");
+      else if (world.nearStall()) crate = { cursor: 0 };
       else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
       else if (!world.atDoor() && live.status === "online" && world.peers.size) openChat("room");
       else if (world.atDoor()) {
@@ -523,7 +527,7 @@ function frame(now: number): void {
 function update(dt: number, t: number): void {
   if (teach.open) teach.draw(g, low.width, low.height, t);
   else if (mode === "world") {
-    const met = world.update(dt, menu ? new Set<string>() : keys);
+    const met = world.update(dt, menu || crate ? new Set<string>() : keys);
     petChatter(dt);
     live.tick(performance.now(), world.me);
     if ((farmTickAt -= dt) <= 0) {
@@ -540,7 +544,8 @@ function update(dt: number, t: number): void {
       const a = state.active ?? 0;
       const rows: MenuRow[] = members().map((m, i) => ({ label: m.name, note: i === a ? "with you" : "at home", icon: icon(m) }));
       drawMenu(g, low.width, low.height, "Your pets", rows, menu.cursor, t, "Enter: take along  P: close");
-    } else if (toast) {
+    } else if (crate) drawMenu(g, low.width, low.height, `Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
+    else if (toast) {
       toast.t -= dt;
       drawDialogue(g, low.width, low.height, toast.text, toast.who);
       if (toast.t <= 0) toast = null;

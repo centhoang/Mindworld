@@ -7,7 +7,7 @@ import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
-import { drawCrop, drawMapTile, drawProp, HOUSE, img, makePlayer, PAL, TREE, type Sprite } from "./art";
+import { drawCrop, drawMapTile, drawProp, hasArt, HOUSE, img, MARKET_STALL, makePlayer, PAL, TREE, type Sprite } from "./art";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
@@ -69,6 +69,8 @@ export class Overworld {
   // press E by the Elder to talk.
   boss: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
   elder: { pos: Vec; sprite: HTMLCanvasElement } | null = null;
+  // The market stall on the market island: E there opens the same buy/sell menu as the crate at home.
+  stall: Vec | null = null;
   // The ghost stone on the event island: touch it to fight a random shared ghost.
   ghostStone: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
   // Other players online (live room): their walker and pet, eased toward the last position received.
@@ -82,6 +84,8 @@ export class Overworld {
     const home = this.world.platforms.find((p) => p.kind === "home")!;
     this.house = { x: home.x, z: home.z - 2.5 };
     this.beds = Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) }));
+    const market = this.world.platforms.find((p) => p.kind === "market");
+    if (market) this.stall = { x: market.x, z: market.z - 1 };
     this.placeTrees();
     const bossIsle = this.world.platforms.find((p) => p.kind === "boss");
     if (bossIsle) this.boss = { pos: { x: bossIsle.x, z: bossIsle.z - 1 }, sprite: drawMonster(petLook(randomGenes(4242)), 40, "front", BUILDS.bully), cool: 0 };
@@ -113,6 +117,7 @@ export class Overworld {
         if (this.nearPath(i, j)) continue;
         if (this.trees.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5)) continue;
         if (Math.abs(x - this.house.x) < 3.5 && Math.abs(z - this.house.z + 1) < 3.5) continue;
+        if (this.stall && Math.abs(x - this.stall.x) < 3.5 && Math.abs(z - this.stall.z + 1) < 3.5) continue;
         if (this.beds.some((b) => Math.abs(b.x + 0.5 - x) < 2.5 && Math.abs(b.z + 0.5 - z) < 2.5)) continue;
         this.trees.push({ x, z });
         this.treeTiles.add(j * m.w + i);
@@ -181,6 +186,11 @@ export class Overworld {
     return !!this.elder && Math.hypot(this.elder.pos.x - this.player.x, this.elder.pos.z - this.player.z) < 2.2;
   }
 
+  nearStall(): boolean {
+    const st = this.stall; // anywhere along its 3-tile front
+    return !!st && Math.abs(this.player.x - st.x) < 2.2 && this.player.z > st.z - 0.5 && this.player.z < st.z + 2.6;
+  }
+
   nearHome(): boolean {
     return Math.hypot(this.player.x - this.house.x, this.player.z - this.house.z) < 9;
   }
@@ -234,6 +244,7 @@ export class Overworld {
   readonly canWalk = (x: number, z: number): boolean => {
     if (!tileWalkable(this.map, x, z)) return false;
     if (Math.abs(x - this.house.x) < 1.6 && z < this.house.z + 0.2 && z > this.house.z - 2.2) return false;
+    if (this.stall && Math.abs(x - this.stall.x) < 1.4 && z < this.stall.z + 0.2 && z > this.stall.z - 1.4) return false;
     if (this.beds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
     const i = Math.floor(x - this.map.ox);
     const j = Math.floor(z - this.map.oz);
@@ -363,7 +374,17 @@ export class Overworld {
       } });
       items.push({ z: p.pet.z, draw: () => g.drawImage(p.sprite, bx - half, by - OVERWORLD_MON + 2) });
     }
-    for (const npc of [this.boss, this.elder, this.ghostStone]) {
+    if (this.stall) {
+      const [mx, my] = toScreen(this.stall.x, this.stall.z);
+      items.push({ z: this.stall.z, draw: () => drawProp(g, MARKET_STALL, mx, my + 4) });
+    }
+    if (this.elder && hasArt("elder-npc")) {
+      // ImageGen Elder: two 16x24 idle frames, 500 ms each.
+      const [nx, ny] = toScreen(this.elder.pos.x, this.elder.pos.z);
+      const f = Math.floor(t * 2) % 2;
+      items.push({ z: this.elder.pos.z, draw: () => g.drawImage(img("elder-npc"), f * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24) });
+    }
+    for (const npc of [this.boss, hasArt("elder-npc") ? null : this.elder, this.ghostStone]) {
       if (!npc) continue;
       const [nx, ny] = toScreen(npc.pos.x, npc.pos.z);
       const s = npc.sprite;

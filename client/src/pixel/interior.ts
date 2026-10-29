@@ -1,11 +1,11 @@
 // Inside your A-frame: a 384x216 room (STYLE.md: cream walls, timber beams, warm wood floor, teal window
 // glass, no new colors). Walk around with your pets, arrange furniture (D: decorate) and use the shipping
 // crate by the door (sell the harvest, buy seeds). Room rules live in ../game/room.ts; this file draws and
-// walks it. Furniture is drawn in code until the ImageGen props sheet is approved.
+// walks it. Background and furniture are ImageGen art (interior-empty.png, props-decor.png).
 
 import { CRATE, COLS, DOOR, FURNITURE, PIECE_KINDS, ROWS, blocked, canPlace, pieceAt, place, removeAt, type Piece, type PieceKind } from "../game/room";
 import { followStep, keyDir, slide, WALK_SPEED, type Vec } from "../world/movement";
-import { drawSheetProp, makePlayer, PAL, type PropName, type Sprite } from "./art";
+import { drawSheetProp, hasArt, img, makePlayer, PAL, type PropName, type Sprite } from "./art";
 import { drawFrame, drawText, GLYPH } from "./text";
 
 export const ROOM_W = 384;
@@ -116,7 +116,7 @@ export class Interior {
     const oy = Math.floor((sh - ROOM_H) / 2);
     g.fillStyle = PAL.ink;
     g.fillRect(0, 0, sw, sh);
-    g.drawImage((this.bg ??= drawRoom()), ox, oy);
+    g.drawImage(hasArt("interior-empty") ? img("interior-empty") : (this.bg ??= drawRoom()), ox, oy);
     const at = (x: number, z: number): [number, number] => [ox + FX + Math.round(x * C), oy + FY + Math.round(z * C)];
     const room = this.host.room();
     // Rugs first, then everything with feet, sorted by their bottom edge.
@@ -169,7 +169,7 @@ export class Interior {
   }
 }
 
-// The A-frame room picture: slanted timber roof meeting at the top, cream walls, a big triangular window
+// Fallback room picture (tests, art not loaded); the ImageGen cabin shares its floor rect and door. Slanted timber roof meeting at the top, cream walls, a big triangular window
 // and a plank floor. Drawn once.
 function drawRoom(): HTMLCanvasElement {
   const c = document.createElement("canvas");

@@ -22,10 +22,13 @@ const FILES = [
   "tile-grass-0", "tile-grass-1", "tile-grass-2", "tile-water-0", "tile-water-1", "tile-water-2", "tile-water-3",
   "tile-path-atlas", "tile-path-0", "tile-path-1", "tile-path-2", "tile-shore-atlas", "tile-shore-inner", "tile-detail-flowers", "tile-detail-tuft",
   "tile-bridge", "tile-crop-states", "prop-tree", "prop-house-aframe", "ui-frame-12", "font-6x8", "player-walk", "props-decor",
+  "interior-empty", "monster-mallow-back", "monster-sprig-back", "market-stall", "elder-npc",
 ] as const;
 export type ArtName = (typeof FILES)[number];
 
 const art = new Map<string, HTMLImageElement>();
+
+export const hasArt = (name: ArtName): boolean => art.has(name);
 
 export function img(name: ArtName): HTMLImageElement {
   const i = art.get(name);
@@ -146,15 +149,29 @@ export interface Sprite {
   frames: number; // horizontal frames
 }
 
-// The player: ImageGen walk sheet, 16x24, 4 frames x 4 directions (rows: down, left, right, up).
+// The player, 16x24, 4 frames x 4 directions (rows: down, left, right, up). Only frame 0 of each ImageGen row
+// is used: the generated in-between frames don't match each other, so the walk is built here from that one pose.
+const LEG_TOP = [19, 20, 20, 19]; // first leg row per direction
 export function makePlayer(): Sprite {
   const src = art.get("player-walk");
-  if (src) {
-    const [c, g] = canvas(src.width, src.height);
-    g.drawImage(src, 0, 0);
-    return { img: c, w: 16, h: 24, frames: 4 };
+  if (!src) return drawnPlayer();
+  const [c, g] = canvas(64, 96);
+  for (let d = 0; d < 4; d++) {
+    const oy = d * 24;
+    const top = LEG_TOP[d]!;
+    for (let f = 0; f < 4; f++) {
+      const ox = f * 16;
+      if (f % 2 === 0) { g.drawImage(src, 0, oy, 16, 24, ox, oy, 16, 24); continue; } // contact pose
+      // Passing pose: body up 1 px, one leg lifted with it, the other stays planted (its top row stretched).
+      g.drawImage(src, 0, oy, 16, top, ox, oy - 1, 16, top);
+      const lift = f === 1 ? 0 : 8;
+      const plant = 8 - lift;
+      g.drawImage(src, lift, oy + top, 8, 24 - top, ox + lift, oy + top - 1, 8, 24 - top);
+      g.drawImage(src, plant, oy + top, 8, 24 - top, ox + plant, oy + top, 8, 24 - top);
+      g.drawImage(src, plant, oy + top, 8, 1, ox + plant, oy + top - 1, 8, 1);
+    }
   }
-  return drawnPlayer();
+  return { img: c, w: 16, h: 24, frames: 4 };
 }
 
 // Fallback before the sheet loads (and in tests): the coded farmer, 2 frames.
@@ -201,6 +218,7 @@ export interface Prop {
 }
 export const TREE: Prop = { name: "prop-tree", w: 32, h: 48 };
 export const HOUSE: Prop = { name: "prop-house-aframe", w: 48, h: 48 };
+export const MARKET_STALL: Prop = { name: "market-stall", w: 48, h: 48 };
 
 // Furniture, tools and crops from the ImageGen props sheet (props-decor.json).
 export const PROPS = {
