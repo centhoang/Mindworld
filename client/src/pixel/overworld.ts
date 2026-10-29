@@ -8,7 +8,8 @@ import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
 import { drawCrop, drawMapTile, drawProp, hasArt, HOUSE, img, MARKET_STALL, makePlayer, PAL, spriteFrame, TREE, type ArtName, type Sprite } from "./art";
-import { drawSpotProp } from "./grounds-draw";
+import { drawDecor, drawSpotProp } from "./grounds-draw";
+import { placeDecor, type DecorPiece } from "./grounds-decor";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
@@ -18,7 +19,7 @@ import { clockLabel, gameTime, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
-import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint } from "./life-draw";
+import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
 import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
@@ -58,6 +59,8 @@ export class Overworld {
   map!: TileMap;
   trees: Vec[] = [];
   private readonly treeTiles = new Set<number>();
+  decor: DecorPiece[] = []; // bushes, rocks, fences, party lights (seeded, grounds-decor.ts)
+  private readonly decorTiles = new Set<number>();
   private layoutIn: LayoutInput;
   houses: Vec[] = []; // other players' A-frames (props only; yours is `house`)
   player: Vec = { x: 0, z: 0 };
@@ -87,6 +90,7 @@ export class Overworld {
   inspect: string | null = null; // the mind shown in the inspector (I)
   mindWhere = "this computer";
   myName = "a visitor"; // set by main.ts (the live name), so villagers can greet me by name
+  petName = "your pet"; // the pet following me (main.ts), so villagers can talk to it by name
   cam: Vec = { x: 0, z: 0 };
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
@@ -150,8 +154,11 @@ export class Overworld {
     this.beds = Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) }));
     this.trees = [];
     this.treeTiles.clear();
+    this.decor = [];
+    this.decorTiles.clear();
     this.placeTrees();
     this.placeSigns();
+    this.placeDecor();
     this.bowl = { x: this.house.x - 3, z: this.house.z + 1.6 };
     const lawn: Vec[] = [];
     for (let i = 0; i < 24; i++) {
@@ -319,6 +326,20 @@ export class Overworld {
     }
   }
 
+  // Decor keeps clear of houses, beds, the stall, trees and name signs (they take part in the walk check).
+  private placeDecor(): void {
+    const m = this.map;
+    const near = (v: Vec, x: number, z: number, d: number) => Math.abs(v.x - x) < d && Math.abs(v.z - z + 1) < d;
+    this.decor = placeDecor(this.world, m, (x, z) =>
+      [this.house, ...this.houses].some((h) => near(h, x, z, 3)) ||
+      (!!this.stall && near(this.stall, x, z, 3)) ||
+      this.beds.some((b) => Math.abs(b.x + 0.5 - x) < 2 && Math.abs(b.z + 0.5 - z) < 2) ||
+      this.signs.some((sg) => Math.abs(sg.x - x) < 1.5 && Math.abs(sg.z - z) < 1.5) ||
+      this.treeTiles.has(Math.floor(z - m.oz) * m.w + Math.floor(x - m.ox)),
+    );
+    for (const d of this.decor) for (const k of d.tiles) this.decorTiles.add(k);
+  }
+
   private nearPath(i: number, j: number): boolean {
     const m = this.map;
     for (let dj = -2; dj <= 2; dj++)
@@ -387,6 +408,11 @@ export class Overworld {
     this.syncMinds();
     this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text) => this.say(`n:${id}`, text, text === "..." ? 25 : 5) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
     this.npcs.people = () => [{ id: this.npcs?.me ?? "me", name: this.myName, pos: this.player }, ...[...this.peers].map(([id, p]) => ({ id, name: p.name, pos: p.pos }))];
+    this.npcs.pets = () => [
+      { id: "pet", name: this.petName, pos: this.pet, busy: this.moving },
+      ...this.residents.map((r) => ({ id: r.agent.id, name: r.agent.name, pos: r.agent.pos, busy: r.agent.state === "walk" })),
+      ...[...this.peers].map(([id, p]) => ({ id: `pet:${id}`, name: `${p.name}'s pet`, pos: p.pet })),
+    ];
   }
 
   private syncMinds(): void {
@@ -565,7 +591,7 @@ export class Overworld {
     if (this.beds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
     const i = Math.floor(x - this.map.ox);
     const j = Math.floor(z - this.map.oz);
-    return !this.treeTiles.has(j * this.map.w + i);
+    return !this.treeTiles.has(j * this.map.w + i) && !this.decorTiles.has(j * this.map.w + i);
   };
 
   // Returns the wild monster the player just bumped into, if any.
@@ -684,6 +710,13 @@ export class Overworld {
       const look = lookAt(m, Math.floor(tr.x), Math.floor(tr.z));
       items.push({ z: tr.z, draw: () => drawProp(g, TREE, sx, sy + 4, look) });
     }
+    const lit = gameTime(this.life.t).phase;
+    for (const d of this.decor) {
+      const [sx, sy] = toScreen(d.x, d.z);
+      if (sx < -40 || sy < -40 || sx > sw + 40 || sy > sh + 40) continue;
+      const look = lookAt(m, Math.floor(d.x), Math.floor(d.z));
+      items.push({ z: d.z - (d.kind === "lights" ? 0.2 : 0), draw: () => drawDecor(g, d.kind, sx, sy + 8, Math.max(1, d.tiles.length), look, lit === "evening" || lit === "night") });
+    }
     {
       const [hx, hy] = toScreen(this.house.x, this.house.z);
       items.push({ z: this.house.z, draw: () => drawProp(g, HOUSE, hx, hy) });
@@ -767,9 +800,10 @@ export class Overworld {
       const way = a.path?.[0] ?? a.target;
       const [dx, dz] = [way.x - a.pos.x, way.z - a.pos.z];
       const dir = !walking ? 0 : Math.abs(dx) > Math.abs(dz) ? (dx < 0 ? 1 : 2) : dz < 0 ? 3 : 0;
-      const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep") ? 3 : 0;
+      const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep");
       const f = spriteFrame(s, walking, t + NPCS.indexOf(a.id as Npc), t);
-      items.push({ z: a.pos.z, draw: () => g.drawImage(s.img, f * 16, dir * 24, 16, 24 - sit, nx - 8, ny - 22 + sit, 16, 24 - sit) });
+      const frame = sit ? sitFrame(s.img, (s.idle ?? 0) * 16, dir * 24, dir === 3) : null; // seated: still, legs bent
+      items.push({ z: a.pos.z, draw: () => (frame ? g.drawImage(frame, nx - 8, ny - 22) : g.drawImage(s.img, f * 16, dir * 24, 16, 24, nx - 8, ny - 22, 16, 24)) });
     }
     for (const sg of this.signs) {
       const [sx, sy] = toScreen(sg.x, sg.z);

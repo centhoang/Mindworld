@@ -76,6 +76,7 @@ function refreshParty(): void {
   const all = members();
   const a = state.active ?? 0;
   world.setPet(all[a]!.genes, all[a]!.arch);
+  world.petName = all[a]!.name ?? "your pet";
   onPetChange();
   world.setResidents(all.filter((_, i) => i !== a));
 }

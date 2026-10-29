@@ -82,6 +82,19 @@ export function linePrompt(p: Persona, m: MindMemory, other: Persona, affinity: 
     temperature: 0.9,
   };
 }
+// A villager passes a pet (a small creature that can't talk back): one line to it or about it.
+export function petLinePrompt(p: Persona, m: MindMemory, pet: string): LmRequest {
+  return {
+    system: SYSTEM,
+    user: `${personaCard(p)}
+${memoryText(m, pet, 1)}
+${p.name} walks past ${pet}, a small pet creature resting nearby. Write what ${p.name} says to the pet or about it: one short sentence, under 12 words, no emoji.`,
+    grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,
+    maxTokens: 20,
+    temperature: 0.9,
+  };
+}
+
 // A player walks up and says something: the mind answers in character, using what it remembers.
 export function replyPrompt(p: Persona, m: MindMemory, player: string, line: string): LmRequest {
   return {
@@ -135,6 +148,9 @@ export function reflectPrompt(p: Persona, m: MindMemory, day: number): LmRequest
 // --- scripted fallbacks (no model, or the model was too slow) ---------------------------------------------
 const OPENERS = ["Hi {o}! Nice day, right?", "Hey {o}, want to play later?", "{o}! I was looking for you.", "Oh, hello {o}."];
 const REPLIES = ["Sure, sounds fun!", "Maybe after my nap.", "Hi! I just ate, I'm so full.", "Yes! Let's go!"];
+const PET_LINES = ["Hello, little {o}!", "{o}, you look sleepy today.", "Who's a good one? You are, {o}!", "Careful by the water, {o}.", "{o}! Did you eat yet?"];
+export const scriptedPetLine = (p: Persona, pet: string, k: number): string => PET_LINES[(k + p.name.length + pet.length) % PET_LINES.length]!.replace("{o}", pet);
+
 export function scriptedLine(p: Persona, other: Persona, turn: number, k: number): string {
   const pool = turn === 0 ? OPENERS : REPLIES;
   return pool[(k + p.name.length) % pool.length]!.replace("{o}", other.name);

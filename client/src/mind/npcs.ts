@@ -9,7 +9,7 @@ import { addAgent, newVillage, stepVillage, type Agent, type Choice, type Env, t
 import type { Vec } from "../world/movement";
 import { NPCS, type MindLine, type Npc } from "../world/live";
 import { MindHub } from "./hub";
-import { linePrompt, parseLine, replyPrompt, scriptedLine } from "./brain";
+import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
 import { emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { VILLAGERS, type Persona } from "./persona";
 import { pairKey } from "../life/relations";
@@ -26,7 +26,19 @@ const GREET_GAP = 180; // sim seconds before the same NPC greets the same player
 const CHAT_DIST = 2.6; // two NPCs this close (hosted on different machines) may chat over the room
 const CHAT_GAP = 120; // sim seconds between two such chats of one NPC
 const CHAT_TURNS = 3; // lines each side says at most
+const PET_DIST = 3; // a resting pet this close may get a line
+const PET_GAP = 180; // sim seconds before the same NPC talks to the same pet again
+const PET_NPC_GAP = 30; // sim seconds between one NPC's pet lines (several pets around: not one after another)
 const SCRIPT_GAP_MS = 3200; // without a model, wait a little before answering (the room allows 1 line / 3 s)
+
+// A pet the NPCs can see (mine, at home or following me, or an online player's). `busy` = walking or doing
+// something, so it isn't spoken to.
+export interface PetSeen {
+  id: string;
+  name: string;
+  pos: Vec;
+  busy?: boolean;
+}
 
 // Someone the NPCs can see: a player here or online (id = live id; "me" before the room knows mine).
 export interface Person {
@@ -47,6 +59,8 @@ export class NpcVillage {
   private myId: string | null = null;
   people: () => Person[] = () => []; // players around (me + online peers), for greetings
   private readonly greeted = new Map<string, number>(); // "npc:player" -> sim time of the greeting
+  pets: () => PetSeen[] = () => []; // pets around, for a passing word
+  private readonly petted = new Map<string, number>(); // "npc:pet" (and "npc" for its last pet line) -> sim time
   private readonly lastChat = new Map<Npc, number>(); // sim time of the NPC's last NPC chat
   private readonly chats = new Map<Npc, { with: Npc; said: string[]; turns: number }>(); // NPC chats over the room
   private readonly busy = new Set<Npc>(); // a line is being made
@@ -173,6 +187,13 @@ export class NpcVillage {
         void this.speak(npc, visitor, guest.id === "me" ? "" : guest.id, { said: [], turns: 0 });
         continue;
       }
+      const pet = this.v.t - (this.petted.get(npc) ?? -1e9) < PET_NPC_GAP ? undefined : this.pets().find((p) => !p.busy && near(p.pos, PET_DIST) && this.v.t - (this.petted.get(`${npc}:${p.id}`) ?? -1e9) > PET_GAP);
+      if (pet) {
+        this.petted.set(`${npc}:${pet.id}`, this.v.t);
+        this.petted.set(npc, this.v.t);
+        void this.petLine(npc, pet);
+        continue;
+      }
       if (a.needs.social > 70 || this.v.t - (this.lastChat.get(npc) ?? -1e9) < CHAT_GAP) continue;
       const mate = this.v.agents.find((o) => o !== a && !this.hosting(o.id as Npc) && this.hosts.get(o.id as Npc) && near(o.pos, CHAT_DIST));
       if (!mate) continue;
@@ -180,6 +201,28 @@ export class NpcVillage {
       this.chats.set(npc, c);
       this.lastChat.set(npc, this.v.t);
       void this.speak(npc, VILLAGERS.find((p) => p.id === mate.id)!, mate.id, c);
+    }
+  }
+
+  // One line to a pet nearby: from the NPC's mind with a model here, else scripted. It goes to the room as a
+  // plain spoken line (no `to`: pets don't answer), so every machine shows the bubble.
+  private async petLine(npc: Npc, pet: PetSeen): Promise<void> {
+    const m = this.hub.minds.get(npc);
+    if (!m || this.busy.has(npc)) return;
+    this.busy.add(npc);
+    try {
+      const k = this.v.nextId;
+      const ans = this.hasModel()
+        ? await this.sched.ask({ prio: PRIO.emote, timeoutMs: 15000, req: petLinePrompt(m.persona, m.mem, pet.name), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedPetLine(m.persona, pet.name, k) })
+        : { value: scriptedPetLine(m.persona, pet.name, k), source: "rules" };
+      if (!this.hosting(npc)) return;
+      m.source = ans.source;
+      this.out.say(npc, ans.value);
+      this.out.line({ who: npc, say: ans.value });
+      const g = gameTime(this.v.t);
+      remember(m.mem, g.day, clockLabel(g.hour), `said hello to ${pet.name}`);
+    } finally {
+      this.busy.delete(npc);
     }
   }
 

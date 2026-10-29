@@ -1,9 +1,11 @@
 // Props on in-between grounds (playground, picnic hill, fishing pond), drawn at an activity spot's foot.
 // Uses the ImageGen sheet `props-grounds` when it is loaded, else small code-drawn stand-ins in the palette.
 
-import { hasArt, img, PAL } from "./art";
+import { hasArt, img, PAL, themed } from "./art";
 import { drawBall } from "./life-draw";
 import { GROUND_PROPS } from "./grounds-props";
+import type { DecorKind } from "./grounds-decor";
+import { AWAY } from "./tiles";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -64,4 +66,34 @@ export function drawSpotProp(g: Ctx, name: string, x: number, y: number, t: numb
       return;
     default: // spots with nothing to draw (the pond is water tiles, the dock bridge tiles)
   }
+}
+
+// Outdoor decor (grounds-decor.ts) at its foot, recoloured with the ground's theme like the trees. Party
+// lights hang on two posts and glow after dark. `tiles` = how many tiles wide, `look` = the tile's look
+// bits (theme | AWAY).
+export function drawDecor(g: Ctx, kind: DecorKind, x: number, y: number, tiles: number, look: number, night: boolean): void {
+  if (look & AWAY) g.globalAlpha = 0.6;
+  if (kind === "lights") {
+    r(g, x - 24, y - 26, 2, 26, PAL.woodD);
+    r(g, x + 22, y - 26, 2, 26, PAL.woodD);
+    if (hasArt("props-grounds")) {
+      const s = GROUND_PROPS.lights;
+      g.drawImage(img("props-grounds"), s.x, s.y, s.w, s.h, Math.round(x - s.w / 2), Math.round(y - 30), s.w, s.h);
+    } else for (let k = -20; k <= 20; k += 5) r(g, x + k, y - 24 + Math.round(Math.cos((k / 20) * 1.4) * 4), 2, 2, k % 2 ? PAL.flowerY : PAL.coral);
+    if (night) {
+      g.globalAlpha *= 0.25;
+      for (let k = -18; k <= 18; k += 9) r(g, x + k - 2, y - 24, 5, 5, PAL.flowerY);
+    }
+  } else if (hasArt("props-grounds")) {
+    const s = GROUND_PROPS[kind];
+    const n = kind === "fence" ? tiles : 1; // a fence = the piece repeated across its tiles (16 px each)
+    for (let k = 0; k < n; k++) g.drawImage(themed("props-grounds", look), s.x, s.y, s.w, s.h, Math.round(x - (s.w * n) / 2 + k * s.w), Math.round(y - s.h), s.w, s.h);
+  } else {
+    const big = kind.endsWith("-big") ? 6 : 0;
+    const [c, d] = kind.startsWith("rock") ? [PAL.stone, PAL.stoneD] : kind === "fence" ? [PAL.wood, PAL.woodD] : [PAL.grassS, PAL.grassD];
+    const half = kind === "fence" ? tiles * 8 : 6 + big;
+    r(g, x - half, y - 9, half * 2, 8, c);
+    r(g, x - half, y - 2, half * 2, 2, d);
+  }
+  g.globalAlpha = 1;
 }

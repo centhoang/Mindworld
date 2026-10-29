@@ -135,3 +135,65 @@ describe("NpcVillage starts talks", () => {
     expect(lines.filter((l) => l.who === "pip")).toEqual([]);
   });
 });
+
+describe("NpcVillage talks to pets", () => {
+  const lmSays = (text: string) => ({ label: "fake 1B", ready: () => true, complete: async () => text });
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+  };
+  function host(lm: string | null) {
+    const lines: (MindLine & { mem?: string })[] = [];
+    const nv = new NpcVillage(new MindScheduler(() => (lm === null ? null : lmSays(lm)), { duty: 1 }), () => lm !== null, { line: (l) => lines.push(l), say: () => {} }, HOMES, SPOTS, () => true, undefined, mulberry32(2));
+    nv.me = "me1";
+    nv.setHost("mo", "me1");
+    const mo = nv.v.agents.find((a) => a.id === "mo")!;
+    const tick = async (dt = 0.25) => {
+      mo.state = "idle";
+      mo.idle = 1e6; // stays put between ticks
+      nv.step(0.25, nv.v.t + dt);
+      await settle();
+    };
+    const said = () => lines.filter((l) => l.who === "mo" && l.say).map((l) => l);
+    return { nv, mo, tick, said };
+  }
+
+  it("a hosted NPC says a line to a resting pet nearby, over the room, from its mind", async () => {
+    const { nv, mo, tick, said } = host("Hello little Sprig, nap time?");
+    nv.pets = () => [{ id: "r0", name: "Sprig", pos: { x: mo.pos.x + 1, z: mo.pos.z } }];
+    await tick();
+    expect(said()).toEqual([{ who: "mo", say: "Hello little Sprig, nap time?" }]);
+    expect(nv.hub.minds.get("mo")!.mem.log.at(-1)!.text).toContain("Sprig");
+  });
+
+  it("falls back to a scripted line without a model or when the model says nothing usable", async () => {
+    for (const lm of [null, ""]) {
+      const { nv, mo, tick, said } = host(lm);
+      nv.pets = () => [{ id: "r0", name: "Sprig", pos: { ...mo.pos } }];
+      await tick();
+      expect(said().filter((l) => l.say!.includes("Sprig")).length, String(lm)).toBe(1);
+      expect(nv.hub.minds.get("mo")!.source).toBe("rules");
+    }
+  });
+
+  it("is rate-limited per pair and per NPC, and skips busy or far pets", async () => {
+    const { nv, mo, tick, said } = host(null);
+    let pets = [{ id: "r0", name: "Sprig", pos: { x: 0, z: 0 }, busy: true }];
+    nv.pets = () => pets.map((p) => ({ ...p, pos: p.id === "far" ? { x: mo.pos.x + 9, z: mo.pos.z } : { ...mo.pos } }));
+    await tick();
+    expect(said().length).toBe(0); // busy
+    pets = [{ id: "far", name: "Far", pos: { x: 0, z: 0 }, busy: false }];
+    await tick();
+    expect(said().length).toBe(0); // too far
+    pets = [{ id: "r0", name: "Sprig", pos: { x: 0, z: 0 }, busy: false }, { id: "r1", name: "Mallow", pos: { x: 0, z: 0 }, busy: false }];
+    await tick();
+    expect(said().length).toBe(1);
+    await tick(5);
+    expect(said().length).toBe(1); // not the next pet right away
+    await tick(40);
+    expect(said().length).toBe(2); // the other pet, after the NPC's own gap
+    await tick(40);
+    expect(said().length).toBe(2); // both pets talked to recently
+    await tick(200);
+    expect(said().length).toBe(3); // the pair gap is over
+  });
+});

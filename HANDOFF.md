@@ -1,3 +1,19 @@
+DIRECTOR MODE ACTIVE since 2026-10-30 night (user asleep; no feedback given, so play-test items wait)
+
+## Morning report
+- (in progress)
+
+## Queue (director runs these one worker at a time)
+1. [ ] W1 world polish: props-decor/props-grounds sheet decor on grounds (bushes, rocks, fence, party lights), seeded + paths kept clear; NPCs greet/talk to pets near them (scripted/mind line, rate-limited); human sit pose fix (no 3 px crop). Done = visible in build, tests added, all tests + tsc pass.
+2. [ ] W2 Codex batch 2 art: autumn + snow ground tiles and tree variants (STYLE.md), wired to themes by the theme key. Done = PNGs in client/public/art, themes use them, build OK.
+3. [ ] W3 stage 5 prep (no training tonight): village-mind data-gen script through the cost wrapper (ledger, hard row/cost cap), mocked tests, a 40-row sample run <= $0.50; FINETUNE.md updated with the exact run commands. Training (~$2 Modal) waits for the user.
+4. [ ] W4 stage 6 docs: README (what it is, how to play, Meta models used, pre-existing vs built this week, credits), docs/DEMO.md 3-min script draft for v3. No public actions.
+5. [ ] Verify: client + worker tests, tsc, build, secrets scan; commit; deploy (standing-approved) if green.
+
+## Decisions needing review
+- Stray Worker deletion: still the user's (not touched).
+- API spend tonight: $0 so far (cap $3).
+
 # HANDOFF: Mindworld v3, stages 1-4 done + talk/relay polish; user play-test + review pending (2026-10-30 night)
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md (approved). I tested and reviewed: <feedback>. Apply it, then continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit)."

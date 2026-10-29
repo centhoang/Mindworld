@@ -91,3 +91,49 @@ export function drawTint(g: Ctx, phase: Phase, sw: number, sh: number): void {
   g.fillStyle = c;
   g.fillRect(0, 0, sw, sh);
 }
+
+// A villager sitting (picnic, bench, fishing, sleeping), from a 16x24 cell of a walk sheet: the body above
+// the legs (rows 0-18) drops 3 px onto the seat and the legs are redrawn bent toward the viewer: knees in
+// the sheet's own trouser colour with ink sides, then the shoes. Facing away (row 3) the lap hides the legs.
+// Built once per sheet cell, so a frame costs one drawImage.
+const HIP = 19; // first leg row on the sheets (makePlayer layout and the npc-*.png sheets)
+const DROP = 3;
+const sitCache = new WeakMap<HTMLCanvasElement, Map<string, HTMLCanvasElement>>();
+
+export function sitFrame(sheet: HTMLCanvasElement, sx: number, sy: number, away = false): HTMLCanvasElement {
+  let byCell = sitCache.get(sheet);
+  if (!byCell) sitCache.set(sheet, (byCell = new Map()));
+  const key = `${sx},${sy},${away}`;
+  const hit = byCell.get(key);
+  if (hit) return hit;
+  const c = document.createElement("canvas");
+  c.width = 16;
+  c.height = 24;
+  const g = c.getContext("2d")!;
+  g.drawImage(sheet, sx, sy, 16, HIP, 0, DROP, 16, HIP);
+  const trousers = legColour(sheet, sx, sy);
+  if (away) r(g, 4, HIP + DROP - 1, 8, 2, trousers);
+  else
+    for (const x of [3, 9]) {
+      r(g, x, 20, 4, 2, PAL.ink); // knee outline
+      r(g, x + 1, 20, 2, 2, trousers);
+      r(g, x + 1, 22, 2, 1, trousers); // shin
+      r(g, x, 22, 1, 1, PAL.ink);
+      r(g, x + 3, 22, 1, 1, PAL.ink);
+      r(g, x, 23, 4, 1, PAL.ink); // shoe
+    }
+  byCell.set(key, c);
+  return c;
+}
+
+// The first coloured (not ink, not clear) pixel on the sheet's leg rows; wood brown if none.
+function legColour(sheet: HTMLCanvasElement, sx: number, sy: number): string {
+  const d = sheet.getContext("2d")?.getImageData(sx, sy + HIP, 16, 3).data;
+  if (d)
+    for (let p = 0; p < d.length; p += 4) {
+      if (d[p + 3]! < 128) continue;
+      const hex = `#${((1 << 24) | (d[p]! << 16) | (d[p + 1]! << 8) | d[p + 2]!).toString(16).slice(1).toUpperCase()}`;
+      if (hex !== PAL.ink) return hex;
+    }
+  return PAL.woodD;
+}
