@@ -160,26 +160,6 @@ export function makePlayer(): Sprite {
   return { img, w: 16, h: 24, frames: 2 };
 }
 
-// A round pet blob tinted by its gene hue: 16x16, 2 bounce frames.
-export function makePetSprite(hue: number): Sprite {
-  const [img, g] = canvas(32, 16);
-  const body = `hsl(${hue} 55% 62%)`;
-  const shade = `hsl(${(hue + 340) % 360} 45% 45%)`;
-  const light = `hsl(${(hue + 20) % 360} 70% 80%)`;
-  for (let f = 0; f < 2; f++) {
-    const ox = f * 16;
-    const sq = f; // squash on frame 1
-    px(g, ox + 2, 4 + sq, PAL.ink, 12, 11 - sq);
-    px(g, ox + 3, 5 + sq, body, 10, 9 - sq);
-    px(g, ox + 3, 11, shade, 10, 3);
-    px(g, ox + 4, 6 + sq, light, 3, 2);
-    px(g, ox + 3, 2 + sq, PAL.ink, 3, 3); px(g, ox + 10, 2 + sq, PAL.ink, 3, 3);
-    px(g, ox + 4, 3 + sq, body); px(g, ox + 11, 3 + sq, body);
-    px(g, ox + 5, 8 + sq, PAL.ink); px(g, ox + 10, 8 + sq, PAL.ink);
-    px(g, ox + 7, 10, PAL.flowerP, 2, 1);
-  }
-  return { img, w: 16, h: 16, frames: 2 };
-}
 
 // Round tree, 32x40 (2x2.5 tiles), trunk anchored at bottom-centre.
 export function makeTree(): Sprite {

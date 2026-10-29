@@ -3,12 +3,32 @@
 // what is where on screen.
 
 import { generateWorld, platformAt, type WorldMap } from "../world/layout";
-import { followStep, keyDir, slide, WALK_SPEED, type Vec } from "../world/movement";
-import { drawShore, makeAtlas, makePetSprite, makePlayer, makeTree, PAL, type Atlas, type Sprite } from "./art";
+import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../world/movement";
+import { petLook, randomGenes } from "../game/genes";
+import type { Genes } from "../sim/ghost";
+import { ARCHETYPES, type ArchetypeId } from "../sim/types";
+import { drawShore, makeAtlas, makePlayer, makeTree, PAL, type Atlas, type Sprite } from "./art";
+import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH } from "./text";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
 
 type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
+
+export const OVERWORLD_MON = 20; // px: monsters in the overworld
+const WILD_PER_MEADOW = 3;
+const MEET_DIST = 1.0;
+
+export interface Wild {
+  id: number;
+  arch: ArchetypeId;
+  genes: Genes;
+  sprite: HTMLCanvasElement;
+  pos: Vec;
+  home: Vec;
+  target: Vec;
+  wait: number;
+  cool: number; // seconds before it can start a fight (after one just ended)
+}
 
 export class Overworld {
   readonly world: WorldMap;
@@ -24,11 +44,13 @@ export class Overworld {
   private bannerT = 0;
   private readonly atlas: Atlas;
   private readonly playerSprite: Sprite;
-  private readonly petSprite: Sprite;
+  private petSprite: HTMLCanvasElement;
+  readonly wilds: Wild[] = [];
+  private nextId = 1;
   private readonly treeSprite: Sprite;
   cam: Vec = { x: 0, z: 0 };
 
-  constructor(petHue = 30) {
+  constructor(petGenes: Genes) {
     this.world = generateWorld();
     this.map = buildTileMap(this.world);
     this.placeTrees();
@@ -38,7 +60,8 @@ export class Overworld {
     this.cam = { ...this.player };
     this.atlas = makeAtlas();
     this.playerSprite = makePlayer();
-    this.petSprite = makePetSprite(petHue);
+    this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
+    for (const p of this.world.platforms) if (p.kind === "wild") for (let i = 0; i < WILD_PER_MEADOW; i++) this.spawnWild(p.x, p.z, p.r);
     this.treeSprite = makeTree();
   }
 
@@ -74,6 +97,29 @@ export class Overworld {
     return false;
   }
 
+  setPet(g: Genes): void {
+    this.petSprite = drawMonster(petLook(g), OVERWORLD_MON, "front");
+  }
+
+  spawnWild(cx: number, cz: number, r: number): void {
+    const seed = Math.floor(Math.random() * 1e9);
+    const arch = ARCHETYPES[seed % ARCHETYPES.length]!;
+    const genes = randomGenes(seed);
+    for (let tries = 0; tries < 30; tries++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.random() * (r - 3);
+      const pos = { x: cx + Math.cos(a) * d, z: cz + Math.sin(a) * d };
+      if (!this.canWalk(pos.x, pos.z)) continue;
+      this.wilds.push({ id: this.nextId++, arch, genes, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front", BUILDS[arch]), pos, home: { ...pos }, target: { ...pos }, wait: Math.random() * 2, cool: 0 });
+      return;
+    }
+  }
+
+  removeWild(id: number): void {
+    const i = this.wilds.findIndex((w) => w.id === id);
+    if (i >= 0) this.wilds.splice(i, 1);
+  }
+
   readonly canWalk = (x: number, z: number): boolean => {
     if (!tileWalkable(this.map, x, z)) return false;
     const i = Math.floor(x - this.map.ox);
@@ -81,7 +127,8 @@ export class Overworld {
     return !this.treeTiles.has(j * this.map.w + i);
   };
 
-  update(dt: number, keys: ReadonlySet<string>): void {
+  // Returns the wild monster the player just bumped into, if any.
+  update(dt: number, keys: ReadonlySet<string>): Wild | null {
     const d = keyDir(keys);
     this.moving = d.x !== 0 || d.z !== 0;
     if (this.moving) {
@@ -97,6 +144,21 @@ export class Overworld {
     if (here && here !== this.place) this.bannerT = 2.5;
     this.place = here || this.place;
     this.bannerT = Math.max(0, this.bannerT - dt);
+    let met: Wild | null = null;
+    for (const w of this.wilds) {
+      w.cool = Math.max(0, w.cool - dt);
+      w.wait -= dt;
+      if (w.wait <= 0) {
+        const s = stepToward(w.pos, w.target, WALK_SPEED * 0.35 * dt);
+        w.pos = slide(w.pos, s.dx, s.dz, this.canWalk);
+        if (s.arrived) {
+          w.wait = 1 + Math.random() * 3;
+          w.target = { x: w.home.x + (Math.random() - 0.5) * 8, z: w.home.z + (Math.random() - 0.5) * 8 };
+        }
+      }
+      if (!met && !w.cool && Math.hypot(w.pos.x - this.player.x, w.pos.z - this.player.z) < MEET_DIST) met = w;
+    }
+    return met;
   }
 
   draw(g: CanvasRenderingContext2D, sw: number, sh: number, t: number): void {
@@ -133,9 +195,16 @@ export class Overworld {
     const [px, py] = toScreen(this.player.x, this.player.z);
     const pf = this.moving ? Math.floor(this.walkT * 8) % 2 : 0;
     items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px - 8, py - 22, 16, 24) });
+    const half = OVERWORLD_MON / 2;
     const [qx, qy] = toScreen(this.pet.x, this.pet.z);
-    const qf = Math.floor(t * 3) % 2;
-    items.push({ z: this.pet.z, draw: () => g.drawImage(this.petSprite.img, qf * 16, 0, 16, 16, qx - 8, qy - 14, 16, 16) });
+    const hop = Math.floor(t * 4) % 2;
+    items.push({ z: this.pet.z, draw: () => g.drawImage(this.petSprite, qx - half, qy - OVERWORLD_MON + 2 - hop) });
+    for (const w of this.wilds) {
+      const [wx, wy] = toScreen(w.pos.x, w.pos.z);
+      if (wx < -24 || wy < -24 || wx > sw + 24 || wy > sh + 24) continue;
+      const wh = w.wait <= 0 ? Math.floor(t * 5 + w.id) % 2 : 0;
+      items.push({ z: w.pos.z, draw: () => g.drawImage(w.sprite, wx - half, wy - OVERWORLD_MON + 2 - wh) });
+    }
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
 
