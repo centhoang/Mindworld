@@ -1,8 +1,10 @@
-# HANDOFF: Mindworld rework v2 (2026-10-29 ~19:30 UTC+7)
+# HANDOFF: Mindworld v3 stage 1 done (2026-10-29 ~22:40 UTC+7)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md. The plan is approved with my decisions noted in HANDOFF. Build stage 1. Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md (approved). Build v3 stage 2 (minds). Follow CLAUDE.md (Normal mode, 35% context limit)."
 
 ## State
+- **v3 stage 1 done + deployed (c228f2bd, commit 591f7d9):** `client/src/life/` = clock (1 day = 12 real min, starts 08:00), needs (pet/human decay), activities (14 defs: eat, sleep, nap, poop, groom, ball, dance, wander, cook, clean, feed, fish, picnic, soccer), village sim (idle -> walk -> wait (gathering) -> do; late joiners; cancel after 25 s; `chooser` hook = where the mind plugs in; `validChoices` only), relations (affinity per pair). 13 tests. Residents at home run on it (`overworld.ts` `life`, spots: bowl, beds by the house, lawn ring); poses in `pixel/life-draw.ts` (sleep/eat/dance/kick/squat/wiggle/sit) + bowl, poop, ball, day/night tint, clock top-right. E next to poop = clean. Player sheet now 6 columns: 4 walk (arm swing: front/back forearm lift, side code-drawn arms) + 2 idle (stand, head bob) via `spriteFrame()` in `art.ts`.
+- Not yet: life state is not saved (resets on reload); human villagers have no sprites yet (stage 2/4); the following pet is not in the sim.
 - The pixel build IS the game now: `client/index.html` -> `src/pixel/main.ts`. three.js and the 3D view are deleted; `/pixel.html` 301-redirects to `/` (Worker). Bundle: main 112 KB (44 KB gz); the 6 MB `lib-*.js` is WebLLM, lazy-loaded only on B.
 - Tests: client 187 (6 grass tests went with grass.ts), worker 149, tsc clean. Build OK.
 - Deployed behind Access: https://pets.uryto.dev/ = the pixel game, version 8f84b901 (2026-10-29, play-test fixes). Redeploys are standing-approved (CLAUDE.md "Decide vs. ask"): run `npm --prefix client run build`, then `npx wrangler deploy` in worker/, as two plain commands.
@@ -19,13 +21,13 @@
 - Earlier decisions stand: Canvas2D + WebGL2 CRT, STYLE.md palette canonical, browser-first, Meta models via the Worker proxy with a spend cap, repo goes public Nov 3.
 
 ## Pending decisions (user)
-- **Review docs/V3-PLAN.md** (written 2026-10-29): plan APPROVED, decisions 1-3 = (a) (village fine-tune for power mode ~$6 approved; ghost ground 10 min; mobile + decor below the line); backlog order: extra themes + real mini-games first. Nothing built yet.
-- Play-test the new build (cabin, market stall, Elder, walk cycle, duel in two tabs, goals card, Speak button in Teach).
+- V3-PLAN approved 2026-10-29, decisions 1-3 = (a) (village fine-tune for power mode ~$6 approved; ghost ground 10 min; mobile + decor below the line); backlog order: extra themes + real mini-games first.
+- Play-test stage 1 (residents living a day at home, poop + E to clean, arm swing + idle, night tint).
 - When to go public (remove Access).
 
 ## Next actions
-1. ~~v3 research + plan~~ DONE: `docs/V3-PLAN.md` (awaiting review). Original brief: follow `docs/V3-BRIEF.md`: players' grounds that join into one world (unique shapes, rare in-between grounds, themes), real-time mind-to-mind chat on the local model, GARP-style minds (personality, hobbies, daily plan, memory, relationships, emotes), an NPC mind model plus hosting NPC minds on players' machines with handover, needs-driven activities for pets and humans, arm swing + still idle, Codex static map art per theme. Output: `docs/V3-PLAN.md` with scope, a cut line for the Nov 3 demo, architecture, costs, stages and at most 3 user decisions. Then STOP for the user's review; build nothing before the OK.
-2. After the plan is approved: build stage 1 (likely needs/activities sim + the limb rig with arm swing/idle, both pure-code and safe), then follow the plan's stages, each ending with a play-test ask.
+1. ~~v3 research + plan~~ DONE (`docs/V3-PLAN.md`, approved). ~~Stage 1~~ DONE. Original brief: follow `docs/V3-BRIEF.md`: players' grounds that join into one world (unique shapes, rare in-between grounds, themes), real-time mind-to-mind chat on the local model, GARP-style minds (personality, hobbies, daily plan, memory, relationships, emotes), an NPC mind model plus hosting NPC minds on players' machines with handover, needs-driven activities for pets and humans, arm swing + still idle, Codex static map art per theme. Output: `docs/V3-PLAN.md` with scope, a cut line for the Nov 3 demo, architecture, costs, stages and at most 3 user decisions. Then STOP for the user's review; build nothing before the OK.
+2. **Stage 2 (next):** `client/src/mind/` persona, memory (rolling log + facts, saved), brain (plan/choose/line/emote/reflect prompts + grammars from `validChoices`), scheduler (one WebLLM engine, priority queue, deadlines, tok/s probe); plug into `Env.chooser`; Mind inspector panel; save life state; pet-to-pet talk at home. Then stages 3-6 per V3-PLAN section 7.
 3. Still open from v2 (fold into the plan's ranking): mobile controls (touch D-pad + A/B), VFX polish, demo prep (README credits, 3-min script, CRT-on captures).
 
 ## Gotchas
