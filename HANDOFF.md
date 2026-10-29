@@ -1,6 +1,6 @@
-# HANDOFF: Mindworld rework in progress (2026-10-29 ~10:30 UTC+7)
+# HANDOFF: Mindworld rework v2 in progress (2026-10-29 ~13:00 UTC+7)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and the v2 section at the top of docs/REWORK.md. Do Next actions 1-3 (Cloudflare Access for me, then research + a rework plan for the CRT 2D monster-RPG direction with the moodboard skill via Codex). Show me the plan before building. Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md (v2 status) and the v2 plan in docs/REWORK.md. Do Next actions 1-3: apply the Codex art bible to the pixel build, then the interior + farm, then port the rest of v1. Follow CLAUDE.md (Normal mode, 35% context limit)."
 
 ## Now
 - User play-tested 2026-10-29 morning: too much UI, combat lag/freeze, art "ok not stunning", wants enterable A-frame interior (`visual-ref/house-inside.webp`), decor felt AI slop, TTS voices unfriendly. Plus backlog: bigger lands, monster-battle view, tamed = owned, farm. All folded into `docs/REWORK.md` (stages A-E, vibe analysis of `visual-ref/`; contact sheet `.scratch/visuals/ref-sheet.jpg` = 19 refs in one image, read that instead of the files).
@@ -9,11 +9,23 @@
 - Deploy: `.claude/settings.json` now allows `npx wrangler deploy` (user OK'd). User is setting up Cloudflare Access (one-time PIN to their email) on pets.uryto.dev so we can deploy privately; go public only when the user says. Until the user confirms Access is on, ask before deploying.
 - Credits: Meta $149.91 left; Modal ~$110 of $129.98 left; Baseten ~$0.15 used, balance unknown (`/v1/billing/usage_summary` = PERMISSION_DENIED with the hackathon inference key; needs a workspace management key from the user). All-time LLM+GPU ~$20.
 
-## Next actions (rework v2: see the top of docs/REWORK.md)
-1. **Cloudflare Access for pets.uryto.dev** (user asked Claude to set it up, 2026-10-29): Zero Trust > Access > Applications > Add > Self-hosted, domain `pets.uryto.dev`, policy Allow, include Emails = the user's address (ky124hoangthe@gmail.com), login method One-time PIN. Use Claude in Chrome (TEMP profile is logged in to Cloudflare, see docs/DEPLOY.md). Stop and hand to the user if Zero Trust onboarding asks for a plan choice, payment card or terms. Then exclude nothing (`/api` must also be behind it while private; the live room WebSocket goes through the same host). Verify: a private window hits the Access login. Then build + `npx wrangler deploy` (allowed in `.claude/settings.json`) and smoke-check.
-2. **Research + plan (user reviews before building):** CRT 2D monster-RPG direction. Engine choice (Phaser 3 / plain canvas / PixiJS vs keeping three.js orthographic sprites; keep the Worker + sim + memo + live room), pixel scale, CRT post shader, top-down tile overworld (big lands + bridges), classic battle screen, interior scene, decor grid, owned pets, farm loop, what carries over from `client/src`. Write `docs/REWORK.md` plan section with stages and play-test points.
-3. **Moodboard skill via Codex:** brief Codex (`scripts/codex.ps1`, effort max, one task at a time) to research how Midjourney moodboards/style references work and write `.claude/skills/moodboard/SKILL.md` (+ helpers if useful) that turns refs into a style profile; then have Codex use it to produce the art bible + first consistent assets (check which image tools Codex has; free CC0 pixel packs are allowed, ask the user if a login is needed). Claude reviews the output with the user before building on it.
-The 3D work from today (dock UI, big lands, grass, babble) is committed but superseded visually; reuse logic, not the look.
+## v2 status (2026-10-29 afternoon)
+- Cloudflare Access ON for pets.uryto.dev (app "pets", policy "Owner only" = user's email, OTP; `/` and `/api` both 302 to Access). Zero Trust Free, team `blue-wind-39a8`. Deploy (`wrangler deploy`) was DENIED by the auto-mode classifier: user must run it or allow it.
+- Plan approved (docs/REWORK.md "v2 plan"): plain Canvas2D + own WebGL2 CRT, CC0 tiles snapped to palette + procedural monsters, 3D dropped.
+- Moodboard skill done by Codex (`.claude/skills/moodboard/`, helper `scripts/palette.mjs extract|quantize`, uses worker/node_modules/sharp). Codex HAS ImageGen. Codex run 2 (art bible `docs/STYLE.md` + samples/mockups in `.scratch/art/`) brief: `.scratch/codex-stylebible-brief.md`, result `.scratch/stylebible-codex.md`.
+- Pixel build (`client/pixel.html`, `client/src/pixel/`), commits 349333a S1, dd70ef0 S2a, dfc884f S2b, 6779acb S2c. Tests 180.
+  - S1: low-res canvas (h 216) + WebGL2 CRT (`crt.ts`, C toggles), tile map from layout (`tiles.ts`, 1 unit = 1 tile), overworld walk/camera/trees/banner, pixel text + dialogue (Press Start 2P thresholded).
+  - S2a: battle screen `battle.ts` (script of timed steps; tested), procedural monsters `monster.ts` (genes -> any size), wild pets wander + fight on touch, pet plays `allowedMoves()[0]` (= memoPolicy) with "memo #n"/"instinct" tag. `game/save.ts` extracted (v1 main.ts uses it too).
+  - S2b: `game/party.ts` owned party (save `party`, `active`); P = "Your pets" menu (`menu.ts`); non-active pets idle at home with bubbles.
+  - S2c: T = Teach screen `teach.ts` (DOM input + canvas memo/proof), `game/coach.ts` chain live -> offline. Teach now uses effort low (was truncating ~1/8 at 4000 tokens); Muse Spark open weights answers in 3-6 s.
+  - Dev hook `window.__px` ({world, battleView, update(dt,t), keys, setCrt, state, fight}). Hidden pane: screenshots can be stale; drive with `for(...) { __px.update(.05,t); await 0 }` (await lets the fight script's promises run).
+- Codex run 2 (art bible) was STILL RUNNING at handoff: `docs/STYLE.md` + `.scratch/art/` (mockups `mock-overworld-4x.png`, `mock-battle-4x.png` look great: soft cozy palette, 6x8 font `font-6x8.png`, A-frame, farm plots, Mallow/Sprig monsters, `build.mjs` generator, `manifest.json`). Final report -> `.scratch/stylebible-codex.md`.
+- Codex wrapper gotcha: pass long briefs as a file ("Read .scratch/x.md and do it"); inline multi-line prompts break PowerShell arg parsing.
+
+## Next actions (rework v2)
+1. Read `.scratch/stylebible-codex.md` + `docs/STYLE.md`; user reviews the mockups. Then swap `pixel/art.ts` placeholders and colors for the approved set (tiles with autotiled coast, A-frame, trees, UI frame, 6x8 font instead of Press Start 2P, palette in `monster.ts` ramps) and match the mockup battle layout (portrait in text box, Fight/Teach/Swap/Run menu: Fight = watch the pet play its memo, Teach = Teach screen, Swap = party, Run).
+2. S4: A-frame interior scene (enter by the door, decor grid) + farm loop (pure logic module + tests first: plots, seeds, water, timed growth, sell at market).
+3. Port the rest of v1 `main.ts` onto pixel: NPC/pet chat (Muse Spark), wild re-teach memos (`fetchWildMemos`), boss, ghosts/live room (`world/live.ts`), local Llama coach + voice (power mode), babble; then make pixel.html the index and delete the three.js files (`world/view.ts`, `grass.ts`, `aframe.ts`, `game/scene.ts`, `style.ts`) and the `three` dependency.
 
 ## Gotchas (new)
 - `client-dev` (5173) proxies /api to `worker-live` (8787, real keys). Dev hook `window.__world`; hidden pane stalls rAF: call `__world.update(dt, t)` by hand before screenshots; hide `.overlay` (hatch/hints) for clean shots.
