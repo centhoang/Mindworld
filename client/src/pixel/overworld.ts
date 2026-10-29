@@ -62,6 +62,10 @@ export class Overworld {
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
   farm: Farm | null = null; // set by main.ts; drawn on the beds
+  // The Reader (boss) on its island and the Elder on hers: they stand still; touch the boss to fight it,
+  // press E by the Elder to talk.
+  boss: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
+  elder: { pos: Vec; sprite: HTMLCanvasElement } | null = null;
   // Speech bubbles: "pet", "r<i>" (resident i) or "w<id>" (wild pet) -> text and seconds left.
   private readonly bubbles = new Map<string, { text: string; t: number }>();
 
@@ -72,6 +76,10 @@ export class Overworld {
     this.house = { x: home.x, z: home.z - 2.5 };
     this.beds = Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) }));
     this.placeTrees();
+    const bossIsle = this.world.platforms.find((p) => p.kind === "boss");
+    if (bossIsle) this.boss = { pos: { x: bossIsle.x, z: bossIsle.z - 1 }, sprite: drawMonster(petLook(randomGenes(4242)), 40, "front", BUILDS.bully), cool: 0 };
+    const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
+    if (npcIsle) this.elder = { pos: { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
     this.player = { x: home.x + 0.5, z: home.z + 3.5 };
     this.pet = { x: home.x - 1, z: home.z + 4 };
     this.cam = { ...this.player };
@@ -161,6 +169,10 @@ export class Overworld {
     return best;
   }
 
+  nearElder(): boolean {
+    return !!this.elder && Math.hypot(this.elder.pos.x - this.player.x, this.elder.pos.z - this.player.z) < 2.2;
+  }
+
   nearHome(): boolean {
     return Math.hypot(this.player.x - this.house.x, this.player.z - this.house.z) < 9;
   }
@@ -223,7 +235,7 @@ export class Overworld {
   };
 
   // Returns the wild monster the player just bumped into, if any.
-  update(dt: number, keys: ReadonlySet<string>): Wild | null {
+  update(dt: number, keys: ReadonlySet<string>): Wild | "boss" | null {
     const d = keyDir(keys);
     this.moving = d.x !== 0 || d.z !== 0;
     if (this.moving) {
@@ -269,6 +281,11 @@ export class Overworld {
       }
       if (!met && !w.cool && Math.hypot(w.pos.x - this.player.x, w.pos.z - this.player.z) < MEET_DIST) met = w;
     }
+    const b = this.boss;
+    if (b) {
+      b.cool = Math.max(0, b.cool - dt);
+      if (!met && !b.cool && Math.hypot(b.pos.x - this.player.x, b.pos.z - this.player.z) < MEET_DIST + 0.4) return "boss";
+    }
     return met;
   }
 
@@ -303,6 +320,12 @@ export class Overworld {
     const pf = this.moving ? Math.floor(this.walkT * 8) % 2 : 0;
     items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px - 8, py - 22, 16, 24) });
     const half = OVERWORLD_MON / 2;
+    for (const npc of [this.boss, this.elder]) {
+      if (!npc) continue;
+      const [nx, ny] = toScreen(npc.pos.x, npc.pos.z);
+      const s = npc.sprite;
+      items.push({ z: npc.pos.z, draw: () => g.drawImage(s, nx - s.width / 2, ny - s.height + 2 - (Math.floor(t * 1.5) % 2)) });
+    }
     const [qx, qy] = toScreen(this.pet.x, this.pet.z);
     const hop = Math.floor(t * 4) % 2;
     items.push({ z: this.pet.z, draw: () => g.drawImage(this.petSprite, qx - half, qy - OVERWORLD_MON + 2 - hop) });
@@ -328,7 +351,7 @@ export class Overworld {
     for (const it of items) it.draw();
 
     for (const [who, b] of this.bubbles) {
-      const pos = who === "pet" ? this.pet : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
+      const pos = who === "pet" ? this.pet : who === "elder" ? this.elder?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
       if (!pos) continue;
       const [bx, by] = toScreen(pos.x, pos.z);
       bubble(g, b.text, bx, by - OVERWORLD_MON - 4, sw);

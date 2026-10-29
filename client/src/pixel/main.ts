@@ -2,7 +2,7 @@
 // S2: overworld walking, wild encounters and the battle screen, with the pet playing its taught memo rules
 // (memoPolicy decides at once). Coach/teach, chat and the live room join when main.ts is ported.
 
-import { petLook } from "../game/genes";
+import { petLook, randomGenes } from "../game/genes";
 import { addCoins, coinsFor } from "../game/shop";
 import { load, MAX_TAMED, save } from "../game/save";
 import { addToParty, type PartyMon } from "../game/party";
@@ -20,6 +20,7 @@ import { drawDialogue } from "./text";
 import { loadArt } from "./art";
 import { Babbler } from "../game/babble";
 import { voiceFor, type Speaker } from "../game/chatter";
+import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "../sim/boss";
 import { askNpc, chatWhoFor } from "../game/npc-chat";
 import { askPets, traitOf } from "../game/pet-chat";
 import { Interior } from "./interior";
@@ -134,18 +135,19 @@ const interior = new Interior({
 // capped and cached; scripted lines when offline). The pet stops wandering while you talk.
 const chatForm = document.getElementById("chat") as HTMLFormElement;
 const chatInput = chatForm.querySelector("input")!;
-let chatWith: Wild | null = null;
-function openChat(w: Wild): void {
+let chatWith: Wild | "elder" | null = null;
+const chatKey = (w: Wild | "elder") => (w === "elder" ? "elder" : `w${w.id}`);
+function openChat(w: Wild | "elder"): void {
   chatWith = w;
-  w.wait = 999;
+  if (w !== "elder") w.wait = 999;
   keys.clear();
   chatForm.hidden = false;
   chatInput.value = "";
   chatInput.focus();
-  world.say(`w${w.id}`, "?", 2);
+  world.say(chatKey(w), w === "elder" ? "Ah, a visitor. Ask me anything." : "?", 3);
 }
 function closeChat(): void {
-  if (chatWith) chatWith.wait = 1;
+  if (chatWith && chatWith !== "elder") chatWith.wait = 1;
   chatWith = null;
   chatForm.hidden = true;
   chatInput.blur();
@@ -154,14 +156,14 @@ chatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const w = chatWith;
   const line = chatInput.value.trim();
-  const who = w && chatWhoFor("wild", w.arch);
+  const who = w === "elder" ? "elder" : w && chatWhoFor("wild", w.arch);
   if (!w || !who || !line) return;
   chatInput.value = "";
-  world.say(`w${w.id}`, "...", 20);
+  world.say(chatKey(w), "...", 20);
   void askNpc(who, line).then((r) => {
-    world.say(`w${w.id}`, r.text, 6);
+    world.say(chatKey(w), r.text, 6);
     if (!state.muted) {
-      const v = voiceFor(w.arch);
+      const v = voiceFor(w === "elder" ? "elder" : w.arch);
       babbler.say(r.text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: "triangle" });
     }
   });
@@ -295,6 +297,7 @@ function menuKey(k: string): void {
     if (k === "e" || k === "enter") {
       const bed = world.bedNear();
       if (bed >= 0) useBed(bed);
+      else if (world.nearElder()) openChat("elder");
       else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
       else if (world.atDoor()) {
         mode = "home";
@@ -327,16 +330,25 @@ function side(m: Member): Side {
   return { name: m.name, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3 };
 }
 
-async function fight(w: Wild): Promise<void> {
+// A fight against a wild pet, or "boss": The Reader, which reads your memo rules and counters them until
+// it runs out of focus (sim/boss.ts); a dazed boss can be befriended.
+async function fight(foe: Wild | "boss"): Promise<void> {
   mode = "battle";
   keys.clear();
-  const tactic = wildMemos[w.arch];
-  foeVoice = w.arch;
-  const def = withTactics(ENEMIES[w.arch], tactic);
-  const battle = new Battle({ enemy: w.arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def });
-  const foeName = w.arch[0]!.toUpperCase() + w.arch.slice(1);
-  const look = petLook(w.genes);
-  await battleView.open({ name: foeName, sprite: drawMonster(look, 64, "front", BUILDS[w.arch]), maxHp: def.maxHp, level: 2 + (w.id % 3) }, side(activeMember()));
+  const w = foe === "boss" ? null : foe;
+  const boss: Boss | null = w ? null : makeBoss(state.memo, pet);
+  const arch = w ? w.arch : BOSS_ARCHETYPE;
+  const tactic = w ? wildMemos[w.arch] : undefined;
+  foeVoice = arch;
+  const def = boss ? boss.def : withTactics(ENEMIES[arch], tactic);
+  const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def, ...(boss ? { maxTurns: BOSS_TURNS } : {}) });
+  const foeName = boss ? BOSS_STATS.label : arch[0]!.toUpperCase() + arch.slice(1);
+  const foeSprite = boss ? drawMonster(petLook(randomGenes(4242)), 80, "front", BUILDS.bully) : drawMonster(petLook(w!.genes), 64, "front", BUILDS[arch]);
+  await battleView.open({ name: foeName, sprite: foeSprite, maxHp: def.maxHp, level: boss ? 9 : 2 + (w!.id % 3) }, side(activeMember()));
+  if (boss) {
+    await battleView.say(wildMemos.boss?.summary ? `"${wildMemos.boss.summary}"` : `"I can read your pet's memo. Every rule. Surprise me."`);
+    await battleView.say(`It loses focus after ${BOSS_FOCUS} reads. A dazed boss might make friends.`);
+  }
   // Fight = watch the pet play its memo; Teach = change the memo first; Swap = next party member; Run = leave.
   for (;;) {
     const c = await battleView.choose();
@@ -356,7 +368,8 @@ async function fight(w: Wild): Promise<void> {
       }
     } else {
       await battleView.say("You slip away safely.");
-      w.cool = 8;
+      if (w) w.cool = 8;
+      else world.boss!.cool = 8;
       mode = "world";
       return;
     }
@@ -369,6 +382,9 @@ async function fight(w: Wild): Promise<void> {
     const tag = allowed.rule !== null ? `memo #${allowed.rule + 1}` : "instinct";
     const rec = battle.step(action);
     await battleView.playTurn(action, cannedLine(action, obs.turn), tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp);
+    const read = boss?.reads.find((r) => r.turn === obs.turn);
+    if (read) await battleView.say(`It read memo #${read.rule + 1}! ${read.did === "idle" ? "It faked the tell." : "It hit hard anyway."}`, "boss read");
+    else if (boss?.dazedTurns.includes(obs.turn)) await battleView.say(`${foeName} is dazed: it can't read you now.`, "dazed");
   }
   const replay = battle.replay();
   await battleView.end(replay.outcome, replay.how);
@@ -376,20 +392,27 @@ async function fight(w: Wild): Promise<void> {
     const earned = coinsFor(replay.outcome, replay.how);
     state.coins = addCoins(state.coins ?? 0, earned);
     let msg = `+${earned} coins.`;
-    if (replay.how === "befriended") {
+    if (replay.how === "befriended" && w) {
       state.tamed = [...(state.tamed ?? []), w.arch].slice(-MAX_TAMED); // v1 readers
       state.party = addToParty(state.party ?? [], w.arch, w.genes);
       state.active = Math.min(state.active ?? 0, state.party.length);
       refreshParty();
       msg = `${state.party.at(-1)!.name} the ${w.arch} is yours now! It waits at your corner. ${msg}`;
     }
+    if (boss) msg = `You outsmarted The Reader! ${msg}`;
     await battleView.say(msg);
-    world.removeWild(w.id);
-    const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
-    if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
-  } else w.cool = 8; // give the player time to walk away
-  state.recent = [...state.recent, replay].slice(-8);
-  state.steps = { ...state.steps, fought: true };
+    if (w) {
+      world.removeWild(w.id);
+      const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
+      if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
+    } else world.boss!.cool = 10;
+  } else {
+    if (boss) await battleView.say("Tip: it reads your rules. Teach a plan it can't predict, then come back.");
+    if (w) w.cool = 8; // give the player time to walk away
+    else world.boss!.cool = 10;
+  }
+  if (!boss) state.recent = [...state.recent, replay].slice(-8);
+  state.steps = { ...state.steps, fought: true, ...(boss && replay.outcome === "win" ? { boss: true } : {}) };
   save(state);
   mode = "world";
 }
