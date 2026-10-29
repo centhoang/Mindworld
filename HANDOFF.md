@@ -58,6 +58,12 @@ Working agreements (in CLAUDE.md): short reports, ask the user only for importan
 2b. DONE: boss log hint for befriend odds (live).
 5. `docs/DEMO.md` draft exists but predates the pivot: rewrite for Mindworld / Build for Your World after the world features settle.
 
+## User backlog (2026-10-29 morning, not yet prioritized)
+- Bigger islands: grounds feel small; bridges should read as links between real lands (larger radius, shorter visible bridges, terrain detail).
+- Classic monster-battle view: battle camera/layout in the genre style (pets facing off on two platforms, info boxes with HP, move menu at bottom). Original art and UI, no copied assets.
+- Tamed = owned: tamed wild pets become selectable as your active pet to walk the world; the rest live at your corner and chill/play together (idle activities).
+- Farm at your corner: free carrot seeds + plots; plant, water, timed growth, harvest, sell at market; shop: slower but higher-value seeds, fertilizer (faster/more), pesticide, chickens + feed -> eggs. Simple and addictive loop; feeds coins/decor economy.
+
 ## Mindworld next (in order)
 0. **TOP PRIORITY (user, 2026-10-29): cozy, cute, beautiful at first sight** (judges, X viewers, players must not dislike it on sight). Research first, write findings to `docs/VISUALS.md`: look for Claude skills/plugins for game art or three.js visuals (SearchSkills/SearchPlugins), free-to-use asset packs (CC0 low-poly/voxel: e.g. Kenney, Quaternius, KayKit, Poly Pizza; check each license, credit in README), and three.js techniques (toon/soft shading, outlines, soft shadows, warm palette + gradient sky, ambient occlusion, bloom, gentle idle animations, particles, water/clouds under the islands). Keep the bundle small and Meta-only for models (art assets are not models, fine). Then restyle the world + battle view and show the user screenshots before/after.
 0b. **Each player's corner = an A-frame house** (user): the pet and player can go inside (or into a cozy porch area) to chill; the player decorates it (inside + plot). Corners of other players show their A-frame + decor.
