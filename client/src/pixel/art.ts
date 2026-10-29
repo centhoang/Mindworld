@@ -24,7 +24,7 @@ const FILES = [
   "tile-bridge", "tile-crop-states", "prop-tree", "prop-house-aframe", "ui-frame-12", "font-6x8", "player-walk", "props-decor",
   "interior-empty", "monster-mallow-back", "monster-sprig-back", "market-stall", "elder-npc",
 ] as const;
-const OPTIONAL = ["props-grounds"] as const; // newer sheets: the game draws code stand-ins until they exist
+const OPTIONAL = ["props-grounds", "npc-mo", "npc-ama", "npc-pip"] as const; // newer sheets: the game draws code stand-ins until they exist
 export type ArtName = (typeof FILES)[number] | (typeof OPTIONAL)[number];
 
 const art = new Map<string, HTMLImageElement>();
@@ -202,8 +202,8 @@ export function spriteFrame(s: Sprite, moving: boolean, walkT: number, t: number
 // views get code-drawn arms (near arm over the body, far arm behind it) swinging against the stride.
 const LEG_TOP = [19, 20, 20, 19]; // first leg row per direction (rows above it come from the art)
 const SIDE_SWING = [-1, 0, 1, 0]; // near arm per walk frame: back while the near leg is ahead
-export function makePlayer(): Sprite {
-  const src = art.get("player-walk");
+export function makePlayer(sheet: ArtName = "player-walk"): Sprite {
+  const src = art.get(sheet);
   if (!src) return drawnPlayer();
   const [c, g] = canvas(96, 96);
   for (let d = 0; d < 4; d++) {

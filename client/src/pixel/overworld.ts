@@ -7,7 +7,7 @@ import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
-import { drawCrop, drawMapTile, drawProp, hasArt, HOUSE, img, MARKET_STALL, makePlayer, PAL, spriteFrame, TREE, type Sprite } from "./art";
+import { drawCrop, drawMapTile, drawProp, hasArt, HOUSE, img, MARKET_STALL, makePlayer, PAL, spriteFrame, TREE, type ArtName, type Sprite } from "./art";
 import { drawSpotProp } from "./grounds-draw";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
@@ -261,10 +261,17 @@ export class Overworld {
     return false;
   }
 
-  // Mo, Ama and Pip: the player's sheet hue-shifted (3 NPC bodies from Codex can replace these later).
+  // Mo, Ama and Pip: their own sheets (npc-*.png) through the player's frame builder, else the player's
+  // sheet hue-shifted.
   private npcSprite(id: Npc): Sprite {
     let s = this.npcSprites.get(id);
     if (s) return s;
+    const own = `npc-${id}` as ArtName;
+    if (hasArt(own)) {
+      s = makePlayer(own); // Codex body + the code-drawn walk frames
+      this.npcSprites.set(id, s);
+      return s;
+    }
     const base = this.playerSprite;
     const c = document.createElement("canvas");
     [c.width, c.height] = [base.img.width, base.img.height];
@@ -686,6 +693,17 @@ export class Overworld {
       const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep") ? 3 : 0;
       const f = spriteFrame(s, walking, t + NPCS.indexOf(a.id as Npc), t);
       items.push({ z: a.pos.z, draw: () => g.drawImage(s.img, f * 16, dir * 24, 16, 24 - sit, nx - 8, ny - 22 + sit, 16, 24 - sit) });
+    }
+    // A picnic away from a picnic hill (the NPCs on the plaza) spreads its own blanket.
+    for (const gt of [...this.life.gatherings, ...(this.npcs?.v.gatherings ?? [])]) {
+      if (gt.act !== "picnic" || !gt.started) continue;
+      if (this.world.platforms.some((p) => p.spots?.blanket && Math.hypot(p.spots.blanket.x - gt.at.x, p.spots.blanket.z - gt.at.z) < 4)) continue;
+      const ps = [...this.life.agents, ...(this.npcs?.v.agents ?? [])].filter((a) => gt.members.includes(a.id) && a.gather === gt.id);
+      if (!ps.length) continue;
+      const cx = ps.reduce((sum, a) => sum + a.pos.x, 0) / ps.length; // under the group, wherever they sat down
+      const cz = ps.reduce((sum, a) => sum + a.pos.z, 0) / ps.length;
+      const [bx, by] = toScreen(cx, cz + 0.7);
+      items.push({ z: cz - 9, draw: () => drawSpotProp(g, "blanket", bx, by, t) });
     }
     // A ball bounces between pets playing together.
     for (const gt of this.life.gatherings) {
