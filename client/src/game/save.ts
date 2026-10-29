@@ -33,6 +33,7 @@ export interface Save {
   active?: number; // v2: who walks and fights: 0 = hatched pet, i = party[i - 1]
   farm?: Farm; // v2: the beds beside your A-frame, seeds and the harvest basket
   room?: Piece[]; // v2: furniture inside your A-frame
+  groundSeed?: number; // v3: your ground's shape + theme (world/ground.ts), rolled once
 }
 
 export function load(): Save {
@@ -61,6 +62,7 @@ export function load(): Save {
         })(),
         ...(raw.farm ? { farm: parseFarm(raw.farm) } : {}),
         ...(raw.room ? { room: parseRoom(raw.room) } : {}),
+        ...(typeof raw.groundSeed === "number" && Number.isInteger(raw.groundSeed) && raw.groundSeed > 0 && raw.groundSeed < 2 ** 31 ? { groundSeed: raw.groundSeed } : {}),
         ...(parseOnboard(raw.onboard) ? { onboard: parseOnboard(raw.onboard) } : {}),
         ...(raw.steps && typeof raw.steps === "object"
           ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true, shipped: raw.steps.shipped === true } }

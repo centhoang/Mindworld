@@ -1,8 +1,9 @@
 import { parseGhostMemo, type GhostMemo } from "./memo-dsl";
 
 // Live room logic (pure, no Workers APIs, so it is unit-tested directly). One room per world: players
-// who are online see each other's avatar + pet walk around, wave with emotes, and the first three get a
-// corner. The Durable Object in room-do.ts owns the sockets; this file validates every message, rate-limits
+// who are online see each other's avatar + pet walk around and wave with emotes. Each player gets a slot
+// for their ground (the client draws it from the seed in their hello); when they leave, the ground stays
+// as a ghost ground for AWAY_MS (the same seed coming back takes its slot again), then the slot frees. The Durable Object in room-do.ts owns the sockets; this file validates every message, rate-limits
 // each socket and says who gets what.
 //
 // Duels: A challenges B (A's memo + genes ride along), B accepts with its own; the room picks the seed and
@@ -18,10 +19,11 @@ export const SAY_MAX = 80;
 export const SAY_GAP_MS = 1500;
 export const DUEL_TTL_MS = 30_000;
 const DUEL_COST = 4; // extra tokens per challenge, so nobody spams invites
-export const CORNERS = 3;
+export const CORNERS = 24; // ground slots on the ring around the hub (client: world/layout SLOTS)
+export const AWAY_MS = 10 * 60_000;
 export const EMOTES = ["wave", "heart", "dance", "laugh"] as const;
 export type Emote = (typeof EMOTES)[number];
-const WORLD_LIMIT = 40; // |x|, |z| bound of the island grid, with margin
+const WORLD_LIMIT = 160; // |x|, |z| bound of the ground ring, with margin
 const RATE_PER_S = 12; // token bucket refill (positions are <= 10 Hz plus the odd emote)
 const BURST = 20;
 const MAX_STRIKES = 60; // dropped messages before the socket is closed
@@ -61,6 +63,7 @@ export interface Peer {
   px: number; // pet position
   pz: number;
   corner: number | null;
+  seed: number; // ground seed: the client draws this player's ground from it
   tokens: number;
   at: number; // last token refill, ms
   strikes: number;
@@ -68,10 +71,20 @@ export interface Peer {
   sayAt?: number; // last chat line, ms
 }
 
-export type PublicPeer = Pick<Peer, "id" | "name" | "genes" | "x" | "z" | "px" | "pz" | "corner">;
+export type PublicPeer = Pick<Peer, "id" | "name" | "genes" | "x" | "z" | "px" | "pz" | "corner" | "seed">;
+
+// A ground whose owner left: kept on its slot until `until` (ms).
+export interface Away {
+  slot: number;
+  name: string;
+  seed: number;
+  until: number;
+}
+export type PublicAway = Omit<Away, "until"> & { ttl: number }; // ms left (clients' clocks differ)
 
 export type ServerMsg =
-  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[] }
+  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[] }
+  | { t: "away"; away: PublicAway }
   | { t: "join"; peer: PublicPeer }
   | { t: "leave"; id: string }
   | { t: "pos"; id: string; x: number; z: number; px: number; pz: number }
@@ -94,7 +107,9 @@ export interface MessageResult {
   changed?: boolean; // the peer's state changed (persist it)
 }
 
-export const publicPeer = (p: Peer): PublicPeer => ({ id: p.id, name: p.name, genes: p.genes, x: p.x, z: p.z, px: p.px, pz: p.pz, corner: p.corner });
+export const publicPeer = (p: Peer): PublicPeer => ({ id: p.id, name: p.name, genes: p.genes, x: p.x, z: p.z, px: p.px, pz: p.pz, corner: p.corner, seed: p.seed });
+const publicAway = (a: Away, now: number): PublicAway => ({ slot: a.slot, name: a.name, seed: a.seed, ttl: Math.max(0, a.until - now) });
+export const cleanSeed = (v: unknown): number => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < 2 ** 31 ? v : 0);
 
 export function cleanName(v: unknown): string {
   if (typeof v !== "string") return "";
@@ -115,6 +130,8 @@ const coord = (v: unknown): number | null =>
 
 export class Room {
   readonly peers = new Map<string, Peer>();
+  aways: Away[] = []; // ghost grounds (the DO stores them: they outlive every socket)
+  awaysChanged = false;
   private readonly dirty = new Set<string>(); // peers changed as a side effect (persist their attachment)
 
   constructor(private readonly random: () => number = Math.random) {}
@@ -130,10 +147,30 @@ export class Room {
     this.peers.set(p.id, p);
   }
 
-  private freeCorner(): number | null {
+  restoreAways(list: unknown): void {
+    if (!Array.isArray(list)) return;
+    this.aways = list
+      .filter((a): a is Away => !!a && typeof a === "object" && Number.isInteger(a.slot) && a.slot >= 0 && a.slot < CORNERS && typeof a.until === "number")
+      .map((a) => ({ slot: a.slot, name: cleanName(a.name) || "Visitor", seed: cleanSeed(a.seed), until: a.until }));
+  }
+
+  private setAways(next: Away[]): void {
+    if (next.length !== this.aways.length || next.some((a, i) => a !== this.aways[i])) this.awaysChanged = true;
+    this.aways = next;
+  }
+
+  // A slot for a new player: their own ghost ground first (same seed, back within AWAY_MS), else the first
+  // slot nobody holds, else the ghost ground closest to expiring.
+  private takeSlot(seed: number, now: number): number | null {
+    this.setAways(this.aways.filter((a) => a.until > now));
     const used = new Set([...this.peers.values()].map((p) => p.corner));
-    for (let c = 0; c < CORNERS; c++) if (!used.has(c)) return c;
-    return null;
+    const mine = seed ? this.aways.find((a) => a.seed === seed && !used.has(a.slot)) : undefined;
+    const held = new Set([...used, ...this.aways.map((a) => a.slot)]);
+    let slot = mine?.slot ?? null;
+    for (let c = 0; slot === null && c < CORNERS; c++) if (!held.has(c)) slot = c;
+    if (slot === null) slot = [...this.aways].sort((a, b) => a.until - b.until).find((a) => !used.has(a.slot))?.slot ?? null;
+    if (slot !== null) this.setAways(this.aways.filter((a) => a.slot !== slot));
+    return slot;
   }
 
   // A new socket says hello. Returns null when the room is full (the DO answers {t:"full"} and closes).
@@ -148,7 +185,8 @@ export class Room {
       z: coord(o.z) ?? 0.5,
       px: coord(o.px) ?? -1,
       pz: coord(o.pz) ?? 2.5,
-      corner: this.freeCorner(),
+      corner: this.takeSlot(cleanSeed(o.groundSeed), now),
+      seed: cleanSeed(o.groundSeed),
       tokens: BURST,
       at: now,
       strikes: 0,
@@ -158,17 +196,22 @@ export class Room {
     return {
       peer,
       out: [
-        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others } },
+        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)) } },
         { to: "others", msg: { t: "join", peer: publicPeer(peer) } },
       ],
     };
   }
 
-  leave(id: string): Out[] {
+  leave(id: string, now = Date.now()): Out[] {
     const me = this.peers.get(id);
     if (!me) return [];
     this.peers.delete(id);
     const out: Out[] = [{ to: "others", msg: { t: "leave", id } }];
+    if (me.corner !== null) {
+      const away: Away = { slot: me.corner, name: me.name, seed: me.seed, until: now + AWAY_MS };
+      this.setAways([...this.aways.filter((a) => a.until > now && a.slot !== me.corner), away]);
+      out.push({ to: "others", msg: { t: "away", away: publicAway(away, now) } });
+    }
     for (const p of this.peers.values()) {
       if (p.duel?.to === id) {
         out.push({ to: { id: p.id }, msg: { t: "duelEnd", duel: p.duel.id, reason: "gone" } });

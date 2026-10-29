@@ -3,7 +3,7 @@ import { generateWorld } from "../world/layout";
 import { buildTileMap, T, tileAt, tileWalkable } from "./tiles";
 
 describe("tile map", () => {
-  const world = generateWorld();
+  const world = generateWorld({ me: { seed: 3, slot: 0 }, others: [{ id: "a", name: "A", seed: 4, slot: 1 }], roomSeed: 2, day: 1 });
   const m = buildTileMap(world);
 
   it("covers every platform with a water margin", () => {

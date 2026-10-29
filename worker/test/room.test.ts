@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanGenes, Room, ROOM_MAX_PEERS } from "../src/room";
+import { AWAY_MS, cleanGenes, CORNERS, Room, ROOM_MAX_PEERS } from "../src/room";
 import { harness } from "./helpers";
 
 const pos = (x: number, z: number) => JSON.stringify({ t: "pos", x, z, px: x - 1, pz: z + 1 });
@@ -16,14 +16,49 @@ describe("live room", () => {
     expect(JSON.stringify(welcome)).not.toContain("tokens"); // internal fields stay on the server
   });
 
-  it("gives out the three corners, then none, and frees a corner on leave", () => {
+  it("gives every player a ground slot and frees it once the ghost ground expires", () => {
     const r = new Room();
-    for (const id of ["a", "b", "c", "d"]) r.join(id, {}, 0);
-    expect([...r.peers.values()].map((p) => p.corner)).toEqual([0, 1, 2, null]);
-    expect(r.leave("b")).toEqual([{ to: "others", msg: { t: "leave", id: "b" } }]);
+    for (const id of ["a", "b", "c"]) r.join(id, { groundSeed: id.charCodeAt(0) }, 0);
+    expect([...r.peers.values()].map((p) => [p.corner, p.seed])).toEqual([[0, 97], [1, 98], [2, 99]]);
+    const out = r.leave("b", 1000);
+    expect(out[0]).toEqual({ to: "others", msg: { t: "leave", id: "b" } });
+    expect(out[1]!.msg).toEqual({ t: "away", away: { slot: 1, name: "Visitor", seed: 98, ttl: AWAY_MS } });
     expect(r.leave("b")).toEqual([]);
-    expect(r.join("e", {}, 0)!.peer.corner).toBe(1);
-    expect(r.join("f", { name: "" }, 0)!.peer.name).toBe("Visitor");
+    // While b's ground is a ghost, newcomers skip its slot...
+    expect(r.join("d", { groundSeed: 5 }, 2000)!.peer.corner).toBe(3);
+    const w = r.join("e", {}, 3000)!.out[0]!.msg;
+    expect(w).toMatchObject({ t: "welcome", corner: 4, aways: [{ slot: 1, seed: 98, ttl: AWAY_MS - 2000 }] });
+    // ...after it expires the slot is free again.
+    expect(r.join("f", { name: "" }, 1000 + AWAY_MS + 1)!.peer).toMatchObject({ corner: 1, name: "Visitor" });
+    expect(r.aways).toEqual([]);
+  });
+
+  it("gives a returning player their own ghost ground back", () => {
+    const r = new Room();
+    r.join("a", { groundSeed: 11 }, 0);
+    r.join("b", { groundSeed: 22 }, 0);
+    r.leave("a", 10);
+    r.awaysChanged = false;
+    expect(r.join("a2", { groundSeed: 11 }, 20)!.peer.corner).toBe(0);
+    expect(r.aways).toEqual([]);
+    expect(r.awaysChanged).toBe(true);
+  });
+
+  it("takes the ghost ground closest to expiring when every slot is held", () => {
+    const r = new Room();
+    for (let n = 0; n < CORNERS; n++) r.join(`p${n}`, { groundSeed: n + 1 }, 0);
+    r.leave("p5", 100);
+    r.leave("p3", 50);
+    expect(r.join("x", { groundSeed: 999 }, 200)!.peer.corner).toBe(3);
+    expect(r.aways.map((a) => a.slot)).toEqual([5]);
+  });
+
+  it("restores stored ghost grounds and drops junk", () => {
+    const r = new Room();
+    r.restoreAways([{ slot: 2, name: "Mo<b>", seed: 7, until: 99 }, { slot: 99, until: 1 }, null, "x"]);
+    expect(r.aways).toEqual([{ slot: 2, name: "Mob", seed: 7, until: 99 }]);
+    r.restoreAways("junk");
+    expect(r.aways).toHaveLength(1);
   });
 
   it("is full at the cap", () => {

@@ -2,16 +2,17 @@
 // camera and the place banner. Game rules (movement, the map) come from ../world; this file only decides
 // what is where on screen.
 
-import { generateWorld, platformAt, type WorldMap } from "../world/layout";
+import { generateWorld, onGround, platformAt, worldDay, type LayoutInput, type Platform, type WorldMap } from "../world/layout";
 import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../world/movement";
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
 import { drawCrop, drawMapTile, drawProp, hasArt, HOUSE, img, MARKET_STALL, makePlayer, PAL, spriteFrame, TREE, type Sprite } from "./art";
+import { drawSpotProp } from "./grounds-draw";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
-import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
+import { buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
 import { ACTIVITY } from "../life/activities";
 import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
@@ -49,12 +50,14 @@ interface Resident {
 }
 
 export class Overworld {
-  readonly world: WorldMap;
-  readonly map: TileMap;
-  readonly trees: Vec[] = [];
+  world!: WorldMap;
+  map!: TileMap;
+  trees: Vec[] = [];
   private readonly treeTiles = new Set<number>();
-  player: Vec;
-  pet: Vec;
+  private layoutIn: LayoutInput;
+  houses: Vec[] = []; // other players' A-frames (props only; yours is `house`)
+  player: Vec = { x: 0, z: 0 };
+  pet: Vec = { x: 0, z: 0 };
   private dir: Dir = 0;
   private moving = false;
   private walkT = 0;
@@ -92,26 +95,49 @@ export class Overworld {
   // Speech bubbles: "pet", "r<i>" (resident i) or "w<id>" (wild pet) -> text and seconds left.
   private readonly bubbles = new Map<string, { text: string; t: number }>();
 
-  constructor(petGenes: Genes) {
-    this.world = generateWorld();
-    this.map = buildTileMap(this.world);
-    const home = this.world.platforms.find((p) => p.kind === "home")!;
-    this.house = { x: home.x, z: home.z - 2.5 };
-    this.beds = Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) }));
+  constructor(petGenes: Genes, groundSeed = 1) {
+    this.layoutIn = { me: { seed: groundSeed, slot: 0 }, roomSeed: 1, day: worldDay() };
+    this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
+    this.lifeEnv = { spots: { home: [], bowl: [], bed: [], lawn: [] }, canWalk: this.canWalk, rng: mulberry32(Date.now() % 1e9) };
+    this.relayout();
+    // The hub never moves: its people and props are placed once.
     const market = this.world.platforms.find((p) => p.kind === "market");
     if (market) this.stall = { x: market.x, z: market.z - 1 };
-    this.placeTrees();
     const bossIsle = this.world.platforms.find((p) => p.kind === "boss");
     if (bossIsle) this.boss = { pos: { x: bossIsle.x, z: bossIsle.z - 1 }, sprite: drawMonster(petLook(randomGenes(4242)), 40, "front", BUILDS.bully), cool: 0 };
     const eventIsle = this.world.platforms.find((p) => p.kind === "event");
     if (eventIsle) this.ghostStone = { pos: { x: eventIsle.x, z: eventIsle.z - 1 }, sprite: ghostSprite(), cool: 0 };
     const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
     if (npcIsle) this.elder = { pos: { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
-    this.player = { x: home.x + 0.5, z: home.z + 3.5 };
-    this.pet = { x: home.x - 1, z: home.z + 4 };
-    this.cam = { ...this.player };
-    this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
+    this.relayout(); // again, so trees keep clear of the stall
     for (const p of this.world.platforms) if (p.kind === "wild") for (let i = 0; i < WILD_PER_MEADOW; i++) this.spawnWild(p.x, p.z, p.r);
+  }
+
+  get home(): Platform {
+    return this.world.platforms.find((p) => p.kind === "home")!;
+  }
+
+  get day(): number {
+    return this.layoutIn.day ?? 0;
+  }
+
+  // Rebuild the map from who holds which slot (live room), the room seed and the shared day. Your ground
+  // may move (the room gave you a slot): your pets, their mess and you (if you were home) move with it.
+  relayout(next: Partial<LayoutInput> = {}): void {
+    const old = this.world ? this.home : null;
+    const wasHome = !!old && onGround(old, this.player.x, this.player.z);
+    this.layoutIn = { ...this.layoutIn, ...next };
+    this.world = generateWorld(this.layoutIn);
+    this.map = buildTileMap(this.world);
+    const home = this.home;
+    const dx = old ? home.x - old.x : 0;
+    const dz = old ? home.z - old.z : 0;
+    this.house = { x: home.x, z: home.z - 2.5 };
+    this.houses = this.world.platforms.filter((p) => p.kind === "ground").map((p) => ({ x: p.x, z: p.z - 2.5 }));
+    this.beds = Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) }));
+    this.trees = [];
+    this.treeTiles.clear();
+    this.placeTrees();
     this.bowl = { x: this.house.x - 3, z: this.house.z + 1.6 };
     const lawn: Vec[] = [];
     for (let i = 0; i < 24; i++) {
@@ -120,13 +146,29 @@ export class Overworld {
       const q = { x: home.x + Math.cos(a) * d, z: home.z + 1 + Math.sin(a) * d };
       if (this.canWalk(q.x, q.z)) lawn.push(q);
     }
-    const spots: Spots = {
+    this.lifeEnv.spots = {
       home: [{ x: home.x, z: home.z + 2 }],
       bowl: [{ x: this.bowl.x, z: this.bowl.z + 0.5 }, { x: this.bowl.x - 0.8, z: this.bowl.z + 0.2 }],
       bed: [{ x: this.house.x - 2, z: this.house.z + 0.7 }, { x: this.house.x + 2, z: this.house.z + 0.7 }, { x: this.house.x - 2.6, z: this.house.z + 1.3 }],
       lawn,
     };
-    this.lifeEnv = { spots, canWalk: this.canWalk, rng: mulberry32(Date.now() % 1e9) };
+    if (dx || dz) {
+      const move = (v: Vec) => {
+        v.x += dx;
+        v.z += dz;
+      };
+      for (const a of this.life.agents) (move(a.pos), move(a.target));
+      for (const m of this.life.messes) move(m.pos);
+      for (const g of this.life.gatherings) move(g.at);
+      if (wasHome) [this.player, this.pet, this.cam].forEach(move);
+    }
+    // Standing on a ground that just went away (a ghost slot freed, the day's playground moved): go home.
+    if (!old || !this.canWalk(this.player.x, this.player.z)) {
+      this.player = { x: home.x + 0.5, z: home.z + 3.5 };
+      this.pet = { x: home.x - 1, z: home.z + 4 };
+      this.cam = { ...this.player };
+    }
+    if (!this.canWalk(this.pet.x, this.pet.z)) this.pet = { x: this.player.x - 0.8, z: this.player.z + 0.5 };
   }
 
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
@@ -139,10 +181,15 @@ export class Overworld {
         const x = m.ox + i + 0.5;
         const z = m.oz + j + 0.5;
         const p = platformAt(this.world, x, z);
-        if (!p) continue;
+        if (!p || p.kind === "islet") continue;
         const d = Math.hypot(x - p.x, z - p.z);
-        const ring = d > p.r - 4 && d < p.r - 1.5;
-        if (!(ring ? hash2(i, j, 9) < 0.22 : hash2(i, j, 9) < 0.012)) continue;
+        const ring = p.ground
+          ? [[-3, 0], [3, 0], [0, -3], [0, 3]].some(([di, dj]) => m.kind[(j + dj!) * m.w + i + di!] === T.water)
+          : d > p.r - 4 && d < p.r - 1.5;
+        const h = hash2(i + m.ox, j + m.oz, 9);
+        if (!(ring ? h < 0.22 : h < 0.012)) continue;
+        if (p.spots && Object.values(p.spots).some((s) => Math.abs(s.x - x) < 3.5 && Math.abs(s.z - z) < 3.5)) continue;
+        if (this.houses.some((hs) => Math.abs(x - hs.x) < 3.5 && Math.abs(z - hs.z + 1) < 3.5)) continue;
         if (this.nearPath(i, j)) continue;
         if (this.trees.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5)) continue;
         if (Math.abs(x - this.house.x) < 3.5 && Math.abs(z - this.house.z + 1) < 3.5) continue;
@@ -348,6 +395,7 @@ export class Overworld {
   readonly canWalk = (x: number, z: number): boolean => {
     if (!tileWalkable(this.map, x, z)) return false;
     if (Math.abs(x - this.house.x) < 1.6 && z < this.house.z + 0.2 && z > this.house.z - 2.2) return false;
+    if (this.houses.some((h) => Math.abs(x - h.x) < 1.6 && z < h.z + 0.2 && z > h.z - 2.2)) return false;
     if (this.stall && Math.abs(x - this.stall.x) < 1.4 && z < this.stall.z + 0.2 && z > this.stall.z - 1.4) return false;
     if (this.beds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
     const i = Math.floor(x - this.map.ox);
@@ -461,11 +509,25 @@ export class Overworld {
     for (const tr of this.trees) {
       const [sx, sy] = toScreen(tr.x, tr.z);
       if (sx < -32 || sy < -48 || sx > sw + 32 || sy > sh + 48) continue;
-      items.push({ z: tr.z, draw: () => drawProp(g, TREE, sx, sy + 4) });
+      const look = lookAt(m, Math.floor(tr.x), Math.floor(tr.z));
+      items.push({ z: tr.z, draw: () => drawProp(g, TREE, sx, sy + 4, look) });
     }
     {
       const [hx, hy] = toScreen(this.house.x, this.house.z);
       items.push({ z: this.house.z, draw: () => drawProp(g, HOUSE, hx, hy) });
+    }
+    for (const h of this.houses) {
+      const [hx, hy] = toScreen(h.x, h.z);
+      if (hx < -48 || hy < -16 || hx > sw + 48 || hy > sh + 64) continue;
+      items.push({ z: h.z, draw: () => drawProp(g, HOUSE, hx, hy, lookAt(m, Math.floor(h.x), Math.floor(h.z))) });
+    }
+    for (const p of this.world.platforms) {
+      if (!p.spots) continue;
+      for (const [name, at] of Object.entries(p.spots)) {
+        const [sx, sy] = toScreen(at.x, at.z);
+        if (sx < -48 || sy < -48 || sx > sw + 48 || sy > sh + 48) continue;
+        items.push({ z: at.z - (name === "blanket" || name === "dock" ? 9 : 0), draw: () => drawSpotProp(g, name, sx, sy, t) });
+      }
     }
     const [px, py] = toScreen(this.player.x, this.player.z);
     const pf = spriteFrame(this.playerSprite, this.moving, this.walkT, t);

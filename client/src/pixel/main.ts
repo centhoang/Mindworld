@@ -4,7 +4,9 @@
 import { parseGenes, petLook, randomGenes } from "../game/genes";
 import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
 import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
-import { EMOTES, LiveLink, liveName, roomUrl, SAY_MAX, type Emote } from "../world/live";
+import { EMOTES, LiveLink, liveName, roomUrl, SAY_MAX, type Emote, type LivePeer } from "../world/live";
+import { worldDay, type GroundOwner } from "../world/layout";
+import { newGroundSeed } from "../world/ground";
 import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
 import { addCoins, coinsFor } from "../game/shop";
 import { load, MAX_TAMED, save } from "../game/save";
@@ -59,7 +61,11 @@ const out = document.getElementById("screen") as HTMLCanvasElement;
 const low = document.createElement("canvas");
 const g = low.getContext("2d")!;
 const presenter = makePresenter(out);
-const world = new Overworld(state.genes);
+if (!state.groundSeed) {
+  state.groundSeed = newGroundSeed() || 1;
+  save(state);
+}
+const world = new Overworld(state.genes, state.groundSeed);
 
 // Who is out with you: 0 = the hatched pet, i = party[i - 1]. Everyone else lives at your corner.
 interface Member { name: string; genes: Genes; arch?: PartyMon["arch"] }
@@ -466,20 +472,63 @@ function coolFoe(foe: Wild | "boss" | "ghost"): void {
 // Your own other tabs (same save, so the same pet) are left out of the world.
 const myGenes = () => activeMember().genes;
 const sameSave = (g: Genes) => JSON.stringify(g) === JSON.stringify(myGenes());
-const addPeer = (p: { id: string; name: string; genes: Genes; x: number; z: number; px: number; pz: number }) => {
+const addPeer = (p: LivePeer) => {
   if (!sameSave(p.genes)) world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz);
 };
-const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()), genes: myGenes(), ...world.me }), {
-  welcome: (_id, _corner, peers) => {
+// Grounds: every player in the room holds a slot on the ring; their ground is drawn from the seed in their
+// hello. A player who leaves leaves a ghost ground for 10 min. Any change rebuilds the map (same on every
+// client); so does the shared day (in-between grounds) and a ghost ground expiring.
+const grounds = new Map<string, GroundOwner>(); // live id -> ground
+const aways = new Map<number, { g: GroundOwner; until: number }>(); // slot -> ghost ground
+let mySlot = 0;
+const ROOM_SEED = [...roomUrl(location)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
+const relayoutGrounds = () => {
+  const now = Date.now();
+  for (const [slot, a] of aways) if (a.until <= now) aways.delete(slot);
+  world.relayout({ me: { seed: state.groundSeed!, slot: mySlot }, others: [...grounds.values(), ...[...aways.values()].map((a) => a.g)], roomSeed: ROOM_SEED, day: worldDay(now) });
+};
+const trackGround = (p: LivePeer) => {
+  if (p.corner === null || sameSave(p.genes)) return;
+  aways.delete(p.corner);
+  grounds.set(p.id, { id: p.id, name: p.name, seed: p.seed || ([...p.id].reduce((h, c) => h * 33 + c.charCodeAt(0), 5) % 2 ** 31) + 1, slot: p.corner });
+};
+setInterval(() => {
+  const due = [...aways.values()].some((a) => a.until <= Date.now());
+  if (due || worldDay() !== world.day) relayoutGrounds();
+}, 5000);
+const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()), genes: myGenes(), groundSeed: state.groundSeed, ...world.me }), {
+  welcome: (_id, corner, peers, awayList) => {
     world.peers.clear();
-    for (const p of peers) addPeer(p);
+    grounds.clear();
+    aways.clear();
+    mySlot = corner ?? 0;
+    for (const a of awayList) aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
+    for (const p of peers) (addPeer(p), trackGround(p));
+    relayoutGrounds();
   },
-  join: addPeer,
-  leave: (id) => world.peers.delete(id),
+  join: (p) => {
+    addPeer(p);
+    trackGround(p);
+    relayoutGrounds();
+  },
+  leave: (id) => {
+    world.peers.delete(id);
+    if (grounds.delete(id)) relayoutGrounds();
+  },
+  away: (a) => {
+    aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
+    relayoutGrounds();
+  },
   pos: (id, x, z, px, pz) => world.movePeer(id, x, z, px, pz),
   emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
   status: (s) => {
-    if (s !== "online") world.peers.clear();
+    if (s === "online") return;
+    world.peers.clear();
+    if (grounds.size || aways.size) {
+      grounds.clear();
+      aways.clear();
+      relayoutGrounds();
+    }
   },
   say: (id, text) => world.say(`p:${id}`, text, 5),
   duel: (duel, from, name) => duelInvited(duel, from, name),

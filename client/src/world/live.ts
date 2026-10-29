@@ -1,4 +1,5 @@
 import { parseGenes } from "../game/genes";
+import { SLOT_COUNT } from "./layout";
 import { parseFighter, type Fighter } from "../sim/duel";
 import type { Genes } from "../sim/ghost";
 import type { Memo } from "../sim/memo";
@@ -19,13 +20,23 @@ export interface LivePeer {
   z: number;
   px: number;
   pz: number;
-  corner: number | null;
+  corner: number | null; // ground slot (world/layout SLOTS)
+  seed: number; // ground seed (0 = none sent: the client picks one from the id)
+}
+
+// A ghost ground: its owner left; it stays on its slot for ttl ms.
+export interface LiveAway {
+  slot: number;
+  name: string;
+  seed: number;
+  ttl: number;
 }
 
 export type LiveStatus = "connecting" | "online" | "offline" | "full";
 
 export interface LiveHandlers {
-  welcome(id: string, corner: number | null, peers: LivePeer[]): void;
+  welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[]): void;
+  away?(a: LiveAway): void;
   join(p: LivePeer): void;
   leave(id: string): void;
   pos(id: string, x: number, z: number, px: number, pz: number): void;
@@ -57,7 +68,18 @@ interface SocketLike {
   onerror: ((ev: unknown) => void) | null;
 }
 
-const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 40 ? v : null);
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 160 ? v : null);
+const slotOf = (v: unknown): number | null => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < SLOT_COUNT ? v : null);
+const seedOf = (v: unknown): number => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < 2 ** 31 ? v : 0);
+const cleanName = (n: string) => n.replace(/[^\p{L}\p{N} _'-]+/gu, "");
+
+export function parseAway(v: unknown): LiveAway | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const slot = slotOf(o.slot), name = str(o.name, 16);
+  if (slot === null || !name || typeof o.ttl !== "number" || !(o.ttl >= 0)) return null;
+  return { slot, name: cleanName(name), seed: seedOf(o.seed), ttl: Math.min(o.ttl, 15 * 60_000) };
+}
 const str = (v: unknown, max: number): string | null => (typeof v === "string" && v.length > 0 && v.length <= max ? v : null);
 
 export function parsePeer(v: unknown): LivePeer | null {
@@ -66,8 +88,7 @@ export function parsePeer(v: unknown): LivePeer | null {
   const id = str(o.id, 16), name = str(o.name, 16);
   const x = num(o.x), z = num(o.z), px = num(o.px), pz = num(o.pz);
   if (!id || !name || x === null || z === null || px === null || pz === null) return null;
-  const corner = typeof o.corner === "number" && Number.isInteger(o.corner) && o.corner >= 0 && o.corner < 3 ? o.corner : null;
-  return { id, name: name.replace(/[^\p{L}\p{N} _'-]+/gu, ""), genes: parseGenes(o.genes) ?? { hue: 0.6 }, x, z, px, pz, corner };
+  return { id, name: cleanName(name), genes: parseGenes(o.genes) ?? { hue: 0.6 }, x, z, px, pz, corner: slotOf(o.corner), seed: seedOf(o.seed) };
 }
 
 // Validates a server message and calls the matching handler. Unknown or malformed messages are ignored.
@@ -83,8 +104,12 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
     case "welcome": {
       const id = str(m.id, 16);
       if (!id || !Array.isArray(m.peers)) return;
-      const corner = typeof m.corner === "number" ? m.corner : null;
-      return h.welcome(id, corner, m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, 32));
+      const aways = (Array.isArray(m.aways) ? m.aways : []).map(parseAway).filter((a): a is LiveAway => !!a).slice(0, SLOT_COUNT);
+      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, 32), aways);
+    }
+    case "away": {
+      const a = parseAway(m.away);
+      return a ? h.away?.(a) : undefined;
     }
     case "join": {
       const p = parsePeer(m.peer);
@@ -145,7 +170,7 @@ export class LiveLink {
 
   constructor(
     private readonly url: string,
-    private readonly hello: () => { name: string; genes: Genes } & Me,
+    private readonly hello: () => { name: string; genes: Genes; groundSeed?: number } & Me,
     private readonly h: LiveHandlers,
     private readonly open: (url: string) => SocketLike = (u) => new WebSocket(u) as unknown as SocketLike,
   ) {}
@@ -172,9 +197,9 @@ export class LiveLink {
       if (ev.data === "pong") return;
       dispatch(ev.data, {
         ...this.h,
-        welcome: (id, corner, peers) => {
+        welcome: (id, corner, peers, aways) => {
           this.myId = id;
-          this.h.welcome(id, corner, peers);
+          this.h.welcome(id, corner, peers, aways);
         },
         status: (s) => {
           if (s === "full") this.full = true;

@@ -21,6 +21,7 @@ export class WorldRoom extends DurableObject<Env> {
       const a = ws.deserializeAttachment() as Attachment | null;
       if (a?.peer) this.room.restore(a.peer);
     }
+    void ctx.blockConcurrencyWhile(async () => this.room.restoreAways(await ctx.storage.get("aways")));
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -50,7 +51,8 @@ export class WorldRoom extends DurableObject<Env> {
         return ws.close(1013, "room full");
       }
       ws.serializeAttachment({ id: a.id, peer: joined.peer } satisfies Attachment);
-      return this.deliver(ws, joined.out);
+      this.deliver(ws, joined.out);
+      return this.persistAways();
     }
     const r = this.room.message(a.id, data, now);
     if (r.changed) {
@@ -79,8 +81,16 @@ export class WorldRoom extends DurableObject<Env> {
     this.persistDirty();
   }
 
+  // Ghost grounds outlive the sockets, so they go to storage (tiny: <= 24 entries).
+  private persistAways() {
+    if (!this.room.awaysChanged) return;
+    this.room.awaysChanged = false;
+    void this.ctx.storage.put("aways", this.room.aways);
+  }
+
   // Peers changed by someone else's message (a challenge answered or dropped) get their attachment rewritten.
   private persistDirty() {
+    this.persistAways();
     const ids = new Set(this.room.takeDirty());
     if (!ids.size) return;
     for (const ws of this.ctx.getWebSockets()) {

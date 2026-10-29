@@ -29,19 +29,20 @@ function fakeSocket() {
   return ws;
 }
 
-const peer = { id: "a1", name: "Ann", genes: { hue: 0.2 }, x: 1, z: 2, px: 0, pz: 3, corner: 0 };
+const peer = { id: "a1", name: "Ann", genes: { hue: 0.2 }, x: 1, z: 2, px: 0, pz: 3, corner: 0, seed: 42 };
 
 describe("live messages", () => {
   it("parses peers defensively", () => {
     expect(parsePeer(peer)).toEqual(peer);
     expect(parsePeer({ ...peer, x: 999 })).toBeNull();
     expect(parsePeer({ ...peer, name: "" })).toBeNull();
-    expect(parsePeer({ ...peer, corner: 7, genes: null })).toMatchObject({ corner: null, genes: { hue: 0.6 } });
+    expect(parsePeer({ ...peer, corner: 24, seed: -1, genes: null })).toMatchObject({ corner: null, seed: 0, genes: { hue: 0.6 } });
+    expect(parsePeer({ ...peer, corner: 23, x: 150 })).toMatchObject({ corner: 23, x: 150 });
   });
 
   it("dispatches valid messages and ignores the rest", () => {
     const { h, log } = handlers();
-    dispatch(JSON.stringify({ t: "welcome", id: "me", corner: 1, peers: [peer, { bad: 1 }] }), h);
+    dispatch(JSON.stringify({ t: "welcome", id: "me", corner: 1, peers: [peer, { bad: 1 }], aways: [{ slot: 2, name: "Mo<", seed: 9, ttl: 5000 }, { slot: 40 }] }), h);
     dispatch(JSON.stringify({ t: "join", peer }), h);
     dispatch(JSON.stringify({ t: "pos", id: "a1", x: 1, z: 1, px: 0, pz: 0 }), h);
     dispatch(JSON.stringify({ t: "emote", id: "a1", e: "heart" }), h);
@@ -49,7 +50,7 @@ describe("live messages", () => {
     dispatch(JSON.stringify({ t: "full" }), h);
     for (const bad of ["{", JSON.stringify({ t: "pos", id: "a1", x: "1" }), JSON.stringify({ t: "emote", id: "a1", e: "<b>" }), JSON.stringify({ t: "nuke" })]) dispatch(bad, h);
     expect(log.map((l) => l[0])).toEqual(["welcome", "join", "pos", "emote", "leave", "status"]);
-    expect(log[0]).toEqual(["welcome", "me", 1, [peer]]);
+    expect(log[0]).toEqual(["welcome", "me", 1, [peer], [{ slot: 2, name: "Mo", seed: 9, ttl: 5000 }]]);
   });
 
   it("builds ws/wss urls", () => {

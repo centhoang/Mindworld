@@ -17,14 +17,16 @@ export interface Ground {
   gates: Record<Side, { i: number; j: number }>;
 }
 
-export const GROUND_W = 22;
-export const GROUND_H = 16;
+export const GROUND_W = 26;
+export const GROUND_H = 20;
+const YARD_RX = 8.5; // tiles: the fixed oval yard in the middle
+const YARD_RY = 6.2;
 
 export function groundFromSeed(seed: number, w = GROUND_W, h = GROUND_H): Ground {
   const rng = mulberry32(seed ^ 0x5bd1e995);
   const theme = THEMES[Math.floor(rng() * THEMES.length)]!;
-  // radius per angle: a base plus three seeded harmonics (lumps, bays, a long side)
-  const harm = [2, 3, 5].map((k) => ({ k, amp: 0.05 + rng() * 0.09, ph: rng() * Math.PI * 2 }));
+  // radius per angle: a base plus three seeded harmonics (lumps, bays, a long side), never past the border
+  const harm = [2, 3, 5].map((k) => ({ k, amp: 0.04 + rng() * 0.07, ph: rng() * Math.PI * 2 }));
   const stretch = 0.85 + rng() * 0.3;
   const cx = (w - 1) / 2;
   const cy = (h - 1) / 2;
@@ -34,8 +36,9 @@ export function groundFromSeed(seed: number, w = GROUND_W, h = GROUND_H): Ground
       const dx = (i - cx) / (cx * stretch);
       const dy = (j - cy) / (cy / stretch);
       const a = Math.atan2(dy, dx);
-      const r = 0.92 - harm.reduce((s, x) => s + x.amp * (0.5 + 0.5 * Math.sin(x.k * a + x.ph)), 0);
-      if (Math.hypot(dx, dy) < r) land[j * w + i] = 1;
+      const r = 0.84 + harm.reduce((s, x) => s + x.amp * Math.sin(x.k * a + x.ph), 0);
+      // plus a fixed oval yard in the middle, so the house, farm beds and plaza always fit
+      if (Math.hypot(dx, dy) < r || Math.hypot((i - cx) / YARD_RX, (j - cy) / YARD_RY) < 1) land[j * w + i] = 1;
     }
   }
   keepMainland(land, w, h, Math.round(cx), Math.round(cy));

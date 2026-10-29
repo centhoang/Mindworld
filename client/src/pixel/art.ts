@@ -1,7 +1,7 @@
 // Pixel art: the approved art bible (docs/STYLE.md) PNGs under /art, plus the few sprites still drawn in code.
 // Every color below is one of the 28 canonical palette entries; scenes ask for tiles and sprites by name.
 
-import { hash2, T, TILE, type TileKind, type TileMap } from "./tiles";
+import { AWAY, hash2, lookAt, T, TILE, type TileKind, type TileMap } from "./tiles";
 
 // Old key names kept so scenes didn't need renaming; values are the STYLE.md palette.
 export const PAL = {
@@ -24,7 +24,8 @@ const FILES = [
   "tile-bridge", "tile-crop-states", "prop-tree", "prop-house-aframe", "ui-frame-12", "font-6x8", "player-walk", "props-decor",
   "interior-empty", "monster-mallow-back", "monster-sprig-back", "market-stall", "elder-npc",
 ] as const;
-export type ArtName = (typeof FILES)[number];
+const OPTIONAL = ["props-grounds"] as const; // newer sheets: the game draws code stand-ins until they exist
+export type ArtName = (typeof FILES)[number] | (typeof OPTIONAL)[number];
 
 const art = new Map<string, HTMLImageElement>();
 
@@ -37,17 +38,45 @@ export function img(name: ArtName): HTMLImageElement {
 }
 
 export function loadArt(base = "/art/"): Promise<void> {
-  return Promise.all(
-    FILES.map(
-      (f) =>
-        new Promise<void>((res, rej) => {
-          const i = new Image();
-          i.onload = () => { art.set(f, i); res(); };
-          i.onerror = () => rej(new Error(`art ${f}`));
-          i.src = `${base}${f}.png`;
-        }),
-    ),
-  ).then(() => undefined);
+  const one = (f: ArtName, must: boolean) =>
+    new Promise<void>((res, rej) => {
+      const i = new Image();
+      i.onload = () => { art.set(f, i); res(); };
+      i.onerror = () => (must ? rej(new Error(`art ${f}`)) : res());
+      i.src = `${base}${f}.png`;
+    });
+  return Promise.all([...FILES.map((f) => one(f, true)), ...OPTIONAL.map((f) => one(f, false))]).then(() => undefined);
+}
+
+// Ground themes by recolour: the meadow greens of any sheet swapped for autumn or snow palette entries
+// (index = THEMES order; 0 = meadow = the art as drawn). Cached per image and theme.
+const SWAP: Record<number, Record<string, string>> = {
+  1: { [PAL.grassD]: PAL.coral, [PAL.grassS]: PAL.furD, [PAL.grass]: PAL.fur, [PAL.grassM]: PAL.furM, [PAL.grassL]: PAL.furL },
+  2: { [PAL.grassD]: PAL.stone, [PAL.grassS]: PAL.stoneM, [PAL.grass]: PAL.stoneL, [PAL.grassM]: PAL.sandL, [PAL.grassL]: PAL.sandL },
+};
+const themedCache = new Map<string, HTMLCanvasElement>();
+const hex = (r: number, g: number, b: number) => `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1).toUpperCase()}`;
+
+export function themed(name: ArtName, theme: number): CanvasImageSource {
+  const swap = SWAP[theme & 3];
+  if (!swap) return img(name);
+  const k = `${name}:${theme & 3}`;
+  const hit = themedCache.get(k);
+  if (hit) return hit;
+  const src = img(name);
+  const [c, g] = canvas(src.width, src.height);
+  g.drawImage(src, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height);
+  for (let p = 0; p < d.data.length; p += 4) {
+    const to = swap[hex(d.data[p]!, d.data[p + 1]!, d.data[p + 2]!)];
+    if (!to || !d.data[p + 3]) continue;
+    d.data[p] = parseInt(to.slice(1, 3), 16);
+    d.data[p + 1] = parseInt(to.slice(3, 5), 16);
+    d.data[p + 2] = parseInt(to.slice(5, 7), 16);
+  }
+  g.putImageData(d, 0, 0);
+  themedCache.set(k, c);
+  return c;
 }
 
 function canvas(w: number, h: number): [HTMLCanvasElement, Ctx] {
@@ -99,7 +128,16 @@ const cell = (mask: number): [number, number] => [(mask % 4) * TILE, Math.floor(
 
 // One map tile at world tile coords (i, j), drawn at screen (sx, sy).
 export function drawMapTile(g: Ctx, m: TileMap, i: number, j: number, sx: number, sy: number, t: number): void {
+  landTile(g, m, i, j, sx, sy, t);
+  if (lookAt(m, i, j) & AWAY) {
+    g.fillStyle = "rgba(57,70,63,0.45)"; // ink veil: the owner is away
+    g.fillRect(sx, sy, TILE, TILE);
+  }
+}
+
+function landTile(g: Ctx, m: TileMap, i: number, j: number, sx: number, sy: number, t: number): void {
   const k = kindAt(m, i, j);
+  const th = lookAt(m, i, j) & 3;
   if (k === T.water) {
     const f = (Math.floor(t * 4) + Math.floor(hash2(i, j, 3) * 4)) % FRAMES;
     g.drawImage(img(`tile-water-${f}` as ArtName), sx, sy);
@@ -121,25 +159,25 @@ export function drawMapTile(g: Ctx, m: TileMap, i: number, j: number, sx: number
     const mask = edgeMask((di, dj) => isPath(m, i + di, j + dj));
     // Inside a plaza (all four sides and corners path) use plain dirt so the grass corner dots don't grid it.
     const solid = mask === 15 && [[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([di, dj]) => isPath(m, i + di!, j + dj!));
-    if (solid) g.drawImage(img(`tile-path-${Math.floor(hash2(i, j, 5) * 3)}` as ArtName), sx, sy);
+    if (solid) g.drawImage(themed(`tile-path-${Math.floor(hash2(i, j, 5) * 3)}` as ArtName, th), sx, sy);
     else {
       const [ax, ay] = cell(mask);
-      g.drawImage(img("tile-path-atlas"), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
+      g.drawImage(themed("tile-path-atlas", th), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
     }
   } else if (water) {
     const [ax, ay] = cell(water);
-    g.drawImage(img("tile-shore-atlas"), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
+    g.drawImage(themed("tile-shore-atlas", th), ax, ay, TILE, TILE, sx, sy, TILE, TILE);
   } else {
-    g.drawImage(img(`tile-grass-${Math.floor(hash2(i, j, 4) * 3)}` as ArtName), sx, sy);
+    g.drawImage(themed(`tile-grass-${Math.floor(hash2(i, j, 4) * 3)}` as ArtName, th), sx, sy);
   }
   // Concave corners: both cardinals are land but the diagonal is water (order NW, NE, SE, SW).
   const corners: [number, number, number][] = [[-1, -1, 0], [1, -1, 1], [1, 1, 2], [-1, 1, 3]];
   for (const [di, dj, n] of corners) {
     if (isWater(m, i + di, j + dj) && !isWater(m, i + di, j) && !isWater(m, i, j + dj))
-      g.drawImage(img("tile-shore-inner"), n * TILE, 0, TILE, TILE, sx, sy, TILE, TILE);
+      g.drawImage(themed("tile-shore-inner", th), n * TILE, 0, TILE, TILE, sx, sy, TILE, TILE);
   }
-  if (!water && k === T.flowers) g.drawImage(img("tile-detail-flowers"), sx, sy);
-  if (!water && k === T.tall) g.drawImage(img("tile-detail-tuft"), sx, sy);
+  if (!water && k === T.flowers) g.drawImage(themed("tile-detail-flowers", th), sx, sy);
+  if (!water && k === T.tall) g.drawImage(themed("tile-detail-tuft", th), sx, sy);
 }
 
 export interface Sprite {
@@ -347,6 +385,8 @@ export function drawCrop(g: Ctx, crop: keyof typeof CROP_ROW, stage: number, x: 
   g.drawImage(img("props-decor"), Math.min(3, stage) * TILE, CROP_ROW[crop], TILE, TILE, x, y, TILE, TILE);
 }
 
-export function drawProp(g: Ctx, p: Prop, footX: number, footY: number): void {
-  g.drawImage(img(p.name), Math.round(footX - p.w / 2), Math.round(footY - p.h));
+export function drawProp(g: Ctx, p: Prop, footX: number, footY: number, look = 0): void {
+  if (look & AWAY) g.globalAlpha = 0.6; // a ghost ground's props fade with it
+  g.drawImage(themed(p.name, look), Math.round(footX - p.w / 2), Math.round(footY - p.h));
+  g.globalAlpha = 1;
 }

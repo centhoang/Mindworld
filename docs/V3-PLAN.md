@@ -76,7 +76,7 @@ server-persisted grounds.
   ("the picnic tomorrow"); the outcome updates affinity and both logs. A line may carry an invitation (activity, place, time):
   the receiver's brain accepts/declines from affinity + plan, and accepted invites enter the plan; this is how a party spreads.
 ### 4.3 Grounds world — `client/src/world/`
-- `ground.ts`: `groundFromSeed(seed)` → tile mask (radial noise blob ~22×16 tiles, smoothed, one connected land), 4 gate points
+- `ground.ts`: `groundFromSeed(seed)` → tile mask (radial noise blob ~26×20 tiles, smoothed, one connected land), 4 gate points
   (N/E/S/W), theme (meadow/autumn/snow, later beach/night), prop placement (seeded, keeps paths clear). Your seed is made once
   and saved; same seed → same ground on every client.
 - `layout.ts` (rework): hub = shared places (event, market, Elder, wild, boss) as today; player grounds on slots of a ring around
