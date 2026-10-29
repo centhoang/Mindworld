@@ -26,6 +26,7 @@ export interface Agent {
   idle: number; // seconds before the next choice
   last: string | null; // previous activity (a small repeat penalty)
   plan: Partial<Record<Phase, string[]>>; // today's plan (from the mind; empty = needs only)
+  path?: Vec[]; // waypoints to the target (bridges to a neighbour ground); empty = straight there
 }
 
 export interface Mess {
@@ -68,6 +69,7 @@ export interface Env {
   // undefined = still thinking (the agent waits a moment and asks again).
   chooser?: (a: Agent, choices: Choice[], v: Village) => string | null | undefined;
   bias?: (a: Agent, act: string) => number; // personality nudge on the scores
+  route?: (from: Vec, to: Vec) => Vec[] | null; // waypoints around water (null = no route: walk straight)
 }
 
 export type LifeEvent =
@@ -153,6 +155,7 @@ function begin(a: Agent, c: Choice, v: Village, env: Env): void {
     g.members.push(a.id);
     a.gather = g.id;
     a.target = near(g.at, g.members.length, env.rng);
+    a.path = env.route?.(a.pos, a.target) ?? undefined;
     return;
   }
   if (def.place === "mess") {
@@ -163,6 +166,7 @@ function begin(a: Agent, c: Choice, v: Village, env: Env): void {
   }
   const spot = def.place === "home" ? near(a.pos, 3, env.rng) : { ...pick(env.spots[def.place]!, env.rng) };
   a.target = spot;
+  a.path = env.route?.(a.pos, a.target) ?? undefined;
   if (def.min > 1) {
     const g: Gathering = { id: v.nextId++, act: def.id, at: spot, members: [a.id], deadline: v.t + GATHER_WAIT, started: false };
     v.gatherings.push(g);
@@ -208,6 +212,14 @@ export function stepVillage(v: Village, dt: number, env: Env): LifeEvent[] {
       continue;
     }
     if (a.state === "walk") {
+      const way = a.path?.[0];
+      if (way && way !== a.path![a.path!.length - 1]) {
+        const s = stepToward(a.pos, way, SPEED[a.kind] * dt);
+        const next = slide(a.pos, s.dx, s.dz, env.canWalk);
+        if (s.arrived || (next.x === a.pos.x && next.z === a.pos.z)) a.path!.shift(); // reached (or blocked): next corner
+        a.pos = next;
+        continue;
+      }
       const s = stepToward(a.pos, a.target, SPEED[a.kind] * dt);
       const next = slide(a.pos, s.dx, s.dz, env.canWalk);
       const stuck = next.x === a.pos.x && next.z === a.pos.z && !s.arrived;

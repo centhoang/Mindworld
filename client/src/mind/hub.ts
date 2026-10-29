@@ -43,8 +43,13 @@ export class MindHub {
     private readonly sched: MindScheduler,
     private readonly out: HubOut,
     private readonly hasModel: () => boolean,
-    private readonly places: ReadonlySet<Place> = new Set(["home", "bowl", "bed", "lawn"]), // spots this ground has
+    private places: ReadonlySet<Place> = new Set(["home", "bowl", "bed", "lawn"]), // spots within walking reach
   ) {}
+
+  // The map changed (a picnic hill or playground appeared next door): plans may use the new places.
+  setPlaces(places: ReadonlySet<Place>): void {
+    this.places = places;
+  }
 
   add(p: Persona, mem: MindMemory = emptyMemory()): Mind {
     const m: Mind = this.minds.get(p.id) ?? { persona: p, mem, source: "rules", thinking: "", pending: null, lastTalk: -TALK_GAP, talking: false };

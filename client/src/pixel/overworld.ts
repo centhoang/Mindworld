@@ -17,6 +17,7 @@ import { ACTIVITY } from "../life/activities";
 import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
+import { findRoute } from "../world/route";
 import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint } from "./life-draw";
 import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
@@ -102,7 +103,7 @@ export class Overworld {
   constructor(petGenes: Genes, groundSeed = 1) {
     this.layoutIn = { me: { seed: groundSeed, slot: 0 }, roomSeed: 1, day: worldDay() };
     this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
-    this.lifeEnv = { spots: { home: [], bowl: [], bed: [], lawn: [] }, canWalk: this.canWalk, rng: mulberry32(Date.now() % 1e9) };
+    this.lifeEnv = { spots: { home: [], bowl: [], bed: [], lawn: [] }, canWalk: this.canWalk, rng: mulberry32(Date.now() % 1e9), route: (a, b) => findRoute(a, b, this.canWalk) };
     this.relayout();
     // The hub never moves: its people and props are placed once.
     const market = this.world.platforms.find((p) => p.kind === "market");
@@ -155,13 +156,15 @@ export class Overworld {
       bowl: [{ x: this.bowl.x, z: this.bowl.z + 0.5 }, { x: this.bowl.x - 0.8, z: this.bowl.z + 0.2 }],
       bed: [{ x: this.house.x - 2, z: this.house.z + 0.7 }, { x: this.house.x + 2, z: this.house.z + 0.7 }, { x: this.house.x - 2.6, z: this.house.z + 1.3 }],
       lawn,
+      ...this.nextDoorSpots(home),
     };
+    this.minds?.setPlaces(new Set(Object.keys(this.lifeEnv.spots) as (keyof Spots)[]));
     if (dx || dz) {
       const move = (v: Vec) => {
         v.x += dx;
         v.z += dz;
       };
-      for (const a of this.life.agents) (move(a.pos), move(a.target));
+      for (const a of this.life.agents) (move(a.pos), move(a.target), a.path?.forEach(move));
       for (const m of this.life.messes) move(m.pos);
       for (const g of this.life.gatherings) move(g.at);
       if (wasHome) [this.player, this.pet, this.cam].forEach(move);
@@ -173,6 +176,28 @@ export class Overworld {
       this.cam = { ...this.player };
     }
     if (!this.canWalk(this.pet.x, this.pet.z)) this.pet = { x: this.player.x - 0.8, z: this.player.z + 0.5 };
+  }
+
+  // In-between grounds bridged to my ground (picnic hill, playground, pond): my minds may walk there for
+  // group activities, so invitations to a picnic can actually happen. Spots ring the prop on free land.
+  private nextDoorSpots(home: Platform): Spots {
+    const out: Spots = {};
+    const [hi, hj] = home.cell;
+    const anchor: Record<string, [keyof Spots, string]> = { picnic: ["picnic", "blanket"], playground: ["playground", "ball"], pond: ["pond", "dock"] };
+    for (const p of this.world.platforms) {
+      const use = anchor[p.kind];
+      if (!use || !p.spots || Math.abs(p.cell[0] - hi) + Math.abs(p.cell[1] - hj) !== 1) continue;
+      const at = p.spots[use[1]]!;
+      const list = (out[use[0]] ??= []);
+      if (p.kind === "pond") list.push({ ...at });
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const q = { x: at.x + Math.cos(a) * 1.6, z: at.z + 0.8 + Math.sin(a) * 1.2 };
+        if (this.canWalk(q.x, q.z)) list.push(q);
+      }
+      if (!list.length) delete out[use[0]];
+    }
+    return out;
   }
 
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
