@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mindworld</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=block" rel="stylesheet" />
+    <style>
+      html, body { margin: 0; height: 100%; background: #08080c; overflow: hidden; }
+      #screen { position: fixed; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; touch-action: none; }
+      #crt { position: fixed; right: 10px; bottom: 10px; font: 10px "Press Start 2P", monospace; color: #f7dfc8; background: #45301f;
+        border: 2px solid #c58757; padding: 6px 8px; cursor: pointer; opacity: 0.8; }
+      #crt:hover { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <canvas id="screen"></canvas>
+    <button id="crt" type="button">CRT on</button>
+    <script type="module" src="/src/pixel/main.ts"></script>
+  </body>
+</html>

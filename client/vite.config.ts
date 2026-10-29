@@ -6,7 +6,7 @@ export default defineConfig({
   server: { port: 5173, proxy: { "/api": { target: process.env.API_PROXY ?? "http://localhost:8787", ws: true } } },
   build: {
     target: "es2022",
-    rollupOptions: { input: { main: "index.html", spikeB: "spike-b.html" } },
+    rollupOptions: { input: { main: "index.html", pixel: "pixel.html", spikeB: "spike-b.html" } },
   },
   test: { environment: "node", include: ["src/**/*.test.ts"] },
 });
