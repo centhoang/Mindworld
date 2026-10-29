@@ -1,6 +1,6 @@
 # HANDOFF: Mindworld rework in progress (2026-10-29 ~10:30 UTC+7)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/REWORK.md, then continue the Mindworld rework from Next actions (stage B polish, then C house interior + decor). Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and the v2 section at the top of docs/REWORK.md. Do Next actions 1-3 (Cloudflare Access for me, then research + a rework plan for the CRT 2D monster-RPG direction with the moodboard skill via Codex). Show me the plan before building. Follow CLAUDE.md (Normal mode, 35% context limit)."
 
 ## Now
 - User play-tested 2026-10-29 morning: too much UI, combat lag/freeze, art "ok not stunning", wants enterable A-frame interior (`visual-ref/house-inside.webp`), decor felt AI slop, TTS voices unfriendly. Plus backlog: bigger lands, monster-battle view, tamed = owned, farm. All folded into `docs/REWORK.md` (stages A-E, vibe analysis of `visual-ref/`; contact sheet `.scratch/visuals/ref-sheet.jpg` = 19 refs in one image, read that instead of the files).
@@ -9,11 +9,11 @@
 - Deploy: `.claude/settings.json` now allows `npx wrangler deploy` (user OK'd). User is setting up Cloudflare Access (one-time PIN to their email) on pets.uryto.dev so we can deploy privately; go public only when the user says. Until the user confirms Access is on, ask before deploying.
 - Credits: Meta $149.91 left; Modal ~$110 of $129.98 left; Baseten ~$0.15 used, balance unknown (`/v1/billing/usage_summary` = PERMISSION_DENIED with the hackathon inference key; needs a workspace management key from the user). All-time LLM+GPU ~$20.
 
-## Next actions
-1. Stage B polish: houses/props scale up for big lands; trees (instanced noise-blob canopies), flower clusters, per-area palettes (boss autumn, elder golden), warmer light + subtle bloom/colour grade, softer island rims, fewer floating labels. Screenshot vs ref sheet.
-2. Stage C: walk into the A-frame -> cutaway interior scene like the ref (raised wooden floor, cream walls, warm lights, plants); decor mode = grid place/rotate/remove real furniture inside + props outside; replace old slot decor UI. Procedural rounded furniture or CC0 packs (user allows free assets; Kenney Furniture Kit CC0). Keep saves compatible (`game/decor.ts`).
-3. Stage D: monster-battle layout (two platforms, info boxes, bottom bar). Stage E: tamed = owned (switch active pet; others chill at home), farm loop (plots, carrot seeds, water, timers, sell; shop: seeds/fertilizer/pesticide/chickens+feed->eggs).
-Ask the user to play-test after each stage. Codex (`scripts/codex.ps1`) is good for isolated modules (grass took one run at effort high).
+## Next actions (rework v2: see the top of docs/REWORK.md)
+1. **Cloudflare Access for pets.uryto.dev** (user asked Claude to set it up, 2026-10-29): Zero Trust > Access > Applications > Add > Self-hosted, domain `pets.uryto.dev`, policy Allow, include Emails = the user's address (ky124hoangthe@gmail.com), login method One-time PIN. Use Claude in Chrome (TEMP profile is logged in to Cloudflare, see docs/DEPLOY.md). Stop and hand to the user if Zero Trust onboarding asks for a plan choice, payment card or terms. Then exclude nothing (`/api` must also be behind it while private; the live room WebSocket goes through the same host). Verify: a private window hits the Access login. Then build + `npx wrangler deploy` (allowed in `.claude/settings.json`) and smoke-check.
+2. **Research + plan (user reviews before building):** CRT 2D monster-RPG direction. Engine choice (Phaser 3 / plain canvas / PixiJS vs keeping three.js orthographic sprites; keep the Worker + sim + memo + live room), pixel scale, CRT post shader, top-down tile overworld (big lands + bridges), classic battle screen, interior scene, decor grid, owned pets, farm loop, what carries over from `client/src`. Write `docs/REWORK.md` plan section with stages and play-test points.
+3. **Moodboard skill via Codex:** brief Codex (`scripts/codex.ps1`, effort max, one task at a time) to research how Midjourney moodboards/style references work and write `.claude/skills/moodboard/SKILL.md` (+ helpers if useful) that turns refs into a style profile; then have Codex use it to produce the art bible + first consistent assets (check which image tools Codex has; free CC0 pixel packs are allowed, ask the user if a login is needed). Claude reviews the output with the user before building on it.
+The 3D work from today (dock UI, big lands, grass, babble) is committed but superseded visually; reuse logic, not the look.
 
 ## Gotchas (new)
 - `client-dev` (5173) proxies /api to `worker-live` (8787, real keys). Dev hook `window.__world`; hidden pane stalls rAF: call `__world.update(dt, t)` by hand before screenshots; hide `.overlay` (hatch/hints) for clean shots.

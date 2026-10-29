@@ -1,3 +1,14 @@
+# Mindworld rework v2 (user decision 2026-10-29 ~11:00 UTC+7): supersedes the 3D plan below
+
+User play-tested the 3D stage A/B build ("isn't my thing") and changed direction:
+- **Overall vibe and features:** like `visual-ref/` (contact sheet `.scratch/visuals/ref-sheet.jpg`; interior `visual-ref/house-inside.webp`) plus the user backlog: bigger lands that bridges connect, monster-battle view, tamed = owned (switch active pet; others chill at home doing activities), corner farm (carrot seeds, plots, water, timed growth, sell at market; shop: slower/higher-value seeds, fertilizer, pesticide, chickens + feed -> eggs), enterable A-frame house with decor inside and outside.
+- **Gameplay and visuals:** a **CRT 2D monster-collecting RPG** look (pixel art, top-down overworld, classic two-platform turn-based battle screen, CRT shader: scanlines, curvature, bloom, slight chromatic aberration). Original art, names and UI only: genre style, never copied assets/characters.
+- **Consistent art style:** Codex researches and writes a project skill `.claude/skills/moodboard/` that works like a Midjourney moodboard (style references -> a reusable style profile: palette, pixel grid/scale, outline rules, lighting, shading ramps, sprite sizes, tile rules, UI frame rules, example prompts), as close in quality to a real moodboard as possible. Then Codex uses that skill to produce the consistent visuals the game needs (tiles, sprites, UI, portraits), and the build follows them.
+- Keep from v1: snappy fights (memo rules decide instantly), Meta-model features (teach/coach, NPC + pet chat, wild re-teach cron, tuned Llama free coach), live room/duels, babble voices (fit retro well), save compatibility where practical.
+- The next session starts with research + a written plan (user reviews it) before building.
+
+---
+
 # Mindworld rework (user play-test 2026-10-29 morning)
 
 Feedback: too much text/UI; combat lags each turn and sometimes freezes; art "ok, not stunning"; wants an enterable A-frame interior (ref `visual-ref/house-inside.webp`); decor feels AI slop; voices not friendly. Plus the user backlog (bigger lands, monster-battle view, tamed = owned, farm). Refs: contact sheet `.scratch/visuals/ref-sheet.jpg` (19 shots, regenerate with the script in this doc's history if lost).
