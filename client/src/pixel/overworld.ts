@@ -7,11 +7,16 @@ import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
-import { drawCrop, drawMapTile, drawProp, hasArt, HOUSE, img, MARKET_STALL, makePlayer, PAL, TREE, type Sprite } from "./art";
+import { drawCrop, drawMapTile, drawProp, hasArt, HOUSE, img, MARKET_STALL, makePlayer, PAL, spriteFrame, TREE, type Sprite } from "./art";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
+import { ACTIVITY } from "../life/activities";
+import { clockLabel, gameTime } from "../life/clock";
+import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
+import { mulberry32 } from "../sim/rng";
+import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint } from "./life-draw";
 
 type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
 
@@ -31,15 +36,12 @@ export interface Wild {
   cool: number; // seconds before it can start a fight (after one just ended)
 }
 
-// Owned pets that are not out with you live at your corner: they wander a little and do small things.
+// Owned pets that are not out with you live at your corner as minds in the life sim (life/village.ts):
+// they get hungry, eat at the bowl, nap, play ball together and leave poop for you to clean.
 interface Resident {
   sprite: HTMLCanvasElement;
-  pos: Vec;
-  target: Vec;
-  wait: number;
-  act: string; // bubble text while idle: sleeping, humming, curious
+  agent: Agent;
 }
-const ACTS = ["z", "zz", "...", "!", "?", "*"];
 
 export class Overworld {
   readonly world: WorldMap;
@@ -61,6 +63,9 @@ export class Overworld {
   readonly wilds: Wild[] = [];
   private nextId = 1;
   private residents: Resident[] = [];
+  readonly life = newVillage();
+  private lifeEnv: Env;
+  bowl: Vec = { x: 0, z: 0 };
   cam: Vec = { x: 0, z: 0 };
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
@@ -98,6 +103,21 @@ export class Overworld {
     this.cam = { ...this.player };
     this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
     for (const p of this.world.platforms) if (p.kind === "wild") for (let i = 0; i < WILD_PER_MEADOW; i++) this.spawnWild(p.x, p.z, p.r);
+    this.bowl = { x: this.house.x - 3, z: this.house.z + 1.6 };
+    const lawn: Vec[] = [];
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      const d = 4 + (i % 3) * 1.4;
+      const q = { x: home.x + Math.cos(a) * d, z: home.z + 1 + Math.sin(a) * d };
+      if (this.canWalk(q.x, q.z)) lawn.push(q);
+    }
+    const spots: Spots = {
+      home: [{ x: home.x, z: home.z + 2 }],
+      bowl: [{ x: this.bowl.x, z: this.bowl.z + 0.5 }, { x: this.bowl.x - 0.8, z: this.bowl.z + 0.2 }],
+      bed: [{ x: this.house.x - 2, z: this.house.z + 0.7 }, { x: this.house.x + 2, z: this.house.z + 0.7 }, { x: this.house.x - 2.6, z: this.house.z + 1.3 }],
+      lawn,
+    };
+    this.lifeEnv = { spots, canWalk: this.canWalk, rng: mulberry32(Date.now() % 1e9) };
   }
 
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
@@ -139,13 +159,32 @@ export class Overworld {
     this.petSprite = drawMonster(petLook(g), OVERWORLD_MON, "front", arch ? BUILDS[arch] : undefined);
   }
 
-  setResidents(mons: readonly { genes: Genes; arch?: ArchetypeId }[]): void {
+  // Keeps each resident's mind (needs, plan, friends) across party swaps; ids are the pets' names.
+  setResidents(mons: readonly { name?: string; genes: Genes; arch?: ArchetypeId }[]): void {
     const home = this.world.platforms.find((p) => p.kind === "home")!;
+    const ids = mons.map((m, i) => m.name ?? `pet${i}`);
+    for (const a of [...this.life.agents]) if (a.kind === "pet" && !ids.includes(a.id)) removeAgent(this.life, a.id);
     this.residents = mons.map((m, i) => {
-      const a = (i / Math.max(1, mons.length)) * Math.PI * 2 + 0.6;
-      const pos = { x: home.x + Math.cos(a) * 5.5, z: home.z + Math.sin(a) * 5.5 };
-      return { sprite: drawMonster(petLook(m.genes), OVERWORLD_MON, "front", m.arch ? BUILDS[m.arch] : undefined), pos, target: { ...pos }, wait: 1 + i, act: "" };
+      const id = ids[i]!;
+      const ang = (i / Math.max(1, mons.length)) * Math.PI * 2 + 0.6;
+      const agent = this.life.agents.find((a) => a.id === id) ?? addAgent(this.life, id, id, "pet", { x: home.x + Math.cos(ang) * 5.5, z: home.z + Math.sin(ang) * 5.5 });
+      return { sprite: drawMonster(petLook(m.genes), OVERWORLD_MON, "front", m.arch ? BUILDS[m.arch] : undefined), agent };
     });
+  }
+
+  // The poop you are standing next to, if any (E: clean it up).
+  messNear(): number | null {
+    let best: number | null = null;
+    let bd = 1.4;
+    for (const m of this.life.messes) {
+      const d = Math.hypot(m.pos.x - this.player.x, m.pos.z - this.player.z);
+      if (d < bd) [best, bd] = [m.id, d];
+    }
+    return best;
+  }
+
+  cleanMess(id: number): boolean {
+    return cleanMess(this.life, id);
   }
 
   spawnWild(cx: number, cz: number, r: number): void {
@@ -293,20 +332,11 @@ export class Overworld {
     this.place = here || this.place;
     this.bannerT = Math.max(0, this.bannerT - dt);
     for (const [k, b] of this.bubbles) if ((b.t -= dt) <= 0) this.bubbles.delete(k);
-    const home = this.world.platforms.find((p) => p.kind === "home")!;
-    for (const r of this.residents) {
-      r.wait -= dt;
-      if (r.wait > 0) continue;
-      const s = stepToward(r.pos, r.target, WALK_SPEED * 0.25 * dt);
-      r.pos = slide(r.pos, s.dx, s.dz, this.canWalk);
-      r.act = "";
-      if (s.arrived) {
-        r.wait = 3 + Math.random() * 5;
-        r.act = ACTS[Math.floor(Math.random() * ACTS.length)]!;
-        const a = Math.random() * Math.PI * 2;
-        const d = 3 + Math.random() * 5;
-        r.target = { x: home.x + Math.cos(a) * d, z: home.z + Math.sin(a) * d };
-      }
+    for (const e of stepVillage(this.life, dt, this.lifeEnv)) {
+      const i = this.residents.findIndex((r) => r.agent.id === e.who);
+      if (i < 0) continue;
+      if (e.kind === "start" && e.act !== "wander") this.say(`r${i}`, ACTIVITY.get(e.act)!.label, 2.5);
+      if (e.kind === "cancel") this.say(`r${i}`, "...nobody came", 2.5);
     }
     let met: Wild | null = null;
     for (const w of this.wilds) {
@@ -370,7 +400,7 @@ export class Overworld {
       items.push({ z: this.house.z, draw: () => drawProp(g, HOUSE, hx, hy) });
     }
     const [px, py] = toScreen(this.player.x, this.player.z);
-    const pf = this.moving ? Math.floor(this.walkT * 8) % this.playerSprite.frames : 0;
+    const pf = spriteFrame(this.playerSprite, this.moving, this.walkT, t);
     items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px - 8, py - 22, 16, 24) });
     const half = OVERWORLD_MON / 2;
     for (const p of this.peers.values()) {
@@ -378,7 +408,7 @@ export class Overworld {
       const [bx, by] = toScreen(p.pet.x, p.pet.z);
       items.push({ z: p.pos.z, draw: () => {
         g.globalAlpha = 0.85;
-        g.drawImage(this.playerSprite.img, 0, 0, 16, 24, ax - 8, ay - 22, 16, 24);
+        g.drawImage(this.playerSprite.img, spriteFrame(this.playerSprite, false, 0, t) * 16, 0, 16, 24, ax - 8, ay - 22, 16, 24);
         g.globalAlpha = 1;
         const tag = p.name.slice(0, 10).toUpperCase();
         drawText(g, tag, ax - (tag.length * GLYPH) / 2, ay - 32, PAL.panel);
@@ -410,23 +440,43 @@ export class Overworld {
       const wh = w.wait <= 0 ? Math.floor(t * 5 + w.id) % 2 : 0;
       items.push({ z: w.pos.z, draw: () => g.drawImage(w.sprite, wx - half, wy - OVERWORLD_MON + 2 - wh) });
     }
-    for (const r of this.residents) {
-      const [rx, ry] = toScreen(r.pos.x, r.pos.z);
-      if (rx < -24 || ry < -40 || rx > sw + 24 || ry > sh + 24) continue;
-      const sleeping = r.act.startsWith("z");
-      items.push({
-        z: r.pos.z,
-        draw: () => {
-          g.drawImage(r.sprite, rx - half, ry - OVERWORLD_MON + 2 + (sleeping ? 1 : 0));
-          if (r.act && Math.floor(t * 1.5) % 3 !== 2) drawText(g, r.act, rx + 4, ry - OVERWORLD_MON - 8 - (Math.floor(t * 2) % 2), PAL.sandL);
-        },
-      });
+    {
+      const [bx, by] = toScreen(this.bowl.x, this.bowl.z);
+      items.push({ z: this.bowl.z, draw: () => drawBowl(g, bx, by) });
+    }
+    for (const m of this.life.messes) {
+      const [mx, my] = toScreen(m.pos.x, m.pos.z);
+      items.push({ z: m.pos.z - 0.3, draw: () => drawPoop(g, mx, my, t, m.id) });
+    }
+    this.residents.forEach((r, k) => {
+      const a = r.agent;
+      const [rx, ry] = toScreen(a.pos.x, a.pos.z);
+      if (rx < -24 || ry < -40 || rx > sw + 24 || ry > sh + 24) return;
+      const pose = a.state === "do" ? ACTIVITY.get(a.act!)!.pose : null;
+      items.push({ z: a.pos.z, draw: () => drawPetPose(g, r.sprite, rx, ry, pose, a.state === "walk", t, k) });
+    });
+    // A ball bounces between pets playing together.
+    for (const gt of this.life.gatherings) {
+      if (gt.act !== "ball" || !gt.started) continue;
+      const ps = gt.members.map((id) => this.life.agents.find((a) => a.id === id)).filter((a): a is Agent => !!a && a.state === "do");
+      if (ps.length < 2) continue;
+      const ph = (t * 0.8 + gt.id) % 2;
+      const u = ph < 1 ? ph : 2 - ph;
+      const [a, b] = [ps[0]!.pos, ps[1]!.pos];
+      const [x, y] = toScreen(a.x + (b.x - a.x) * u, a.z + (b.z - a.z) * u);
+      items.push({ z: a.z + (b.z - a.z) * u, draw: () => drawBall(g, x, y - Math.round(Math.sin(u * Math.PI) * 8)) });
     }
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
+    const now = gameTime(this.life.t);
+    drawTint(g, now.phase, sw, sh);
+    {
+      const label = `DAY ${now.day + 1} ${clockLabel(now.hour)}`;
+      drawText(g, label, sw - label.length * GLYPH - 6, 6, PAL.panel);
+    }
 
     for (const [who, b] of this.bubbles) {
-      const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" ? this.elder?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
+      const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" ? this.elder?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
       if (!pos) continue;
       const [bx, by] = toScreen(pos.x, pos.z);
       bubble(g, b.text, bx, by - OVERWORLD_MON - 4, sw);
@@ -436,7 +486,7 @@ export class Overworld {
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
-        : this.nearElder() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.peerNear() ? "E: SAY HI" : "";
+        : this.nearElder() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : "";
     if (hint) {
       const w = hint.length * GLYPH + 12;
       drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);

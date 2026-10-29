@@ -1,6 +1,6 @@
 # v3 plan: a village of players' grounds, run by local minds
 
-Status: **draft for the user's review (2026-10-29)**. Nothing is built until the OK. Input: `docs/V3-BRIEF.md`.
+Status: **approved 2026-10-29** (decisions 1-3 = a). Input: `docs/V3-BRIEF.md`.
 Time: 4 build days (Oct 30 – Nov 2), Nov 3 = repo public + demo capture, Nov 4 9 PM ET = submit.
 
 ## 1. Pitch the plan is tested against
@@ -135,7 +135,7 @@ together are the demo, so stage 5 and art batch 2 go first.
 - Time → the cut line above; duels/boss/market frozen.
 
 ## 9. Decisions for the user (max 3)
-User 2026-10-29: **2 = (a) approved, 3 = (a) approved**; 1 still open (question answered in chat).
+User 2026-10-29: **all three = (a), plan approved.** Stage 5 fine-tune (~$6) is approved.
 1. **Model.** (a, recommended) one stock Llama 3.2 1B per machine serves every mind (pets + NPCs) with persona prompts and
    grammar; a multi-task LoRA (coach + village) for power mode only as optional stage 5 (~$6). (b) No new fine-tune at all.
    (c) Two separate LoRAs (pet / village): twice the downloads, no browser benefit while MLC is blocked.

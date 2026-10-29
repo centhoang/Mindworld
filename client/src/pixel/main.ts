@@ -348,7 +348,7 @@ resize();
 function menuKey(k: string): void {
   if (!menu) {
     if (k === "e" || k === "enter") {
-      // Same order as the hint over your head (overworld.ts): door, bed, Elder, stall, player, wild pet.
+      // Same order as the hint over your head (overworld.ts): door, bed, Elder, stall, poop, player, wild pet.
       const bed = world.bedNear();
       if (world.atDoor()) {
         mode = "home";
@@ -358,6 +358,10 @@ function menuKey(k: string): void {
       } else if (bed >= 0) useBed(bed);
       else if (world.nearElder()) openChat("elder");
       else if (world.nearStall()) crate = { cursor: 0 };
+      else if (world.messNear() !== null) {
+        world.cleanMess(world.messNear()!);
+        world.say("me", "All clean!", 1.5);
+      }
       else if (world.peerNear()) peerMenu = { id: world.peerNear()!, cursor: 0 };
       else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
       else if (live.status === "online" && world.peers.size) openChat("room");

@@ -5,7 +5,7 @@
 
 import { CRATE, COLS, DOOR, FURNITURE, PIECE_KINDS, ROWS, blocked, canPlace, pieceAt, place, removeAt, type Piece, type PieceKind } from "../game/room";
 import { followStep, keyDir, slide, WALK_SPEED, type Vec } from "../world/movement";
-import { drawSheetProp, hasArt, img, makePlayer, PAL, type PropName, type Sprite } from "./art";
+import { drawSheetProp, hasArt, img, makePlayer, PAL, spriteFrame, type PropName, type Sprite } from "./art";
 import { drawFrame, drawText, GLYPH } from "./text";
 
 export const ROOM_W = 384;
@@ -135,7 +135,7 @@ export class Interior {
     const [qx, qy] = at(this.pet.x, this.pet.z);
     items.push({ z: this.pet.z, draw: () => g.drawImage(pet, qx - pet.width / 2, qy - pet.height + 2 - (Math.floor(t * 4) % 2)) });
     const [px0, py0] = at(this.player.x, this.player.z);
-    const pf = this.moving ? Math.floor(this.walkT * 8) % this.playerSprite.frames : 0;
+    const pf = spriteFrame(this.playerSprite, this.moving, this.walkT, t);
     items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px0 - 8, py0 - 22, 16, 24) });
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();

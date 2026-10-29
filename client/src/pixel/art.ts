@@ -146,27 +146,89 @@ export interface Sprite {
   img: HTMLCanvasElement;
   w: number;
   h: number;
-  frames: number; // horizontal frames
+  frames: number; // walk frames (columns 0..frames-1)
+  idle?: number; // first of two idle columns (standing, then the breathing head bob), if the sheet has them
 }
 
-// The player, 16x24, 4 frames x 4 directions (rows: down, left, right, up). The body (hat to hips) is frame 0
-// of each ImageGen row; the generated in-between frames don't match, so the legs are drawn here per frame.
+// The frame column to draw: the walk cycle while moving, else standing still with a short head bob every
+// ~2.5 s (sheets without idle columns stand on frame 0).
+export function spriteFrame(s: Sprite, moving: boolean, walkT: number, t: number): number {
+  if (moving) return Math.floor(walkT * 8) % s.frames;
+  if (s.idle === undefined) return 0;
+  return s.idle + (t % 2.5 > 2.1 ? 1 : 0);
+}
+
+// The player, 16x24, 4 walk frames + 2 idle frames x 4 directions (rows: down, left, right, up). The body
+// (hat to hips) is frame 0 of each ImageGen row; the generated in-between frames don't match, so legs and
+// arms are drawn here per frame: front/back raise the forearm on the side opposite the lifted foot, side
+// views get code-drawn arms (near arm over the body, far arm behind it) swinging against the stride.
 const LEG_TOP = [19, 20, 20, 19]; // first leg row per direction (rows above it come from the art)
+const SIDE_SWING = [-1, 0, 1, 0]; // near arm per walk frame: back while the near leg is ahead
 export function makePlayer(): Sprite {
   const src = art.get("player-walk");
   if (!src) return drawnPlayer();
-  const [c, g] = canvas(64, 96);
+  const [c, g] = canvas(96, 96);
   for (let d = 0; d < 4; d++) {
     const oy = d * 24;
     const top = LEG_TOP[d]!;
-    for (let f = 0; f < 4; f++) {
+    const side = d === 1 || d === 2;
+    for (let f = 0; f < 6; f++) {
       const ox = f * 16;
+      const idle = f >= 4;
       g.drawImage(src, 0, oy, 16, top, ox, oy, 16, top);
-      if (d === 0 || d === 3) frontLegs(g, ox, oy, f);
-      else sideLegs(g, ox, oy, f, d === 1);
+      if (f === 5) {
+        // head bob: hat and face 1 px down, shoulders stay
+        g.clearRect(ox, oy, 16, 14);
+        g.drawImage(src, 0, oy, 16, 14, ox, oy + 1, 16, 14);
+      }
+      if (!side) {
+        frontLegs(g, ox, oy, idle ? 0 : f);
+        if (f === 1 || f === 3) raiseForearm(g, ox, oy, d, f === 1 ? 10 : 3);
+        continue;
+      }
+      const left = d === 1;
+      const X = (x: number) => ox + (left ? 15 - x : x);
+      // Remove the baked-in arms (the sheet's frame 0 is mid-stride) and close the chest outline.
+      for (const [x, y] of [[4, 15], [4, 16], [4, 17], [9, 16], [10, 16], [11, 16], [9, 17], [10, 17], [11, 17]] as const) g.clearRect(X(x), oy + y, 1, 1);
+      for (const y of [15, 16, 17]) px(g, X(9), oy + y, PAL.ink);
+      sideLegs(g, ox, oy, idle ? 4 : f, left);
+      const sw = idle ? 0 : SIDE_SWING[f]!;
+      g.globalCompositeOperation = "destination-over"; // far arm: only where the body leaves gaps
+      sideArm(g, ox, oy, -sw, left);
+      g.globalCompositeOperation = "source-over";
+      sideArm(g, ox, oy, sw, left);
     }
   }
-  return { img: c, w: 16, h: 24, frames: 4 };
+  return { img: c, w: 16, h: 24, frames: 4, idle: 4 };
+}
+
+// Front/back: the forearm (below the sleeve) moves up 1 px, as if swung toward or away from the viewer.
+function raiseForearm(g: Ctx, ox: number, oy: number, d: number, x: number): void {
+  const y0 = d === 0 ? 16 : 15;
+  const img = g.getImageData(ox + x, oy + y0, 2, 19 - y0);
+  g.clearRect(ox + x, oy + y0, 2, 19 - y0);
+  g.putImageData(img, ox + x, oy + y0 - 1);
+}
+
+// A side-view arm from the shoulder (cols 6-7): two sleeve rows, two skin rows and the hand outline; the
+// lower rows lean with the swing (-1 back, 0 hanging, 1 forward). Drawn facing right; left mirrors it.
+function sideArm(g: Ctx, ox: number, oy: number, swing: number, left: boolean): void {
+  const dot = (x: number, y: number, col: string) => px(g, ox + (left ? 15 - x : x), oy + y, col);
+  const rows: [number, number, string, string][] = [
+    [14, 0, PAL.cream, PAL.stoneM],
+    [15, 0, PAL.cream, PAL.stoneM],
+    [16, swing, PAL.woodL, PAL.woodM],
+    [17, 2 * swing, PAL.woodM, PAL.wood],
+  ];
+  for (const [y, dx, c1, c2] of rows) {
+    const x = 6 + dx;
+    dot(x - 1, y, PAL.ink);
+    dot(x, y, c1);
+    dot(x + 1, y, c2);
+    dot(x + 2, y, PAL.ink);
+  }
+  dot(6 + 2 * swing, 18, PAL.ink);
+  dot(7 + 2 * swing, 18, PAL.ink);
 }
 
 // Front/back: two short legs; frames 1 and 3 lift the left or the right foot 2 px (0 and 2 both planted).
@@ -210,9 +272,12 @@ function sideLegs(g: Ctx, ox: number, oy: number, f: number, left: boolean): voi
   } else if (f === 1) {
     leg([6, 6], far); // swinging forward, foot raised
     leg([7, 7, 7], near); // planted under the hips
-  } else {
+  } else if (f === 3) {
     leg([6, 6, 6], far);
     leg([7, 7], near);
+  } else {
+    leg([6, 6, 6], far); // idle: both feet planted under the hips
+    leg([7, 7, 7], near);
   }
 }
 
