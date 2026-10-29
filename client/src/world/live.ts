@@ -252,6 +252,17 @@ export class LiveLink {
     return true;
   }
 
+  // Say hello again (new pet or name): drop the socket quietly and reconnect at once.
+  rejoin() {
+    if (this.stopped || !this.ws) return;
+    const ws = this.ws;
+    ws.onclose = null;
+    this.ws = null;
+    ws.close();
+    this.retries = 0;
+    this.connect();
+  }
+
   close() {
     this.stopped = true;
     const ws = this.ws;

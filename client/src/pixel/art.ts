@@ -149,9 +149,9 @@ export interface Sprite {
   frames: number; // horizontal frames
 }
 
-// The player, 16x24, 4 frames x 4 directions (rows: down, left, right, up). Only frame 0 of each ImageGen row
-// is used: the generated in-between frames don't match each other, so the walk is built here from that one pose.
-const LEG_TOP = [19, 20, 20, 19]; // first leg row per direction
+// The player, 16x24, 4 frames x 4 directions (rows: down, left, right, up). The body (hat to hips) is frame 0
+// of each ImageGen row; the generated in-between frames don't match, so the legs are drawn here per frame.
+const LEG_TOP = [19, 20, 20, 19]; // first leg row per direction (rows above it come from the art)
 export function makePlayer(): Sprite {
   const src = art.get("player-walk");
   if (!src) return drawnPlayer();
@@ -161,17 +161,59 @@ export function makePlayer(): Sprite {
     const top = LEG_TOP[d]!;
     for (let f = 0; f < 4; f++) {
       const ox = f * 16;
-      if (f % 2 === 0) { g.drawImage(src, 0, oy, 16, 24, ox, oy, 16, 24); continue; } // contact pose
-      // Passing pose: body up 1 px, one leg lifted with it, the other stays planted (its top row stretched).
-      g.drawImage(src, 0, oy, 16, top, ox, oy - 1, 16, top);
-      const lift = f === 1 ? 0 : 8;
-      const plant = 8 - lift;
-      g.drawImage(src, lift, oy + top, 8, 24 - top, ox + lift, oy + top - 1, 8, 24 - top);
-      g.drawImage(src, plant, oy + top, 8, 24 - top, ox + plant, oy + top, 8, 24 - top);
-      g.drawImage(src, plant, oy + top, 8, 1, ox + plant, oy + top - 1, 8, 1);
+      g.drawImage(src, 0, oy, 16, top, ox, oy, 16, top);
+      if (d === 0 || d === 3) frontLegs(g, ox, oy, f);
+      else sideLegs(g, ox, oy, f, d === 1);
     }
   }
   return { img: c, w: 16, h: 24, frames: 4 };
+}
+
+// Front/back: two short legs; frames 1 and 3 lift the left or the right foot 2 px (0 and 2 both planted).
+function frontLegs(g: Ctx, ox: number, oy: number, f: number): void {
+  px(g, ox + 7, oy + 19, PAL.ink, 1, 2); // between the legs
+  for (const [x0, outer, lift] of [[5, 4, f === 1 ? 2 : 0], [8, 10, f === 3 ? 2 : 0]] as const) {
+    px(g, ox + outer, oy + 19, PAL.ink, 1, 3 - lift);
+    px(g, ox + x0, oy + 19, PAL.teal, 2, 3 - lift);
+    px(g, ox + Math.min(x0, outer), oy + 22 - lift, PAL.ink, 3, 2);
+    px(g, ox + x0, oy + 22 - lift, lift ? PAL.wood : PAL.woodD, 2, 1);
+  }
+}
+
+// Side: a 4-frame stride (near leg ahead, passing, far leg ahead, passing). Drawn facing right; facing left
+// mirrors it. The near leg is lighter teal; the far one is drawn first so the near one overlaps it.
+function sideLegs(g: Ctx, ox: number, oy: number, f: number, left: boolean): void {
+  const X = (x: number) => ox + (left ? 15 - x : x);
+  const dot = (x: number, y: number, col: string) => px(g, X(x), oy + y, col);
+  // cols: x of the 2-px leg per row from row 20; the last entry is the boot. A lifted leg has fewer rows.
+  const leg = (cols: readonly number[], pants: string) => {
+    cols.forEach((x, r) => {
+      const boot = r === cols.length - 1;
+      dot(x - 1, 20 + r, PAL.ink);
+      dot(x + 2, 20 + r, PAL.ink);
+      dot(x, 20 + r, boot ? PAL.woodD : pants);
+      dot(x + 1, 20 + r, boot ? PAL.wood : pants);
+    });
+    const y = 20 + cols.length;
+    const x = cols[cols.length - 1]!;
+    for (let i = -1; i <= 2; i++) dot(x + i, y, PAL.ink); // sole
+    dot(x + 3, y - 1, PAL.ink); // toe points forward
+  };
+  const near = PAL.waterD;
+  const far = PAL.teal;
+  if (f === 0) {
+    leg([6, 5, 4], far);
+    leg([7, 8, 9], near);
+  } else if (f === 2) {
+    leg([7, 8, 9], far);
+    leg([6, 5, 4], near);
+  } else if (f === 1) {
+    leg([6, 6], far); // swinging forward, foot raised
+    leg([7, 7, 7], near); // planted under the hips
+  } else {
+    leg([6, 6, 6], far);
+    leg([7, 7], near);
+  }
 }
 
 // Fallback before the sheet loads (and in tests): the coded farmer, 2 frames.

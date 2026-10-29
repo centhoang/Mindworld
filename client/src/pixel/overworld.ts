@@ -432,7 +432,11 @@ export class Overworld {
       bubble(g, b.text, bx, by - OVERWORLD_MON - 4, sw);
     }
     const bed = this.bedNear();
-    const hint = this.atDoor() ? "E: GO IN" : bed >= 0 && this.farm ? bedHint(this.farm, bed) : "";
+    const hint = this.atDoor()
+      ? "E: GO IN"
+      : bed >= 0 && this.farm
+        ? bedHint(this.farm, bed)
+        : this.nearElder() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.peerNear() ? "E: SAY HI" : "";
     if (hint) {
       const w = hint.length * GLYPH + 12;
       drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);

@@ -63,10 +63,12 @@ const world = new Overworld(state.genes);
 interface Member { name: string; genes: Genes; arch?: PartyMon["arch"] }
 const members = (): Member[] => [{ name: pet.name, genes: state.genes }, ...(state.party ?? [])];
 const activeMember = (): Member => members()[state.active ?? 0] ?? members()[0]!;
+let onPetChange = (): void => undefined; // set once the live room exists: others see the pet you walk with
 function refreshParty(): void {
   const all = members();
   const a = state.active ?? 0;
   world.setPet(all[a]!.genes, all[a]!.arch);
+  onPetChange();
   world.setResidents(all.filter((_, i) => i !== a));
 }
 refreshParty();
@@ -346,19 +348,19 @@ resize();
 function menuKey(k: string): void {
   if (!menu) {
     if (k === "e" || k === "enter") {
+      // Same order as the hint over your head (overworld.ts): door, bed, Elder, stall, player, wild pet.
       const bed = world.bedNear();
-      if (bed >= 0) useBed(bed);
-      else if (world.nearElder()) openChat("elder");
-      else if (world.nearStall()) crate = { cursor: 0 };
-      else if (world.peerNear()) peerMenu = { id: world.peerNear()!, cursor: 0 };
-      else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
-      else if (!world.atDoor() && live.status === "online" && world.peers.size) openChat("room");
-      else if (world.atDoor()) {
+      if (world.atDoor()) {
         mode = "home";
         keys.clear();
         toast = null;
         interior.enter();
-      }
+      } else if (bed >= 0) useBed(bed);
+      else if (world.nearElder()) openChat("elder");
+      else if (world.nearStall()) crate = { cursor: 0 };
+      else if (world.peerNear()) peerMenu = { id: world.peerNear()!, cursor: 0 };
+      else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
+      else if (live.status === "online" && world.peers.size) openChat("room");
     }
     if (k === "p") menu = { cursor: state.active ?? 0 };
     if (k === "t") {
@@ -432,13 +434,19 @@ function coolFoe(foe: Wild | "boss" | "ghost"): void {
 }
 
 // Live room: other players online walk around this world (WebSocket Durable Object, ~10 Hz while moving).
-// Room chat goes through the same Say box when nobody is near; duels stay in v1 for now.
-const live = new LiveLink(roomUrl(location), () => ({ name: liveName(state.genes), genes: state.genes, ...world.me }), {
+// Room chat goes through the same Say box when nobody is near. Others see (and duel) your active pet.
+// Your own other tabs (same save, so the same pet) are left out of the world.
+const myGenes = () => activeMember().genes;
+const sameSave = (g: Genes) => JSON.stringify(g) === JSON.stringify(myGenes());
+const addPeer = (p: { id: string; name: string; genes: Genes; x: number; z: number; px: number; pz: number }) => {
+  if (!sameSave(p.genes)) world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz);
+};
+const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()), genes: myGenes(), ...world.me }), {
   welcome: (_id, _corner, peers) => {
     world.peers.clear();
-    for (const p of peers) world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz);
+    for (const p of peers) addPeer(p);
   },
-  join: (p) => world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz),
+  join: addPeer,
   leave: (id) => world.peers.delete(id),
   pos: (id, x, z, px, pz) => world.movePeer(id, x, z, px, pz),
   emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
@@ -451,6 +459,7 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(state.genes
   duelEnd: (_duel, reason) => duelEnded(reason),
 });
 live.connect();
+onPetChange = () => live.rejoin();
 
 // ---- live room extras: emotes (1-4 or the peer menu) and duels. A duel is pet vs pet, both following their
 // own memo rules on a shared seed (sim/duel.ts), so both players watch the same fight.
@@ -473,7 +482,7 @@ function peerKey(k: string): void {
   const row = PEER_ROWS[m.cursor]!;
   const p = world.peers.get(m.id);
   peerMenu = null;
-  if (row === "Duel" && p && !duelOut && live.challenge(m.id, state.memo, state.genes)) {
+  if (row === "Duel" && p && !duelOut && live.challenge(m.id, state.memo, myGenes())) {
     duelOut = { name: p.name, timer: window.setTimeout(() => duelEnded("gone"), DUEL_WAIT_MS) };
     toast = { text: `You challenged ${p.name}. Waiting for an answer...`, t: 4 };
     world.say("pet", "A duel? I'm ready!", 2);
@@ -487,7 +496,7 @@ function duelInvited(duel: string, _from: string, name: string): void {
 function answerInvite(yes: boolean): void {
   if (!duelIn) return;
   clearTimeout(duelIn.timer);
-  if (yes) live.accept(duelIn.duel, state.memo, state.genes);
+  if (yes) live.accept(duelIn.duel, state.memo, myGenes());
   else live.decline(duelIn.duel);
   duelIn = null;
 }
