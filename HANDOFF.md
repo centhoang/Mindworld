@@ -1,40 +1,37 @@
-# HANDOFF: Mindworld v3 stage 1 done (2026-10-29 ~22:40 UTC+7)
+# HANDOFF: Mindworld v3, stages 1-2 done, stage 3 started (2026-10-29 ~23:45 UTC+7)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md (approved). Build v3 stage 2 (minds). Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md (approved). Continue v3 stage 3 (grounds world) from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit)."
 
 ## State
-- **v3 stage 1 done + deployed (c228f2bd, commit 591f7d9):** `client/src/life/` = clock (1 day = 12 real min, starts 08:00), needs (pet/human decay), activities (14 defs: eat, sleep, nap, poop, groom, ball, dance, wander, cook, clean, feed, fish, picnic, soccer), village sim (idle -> walk -> wait (gathering) -> do; late joiners; cancel after 25 s; `chooser` hook = where the mind plugs in; `validChoices` only), relations (affinity per pair). 13 tests. Residents at home run on it (`overworld.ts` `life`, spots: bowl, beds by the house, lawn ring); poses in `pixel/life-draw.ts` (sleep/eat/dance/kick/squat/wiggle/sit) + bowl, poop, ball, day/night tint, clock top-right. E next to poop = clean. Player sheet now 6 columns: 4 walk (arm swing: front/back forearm lift, side code-drawn arms) + 2 idle (stand, head bob) via `spriteFrame()` in `art.ts`.
-- Not yet: life state is not saved (resets on reload); human villagers have no sprites yet (stage 2/4); the following pet is not in the sim.
-- The pixel build IS the game now: `client/index.html` -> `src/pixel/main.ts`. three.js and the 3D view are deleted; `/pixel.html` 301-redirects to `/` (Worker). Bundle: main 112 KB (44 KB gz); the 6 MB `lib-*.js` is WebLLM, lazy-loaded only on B.
-- Tests: client 187 (6 grass tests went with grass.ts), worker 149, tsc clean. Build OK.
-- Deployed behind Access: https://pets.uryto.dev/ = the pixel game, version 8f84b901 (2026-10-29, play-test fixes). Redeploys are standing-approved (CLAUDE.md "Decide vs. ask"): run `npm --prefix client run build`, then `npx wrangler deploy` in worker/, as two plain commands.
-- Commits this session: f6f6492 ImageGen pass 2 (cabin background `interior-empty.png`, Elder 2-frame idle, market stall on the Market island with E = buy/sell menu; player walk rebuilt in code) · d22590e v1 port (live duels, emotes 1-4, voice lessons in Teach, first-run hatch line + hints, goals card G) · 64df3db index swap + three.js removed.
-- Credits: Meta $149.91, Modal ~$110, Baseten ~$0.15. No paid calls this session.
+- **Deployed behind Access:** https://pets.uryto.dev/ version 0301b847 (stages 1+2). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` in worker/ (two plain commands).
+- **Tests:** client 215 (incl. life 13, mind 11, ground 4), worker 149, tsc clean, build OK (2026-10-29 late).
+- **Stage 1 (591f7d9):** `client/src/life/` = clock (1 day = 12 real min), needs, 14 activities, village sim (idle -> walk -> wait/gathering -> do; late joiners; cancel after 25 s), relations. Residents at home live on it; `pixel/life-draw.ts` poses + bowl/poop/ball + day/night tint; E on poop = clean. Player sheet 6 columns (4 walk with arm swing + 2 idle) via `spriteFrame()` in `art.ts`.
+- **Stage 2 (33fb9d5):** `client/src/mind/` = persona (from genes; traits bias the sim via `Env.bias`; `VILLAGERS` Elder/Mo/Ama/Pip authored), memory (log 30 + facts 6 + plan), brain (plan/choose/line/emote/reflect prompts + GBNF grammars + parsers + scripted fallbacks), scheduler (one queue per machine: priority, deadline race, duty cap 0.7, paused in battle), hub (chooser async: `undefined` = thinking; talk 2-4 lines with "..." bubble; invitations spread into the friend's plan; emotes after shared fun; reflection at sleep; save `petmind.minds.v1`). Model = whatever B loaded (native 3B or WebLLM 1B; `complete()` added to both). Inspector = I near a pet (`pixel/inspector.ts`). WebLLM load now warms up (first call ~33 s shader compile).
+- **Measured in the hidden preview pane (throttled):** grammar choice 2.2 s, a talk line 6-12 s; model plan + lines verified ("I'm so happy to meet you Mallow."). Visible tabs should be faster.
+- **Stage 3 started (49b216c):** `world/ground.ts` `groundFromSeed` (unique island, mainland only, no holes, theme meadow/autumn/snow, N/E/S/W gates) + tests. Not wired into the map yet.
+- Credits: Meta $149.91, Modal ~$110. No paid calls this session.
 
 ## Decisions made
-- **Art: Codex ImageGen = static art only** (user feedback 2026-10-29: the style looks great, but Codex animation is wrong). Claude does every animation, VFX and lighting in code. Example: the player walk uses only frame 0 of each `player-walk.png` row; `makePlayer()` in `pixel/art.ts` builds the 4-frame cycle (1 px bob, one leg lifted, the other planted).
-- Play-test 1 fixes (c9f7b93): E order = door, bed, Elder, stall, player, wild (hint over your head matches). Live presence + duels use the ACTIVE pet (LiveLink.rejoin on swap); peers with your own genes (your other tabs) are hidden. Player legs are drawn per frame in `art.ts` (frontLegs/sideLegs); only hat-to-hips comes from the ImageGen sheet. Hidden preview tabs join the local room as idle players: close them after live tests.
-- Mallow/Sprig back views (`monster-*-back.png`) are copied but NOT used: pets are procedural from genes, so a fixed back sprite would not match the pet's front/overworld look. Use them only if a fixed starter species with front + overworld art is added.
-- Duels: E next to an online player opens Duel / Wave / Heart / Dance / Laugh / Say. The invite is an Accept/Decline box (20 s timeout). The shared-seed `duelView` plays on the battle screen; coins come from `duelCoins`. Emotes show as speech bubbles ("*waves*", "<3 <3"), because the bitmap font has no emoji.
-- Onboarding: the first run shows the hatch line plus 3 `PIXEL_HINTS` (6 s each, Esc skips), marked seen afterwards. Goals card top-left (`pixelGoals`: teach, befriend, grow+sell, boss; `steps.shipped` added to the save), hidden while a menu is open or when all are done.
-- Outdoor plot decor (`game/decor.ts` porch/plot slots) NOT ported: next in the cut order, and it needs static ImageGen art for the outdoor items (sunflower, pond, birdhouse).
-- Earlier decisions stand: Canvas2D + WebGL2 CRT, STYLE.md palette canonical, browser-first, Meta models via the Worker proxy with a spend cap, repo goes public Nov 3.
+- V3-PLAN approved 2026-10-29, all three decisions = (a): stock 1B serves every mind in the browser + optional village LoRA for power mode (~$6, stage 5); ghost ground 10 min then slot freed; mobile + outdoor decor below the line. Backlog after the event: extra themes + real mini-games first.
+- Codex ImageGen = static art only; Claude does all animation/VFX in code.
+- Minds never run inside an activity: they only pick from `validChoices` (top 5 by score); every decision has a fallback, so no model = same village, less personal. Inspector labels the source honestly ("RULES (B: LOAD LLAMA)").
+- Pet mind ids = pet names (party swaps keep the mind). `life/` is separate from `sim/` (combat).
+- Earlier: Canvas2D + WebGL2 CRT, STYLE.md palette, browser-first, Meta models via the Worker proxy with a spend cap, repo public Nov 3.
 
-## Pending decisions (user)
-- V3-PLAN approved 2026-10-29, decisions 1-3 = (a) (village fine-tune for power mode ~$6 approved; ghost ground 10 min; mobile + decor below the line); backlog order: extra themes + real mini-games first.
-- Play-test stage 1 (residents living a day at home, poop + E to clean, arm swing + idle, night tint).
-- When to go public (remove Access).
+## Pending decisions / user actions
+- Play-test stages 1+2: party of 2+ pets, stand by the house, I = inspector, B = load Llama, watch them plan/talk/play ball; poop + E; night after ~9 min.
+- When to go public (remove Access); make the HF coach repos public (power-mode download).
 
 ## Next actions
-1. ~~v3 research + plan~~ DONE (`docs/V3-PLAN.md`, approved). ~~Stage 1~~ DONE. Original brief: follow `docs/V3-BRIEF.md`: players' grounds that join into one world (unique shapes, rare in-between grounds, themes), real-time mind-to-mind chat on the local model, GARP-style minds (personality, hobbies, daily plan, memory, relationships, emotes), an NPC mind model plus hosting NPC minds on players' machines with handover, needs-driven activities for pets and humans, arm swing + still idle, Codex static map art per theme. Output: `docs/V3-PLAN.md` with scope, a cut line for the Nov 3 demo, architecture, costs, stages and at most 3 user decisions. Then STOP for the user's review; build nothing before the OK.
-2. **Stage 2 (next):** `client/src/mind/` persona, memory (rolling log + facts, saved), brain (plan/choose/line/emote/reflect prompts + grammars from `validChoices`), scheduler (one WebLLM engine, priority queue, deadlines, tok/s probe); plug into `Env.chooser`; Mind inspector panel; save life state; pet-to-pet talk at home. Then stages 3-6 per V3-PLAN section 7.
-3. Still open from v2 (fold into the plan's ranking): mobile controls (touch D-pad + A/B), VFX polish, demo prep (README credits, 3-min script, CRT-on captures).
+1. **Stage 3 (grounds world):** rework `world/layout.ts` + `pixel/tiles.ts` so your home is your own `groundFromSeed` ground (seed saved once), players' grounds sit on a ring of slots around the hub (slot = server `corner`, raise slots to 24 in `worker/src/room.ts`, send `groundSeed`/`theme` in hello/welcome/join), bridges gate-to-gate, ghost ground 10 min on leave, in-between grounds by `roll(roomSeed, slotPair, day)` (playground 30 / picnic hill 25 / fishing pond 25) with spots for soccer/picnic/fish. Themes by recolour first; Codex art batch 1 (V3-PLAN section 5). Tests for layout + room messages. Then play-test ask (two tabs).
+2. **Stage 4:** networked minds per V3-PLAN 4.4 (`mind` relay, NPC host election in the room DO, handover with stored state, villagers Mo/Ama/Pip need human sprites).
+3. Stage 5 (fine-tune, background) + stage 6 (polish, README, demo script, captures).
 
 ## Gotchas
-- Codex: pass long briefs as a file; `-Sandbox workspace-write` for ImageGen; output can be truncated (rerun once). Ask for static frames only.
-- Dev hook `window.__px` = {world, battleView, interior, update, keys, setCrt, state, fight, live}. In a hidden pane rAF stalls: call `__px.update(dt,t)` (plus `await 0`) before screenshots. Two-tab duel test: preview tabs share localStorage (same pet); live needs the Worker on 8787 (`worker-live` in launch.json).
-- Python edits: write the script to `.scratch/` and run it (heredoc quoting breaks on `'''`).
-- Small Muse calls burn reasoning tokens: maxTokens >= 400. Never commit `.env`.
+- **GPU:** reloading the page while WebLLM generates can kill the D3D12 device ("DXGI_ERROR_DEVICE_REMOVED" / "object disposed"); fix = close the tab, open a new one. Stop update loops before reloading.
+- Dev hook `window.__px` = {world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain}. Hidden pane: rAF stalls, drive `__px.update(dt,t)` from a setInterval; JS calls time out at 45 s, so split waits. `world.setResidents([...])` injects test pets.
+- Python edits: write the script with the Write tool to `.scratch/` and run it (bash heredocs break on `'''`).
+- Codex: long briefs as a file; `-Sandbox workspace-write` for ImageGen; static frames only. Muse calls: maxTokens >= 400. Never commit `.env`.
 
 ## File map
-docs/{EVENT,PLAN,REWORK,V3-BRIEF,STYLE,DEPLOY,FINETUNE}.md · info-ref/ (GARP transcript) · client/index.html · client/src/pixel/{main,art,tiles,text,overworld,battle,interior,teach,menu,monster,crt}.ts · client/src/game/{farm,room,party,save,onboard,coach,instinct,voices,voice-input,npc-chat,pet-chat,babble,ghost-api}.ts · client/src/sim/duel.ts · client/src/world/live.ts · client/public/art/ · worker/ · scripts/codex.ps1 · .scratch/art/{,gen,gen2}/
+docs/{V3-PLAN,V3-BRIEF,EVENT,STYLE,DEPLOY,FINETUNE,SPIKES,CREDITS}.md · info-ref/ (GARP transcript, untracked) · client/src/life/{clock,needs,activities,village,relations}.ts · client/src/mind/{persona,memory,brain,scheduler,hub}.ts · client/src/world/{layout,ground,live,movement}.ts · client/src/pixel/{main,art,overworld,life-draw,inspector,tiles,text,battle,interior,teach,menu,monster,crt}.ts · client/src/game/{voices,instinct,grammar,...}.ts · worker/src/{room,room-do}.ts · scripts/codex.ps1 · .scratch/v3/ (prototype + edit scripts)
