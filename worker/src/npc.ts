@@ -86,16 +86,20 @@ export class NpcBoard {
     return Object.fromEntries(this.logs);
   }
 
-  // Give every NPC a live host: NPCs whose host left or went quiet go to the best other player. With
-  // `balance` (on join/leave), also move NPCs off a host holding 2+ more than another player.
+  // Give every NPC a live host: NPCs whose host left or went quiet go to the best other player. Players
+  // with a local model come first: once anyone has one loaded, NPCs leave hosts without a model (checked on
+  // every message, so loading a model pulls NPCs over within one heartbeat). With `balance` (on join/leave),
+  // also move NPCs off a host holding 2+ more than another eligible player.
   elect(peers: ReadonlyMap<string, Hostable>, now: number, balance = false): HostChange[] {
     const changes: HostChange[] = [];
     const load = (id: string) => [...this.hosts.values()].filter((h) => h.host === id).length;
+    const modeled = [...peers.values()].some((p) => p.cap.tps > 0);
+    const eligible = (p: Hostable) => !modeled || p.cap.tps > 0;
     const best = (except?: string) => {
       let pick: Hostable | null = null;
       let score = -1;
       for (const p of [...peers.values()].sort((a, b) => (a.id < b.id ? -1 : 1))) {
-        if (p.id === except) continue;
+        if (p.id === except || !eligible(p)) continue;
         const s = hostScore(p.cap, load(p.id));
         if (s > score) [pick, score] = [p, s];
       }
@@ -115,9 +119,17 @@ export class NpcBoard {
       if (next?.id !== h?.host) assign(npc, next?.id ?? null);
       else if (h) h.beat = now; // the quiet host is the only one left: keep it
     }
-    if (balance && peers.size > 1) {
+    for (const npc of NPCS) {
+      const h = this.hosts.get(npc);
+      const hp = h && peers.get(h.host);
+      if (!hp || eligible(hp)) continue;
+      const next = best();
+      if (next) assign(npc, next.id);
+    }
+    const pool = [...peers.values()].filter(eligible);
+    if (balance && pool.length > 1) {
       for (let guard = 0; guard < NPCS.length; guard++) {
-        const ids = [...peers.keys()].sort();
+        const ids = pool.map((p) => p.id).sort();
         const most = ids.reduce((a, b) => (load(b) > load(a) ? b : a));
         const least = ids.reduce((a, b) => (load(b) < load(a) ? b : a));
         if (load(most) - load(least) < 2) break;

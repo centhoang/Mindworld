@@ -132,7 +132,30 @@ describe("live chat + duel messages", () => {
     expect((got[3] as unknown[])[2]).toBe(7);
   });
 
-  it("sends chat and duel messages with rules only (no free text)", () => {
+  it("queues a mind's spoken lines 3 s apart instead of losing them, skipping stale ones", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const { h } = handlers();
+    const ws = fakeSocket();
+    const link = new LiveLink("ws://x", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, () => ws);
+    link.connect();
+    ws.readyState = 1;
+    ws.onopen!({});
+    const said = () => ws.sent.map((m) => JSON.parse(m)).filter((m) => m.t === "mind" && m.say).map((m) => m.say);
+    link.mind({ who: "mo", say: "one" });
+    link.mind({ who: "mo", say: "two" });
+    link.mind({ who: "pip", say: "pip!" }); // another mind: no wait
+    link.mind({ who: "mo", act: "fish" }); // not spoken: goes at once
+    expect(said()).toEqual(["one", "pip!"]);
+    vi.advanceTimersByTime(3100);
+    expect(said()).toEqual(["one", "pip!", "two"]);
+    for (const w of ["a", "b", "c", "d", "e"]) link.mind({ who: "ama", say: w });
+    vi.advanceTimersByTime(20_000);
+    expect(said().filter((x) => x.length === 1)).toEqual(["a", "b", "c", "d", "e"].slice(0, 5).filter((_, i) => i * 3100 <= 12_000));
+    vi.useRealTimers();
+  });
+
+    it("sends chat and duel messages with rules only (no free text)", () => {
     const { h } = handlers();
     const ws = fakeSocket();
     const link = new LiveLink("ws://x", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, () => ws);

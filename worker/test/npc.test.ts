@@ -66,11 +66,25 @@ describe("room minds", () => {
     expect(send(r, asker, { t: "ask", npc: "mo", text: "where do you fish?" }, 0).out).toEqual([{ to: { id: host }, msg: { t: "ask", npc: "mo", from: asker, name: expect.any(String), text: "where do you fish?" } }]);
     expect(send(r, asker, { t: "ask", npc: "mo", text: "again?" }, 1000).out[0]!.msg).toEqual({ t: "askNo", npc: "mo" }); // too soon
     expect(send(r, host, { t: "ask", npc: "mo", text: "me?" }, 5000).out[0]!.msg).toEqual({ t: "askNo", npc: "mo" }); // I host it
-    r.peers.get(host)!.cap = { tps: 0, webgpu: false };
-    expect(send(r, asker, { t: "ask", npc: "mo", text: "hello" }, 9000).out[0]!.msg).toEqual({ t: "askNo", npc: "mo" }); // no model there
+    for (const p of r.peers.values()) p.cap = { tps: 0, webgpu: false }; // nobody has a model loaded
+    expect(send(r, asker, { t: "ask", npc: "mo", text: "hello" }, 9000).out.map((o) => o.msg)).toContainEqual({ t: "askNo", npc: "mo" });
     expect(send(r, asker, { t: "ask", npc: "boss", text: "hi" }, 9500).out.some((o) => o.msg.t === "ask")).toBe(false); // not an NPC
     const line = send(r, host, { t: "mind", who: "mo", say: "At dawn, by the pond.", to: asker }, 10000);
     expect(line.out[0]!.msg).toMatchObject({ t: "mind", who: "mo", say: "At dawn, by the pond.", to: asker });
+  });
+
+  it("moves NPCs to a player who loads a model, and keeps them off players without one", () => {
+    const r = new Room();
+    r.join("a", { cap: { tps: 0, webgpu: true } }, 0);
+    r.join("b", { cap: { tps: 0, webgpu: true } }, 0);
+    expect(NPCS.filter((n) => r.board.hostOf(n) === "a")).toHaveLength(2);
+    const res = send(r, "b", { t: "cap", tps: 25, webgpu: true }, 1000); // b loaded Llama
+    expect(NPCS.every((n) => r.board.hostOf(n) === "b")).toBe(true);
+    expect(res.out.filter((o) => o.msg.t === "npcHost")).not.toHaveLength(0);
+    r.join("c", { cap: { tps: 0, webgpu: false } }, 2000); // no model: balancing gives it nothing
+    expect(NPCS.every((n) => r.board.hostOf(n) === "b")).toBe(true);
+    r.join("d", { cap: { tps: 20, webgpu: true } }, 3000); // a second model holder shares the load
+    expect(NPCS.filter((n) => r.board.hostOf(n) === "d")).toHaveLength(2);
   });
 
   it("tells a newcomer who hosts which NPC and hands the new host the NPC's memory", () => {

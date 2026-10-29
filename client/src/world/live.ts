@@ -47,6 +47,8 @@ export interface MindLine {
   invite?: { act: string; to?: string };
 }
 export const MIND_SAY_MAX = 80;
+const MIND_GAP_MS = 3100; // the room's spoken-line gap per mind (3 s) plus a little slack
+const MIND_QUEUE_MS = 12_000;
 
 export type LiveStatus = "connecting" | "online" | "offline" | "full";
 
@@ -228,6 +230,7 @@ export class LiveLink {
   private ws: SocketLike | null = null;
   private last: Me | null = null;
   private lastSent = 0;
+  private readonly sayNext = new Map<string, number>(); // mind -> earliest time (ms) its next spoken line may go
   private retries = 0;
   private stopped = false;
   private full = false;
@@ -321,9 +324,19 @@ export class LiveLink {
   }
 
   // A mind line for one of my pets or an NPC I host; `mem` (NPCs only) goes to the room's NPC log.
+  // The room takes one spoken line per mind per 3 s, so spoken lines wait their turn here (in order)
+  // instead of being dropped; a line that would wait over MIND_QUEUE_MS is stale and skipped.
   mind(line: MindLine & { mem?: string }): boolean {
     const say = line.say?.replace(/\s+/g, " ").trim().slice(0, MIND_SAY_MAX);
-    return this.send({ t: "mind", ...line, say: say || undefined }); // undefined fields drop out of the JSON
+    const msg = { t: "mind", ...line, say: say || undefined }; // undefined fields drop out of the JSON
+    if (!say) return this.send(msg);
+    const now = Date.now();
+    const at = Math.max(now, this.sayNext.get(line.who) ?? 0);
+    if (at - now > MIND_QUEUE_MS) return false;
+    this.sayNext.set(line.who, at + MIND_GAP_MS);
+    if (at === now) return this.send(msg);
+    setTimeout(() => this.send(msg), at - now);
+    return true;
   }
 
   // A question for an NPC hosted on another machine (the room relays it to that host's local model).
