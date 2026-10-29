@@ -2,7 +2,7 @@
 // camera and the place banner. Game rules (movement, the map) come from ../world; this file only decides
 // what is where on screen.
 
-import { generateWorld, onGround, platformAt, worldDay, type LayoutInput, type Platform, type WorldMap } from "../world/layout";
+import { generateWorld, groundOrigin, onGround, platformAt, worldDay, type LayoutInput, type Platform, type WorldMap } from "../world/layout";
 import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../world/movement";
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
@@ -80,6 +80,7 @@ export class Overworld {
   minds: MindHub | null = null;
   npcs: NpcVillage | null = null; // Elder, Mo, Ama, Pip on the hub (their minds run on whoever hosts them)
   private npcSprites = new Map<Npc, Sprite>();
+  private signs: { x: number; z: number; text: string }[] = []; // owner's name at each ground's hub-side gate
   private mini: HTMLCanvasElement | null = null; // the whole map, 1 px per tile (rebuilt on relayout)
   private savedMinds: MindsSave | null = null;
   inspect: string | null = null; // the mind shown in the inspector (I)
@@ -148,6 +149,7 @@ export class Overworld {
     this.trees = [];
     this.treeTiles.clear();
     this.placeTrees();
+    this.placeSigns();
     this.bowl = { x: this.house.x - 3, z: this.house.z + 1.6 };
     const lawn: Vec[] = [];
     for (let i = 0; i < 24; i++) {
@@ -221,6 +223,29 @@ export class Overworld {
   private npcHomes(): Record<Npc, Vec> {
     const isle = this.world.platforms.find((p) => p.kind === "npc") ?? { x: 0, z: 0 };
     return { elder: { x: isle.x, z: isle.z - 1 }, mo: { x: -3, z: 2 }, ama: { x: 3, z: 2 }, pip: { x: 0, z: 4 } };
+  }
+
+  // A name sign beside the gate that faces the hub, on whichever side of the path is free land.
+  private placeSigns(): void {
+    this.signs = [];
+    for (const p of this.world.platforms) {
+      if (!p.ground) continue;
+      const [ci, cj] = p.cell;
+      const side = Math.abs(ci) >= Math.abs(cj) ? (ci > 0 ? "w" : "e") : cj > 0 ? "n" : "s";
+      const [ox, oz] = groundOrigin(p);
+      const gate = p.ground.gates[side];
+      const inX = side === "w" ? 2 : side === "e" ? -2 : 0; // a couple of tiles inside the gate
+      const inZ = side === "n" ? 2 : side === "s" ? -2 : 0;
+      const x0 = ox + gate.i + 0.5 + inX;
+      const z0 = oz + gate.j + 0.5 + inZ;
+      const name = p.owner === "me" ? "HOME" : p.label.replace(/'s ground.*$/, "").toUpperCase();
+      for (const d of [1.6, -1.6]) {
+        const at = inX ? { x: x0, z: z0 + d } : { x: x0 + d, z: z0 };
+        if (!this.canWalk(at.x, at.z)) continue;
+        this.signs.push({ ...at, text: name.slice(0, 12) });
+        break;
+      }
+    }
   }
 
   // Top-right map of the islands: land, paths and bridges, my ground, other players and me.
@@ -729,6 +754,15 @@ export class Overworld {
       const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep") ? 3 : 0;
       const f = spriteFrame(s, walking, t + NPCS.indexOf(a.id as Npc), t);
       items.push({ z: a.pos.z, draw: () => g.drawImage(s.img, f * 16, dir * 24, 16, 24 - sit, nx - 8, ny - 22 + sit, 16, 24 - sit) });
+    }
+    for (const sg of this.signs) {
+      const [sx, sy] = toScreen(sg.x, sg.z);
+      if (sx < -48 || sy < -48 || sx > sw + 48 || sy > sh + 48) continue;
+      const near = Math.hypot(sg.x - this.player.x, sg.z - this.player.z) < 7;
+      items.push({ z: sg.z, draw: () => {
+        drawSpotProp(g, "sign", sx, sy + 4, t);
+        if (near) drawText(g, sg.text, Math.round(sx - (sg.text.length * GLYPH) / 2), sy - 30, PAL.panel);
+      } });
     }
     // A picnic away from a picnic hill (the NPCs on the plaza) spreads its own blanket.
     for (const gt of [...this.life.gatherings, ...(this.npcs?.v.gatherings ?? [])]) {
