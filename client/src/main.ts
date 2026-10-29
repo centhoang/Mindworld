@@ -632,10 +632,12 @@ async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {
   }
   setHp(pet.maxHp, opp, def.maxHp);
   await banner(ghost ? `vs ${ghost.name}'s ghost` : boss ? `Boss: ${BOSS_STATS.label}` : `vs ${enemy}`, 900);
+  // The next decision starts while the current turn animates, so a cloud model's latency is mostly hidden.
+  let next = instinct.decide(pet.name, state.memo, battle.observe());
   while (!battle.done) {
     const obs = battle.observe();
     say("enemy", TELL[obs.intent]);
-    const choice = await instinct.decide(pet.name, state.memo, obs);
+    const choice = await next;
     say("pet", choice.line);
     const rec = battle.step(choice.action);
     const outcome = battle.done ? battle.replay().outcome : null;
@@ -644,6 +646,7 @@ async function fight(from: { pick?: string; ghost?: Ghost; entity?: Entity } = {
         `<span class="dim">${rec.dealt ? `hit ${rec.dealt}` : ""}${rec.taken ? ` took ${rec.taken}` : ""}</span>`,
     );
     if (boss) logBossTurn(boss, obs.turn);
+    if (!battle.done) next = instinct.decide(pet.name, state.memo, battle.observe());
     await arena.playTurn(choice.action, rec.enemyAct, rec.dealt, rec.taken, outcome);
     setHp(rec.myHp, opp, rec.enemyHp);
   }
@@ -1055,7 +1058,8 @@ renderHome();
 setHp(pet.maxHp, null, null);
 setButtons();
 void probeNative(true);
-void probeCloud();
+// Per-move cloud picks take 2-8 s, too slow for fights: opt in with ?cloudmoves (Meta models still teach, chat and re-teach wild pets).
+if (new URLSearchParams(location.search).has("cloudmoves")) void probeCloud();
 
 // ---------------- first run: hatch, three hints, goals (shown once; "?" replays) ----------------
 

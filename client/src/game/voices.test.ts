@@ -13,7 +13,7 @@ describe("CloudVoice", () => {
     const abort = signal();
     expect(await cloud.pick(prompt, abort)).toEqual({ action: "guard", line: "Bracing!" });
     expect(cloud.label).toBe("Glimmer");
-    expect(cloud.timeoutMs).toBe(4000);
+    expect(cloud.timeoutMs).toBe(3000);
     expect(fetchFn).toHaveBeenCalledWith("https://worker.test/api/llm", {
       method: "POST",
       headers: { "content-type": "application/json" },

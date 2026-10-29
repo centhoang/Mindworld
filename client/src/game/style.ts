@@ -80,6 +80,16 @@ export function addLights(scene: THREE.Scene, span: number): THREE.DirectionalLi
   return sun;
 }
 
+// Frees GPU buffers of a removed subtree (textures such as the shared toon ramp are kept).
+export function disposeTree(obj: THREE.Object3D) {
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh && !(o as THREE.Sprite).isSprite) return;
+    m.geometry?.dispose();
+    for (const mat of Array.isArray(m.material) ? m.material : [m.material]) mat?.dispose();
+  });
+}
+
 export function castAll(obj: THREE.Object3D, receive = true) {
   obj.traverse((o) => {
     if (o instanceof THREE.Mesh) {

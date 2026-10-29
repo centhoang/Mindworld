@@ -70,16 +70,23 @@ describe("Instinct", () => {
         ...fakeVoice((_, signal) => new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted"))))),
         timeoutMs: 50,
       };
-      const memo = (await new ScriptedCortex().teach(EMPTY_MEMO, "guard the heavy hits")).memo;
-      const pending = new Instinct(slow).decide("Mochi", memo, obs);
+      const pending = new Instinct(slow).decide("Mochi", EMPTY_MEMO, obs);
       const settled = vi.fn();
       void pending.then(settled);
       await vi.advanceTimersByTimeAsync(49);
       expect(settled).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
-      expect(await pending).toMatchObject({ action: "guard", source: "rule", note: "model timeout" });
+      expect(await pending).toMatchObject({ action: "attack", source: "reflex", note: "model timeout" });
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("lets a firing memo rule decide without waiting for the model", async () => {
+    const pick = vi.fn(async () => ({ action: "attack", line: "" }));
+    const memo = (await new ScriptedCortex().teach(EMPTY_MEMO, "guard the heavy hits")).memo;
+    const c = await new Instinct(fakeVoice(pick)).decide("Mochi", memo, obs);
+    expect(c).toMatchObject({ action: "guard", source: "rule" });
+    expect(pick).not.toHaveBeenCalled();
   });
 });

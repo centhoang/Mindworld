@@ -5,7 +5,7 @@ import { PET_GENES, type Genes } from "../sim/ghost";
 import { petLook, type Ears, type Horns, type Tail } from "./genes";
 import { slotPosition, type DecorKind, type Slot } from "./home";
 import type { WorldView } from "../world/view";
-import { addLights, castAll, Clouds, makeIsland, Motes, PAL, setupRenderer, skyTexture, toon } from "./style";
+import { addLights, castAll, Clouds, disposeTree, makeIsland, Motes, PAL, setupRenderer, skyTexture, toon } from "./style";
 
 // The arena: a procedural pet (left) and enemy (right) on a low-poly plot, plus short tweened animations
 // for each move. Everything is built from primitives so there are no asset files to load.
@@ -442,6 +442,7 @@ export class Arena {
 
   // Home-plot decor around the platform edge (yours, or a ghost owner's during a ghost fight).
   setDecor(slots: readonly Slot[]) {
+    disposeTree(this.decor);
     this.decor.clear();
     slots.forEach((kind, i) => {
       if (!kind) return;
@@ -456,7 +457,10 @@ export class Arena {
 
   // An archetype builds its creature; a ready-made group (a ghost pet) is used as is.
   setEnemy(id: ArchetypeId | THREE.Group | null) {
-    if (this.enemy) this.scene.remove(this.enemy);
+    if (this.enemy) {
+      this.scene.remove(this.enemy);
+      disposeTree(this.enemy);
+    }
     this.enemy = id === null ? null : typeof id === "string" ? makeEnemy(id) : id;
     if (this.enemy) {
       this.enemy.position.copy(this.enemyHome);

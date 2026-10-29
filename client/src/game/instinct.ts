@@ -104,6 +104,8 @@ export class Instinct {
       note,
     });
     if (!this.voice || !this.voice.ready()) return fallback(this.voice ? "model loading" : undefined);
+    // A firing memo rule decides at once (it is the measured policy); the model only fills the gaps, so turns stay snappy.
+    if (a.rule !== null) return fallback();
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), this.voice.timeoutMs ?? this.timeoutMs);
     try {

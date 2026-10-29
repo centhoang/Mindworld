@@ -10,7 +10,7 @@ import { splitReply, type VoiceBackend, type VoicePrompt, type VoiceReply } from
 export const NATIVE_URL = "http://127.0.0.1:8080";
 
 export class CloudVoice implements VoiceBackend {
-  readonly timeoutMs = 4000;
+  readonly timeoutMs = 3000; // runs during the previous turn's animation; only when no memo rule fires
   readonly label: string;
   private readonly baseUrl: string;
   private readonly provider: "modal" | "glimmer";
