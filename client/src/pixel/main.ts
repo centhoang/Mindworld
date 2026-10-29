@@ -18,6 +18,7 @@ import { BUILDS, drawMonster } from "./monster";
 import { Overworld, type Wild } from "./overworld";
 import { drawDialogue } from "./text";
 import { drawMenu, type MenuRow } from "./menu";
+import { TeachScreen } from "./teach";
 
 export const LOW_H = 216;
 
@@ -55,12 +56,27 @@ function refreshParty(): void {
 }
 refreshParty();
 let menu: { cursor: number } | null = null;
+const portraits = new Map<Genes, HTMLCanvasElement>();
+const teach = new TeachScreen({
+  memo: () => state.memo,
+  recent: () => state.recent,
+  setMemo: (m) => {
+    state.memo = m;
+    state.steps = { ...state.steps, proved: true };
+    save(state);
+  },
+  petName: () => activeMember().name,
+  portrait: () => {
+    const m = activeMember();
+    return portraits.get(m.genes) ?? portraits.set(m.genes, drawMonster(petLook(m.genes), 48, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;
+  },
+});
 const iconCache = new Map<Genes, HTMLCanvasElement>();
 const icon = (m: Member) => iconCache.get(m.genes) ?? iconCache.set(m.genes, drawMonster(petLook(m.genes), 16, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;
 const battleView = new BattleView();
 const keys = new Set<string>();
 let mode: "world" | "battle" = "world";
-let toast: { text: string; who?: string; t: number } | null = { text: "Walk with WASD or the arrow keys. Bump into a wild pet to battle. P = your pets. C switches the CRT look.", who: "Hint", t: 7 };
+let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
 
 const CRT_KEY = "mw.crt";
 let crt = (() => {
@@ -96,6 +112,10 @@ function resize(): void {
 window.addEventListener("resize", resize);
 window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
+  if (teach.open) {
+    if (k === "escape") teach.hide();
+    return; // typing in the teach box
+  }
   if (k === "c" && !e.repeat) setCrt(!crt);
   if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
   if (mode === "world" && !e.repeat) menuKey(k);
@@ -110,6 +130,10 @@ resize();
 function menuKey(k: string): void {
   if (!menu) {
     if (k === "p") menu = { cursor: state.active ?? 0 };
+    if (k === "t") {
+      keys.clear();
+      teach.show();
+    }
     return;
   }
   const n = members().length;
@@ -178,7 +202,8 @@ function frame(now: number): void {
 }
 
 function update(dt: number, t: number): void {
-  if (mode === "world") {
+  if (teach.open) teach.draw(g, low.width, low.height, t);
+  else if (mode === "world") {
     const met = world.update(dt, menu ? new Set<string>() : keys);
     world.draw(g, low.width, low.height, t);
     if (met) void fight(met);

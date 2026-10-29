@@ -127,11 +127,12 @@ export class LlmCortex implements Cortex {
   }
 
   teach(memo: Memo, instruction: string): Promise<CortexResult> {
-    return this.run("teach", memo, buildTeachPrompt(memo, instruction), this.provider);
+    // Low effort too: at full effort ~1 in 8 teach replies ran out of tokens while reasoning (docs/SPIKES.md).
+    return this.run("teach", memo, buildTeachPrompt(memo, instruction), this.provider, "low");
   }
 
   private async run(kind: "memo" | "teach", before: Memo, p: { system: string; prompt: string }, provider: "baseten" | "meta", effort?: "low"): Promise<CortexResult> {
-    // Low reasoning effort keeps Reflect inside the budget (Muse Spark accepts reasoning.effort).
+    // Low reasoning effort keeps replies inside the budget (Muse Spark accepts reasoning.effort).
     const reply = await this.llm.complete({ kind, ...p, maxTokens: 4000, provider, ...(effort ? { effort } : {}) });
     // A mock server (LLM_MOCK=1) never coaches; let the caller fall back to the scripted coach instead.
     if (reply.model === "mock") throw new CortexUnavailable("server is in mock mode");

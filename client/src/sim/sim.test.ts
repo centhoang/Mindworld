@@ -309,7 +309,7 @@ describe("cortex", () => {
     const c = new LlmCortex(llm);
     expect((await c.teach(EMPTY_MEMO, "x")).source).toBe("muse-spark-open");
     expect((await c.reflect(EMPTY_MEMO, [])).source).toBe("muse-spark");
-    expect(seen).toEqual(["baseten", "meta/low"]);
+    expect(seen).toEqual(["baseten/low", "meta/low"]);
   });
 });
 

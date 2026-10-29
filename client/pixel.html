@@ -13,10 +13,24 @@
       #crt { position: fixed; right: 10px; bottom: 10px; font: 10px "Press Start 2P", monospace; color: #f7dfc8; background: #45301f;
         border: 2px solid #c58757; padding: 6px 8px; cursor: pointer; opacity: 0.8; }
       #crt:hover { opacity: 1; }
+      #teach { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 760px); display: flex; gap: 6px; flex-wrap: wrap;
+        font: 11px "Press Start 2P", monospace; }
+      #teach[hidden] { display: none; }
+      #teach input { flex: 1 1 260px; font: inherit; padding: 9px 10px; color: #141820; background: #f7dfc8; border: 3px solid #45301f; outline: none; }
+      #teach input:focus { border-color: #a85f2a; }
+      #teach button { font: inherit; padding: 8px 10px; color: #f7dfc8; background: #a85f2a; border: 3px solid #45301f; cursor: pointer; }
+      #teach button[data-act=close] { background: #7a4628; }
+      #teach button:disabled, #teach input:disabled { opacity: 0.55; cursor: default; }
     </style>
   </head>
   <body>
     <canvas id="screen"></canvas>
+    <form id="teach" hidden autocomplete="off">
+      <input maxlength="300" placeholder="e.g. guard when it winds up a heavy hit" aria-label="Teach your pet" />
+      <button type="submit">Teach</button>
+      <button type="button" data-act="review">Review fights</button>
+      <button type="button" data-act="close">Close</button>
+    </form>
     <button id="crt" type="button">CRT on</button>
     <script type="module" src="/src/pixel/main.ts"></script>
   </body>
