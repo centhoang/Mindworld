@@ -2,6 +2,7 @@
 // Every color below is one of the 28 canonical palette entries; scenes ask for tiles and sprites by name.
 
 import { AWAY, hash2, lookAt, T, TILE, type TileKind, type TileMap } from "./tiles";
+import { THEMES } from "../world/ground";
 
 // Old key names kept so scenes didn't need renaming; values are the STYLE.md palette.
 export const PAL = {
@@ -26,6 +27,10 @@ const FILES = [
 ] as const;
 const OPTIONAL = ["props-grounds", "npc-mo", "npc-ama", "npc-pip"] as const; // newer sheets: the game draws code stand-ins until they exist
 export type ArtName = (typeof FILES)[number] | (typeof OPTIONAL)[number];
+// Drawn season art for the autumn and snow grounds ("tile-grass-1" -> "tile-grass-autumn-1"); anything without
+// its own file is recoloured from the meadow art (themed below).
+const SEASONAL: readonly ArtName[] = ["tile-grass-0", "tile-grass-1", "tile-grass-2", "prop-tree"];
+export const seasonName = (name: string, theme: number): string => name.replace(/(-\d+)?$/, (n) => `-${THEMES[theme & 3]}${n}`);
 
 const art = new Map<string, HTMLImageElement>();
 
@@ -45,7 +50,8 @@ export function loadArt(base = "/art/"): Promise<void> {
       i.onerror = () => (must ? rej(new Error(`art ${f}`)) : res());
       i.src = `${base}${f}.png`;
     });
-  return Promise.all([...FILES.map((f) => one(f, true)), ...OPTIONAL.map((f) => one(f, false))]).then(() => undefined);
+  const seasons = SEASONAL.flatMap((f) => [1, 2].map((th) => seasonName(f, th) as ArtName));
+  return Promise.all([...FILES.map((f) => one(f, true)), ...[...OPTIONAL, ...seasons].map((f) => one(f, false))]).then(() => undefined);
 }
 
 // Ground themes by recolour: the meadow greens of any sheet swapped for autumn or snow palette entries
@@ -60,6 +66,8 @@ const hex = (r: number, g: number, b: number) => `#${((1 << 24) | (r << 16) | (g
 export function themed(name: ArtName, theme: number): CanvasImageSource {
   const swap = SWAP[theme & 3];
   if (!swap) return img(name);
+  const drawn = art.get(seasonName(name, theme));
+  if (drawn) return drawn;
   const k = `${name}:${theme & 3}`;
   const hit = themedCache.get(k);
   if (hit) return hit;
