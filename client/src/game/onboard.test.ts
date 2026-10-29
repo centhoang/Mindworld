@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { goals, hints, parseOnboard } from "./onboard";
+import { goals, hints, parseOnboard, pixelGoals } from "./onboard";
+
+describe("pixel goals card", () => {
+  it("ticks each goal from its own progress flag", () => {
+    const none = pixelGoals({ taught: false, party: 0, shipped: false, boss: false });
+    expect(none.map((g) => g.done)).toEqual([false, false, false, false]);
+    const some = pixelGoals({ taught: true, party: 2, shipped: false, boss: true });
+    expect(some.filter((g) => g.done).map((g) => g.id)).toEqual(["teach", "befriend", "boss"]);
+  });
+});
 
 describe("first-run onboarding", () => {
   it("has three hints, with touch wording on phones", () => {

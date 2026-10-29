@@ -252,6 +252,17 @@ export class Overworld {
   };
 
   // Returns the wild monster the player just bumped into, if any.
+  // The online player standing next to you, if any (E: duel / emote / say).
+  peerNear(): string | null {
+    let best: string | null = null;
+    let bd = 2.2;
+    for (const [id, p] of this.peers) {
+      const d = Math.hypot(p.pos.x - this.player.x, p.pos.z - this.player.z);
+      if (d < bd) [best, bd] = [id, d];
+    }
+    return best;
+  }
+
   addPeer(id: string, name: string, genes: Genes, x: number, z: number, px: number, pz: number): void {
     this.peers.set(id, { name, pos: { x, z }, pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front") });
   }

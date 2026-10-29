@@ -13,7 +13,7 @@ export interface GoalInput {
 }
 
 export interface Goal {
-  id: "befriend" | "decorate" | "boss";
+  id: "befriend" | "decorate" | "boss" | "teach" | "farm";
   label: string;
   how: string;
   done: boolean;
@@ -26,6 +26,30 @@ export function goals(g: GoalInput): Goal[] {
     { id: "boss", label: "Beat the boss", how: "North-east island; it reads your memo", done: g.boss },
   ];
 }
+
+// The pixel build's goals card: the four things a first visit should touch (teach, tame, farm, boss).
+export interface PixelGoalInput {
+  taught: boolean; // a lesson changed the memo (steps.proved)
+  party: number; // pets befriended
+  shipped: boolean; // sold a harvest at the crate or the market
+  boss: boolean;
+}
+
+export function pixelGoals(g: PixelGoalInput): Goal[] {
+  return [
+    { id: "teach", label: "Teach your pet (T)", how: "Plain words; it is tested on new fights", done: g.taught },
+    { id: "befriend", label: "Befriend a wild pet", how: "Wild meadows; weaken it, then befriend", done: g.party > 0 },
+    { id: "farm", label: "Grow and sell a crop", how: "Beds by your A-frame; sell at the crate", done: g.shipped },
+    { id: "boss", label: "Outsmart The Reader", how: "Boss island; it reads your memo", done: g.boss },
+  ];
+}
+
+// First-run lines for the pixel build, after the hatch line.
+export const PIXEL_HINTS: readonly string[] = [
+  "WASD or arrows to walk. Your pet follows you everywhere.",
+  "E talks and uses things: the Elder, wild pets, the farm beds, the market stall, your door.",
+  "Bump a wild pet to battle. Your pet fights by its memo: press T to teach it new rules. G: goals.",
+];
 
 export interface Hint {
   icon: string;

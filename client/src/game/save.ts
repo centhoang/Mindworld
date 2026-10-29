@@ -25,7 +25,7 @@ export interface Save {
   coins?: number; // earned from wild wins and befriends, spent at the market
   owned?: DecorKind[]; // decor bought at the market (the starter set is always owned)
   muted?: boolean; // in-world voice off
-  steps?: { fought?: boolean; proved?: boolean; boss?: boolean }; // first-steps guide progress
+  steps?: { fought?: boolean; proved?: boolean; boss?: boolean; shipped?: boolean }; // first-steps guide progress
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
   genes: Genes; // the pet's looks, rolled at hatch (older saves get one on first load)
   onboard?: OnboardSave; // first-run hatch + hints seen, goals card closed
@@ -63,7 +63,7 @@ export function load(): Save {
         ...(raw.room ? { room: parseRoom(raw.room) } : {}),
         ...(parseOnboard(raw.onboard) ? { onboard: parseOnboard(raw.onboard) } : {}),
         ...(raw.steps && typeof raw.steps === "object"
-          ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true } }
+          ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true, shipped: raw.steps.shipped === true } }
           : {}),
       };
     }

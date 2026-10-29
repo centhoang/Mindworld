@@ -5,7 +5,8 @@
 import { parseGenes, petLook, randomGenes } from "../game/genes";
 import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
 import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
-import { LiveLink, liveName, roomUrl, SAY_MAX } from "../world/live";
+import { EMOTES, LiveLink, liveName, roomUrl, SAY_MAX, type Emote } from "../world/live";
+import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
 import { addCoins, coinsFor } from "../game/shop";
 import { load, MAX_TAMED, save } from "../game/save";
 import { addToParty, type PartyMon } from "../game/party";
@@ -14,12 +15,13 @@ import { Battle } from "../sim/battle";
 import { allowedMoves, cannedLine } from "../game/instinct";
 import { fetchWildMemos, withTactics, type WildMemos } from "../sim/tactics";
 import { ENEMIES } from "../sim/enemies";
-import { DEFAULT_PET, type Intent } from "../sim/types";
+import { DEFAULT_PET, type Intent, type Outcome } from "../sim/types";
 import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
 import { BUILDS, drawMonster } from "./monster";
 import { Overworld, type Wild } from "./overworld";
-import { drawDialogue } from "./text";
+import { drawDialogue, drawFrame, drawText } from "./text";
+import { PIXEL_HINTS, pixelGoals } from "../game/onboard";
 import { loadArt } from "./art";
 import { Babbler } from "../game/babble";
 import { voiceFor, type Speaker } from "../game/chatter";
@@ -219,6 +221,7 @@ function crateKey(k: string): void {
   const f = state.farm!;
   if (c.cursor === 0) {
     const r = sellAll(f, state.coins ?? 0);
+    if (r.earned > 0) state.steps = { ...state.steps, shipped: true };
     state.farm = world.farm = r.farm;
     state.coins = r.coins;
   } else if (c.cursor <= CROP_IDS.length) {
@@ -231,6 +234,30 @@ function crateKey(k: string): void {
   save(state);
 }
 let toast: { text: string; who?: string; t: number } | null = { text: "WASD or arrows: walk. Bump a wild pet to battle. E: use/talk  M: mute  B: brain  P: your pets  T: teach  C: CRT look", who: "Hint", t: 7 };
+// First visit: the hatch line, then the control hints one after another (each 6 s, Esc skips), once.
+const hintQueue: { text: string; who?: string; t: number }[] = [];
+if (!state.onboard?.seen) {
+  toast = { text: `Your egg hatched! Meet ${pet.name}. It learns to fight from what you teach it.`, who: pet.name, t: 6 };
+  hintQueue.push(...PIXEL_HINTS.map((text) => ({ text, who: "Hint", t: 6 })));
+}
+function nextToast(): void {
+  toast = hintQueue.shift() ?? null;
+  if (!toast && !state.onboard?.seen) {
+    state.onboard = { ...state.onboard, seen: true };
+    save(state);
+  }
+}
+
+// The goals card (top left, G hides it): what a first visit should try. Gone once all four are done.
+function drawGoals(): void {
+  if (state.onboard?.goalsHidden) return;
+  const list = pixelGoals({ taught: !!state.steps?.proved, party: (state.party ?? []).length, shipped: !!state.steps?.shipped, boss: !!state.steps?.boss });
+  if (list.every((x) => x.done)) return;
+  const w = 150;
+  drawFrame(g, 4, 4, w, 18 + list.length * 10);
+  drawText(g, "GOALS  (G)", 10, 9, "#795849");
+  list.forEach((x, i) => drawText(g, `${x.done ? "+" : "-"} ${x.label}`.slice(0, 22), 10, 20 + i * 10, x.done ? "#7A8F89" : "#39463F"));
+}
 
 const CRT_KEY = "mw.crt";
 let crt = (() => {
@@ -276,6 +303,11 @@ window.addEventListener("keydown", (e) => {
   }
   if (k === "c" && !e.repeat) setCrt(!crt);
   if (k === "b" && !e.repeat && mode === "world" && !menu) void switchBrain();
+  if (k === "g" && !e.repeat && mode === "world" && !chatWith) {
+    state.onboard = { ...state.onboard, goalsHidden: !state.onboard?.goalsHidden };
+    save(state);
+  }
+  if (k === "escape" && mode === "world" && toast && !menu && !crate) nextToast();
   if (k === "m" && !e.repeat) {
     state.muted = !state.muted;
     save(state);
@@ -284,8 +316,14 @@ window.addEventListener("keydown", (e) => {
   if (mode === "battle" && battleView.choosing) battleView.cmdKey(k);
   else if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
   if (mode === "world" && !e.repeat) {
-    if (crate) crateKey(k);
-    else menuKey(k);
+    if (duelIn) inviteKey(k);
+    else if (peerMenu) peerKey(k);
+    else if (crate) crateKey(k);
+    else {
+      const em = !menu && live.status === "online" ? EMOTES[Number(k) - 1] : undefined;
+      if (em) sendEmote(em);
+      else menuKey(k);
+    }
   }
   if (mode === "home" && !e.repeat) {
     if (crate) crateKey(k);
@@ -313,6 +351,7 @@ function menuKey(k: string): void {
       if (bed >= 0) useBed(bed);
       else if (world.nearElder()) openChat("elder");
       else if (world.nearStall()) crate = { cursor: 0 };
+      else if (world.peerNear()) peerMenu = { id: world.peerNear()!, cursor: 0 };
       else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
       else if (!world.atDoor() && live.status === "online" && world.peers.size) openChat("room");
       else if (world.atDoor()) {
@@ -403,13 +442,95 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(state.genes
   join: (p) => world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz),
   leave: (id) => world.peers.delete(id),
   pos: (id, x, z, px, pz) => world.movePeer(id, x, z, px, pz),
-  emote: () => undefined,
+  emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
   status: (s) => {
     if (s !== "online") world.peers.clear();
   },
   say: (id, text) => world.say(`p:${id}`, text, 5),
+  duel: (duel, from, name) => duelInvited(duel, from, name),
+  duelStart: (_duel, seed, a, b) => void duelStarted(seed, a, b),
+  duelEnd: (_duel, reason) => duelEnded(reason),
 });
 live.connect();
+
+// ---- live room extras: emotes (1-4 or the peer menu) and duels. A duel is pet vs pet, both following their
+// own memo rules on a shared seed (sim/duel.ts), so both players watch the same fight.
+const EMOTE_TEXT: Record<Emote, string> = { wave: "*waves*", heart: "<3 <3", dance: "*dances*", laugh: "haha!" };
+function sendEmote(e: Emote): void {
+  if (live.emote(e)) world.say("me", EMOTE_TEXT[e], 3);
+}
+const DUEL_WAIT_MS = 20_000;
+let peerMenu: { id: string; cursor: number } | null = null;
+let duelOut: { name: string; timer: number } | null = null;
+let duelIn: { duel: string; name: string; cursor: number; timer: number } | null = null;
+const PEER_ROWS = ["Duel", "Wave", "Heart", "Dance", "Laugh", "Say something", "Close"] as const;
+function peerKey(k: string): void {
+  const m = peerMenu!;
+  const n = PEER_ROWS.length;
+  if (k === "arrowup" || k === "w") m.cursor = (m.cursor + n - 1) % n;
+  if (k === "arrowdown" || k === "s") m.cursor = (m.cursor + 1) % n;
+  if (k === "escape" || k === "x") peerMenu = null;
+  if (k !== "enter" && k !== " " && k !== "z" && k !== "e") return;
+  const row = PEER_ROWS[m.cursor]!;
+  const p = world.peers.get(m.id);
+  peerMenu = null;
+  if (row === "Duel" && p && !duelOut && live.challenge(m.id, state.memo, state.genes)) {
+    duelOut = { name: p.name, timer: window.setTimeout(() => duelEnded("gone"), DUEL_WAIT_MS) };
+    toast = { text: `You challenged ${p.name}. Waiting for an answer...`, t: 4 };
+    world.say("pet", "A duel? I'm ready!", 2);
+  } else if (row === "Say something") openChat("room");
+  else if (row !== "Close" && row !== "Duel") sendEmote(row.toLowerCase() as Emote);
+}
+function duelInvited(duel: string, _from: string, name: string): void {
+  if (mode !== "world" || duelIn || teach.open) return void live.decline(duel);
+  duelIn = { duel, name, cursor: 0, timer: window.setTimeout(() => answerInvite(false), DUEL_WAIT_MS) };
+}
+function answerInvite(yes: boolean): void {
+  if (!duelIn) return;
+  clearTimeout(duelIn.timer);
+  if (yes) live.accept(duelIn.duel, state.memo, state.genes);
+  else live.decline(duelIn.duel);
+  duelIn = null;
+}
+function inviteKey(k: string): void {
+  const d = duelIn!;
+  if (k === "arrowup" || k === "w" || k === "arrowdown" || k === "s") d.cursor = 1 - d.cursor;
+  if (k === "escape" || k === "x") answerInvite(false);
+  if (k === "enter" || k === " " || k === "z" || k === "e") answerInvite(d.cursor === 0);
+}
+function duelEnded(reason: "declined" | "gone"): void {
+  if (duelIn && reason === "gone") {
+    clearTimeout(duelIn.timer);
+    duelIn = null;
+  }
+  if (!duelOut) return;
+  clearTimeout(duelOut.timer);
+  toast = { text: reason === "declined" ? `${duelOut.name} said no thanks.` : `${duelOut.name} did not answer.`, t: 3 };
+  duelOut = null;
+}
+const DUEL_END: Record<DuelResult, [Outcome, string]> = { win: ["win", "ko"], loss: ["loss", "ko"], draw: ["timeout", ""], friends: ["win", "befriended"] };
+async function duelStarted(seed: number, a: Fighter, b: Fighter): Promise<void> {
+  const me = live.myId === a.id ? "a" : live.myId === b.id ? "b" : null;
+  if (!me || mode !== "world") return; // not ours, or busy (the other side still sees the whole duel)
+  if (duelOut) clearTimeout(duelOut.timer);
+  duelOut = null;
+  mode = "battle";
+  keys.clear();
+  const them = me === "a" ? b : a;
+  const v = duelView(a, b, seed, me);
+  const mine = { ...side(activeMember()), maxHp: v.myMaxHp };
+  await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), maxHp: v.theirMaxHp, level: 3 }, mine);
+  await battleView.say(`Live duel! Both pets follow their own memo rules. Same fight on both screens.`);
+  for (const t of v.turns) await battleView.playTurn(t.mine, "", "duel", t.theirAct, t.dealt, t.taken, t.myHp, t.theirHp);
+  await battleView.end(...DUEL_END[v.result]);
+  const earned = duelCoins(v.result);
+  if (earned) {
+    state.coins = addCoins(state.coins ?? 0, earned);
+    await battleView.say(`+${earned} coins.`);
+  }
+  save(state);
+  mode = "world";
+}
 
 async function fight(foe: Wild | "boss" | "ghost"): Promise<void> {
   mode = "battle";
@@ -527,7 +648,7 @@ function frame(now: number): void {
 function update(dt: number, t: number): void {
   if (teach.open) teach.draw(g, low.width, low.height, t);
   else if (mode === "world") {
-    const met = world.update(dt, menu || crate ? new Set<string>() : keys);
+    const met = world.update(dt, menu || crate || peerMenu || duelIn ? new Set<string>() : keys);
     petChatter(dt);
     live.tick(performance.now(), world.me);
     if ((farmTickAt -= dt) <= 0) {
@@ -539,16 +660,19 @@ function update(dt: number, t: number): void {
       }
     }
     world.draw(g, low.width, low.height, t);
+    if (!menu && !crate && !peerMenu && !duelIn) drawGoals();
     if (met) void fight(met);
     if (menu) {
       const a = state.active ?? 0;
       const rows: MenuRow[] = members().map((m, i) => ({ label: m.name, note: i === a ? "with you" : "at home", icon: icon(m) }));
       drawMenu(g, low.width, low.height, "Your pets", rows, menu.cursor, t, "Enter: take along  P: close");
-    } else if (crate) drawMenu(g, low.width, low.height, `Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
+    } else if (duelIn) drawMenu(g, low.width, low.height, `${duelIn.name} wants a duel!`, [{ label: "Accept" }, { label: "Decline" }], duelIn.cursor, t, "Your pet fights with its memo rules");
+    else if (peerMenu) drawMenu(g, low.width, low.height, world.peers.get(peerMenu.id)?.name ?? "Player", PEER_ROWS.map((label) => ({ label })), peerMenu.cursor, t, "Enter: pick  Esc: close  1-4: emotes");
+    else if (crate) drawMenu(g, low.width, low.height, `Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
     else if (toast) {
       toast.t -= dt;
       drawDialogue(g, low.width, low.height, toast.text, toast.who);
-      if (toast.t <= 0) toast = null;
+      if (toast.t <= 0) nextToast();
     }
   } else if (mode === "home") {
     interior.update(dt, crate || interior.deco ? new Set<string>() : keys);
@@ -565,4 +689,4 @@ function update(dt: number, t: number): void {
 void loadArt().then(() => requestAnimationFrame(frame));
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
-(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight };
+(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live };

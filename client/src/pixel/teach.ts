@@ -4,6 +4,7 @@
 
 import { COACH_LABEL, runCoach } from "../game/coach";
 import { thinkingLabel } from "../game/thinking";
+import { transcribe, voiceInputSupported, VoiceRecorder } from "../game/voice-input";
 import { FetchLlmClient, LlmCortex, ScriptedCortex, type Cortex, type CortexResult } from "../sim/cortex";
 import { describeCond, type Memo } from "../sim/memo";
 import { prove, type ProofReport } from "../sim/proof";
@@ -41,6 +42,35 @@ export class TeachScreen {
     });
     this.form.querySelector<HTMLButtonElement>("[data-act=review]")!.onclick = () => void this.coach((c) => c.reflect(this.host.memo(), this.host.recent()), true);
     this.form.querySelector<HTMLButtonElement>("[data-act=close]")!.onclick = () => this.hide();
+    const speak = this.form.querySelector<HTMLButtonElement>("[data-act=speak]")!;
+    speak.hidden = !voiceInputSupported();
+    speak.onclick = () => void this.toggleVoice(speak);
+  }
+
+  // Speak a lesson: record (press again or 20 s to stop), transcribe on the Worker, then teach it.
+  private readonly recorder = new VoiceRecorder();
+  private async toggleVoice(btn: HTMLButtonElement): Promise<void> {
+    if (!this.recorder.recording) {
+      try {
+        await this.recorder.start(() => void this.toggleVoice(btn));
+        btn.textContent = "Stop";
+        this.status = "Listening... say the lesson, then press Stop.";
+      } catch {
+        this.status = "No microphone access. Type the lesson instead.";
+      }
+      return;
+    }
+    btn.textContent = "Speak";
+    this.status = "Writing down what you said...";
+    try {
+      const { transcript } = await transcribe(await this.recorder.stop());
+      const text = transcript.trim();
+      if (!text) return void (this.status = "I didn't catch any words. Try again a little closer to the mic.");
+      this.input.value = text.slice(0, 300);
+      await this.coach((c) => c.teach(this.host.memo(), this.input.value), false);
+    } catch (e) {
+      this.status = `Could not transcribe (${(e as Error).message}). Type the lesson instead.`;
+    }
   }
 
   show(): void {
