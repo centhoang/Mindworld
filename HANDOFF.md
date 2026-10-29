@@ -19,7 +19,7 @@
 - Earlier decisions stand: Canvas2D + WebGL2 CRT, STYLE.md palette canonical, browser-first, Meta models via the Worker proxy with a spend cap, repo goes public Nov 3.
 
 ## Pending decisions (user)
-- **Review docs/V3-PLAN.md** (written 2026-10-29): 3 decisions in section 9 (model, ground-leave policy, scope room). Nothing built yet.
+- **Review docs/V3-PLAN.md** (written 2026-10-29): decision 1 (model) still open; 2 (ghost ground 10 min) and 3 (mobile + decor below the line) approved; backlog order: extra themes + real mini-games first. Nothing built yet.
 - Play-test the new build (cabin, market stall, Elder, walk cycle, duel in two tabs, goals card, Speak button in Teach).
 - When to go public (remove Access).
 

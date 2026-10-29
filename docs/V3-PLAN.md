@@ -42,7 +42,7 @@ mind logs (~3 KB per mind).
 5. Networked minds: mind-to-mind talk across machines, 3 village NPCs + the Elder hosted on players' machines with handover,
    invitations that spread (the picnic/party demo beat).
 6. Codex static art for the 3 themes + props; Claude animates/recolors.
-**Below the line (after the event unless time is left):** themes 4–5 (beach, night) as recolors, party plaza + event ground as
+**Below the line (after the event unless time is left; user 2026-10-29: extra themes and real mini-games come first in this backlog):** themes 4–5 (beach, night) as recolors, party plaza + event ground as
 in-between types, load-based rebalancing (we only hand over on join/leave/timeout), fishing/soccer as real mini-games (above the
 line they are timed animations with outcomes), outdoor plot decor port, mobile touch controls, tuned 1B in the browser (MLC),
 server-persisted grounds.
@@ -135,6 +135,7 @@ together are the demo, so stage 5 and art batch 2 go first.
 - Time → the cut line above; duels/boss/market frozen.
 
 ## 9. Decisions for the user (max 3)
+User 2026-10-29: **2 = (a) approved, 3 = (a) approved**; 1 still open (question answered in chat).
 1. **Model.** (a, recommended) one stock Llama 3.2 1B per machine serves every mind (pets + NPCs) with persona prompts and
    grammar; a multi-task LoRA (coach + village) for power mode only as optional stage 5 (~$6). (b) No new fine-tune at all.
    (c) Two separate LoRAs (pet / village): twice the downloads, no browser benefit while MLC is blocked.
