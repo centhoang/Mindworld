@@ -1,6 +1,6 @@
 # HANDOFF: Mindworld rework v2 (2026-10-29 ~19:30 UTC+7)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-BRIEF.md. Do Next action 1: research and write docs/V3-PLAN.md, then stop for my review. Follow CLAUDE.md (Normal mode, 35% context limit)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md. The plan is approved with my decisions noted in HANDOFF. Build stage 1. Follow CLAUDE.md (Normal mode, 35% context limit)."
 
 ## State
 - The pixel build IS the game now: `client/index.html` -> `src/pixel/main.ts`. three.js and the 3D view are deleted; `/pixel.html` 301-redirects to `/` (Worker). Bundle: main 112 KB (44 KB gz); the 6 MB `lib-*.js` is WebLLM, lazy-loaded only on B.
@@ -19,11 +19,12 @@
 - Earlier decisions stand: Canvas2D + WebGL2 CRT, STYLE.md palette canonical, browser-first, Meta models via the Worker proxy with a spend cap, repo goes public Nov 3.
 
 ## Pending decisions (user)
+- **Review docs/V3-PLAN.md** (written 2026-10-29): 3 decisions in section 9 (model, ground-leave policy, scope room). Nothing built yet.
 - Play-test the new build (cabin, market stall, Elder, walk cycle, duel in two tabs, goals card, Speak button in Teach).
 - When to go public (remove Access).
 
 ## Next actions
-1. **v3 research + plan (user request 2026-10-29 evening):** follow `docs/V3-BRIEF.md`: players' grounds that join into one world (unique shapes, rare in-between grounds, themes), real-time mind-to-mind chat on the local model, GARP-style minds (personality, hobbies, daily plan, memory, relationships, emotes), an NPC mind model plus hosting NPC minds on players' machines with handover, needs-driven activities for pets and humans, arm swing + still idle, Codex static map art per theme. Output: `docs/V3-PLAN.md` with scope, a cut line for the Nov 3 demo, architecture, costs, stages and at most 3 user decisions. Then STOP for the user's review; build nothing before the OK.
+1. ~~v3 research + plan~~ DONE: `docs/V3-PLAN.md` (awaiting review). Original brief: follow `docs/V3-BRIEF.md`: players' grounds that join into one world (unique shapes, rare in-between grounds, themes), real-time mind-to-mind chat on the local model, GARP-style minds (personality, hobbies, daily plan, memory, relationships, emotes), an NPC mind model plus hosting NPC minds on players' machines with handover, needs-driven activities for pets and humans, arm swing + still idle, Codex static map art per theme. Output: `docs/V3-PLAN.md` with scope, a cut line for the Nov 3 demo, architecture, costs, stages and at most 3 user decisions. Then STOP for the user's review; build nothing before the OK.
 2. After the plan is approved: build stage 1 (likely needs/activities sim + the limb rig with arm swing/idle, both pure-code and safe), then follow the plan's stages, each ending with a play-test ask.
 3. Still open from v2 (fold into the plan's ranking): mobile controls (touch D-pad + A/B), VFX polish, demo prep (README credits, 3-min script, CRT-on captures).
 
