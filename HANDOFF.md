@@ -10,7 +10,7 @@
 - Rules check clean: all 8 HF repos and the GitHub repo answer 401/404 anonymously; no secrets in git.
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` (see the last deploy in git log). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **9ccc597a** (2026-10-30, proxy + browser coach; no HF_TOKEN secret yet). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
 - **Tests:** client + worker green, tsc clean (mlc.test.ts added).
 - v3 stages 1-4 (life sim, minds, grounds, networked NPC hosts, scene awareness, coach chain Muse Spark -> tuned local -> scripted) are all in. Details: docs/V3-PLAN.md, docs/FINETUNE.md (stage 5 + browser unblock).
 - **Browser model loading** (client/src/game/voices.ts): `tunedRecord(list, repo, f16)` builds a WebLLM model_list entry that reuses the stock 1B wasm with our weights. `repo` = "user/name" (HF; appends `-{q}-MLC`) or a full URL template with `{q}`. It picks f16 when the GPU has shader-f16, and falls back to the stock 1B if the tuned load fails. Dev override: `?tuned=<url with {q}>`.
