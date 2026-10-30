@@ -1,53 +1,46 @@
-Director night of 2026-10-30 finished (queue empty); next session = Normal mode
+# HANDOFF: Mindworld v3, stage 5 done + models uploaded to HF (private); next = serve the tuned 1B privately (2026-10-30)
 
-## Status (2026-10-30 morning, Normal mode)
-- Deployed pet-mind **8611b544** = night work + scene awareness + restored coach chain (d4dd841). Stray Worker deleted (user OK).
-- Codex backlog art batch running in background (brief `.scratch/v3/b3-codex-brief.md`, note -> `.scratch/v3/b3-codex-note.md`).
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md. Continue from Next actions, starting with the private /mlc proxy. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
-## Decisions needing review
-- API spend tonight: $0.0753 (W3 sample, Modal Muse Spark Open; cap $3).
-- Stage 5 DONE (12a45ec, $4.26 data + ~$2 Modal): tuned 1B 99.5% village checks (stock 48.5%), Teach +22.6 (was +18.4); MLC browser build works via our own NumPy converter (FINETUNE.md stage 5).
-
-# HANDOFF: Mindworld v3, stages 1-4 done + talk/relay polish; user play-test + review pending (2026-10-30 night)
-
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/V3-PLAN.md (approved). I tested and reviewed: <feedback>. Apply it, then continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit)."
+## Morning report
+- Stage 5 done (12a45ec): one tuned Llama 3.2 1B for coach + pets + villagers. Village checks 99.5% (stock 48.5%), Teach +22.6 (old +18.4, 1 harmful). 3B: 98.5%, +21.5. Spend $4.26 data + ~$2 Modal.
+- The browser build works via our own NumPy MLC converter (modal/mlc_q4.py; stock 1B matches mlc-ai's tensor for tensor).
+- Uploaded (PRIVATE, keep private until submission day): kysupo/Llama-3.2-{1B,3B}-Mindworld-GGUF, kysupo/Llama-3.2-1B-Mindworld-{q4f32_1,q4f16_1}-MLC.
+- Not deployed since 8611b544. The game still uses the stock 1B (`TUNED_1B.repo = ""`).
 
 ## State
-- **Deployed behind Access:** https://pets.uryto.dev/ = Worker `pet-mind` version **b42ac324** (everything below + the night's W1-W4). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 255, worker 162, tsc clean, build OK (at 2717b6b).
-- **Stage 1 sim** `client/src/life/` (clock, needs, 14 activities, village sim, relations), poses in `pixel/life-draw.ts`. **Stage 2 minds** `client/src/mind/` (persona, memory, brain prompts+GBNF, scheduler one queue/machine, hub; inspector = I). **Stage 3 grounds** `world/{ground,layout}.ts` (seeded grounds on a 24-slot ring, in-between playground/picnic/pond per room+day, ghosts 10 min), minimap, gate name signs.
-- **Stage 4 networked minds:** server `worker/src/npc.ts` NpcBoard elects NPC hosts (Elder/Mo/Ama/Pip); **model holders first**: once any player reports tps > 0 (`cap`, every 10 s), NPCs leave hosts without a model; balance only among model holders; quiet 15 s -> moved; NPC memory log in DO storage -> `npcState` to the new host. Room `mind {who, act?, say?, to?, emote?, invite?, mem?}` (owner/host only, 1 say / 3 s / mind) and `ask {npc,text}` -> host's `ask` (if its tps > 0) else `askNo`.
-- Client `mind/npcs.ts` NpcVillage: the NPC sim runs on every machine; the host runs their minds (MindHub) and sends act/say/mem, others replay acts. Offline = minds run locally. `social()`: hosted NPCs **greet players** within 3 tiles (by name, 180 s per pair) and **chat with NPCs hosted elsewhere** (answers over the room via `to`, 3 turns). Player chat (E by any villager, `villagerAnswer` in main.ts): own mind here -> relayed to host's local model (15 s) -> Muse Spark `/api/chat` (event credits, server cap) -> scripted. `LiveLink.mind` queues spoken lines 3.1 s apart per mind (no more drops).
-- Pets walk over bridges (`world/route.ts` BFS waypoints) to in-between grounds next to home; NPCs roam to any reachable one (Mo fishes at far ponds). **Shared clock**: `worldSeconds()` (wall time since Oct 27 UTC) drives day/night for all players.
-- Art: Codex villager sheets `client/public/art/npc-{mo,ama,pip}.png` (walk frames drawn in code).
-- Credits: Meta $149.91, Modal ~$110. No paid calls this session (chat goes through the existing capped /api/chat).
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **8611b544**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client 264, worker 163, tsc clean.
+- v3 stages 1-4 (life sim, minds, grounds, networked NPC hosts, scene awareness, coach chain Muse Spark -> tuned local -> scripted) are all in. Details: docs/V3-PLAN.md, docs/FINETUNE.md (stage 5 + browser unblock).
+- **Browser model loading** (client/src/game/voices.ts): `tunedRecord(list, repo, f16)` builds a WebLLM model_list entry that reuses the stock 1B wasm with our weights. `repo` = "user/name" (HF; appends `-{q}-MLC`) or a full URL template with `{q}`. It picks f16 when the GPU has shader-f16, and falls back to the stock 1B if the tuned load fails. Dev override: `?tuned=<url with {q}>`.
+- Credits: Meta ~$149.9, Modal ~$102 left (approx).
 
 ## Decisions made
-- V3-PLAN approved 2026-10-29 (stock 1B for every mind in the browser, optional village LoRA ~$6 in stage 5; ghost ground 10 min; mobile + outdoor decor below the line).
-- 2026-10-30 user: time must be shared by all players (done); villager chat may use cloud credits while event credits are free, otherwise local model; NPCs should move to a host that has a model (done); lines must queue, not drop (done).
-- Minds only pick from `validChoices`; every decision has a fallback; inspector labels the source honestly. Codex = static art only.
+- 2026-10-30 user: **nothing game-related goes public before submission day.** This covers the game (Access, only the user's email), the GitHub repo, HF repos and posts. Recorded in CLAUDE.md.
+- 2026-10-30 user: HF is standing-approved for private repos (create/upload/update/delete) with the .env token.
+- Power mode (llama.cpp) is now optional: the in-browser tuned 1B is the main local mind (it beats the 3B on village checks). Keep power mode as an extra for no-WebGPU machines, and don't pitch it.
+- Earlier ones still hold: shared clock, villager chat may use event cloud credits, NPCs move to model holders, lines queue.
 
 ## Pending decisions (user)
-- Publish the Mindworld models to HF (auto mode blocked me): `modal run modal/publish_coach.py --what all --tag village` (private), then make the 1B MLC repos public so the game can load them; then I set `TUNED_1B.repo` (voices.ts), deploy, and switch power-mode.ps1 to the Mindworld GGUF.
-- When to go public (remove Access); make the HF coach repos public.
-
-## User-only actions (morning test plan, two windows: normal + incognito, both on https://pets.uryto.dev/)
-1. Each spawns on its own ground; day/night and clock match in both windows.
-2. Walk to the square: villagers greet you by name; E = chat with any villager.
-3. Press B (load Llama) in window A, wait ~10 s: A hosts all villagers (I by one shows its mind). Chat from window B: the answer comes from A's model.
-4. Close A: within ~15 s B takes over (memory kept). Pets: 2+ at home plan/talk/picnic; invites show in the other window.
+- Submission day: make the GitHub repo + the 4 HF repos public, then remove Access. Switch `TUNED_1B.repo` to `kysupo/Llama-3.2-1B-Mindworld` at the same time, or keep the proxy below.
 
 ## Next actions
-1. Apply the user's play-test feedback and decisions (stray Worker, wording, bugs).
-2. After publish: set TUNED_1B.repo, verify the f16 build in a fresh app (pane iGPU hit DEVICE_HUNG for stock and tuned alike; restart clears it), deploy, update power-mode.ps1 model pins + README/DEMO numbers. Far-pond fishing not yet seen live.
-3. Stage 6: VFX polish, captures for the demo (DEMO.md shot list), repo public Nov 3 (user).
+1. **Private serving of the tuned 1B (Claude decides, no public surface):**
+   - Add a Worker route `/mlc/<quant>/<file>` that fetches `https://huggingface.co/kysupo/Llama-3.2-1B-Mindworld-<quant>-MLC/resolve/main/<file>` with `Authorization: Bearer ${env.HF_TOKEN}` (new Worker secret via `npx wrangler secret put HF_TOKEN` in worker/; never print it).
+   - Whitelist the quant and file names, cache through the Cache API, stream the body.
+   - It stays behind Access.
+   - Set the client to `${location.origin}/mlc/{q}/`, test it (worker test with mocked fetch), deploy, and verify in a fresh app window (the pane's Intel iGPU hit DXGI DEVICE_HUNG last session; an app restart clears it).
+   - Note: WebLLM appends `resolve/main/` only for HF-style URLs. Check `cleanModelUrl` against our URL form.
+2. Power mode: switch scripts/power-mode.ps1 to the Mindworld GGUFs (size + SHA-256 pins; the private repo needs a token now, so this waits for submission day, or the script uses the local .scratch/finetune GGUFs). Update the README/DEMO numbers with the stage 5 table.
+3. User play-test still owed (two windows: scene-aware chat, relay to host model, pets). Then stage 6: VFX polish, demo captures (DEMO.md).
 
 ## Gotchas
-- **Deploy only from worker/** and read the output: a root wrangler config sends deploys to a different Worker (see above). PowerShell cwd persists between calls.
-- GPU: reloading while WebLLM generates can kill the D3D12 device; close the tab, open a new one.
-- Dev hook `window.__px` = {world, update, live, mindSched, ...}. Hidden preview pane: rAF stalls, drive `__px.update(dt,t)` from setInterval; JS calls time out at 45 s. Shared clock = real time, so night in the preview is real night.
-- Relayout rebuilds the whole map (~100 ms with 3 neighbours: NPC route checks). Wrangler 10013 error: retry.
-- Python edits: script file in `.scratch/` or heredoc without `'''`. Codex: briefs as files, `-Sandbox workspace-write` for ImageGen. Never commit `.env`.
+- The auto-mode classifier blocks "make public" actions. That's fine: we don't do that before submission anyway.
+- Modal CLI on Windows: prefix `PYTHONUTF8=1 PYTHONIOENCODING=utf-8`. `--cap` in gen-village is the cumulative ledger total, not per run.
+- **Deploy only from worker/**: a root wrangler config deploys to a different Worker.
+- GPU: reloading while WebLLM generates can kill the D3D12 device; open a new tab.
+- Dev hook `window.__px`. Hidden preview pane: rAF stalls; drive `__px.update(dt,t)` from setInterval.
+- Python edits: script file in `.scratch/`. Codex can't run Python in its sandbox; ask it for files only. Never commit `.env`.
 
 ## File map
-docs/{V3-PLAN,V3-BRIEF,EVENT,STYLE,DEPLOY,FINETUNE,SPIKES,CREDITS}.md · client/src/life/* · client/src/mind/{persona,memory,brain,scheduler,hub,npcs}.ts · client/src/world/{layout,ground,live,movement,route}.ts · client/src/pixel/{main,overworld,art,life-draw,inspector,tiles,grounds-draw,grounds-props}.ts · client/src/game/{npc-chat,chatter,voices}.ts · worker/src/{room,room-do,npc,chat}.ts · worker/test/npc.test.ts · scripts/codex.ps1 · .scratch/v3/ (briefs, previews)
+modal/{mlc_q4,convert_mlc,publish_coach,train_*}.py · client/src/game/voices.ts (+test) · client/src/finetune/{gen-village,village-bench}.ts · docs/{V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO}.md · client/src/{life,mind,world,pixel}/* · worker/src/{room,room-do,npc,chat}.ts · scripts/{codex,power-mode}.ps1 · .scratch/finetune/*.gguf (local copies) · .scratch/v3/{vbench,cbench}.sh
