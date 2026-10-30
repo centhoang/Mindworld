@@ -1,0 +1,335 @@
+{
+    "cell":  16,
+    "parts":  [
+                  {
+                      "kind":  "ear",
+                      "name":  "round",
+                      "x":  0,
+                      "y":  0,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "ear",
+                      "name":  "pointy",
+                      "x":  16,
+                      "y":  0,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "ear",
+                      "name":  "floppy",
+                      "x":  32,
+                      "y":  0,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "ear",
+                      "name":  "bunny-long",
+                      "x":  48,
+                      "y":  0,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "ear",
+                      "name":  "fin",
+                      "x":  64,
+                      "y":  0,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "ear",
+                      "name":  "tufted",
+                      "x":  80,
+                      "y":  0,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "horn",
+                      "name":  "nub",
+                      "x":  0,
+                      "y":  16,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "horn",
+                      "name":  "curl",
+                      "x":  16,
+                      "y":  16,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "horn",
+                      "name":  "antler",
+                      "x":  32,
+                      "y":  16,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "horn",
+                      "name":  "single",
+                      "x":  48,
+                      "y":  16,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "tail",
+                      "name":  "round-puff",
+                      "x":  0,
+                      "y":  32,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "tail",
+                      "name":  "fox-brush",
+                      "x":  16,
+                      "y":  32,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "tail",
+                      "name":  "curly",
+                      "x":  32,
+                      "y":  32,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "tail",
+                      "name":  "lizard",
+                      "x":  48,
+                      "y":  32,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "tail",
+                      "name":  "fin",
+                      "x":  64,
+                      "y":  32,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "tail",
+                      "name":  "leaf",
+                      "x":  80,
+                      "y":  32,
+                      "anchor":  [
+                                     8,
+                                     15
+                                 ]
+                  },
+                  {
+                      "kind":  "foot",
+                      "name":  "paws",
+                      "x":  0,
+                      "y":  48,
+                      "anchor":  [
+                                     8,
+                                     0
+                                 ]
+                  },
+                  {
+                      "kind":  "foot",
+                      "name":  "stubby",
+                      "x":  16,
+                      "y":  48,
+                      "anchor":  [
+                                     8,
+                                     0
+                                 ]
+                  },
+                  {
+                      "kind":  "foot",
+                      "name":  "claws",
+                      "x":  32,
+                      "y":  48,
+                      "anchor":  [
+                                     8,
+                                     0
+                                 ]
+                  },
+                  {
+                      "kind":  "eye",
+                      "name":  "dot",
+                      "x":  0,
+                      "y":  64,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "eye",
+                      "name":  "big-shiny",
+                      "x":  16,
+                      "y":  64,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "eye",
+                      "name":  "sleepy-line",
+                      "x":  32,
+                      "y":  64,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "eye",
+                      "name":  "happy-arc",
+                      "x":  48,
+                      "y":  64,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "eye",
+                      "name":  "star",
+                      "x":  64,
+                      "y":  64,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "eye",
+                      "name":  "wide",
+                      "x":  80,
+                      "y":  64,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "mouth",
+                      "name":  "smile",
+                      "x":  0,
+                      "y":  80,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "mouth",
+                      "name":  "open",
+                      "x":  16,
+                      "y":  80,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "mouth",
+                      "name":  "fang",
+                      "x":  32,
+                      "y":  80,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "mouth",
+                      "name":  "cat-w",
+                      "x":  48,
+                      "y":  80,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "pattern",
+                      "name":  "spots",
+                      "x":  0,
+                      "y":  96,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "pattern",
+                      "name":  "stripes",
+                      "x":  16,
+                      "y":  96,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "pattern",
+                      "name":  "patch",
+                      "x":  32,
+                      "y":  96,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  },
+                  {
+                      "kind":  "pattern",
+                      "name":  "belly-heart",
+                      "x":  48,
+                      "y":  96,
+                      "anchor":  [
+                                     8,
+                                     8
+                                 ]
+                  }
+              ]
+}
