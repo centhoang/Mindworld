@@ -158,7 +158,7 @@ export class NpcVillage {
       const aff = this.v.rel.get(pairKey(npc, other.id)) ?? 0;
       const topic = c.said.length ? "what was just said" : m.mem.log.at(-1)?.text ?? "the day on the islands";
       const ans = this.hasModel()
-        ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 20000, req: linePrompt(m.persona, m.mem, other, aff, topic, c.said), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedLine(m.persona, other, c.said.length, this.v.nextId) })
+        ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 20000, req: linePrompt(m.persona, m.mem, other, aff, topic, c.said, this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedLine(m.persona, other, c.said.length, this.v.nextId) })
         : (await new Promise((r) => setTimeout(r, SCRIPT_GAP_MS)), { value: scriptedLine(m.persona, other, c.said.length, this.v.nextId), source: "rules" });
       if (!this.hosting(npc)) return; // moved to another host meanwhile
       c.said.push(`${m.persona.name}: ${ans.value}`);
@@ -213,7 +213,7 @@ export class NpcVillage {
     try {
       const k = this.v.nextId;
       const ans = this.hasModel()
-        ? await this.sched.ask({ prio: PRIO.emote, timeoutMs: 15000, req: petLinePrompt(m.persona, m.mem, pet.name), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedPetLine(m.persona, pet.name, k) })
+        ? await this.sched.ask({ prio: PRIO.emote, timeoutMs: 15000, req: petLinePrompt(m.persona, m.mem, pet.name, this.hub.sceneOf?.(npc, pet.pos) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedPetLine(m.persona, pet.name, k) })
         : { value: scriptedPetLine(m.persona, pet.name, k), source: "rules" };
       if (!this.hosting(npc)) return;
       m.source = ans.source;
@@ -252,11 +252,12 @@ export class NpcVillage {
   // The player talks to an NPC. Hosted here with a model: its own mind answers (persona + memories) and
   // remembers the chat, which reaches the room as a memory line. Otherwise null: the caller asks the cloud.
   // `to` = the asker's live id when the question came through the room (their game shows the answer).
-  async reply(npc: Npc, player: string, line: string, to?: string): Promise<{ text: string; source: string } | null> {
+  // `scene` = what the asker and the NPC both see on the asker's screen (relayed questions bring theirs).
+  async reply(npc: Npc, player: string, line: string, to?: string, scene?: string): Promise<{ text: string; source: string } | null> {
     const m = this.hub.minds.get(npc);
     this.hold(npc);
     if (!m || !this.hosting(npc) || !this.hasModel()) return null;
-    const ans = await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
+    const ans = await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
     if (!ans.value) return null;
     const g = gameTime(this.v.t);
     remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);

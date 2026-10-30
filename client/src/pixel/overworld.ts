@@ -15,7 +15,7 @@ import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
 import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
 import { ACTIVITY } from "../life/activities";
-import { clockLabel, gameTime, worldSeconds } from "../life/clock";
+import { clockLabel, gameTime, phaseOf, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
@@ -26,6 +26,11 @@ import type { MindScheduler } from "../mind/scheduler";
 import { drawInspector } from "./inspector";
 import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
+import { petScene, sharedScene, type Seen } from "../mind/scene";
+
+const xz = (v: Vec) => ({ x: v.x, z: v.z });
+const DECOR_NAME: Record<DecorPiece["kind"], string> = { bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
+const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "the lawn", playground: "the playground slide and goal", picnic: "the picnic blanket", pond: "the fishing pond", plaza: "the village square" };
 
 type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
 
@@ -413,6 +418,55 @@ export class Overworld {
       ...this.residents.map((r) => ({ id: r.agent.id, name: r.agent.name, pos: r.agent.pos, busy: r.agent.state === "walk" })),
       ...[...this.peers].map(([id, p]) => ({ id: `pet:${id}`, name: `${p.name}'s pet`, pos: p.pet })),
     ];
+    this.minds.sceneOf = this.npcs.hub.sceneOf = (id, withPos) => this.sceneFor(id, withPos);
+  }
+
+  // Everything a mind could notice on this screen (scene.ts filters it by distance and by who is looking).
+  seenThings(): Seen[] {
+    const label = (act: string | null) => (act ? ACTIVITY.get(act)?.label : undefined);
+    const out: Seen[] = [{ name: this.myName, kind: "person", ...xz(this.player) }, { name: this.petName, kind: "pet", ...xz(this.pet) }];
+    for (const [, p] of this.peers) out.push({ name: p.name, kind: "person", ...xz(p.pos) }, { name: `${p.name}'s pet`, kind: "pet", ...xz(p.pet) });
+    for (const a of this.npcs?.v.agents ?? []) out.push({ name: a.name, kind: "person", ...xz(a.pos), doing: label(a.act) });
+    for (const r of this.residents) out.push({ name: r.agent.name, kind: "pet", ...xz(r.agent.pos), doing: label(r.agent.act) });
+    for (const w of this.wilds) out.push({ name: `a wild ${w.arch}`, kind: "pet", ...xz(w.pos) });
+    for (const m of this.life.messes) out.push({ name: "a poop", kind: "thing", ...xz(m.pos), petCares: true });
+    out.push({ name: "the food bowl", kind: "thing", ...xz(this.bowl), petCares: true }, { name: "your A-frame house", kind: "thing", ...xz(this.house) });
+    for (const h of this.houses) out.push({ name: "a little A-frame house", kind: "thing", ...xz(h) });
+    for (const t of this.trees) out.push({ name: "a tree", kind: "thing", ...xz(t) });
+    for (const d of this.decor) out.push({ name: DECOR_NAME[d.kind], kind: "thing", x: d.x, z: d.z });
+    const spots = { ...this.lifeEnv.spots, ...this.npcSpots() };
+    for (const [place, at] of Object.entries(spots) as [keyof Spots, Vec[]][]) {
+      const name = SPOT_NAME[place];
+      if (name) for (const v of at) out.push({ name, kind: "thing", ...xz(v), petCares: place === "lawn" || place === "bed" });
+    }
+    if (this.stall) out.push({ name: "the market stall", kind: "thing", ...xz(this.stall) });
+    if (this.elder && !this.npcs) out.push({ name: "the Elder", kind: "person", ...xz(this.elder.pos) });
+    return out;
+  }
+
+  // `withPos` = the one this mind talks to (only what both can see); none = a pet's own small view, or an NPC's.
+  sceneFor(id: string, withPos?: { x: number; z: number }): string {
+    const me = this.npcs?.v.agents.find((a) => a.id === id) ?? this.life.agents.find((a) => a.id === id);
+    if (!me) return "";
+    const g = gameTime(this.life.t);
+    const place = platformAt(this.world, me.pos.x, me.pos.z)?.label ?? "";
+    const when = `${phaseOf(g.hour)} (${clockLabel(g.hour)})`;
+    // Not itself, and not the one it talks to (the prompt names them already).
+    const others = this.seenThings().filter((s) => s.name !== me.name && !(withPos && s.x === withPos.x && s.z === withPos.z));
+    if (me.kind === "pet") return petScene(me.pos, others, place, when);
+    return sharedScene(me.pos, withPos ?? me.pos, others, place, when);
+  }
+
+  // The scene for a chat between me (the player) and an NPC, as both see it here.
+  sceneWithMe(npc: Npc): string {
+    return this.sceneFor(npc, this.player);
+  }
+
+  // A wild pet's own small view (pets only notice what is close and pet-relevant).
+  wildScene(w: Wild): string {
+    const g = gameTime(this.life.t);
+    const place = platformAt(this.world, w.pos.x, w.pos.z)?.label ?? "the wild meadow";
+    return petScene(w.pos, this.seenThings().filter((s) => s.name !== `a wild ${w.arch}` || s.x !== w.pos.x), place, `${phaseOf(g.hour)} (${clockLabel(g.hour)})`);
   }
 
   private syncMinds(): void {

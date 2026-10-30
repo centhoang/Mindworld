@@ -1,4 +1,4 @@
-import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, isChatWho, isOpener, OpenerCache, parsePetSide, petsPrompt, scriptedLine, scriptedPair, tidyPair, tidyReply } from "./chat";
+import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, cleanScene, isChatWho, isOpener, OpenerCache, parsePetSide, petsPrompt, scriptedLine, scriptedPair, tidyPair, tidyReply } from "./chat";
 import { geoOf, isRestricted } from "./geo";
 import {
   allowGhostPost,
@@ -241,6 +241,7 @@ async function handleChat(request: Request, deps: Deps): Promise<Response> {
   if (!isChatWho(b.who)) return fail(400, "bad_request", { message: "unknown who" });
   const who = b.who;
   const line = cleanLine(b.line);
+  const scene = cleanScene(b.scene);
   const cache = deps.chatCache ?? sharedChatCache;
   const scripted = (why: string) => json({ text: scriptedLine(who, deps.random), source: "scripted", why });
 
@@ -250,7 +251,7 @@ async function handleChat(request: Request, deps: Deps): Promise<Response> {
   const { cfg } = deps;
   const provider = cfg.defaultProvider;
   if (!cfg.mock && !providerConfigured(cfg.providers, provider)) return scripted("unconfigured");
-  const p = chatPrompt(who, line);
+  const p = chatPrompt(who, line, scene);
   const worst = worstCaseCostUsd(provider, estimateInputTokens(p.system + p.prompt), CHAT_MAX_TOKENS);
   const id = deps.newId();
   const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");

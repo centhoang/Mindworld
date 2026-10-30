@@ -68,10 +68,19 @@ export function cleanLine(v: unknown): string {
 export const isOpener = (line: string): boolean =>
   line === "" || /^(hi+|hello+|hey+|yo|howdy|hiya|good (morning|evening|day)|greetings)[!. ]*$/i.test(line);
 
-export function chatPrompt(who: ChatWho, line: string): { system: string; prompt: string } {
+// What the player and the NPC both see (built by the client, mind/scene.ts): one short line, cleaned like chat.
+export const SCENE_MAX = 300;
+export function cleanScene(v: unknown): string {
+  if (typeof v !== "string") return "";
+  const t = v.replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim();
+  return /https?:|www\.|\.(com|net|org|io)\b/i.test(t) ? "" : t.slice(0, SCENE_MAX);
+}
+
+export function chatPrompt(who: ChatWho, line: string, scene = ""): { system: string; prompt: string } {
+  const around = scene ? `Around you right now: ${scene}\nIf the player asks about something around you, answer only from that list.\n` : "";
   return {
     system: `${STYLE}\n${PERSONA[who]}`,
-    prompt: line ? `The player says: ${line}\nYour reply:` : "The player walks up to you and waves. Greet them.\nYour reply:",
+    prompt: line ? `${around}The player says: ${line}\nYour reply:` : `${around}The player walks up to you and waves. Greet them.\nYour reply:`,
   };
 }
 

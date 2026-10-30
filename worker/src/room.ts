@@ -1,3 +1,4 @@
+import { cleanScene } from "./chat";
 import { parseGhostMemo, type GhostMemo } from "./memo-dsl";
 import { cleanCap, cleanMem, isNpc, MIND_ACTS, NpcBoard, type Cap, type HostChange, type Npc } from "./npc";
 
@@ -100,7 +101,7 @@ export type ServerMsg =
   | { t: "npcHost"; npc: Npc; host: string | null }
   | { t: "npcState"; npc: Npc; log: string[] }
   | { t: "mind"; id: string; who: string; act?: string; say?: string; to?: string; emote?: Emote; invite?: { act: string; to?: string } }
-  | { t: "ask"; npc: Npc; from: string; name: string; text: string }
+  | { t: "ask"; npc: Npc; from: string; name: string; text: string; scene?: string }
   | { t: "askNo"; npc: Npc }
   | { t: "away"; away: PublicAway }
   | { t: "join"; peer: PublicPeer }
@@ -311,7 +312,8 @@ export class Room {
       const host = this.board.hostOf(o.npc);
       const h = host && host !== id ? this.peers.get(host) : undefined;
       if (!h || h.cap.tps <= 0) return { out: [{ to: "self", msg: { t: "askNo", npc: o.npc } }], changed: true };
-      return { out: [{ to: { id: h.id }, msg: { t: "ask", npc: o.npc, from: id, name: peer.name, text } }], changed: true };
+      const scene = cleanScene((o as { scene?: unknown }).scene); // what the asker and the NPC both see
+      return { out: [{ to: { id: h.id }, msg: scene ? { t: "ask", npc: o.npc, from: id, name: peer.name, text, scene } : { t: "ask", npc: o.npc, from: id, name: peer.name, text } }], changed: true };
     }
     if (o.t === "cap") {
       if (peer.capAt !== undefined && now - peer.capAt < CAP_GAP_MS) return { out: [] };

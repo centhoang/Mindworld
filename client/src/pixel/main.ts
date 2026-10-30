@@ -111,6 +111,7 @@ const teach = new TeachScreen({
     save(state);
   },
   petName: () => activeMember().name,
+  powerMode: () => instinct.voice === nativeBrain,
   portrait: () => {
     const m = activeMember();
     return portraits.get(m.genes) ?? portraits.set(m.genes, drawMonster(petLook(m.genes), 48, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;
@@ -184,7 +185,7 @@ chatForm.addEventListener("submit", (e) => {
   if (!w || !who || !line) return;
   chatInput.value = "";
   world.say(chatKey(w), "...", 20);
-  void (typeof w === "string" ? villagerAnswer(w, line) : askNpc(who, line)).then((r) => {
+  void (typeof w === "string" ? villagerAnswer(w, line) : askNpc(who, line, "", undefined, undefined, world.wildScene(w))).then((r) => {
     world.say(chatKey(w), r.text, 6);
     if (!state.muted) {
       const v = voiceFor(typeof w === "string" ? w : w.arch);
@@ -200,10 +201,11 @@ chatForm.querySelector("[data-act=close]")!.addEventListener("click", closeChat)
 const ASK_WAIT_MS = 15_000;
 const asking = new Map<Npc, (text: string | null) => void>();
 async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string }> {
-  const here = await world.npcs?.reply(npc, liveName(myGenes()), line);
+  const scene = world.sceneWithMe(npc); // what we both see here, so "what's by the pond?" gets a real answer
+  const here = await world.npcs?.reply(npc, liveName(myGenes()), line, undefined, scene);
   if (here) return here;
   const hostedHere = !!world.npcs?.hosting(npc);
-  if (!hostedHere && live.status === "online" && npcHosts.get(npc) && !asking.has(npc) && live.ask(npc, line)) {
+  if (!hostedHere && live.status === "online" && npcHosts.get(npc) && !asking.has(npc) && live.ask(npc, line, scene)) {
     const text = await new Promise<string | null>((resolve) => {
       const timer = setTimeout(() => done(null), ASK_WAIT_MS);
       const done = (t: string | null) => {
@@ -215,7 +217,7 @@ async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string }>
     });
     if (text) return { text };
   }
-  return askNpc(npc, line);
+  return askNpc(npc, line, "", undefined, undefined, scene);
 }
 
 // Pets chat with each other at home now and then (Muse Spark via /api/petchat, scripted when offline).
@@ -555,7 +557,7 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()),
     world.hearMind(from, l);
     if (l.say && l.to && l.to === world.npcs?.me && isNpc(l.who)) asking.get(l.who)?.(l.say); // my relayed question's answer
   },
-  ask: (npc, from, name, text) => void world.npcs?.reply(npc, name, text, from),
+  ask: (npc, from, name, text, scene) => void world.npcs?.reply(npc, name, text, from, scene),
   askNo: (npc) => asking.get(npc)?.(null),
   npcHost: (npc, host) => setNpcHost(npc, host),
   npcState: (npc, log) => world.npcs?.setMemory(npc, log),

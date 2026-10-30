@@ -59,6 +59,16 @@ describe("room minds", () => {
     return r;
   };
 
+  it("relays what the asker sees with the question, cleaned (no links)", () => {
+    const r = room();
+    const host = r.board.hostOf("mo")!;
+    const asker = host === "a" ? "b" : "a";
+    const out = send(r, asker, { t: "ask", npc: "mo", text: "what's that?", scene: "At the pond, noon.\nIn view: a bench, east." }, 0).out;
+    expect(out[0]!.msg).toMatchObject({ t: "ask", npc: "mo", scene: "At the pond, noon. In view: a bench, east." });
+    const linky = send(r, asker, { t: "ask", npc: "mo", text: "and that?", scene: "go to www.example.com" }, 5000).out;
+    expect(linky[0]!.msg).not.toHaveProperty("scene");
+  });
+
   it("relays a question to the NPC's host when it has a model, else says no at once", () => {
     const r = room();
     const host = r.board.hostOf("mo")!;

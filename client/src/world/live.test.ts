@@ -210,8 +210,9 @@ describe("live minds", () => {
     };
     dispatch(JSON.stringify({ t: "ask", npc: "mo", from: "p1", name: "Kai", text: "fish?" }), h);
     dispatch(JSON.stringify({ t: "ask", npc: "boss", from: "p1", text: "hi" }), h);
+    dispatch(JSON.stringify({ t: "ask", npc: "pip", from: "p2", name: "Lu", text: "what is that?", scene: "In view: a bench, east." }), h);
     dispatch(JSON.stringify({ t: "askNo", npc: "ama" }), h);
     dispatch(JSON.stringify({ t: "mind", id: "a1", who: "mo", say: "At dawn.", to: "p1" }), h);
-    expect(got).toEqual([["ask", "mo", "p1", "Kai", "fish?"], ["no", "ama"], { who: "mo", say: "At dawn.", to: "p1" }]);
+    expect(got).toEqual([["ask", "mo", "p1", "Kai", "fish?", undefined], ["ask", "pip", "p2", "Lu", "what is that?", "In view: a bench, east."], ["no", "ama"], { who: "mo", say: "At dawn.", to: "p1" }]);
   });
 });

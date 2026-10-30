@@ -1,5 +1,6 @@
 import { parseGenes } from "../game/genes";
 import { SLOT_COUNT } from "./layout";
+import { cleanScene } from "../mind/scene";
 import { parseFighter, type Fighter } from "../sim/duel";
 import type { Genes } from "../sim/ghost";
 import type { Memo } from "../sim/memo";
@@ -57,7 +58,7 @@ export interface LiveHandlers {
   mind?(from: string, line: MindLine): void; // from = the sender's live id
   npcHost?(npc: Npc, host: string | null): void;
   npcState?(npc: Npc, log: string[]): void; // we host it now: its memory so far
-  ask?(npc: Npc, from: string, name: string, text: string): void; // a player asks an NPC I host
+  ask?(npc: Npc, from: string, name: string, text: string, scene?: string): void; // a player asks an NPC I host (+ what they both see)
   askNo?(npc: Npc): void; // my question can't reach the NPC's host model: answer it another way
   away?(a: LiveAway): void;
   join(p: LivePeer): void;
@@ -172,7 +173,8 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
     }
     case "ask": {
       const from = str(m.from, 16), text = str(m.text, 80);
-      return isNpc(m.npc) && from && text ? h.ask?.(m.npc, from, str(m.name, 16) ?? "someone", text) : undefined;
+      const scene = typeof m.scene === "string" ? cleanScene(m.scene) || undefined : undefined;
+      return isNpc(m.npc) && from && text ? h.ask?.(m.npc, from, str(m.name, 16) ?? "someone", text, scene) : undefined;
     }
     case "askNo":
       return isNpc(m.npc) ? h.askNo?.(m.npc) : undefined;
@@ -340,9 +342,10 @@ export class LiveLink {
   }
 
   // A question for an NPC hosted on another machine (the room relays it to that host's local model).
-  ask(npc: Npc, text: string): boolean {
+  ask(npc: Npc, text: string, scene = ""): boolean {
     const t = text.replace(/\s+/g, " ").trim().slice(0, SAY_MAX);
-    return t ? this.send({ t: "ask", npc, text: t }) : false;
+    const sc = cleanScene(scene);
+    return t ? this.send(sc ? { t: "ask", npc, text: t, scene: sc } : { t: "ask", npc, text: t }) : false;
   }
 
   // Heartbeat + model speed, so the room can pick NPC hosts (the server takes one per ~10 s).

@@ -38,6 +38,9 @@ const EMOTE_TEXT: Record<Emote, string> = { wave: "*waves*", heart: "<3", dance:
 export class MindHub {
   readonly minds = new Map<string, Mind>();
 
+  // What a mind sees right now (scene.ts), set by the overworld; `with` = the one it talks to. Null = no scene.
+  sceneOf: ((id: string, withPos?: { x: number; z: number }) => string) | null = null;
+
   constructor(
     private readonly v: Village,
     private readonly sched: MindScheduler,
@@ -218,7 +221,7 @@ export class MindHub {
         const [sp, ls] = k % 2 ? [mb, ma] : [ma, mb];
         if (this.hasModel()) this.out.say(sp.persona.id, "..."); // typing while the model thinks
         const ans = this.hasModel()
-          ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: linePrompt(sp.persona, sp.mem, ls.persona, aff, topic, said), parse: (t) => parseLine(t, sp.persona.name), fallback: () => scriptedLine(sp.persona, ls.persona, k, this.v.nextId) })
+          ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: linePrompt(sp.persona, sp.mem, ls.persona, aff, topic, said, this.sceneOf?.(sp.persona.id) ?? ""), parse: (t) => parseLine(t, sp.persona.name), fallback: () => scriptedLine(sp.persona, ls.persona, k, this.v.nextId) })
           : { value: scriptedLine(sp.persona, ls.persona, k, this.v.nextId + k), source: "rules" };
         sp.source = ans.source;
         said.push(`${sp.persona.name}: ${ans.value}`);

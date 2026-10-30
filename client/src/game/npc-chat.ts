@@ -1,3 +1,4 @@
+import { SCENE_MAX } from "../mind/scene";
 import { pickLine } from "./chatter";
 
 // Talk to the elder or a wild pet: the Worker asks a Meta model (Muse Spark) for one short in-character
@@ -19,6 +20,7 @@ export async function askNpc(
   base = "",
   fetchFn: FetchFn = (i, o) => fetch(i, o),
   timeoutMs = 20_000,
+  scene = "", // what the player and the NPC both see (mind/scene.ts); the Worker adds it to the prompt
 ): Promise<{ text: string; source: ChatSource }> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
@@ -26,7 +28,7 @@ export async function askNpc(
     const res = await fetchFn(`${base}/api/chat`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ who, line: line.trim().slice(0, CHAT_MAX_LINE) }),
+      body: JSON.stringify(scene ? { who, line: line.trim().slice(0, CHAT_MAX_LINE), scene: scene.slice(0, SCENE_MAX) } : { who, line: line.trim().slice(0, CHAT_MAX_LINE) }),
       signal: ctl.signal,
     });
     if (res.ok) {

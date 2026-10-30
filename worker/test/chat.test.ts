@@ -103,5 +103,7 @@ describe("chat helpers", () => {
   it("greets when the player says nothing", () => {
     expect(chatPrompt("elder", "").prompt).toContain("waves");
     expect(chatPrompt("bully", "yo").system).toContain("Bully");
+    expect(chatPrompt("mo", "what's that?").prompt).not.toContain("Around you");
+    expect(chatPrompt("mo", "what's that?", "In view: a bench, east.").prompt).toContain("Around you right now: In view: a bench, east.");
   });
 });

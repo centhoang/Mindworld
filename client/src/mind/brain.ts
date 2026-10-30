@@ -71,24 +71,27 @@ export function parseChoice(text: string, choices: readonly string[]): string | 
 }
 
 // --- line: one sentence of talk to another mind --------------------------------------------------------
-export function linePrompt(p: Persona, m: MindMemory, other: Persona, affinity: number, topic: string, said: readonly string[]): LmRequest {
+// `scene` (scene.ts) = what this mind can see right now; empty = the prompt stays exactly as before.
+const sceneLine = (scene: string): string => (scene ? `Around you: ${scene}\n` : "");
+
+export function linePrompt(p: Persona, m: MindMemory, other: Persona, affinity: number, topic: string, said: readonly string[], scene = ""): LmRequest {
   const feel = affinity > 30 ? "a good friend" : affinity < -20 ? "someone they find annoying" : "someone they know a little";
   const convo = said.length ? `The conversation so far:\n${said.join("\n")}\n` : `${p.name} starts the conversation.\n`;
   return {
     system: SYSTEM,
-    user: `${personaCard(p)}\n${memoryText(m, `${topic} ${other.name}`, 2)}\n${p.name} meets ${other.name}, ${feel}. Topic: ${topic}.\n${convo}Write ${p.name}'s next line: one short sentence, under 15 words, no emoji.`,
+    user: `${personaCard(p)}\n${memoryText(m, `${topic} ${other.name}`, 2)}\n${p.name} meets ${other.name}, ${feel}. Topic: ${topic}.\n${sceneLine(scene)}${convo}Write ${p.name}'s next line: one short sentence, under 15 words, no emoji.`,
     grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,
     maxTokens: 24,
     temperature: 0.9,
   };
 }
 // A villager passes a pet (a small creature that can't talk back): one line to it or about it.
-export function petLinePrompt(p: Persona, m: MindMemory, pet: string): LmRequest {
+export function petLinePrompt(p: Persona, m: MindMemory, pet: string, scene = ""): LmRequest {
   return {
     system: SYSTEM,
     user: `${personaCard(p)}
 ${memoryText(m, pet, 1)}
-${p.name} walks past ${pet}, a small pet creature resting nearby. Write what ${p.name} says to the pet or about it: one short sentence, under 12 words, no emoji.`,
+${sceneLine(scene)}${p.name} walks past ${pet}, a small pet creature resting nearby. Write what ${p.name} says to the pet or about it: one short sentence, under 12 words, no emoji.`,
     grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,
     maxTokens: 20,
     temperature: 0.9,
@@ -96,13 +99,13 @@ ${p.name} walks past ${pet}, a small pet creature resting nearby. Write what ${p
 }
 
 // A player walks up and says something: the mind answers in character, using what it remembers.
-export function replyPrompt(p: Persona, m: MindMemory, player: string, line: string): LmRequest {
+export function replyPrompt(p: Persona, m: MindMemory, player: string, line: string, scene = ""): LmRequest {
   return {
     system: SYSTEM,
     user: `${personaCard(p)}
 ${memoryText(m, line, 3)}
-A visitor, ${player}, says to ${p.name}: "${line.slice(0, 140)}"
-Write ${p.name}'s answer: one or two short friendly sentences, under 25 words, in character, no emoji.`,
+${sceneLine(scene)}A visitor, ${player}, says to ${p.name}: "${line.slice(0, 140)}"
+Write ${p.name}'s answer: one or two short friendly sentences, under 25 words, in character, no emoji.${scene ? " If they ask about something around you, answer only from what is listed there." : ""}`,
     grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,
     maxTokens: 40,
     temperature: 0.8,
