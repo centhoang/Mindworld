@@ -1,15 +1,10 @@
 Director night of 2026-10-30 finished (queue empty); next session = Normal mode
 
-## Morning report (night of 2026-10-30, director)
-- Done + committed + deployed (pet-mind **b42ac324**): W1 seeded ground decor + party lights, NPC lines to resting pets, seated legs (0453db6); W2 Codex autumn/snow grass x3 + trees (25e03f3); W3 village fine-tune data-gen + 40-row sample, 40/40 valid, $0.0753 (cdf436d); W4 README + v3 3-min demo script (2717b6b).
-- Verified: client 255, worker 162, tsc clean, build OK, secrets scan clean. Nothing pushed. Broken: nothing known.
-- Needs you: (1) play-test the morning plan below + new decor/themes; (2) go-ahead for the stage 5 full data run (~$4) + Modal training (~$2), commands in FINETUNE.md; (3) stray Worker deletion; (4) review README/DEMO wording.
-- Note: new sessions can't be started from automated wake-ups, so all four batches ran in one worker (w1-world-polish, ~25% context).
-
-## Queue: all done (W1-W4 + verify/deploy)
+## Status (2026-10-30 morning, Normal mode)
+- Deployed pet-mind **8611b544** = night work + scene awareness + restored coach chain (d4dd841). Stray Worker deleted (user OK).
+- Codex backlog art batch running in background (brief `.scratch/v3/b3-codex-brief.md`, note -> `.scratch/v3/b3-codex-note.md`).
 
 ## Decisions needing review
-- Stray Worker deletion: still the user's (not touched).
 - API spend tonight: $0.0753 (W3 sample, Modal Muse Spark Open; cap $3).
 - Stage 5 full data run (~$4) + Modal training (~$2): commands in FINETUNE.md, awaiting the user's go-ahead.
 
@@ -33,7 +28,7 @@ Director night of 2026-10-30 finished (queue empty); next session = Normal mode
 - Minds only pick from `validChoices`; every decision has a fallback; inspector labels the source honestly. Codex = static art only.
 
 ## Pending decisions (user)
-- **Stray Worker `eta-lobal---eveloper-ackathon-roject`:** created by accident on 2026-10-30 00:13 (a `wrangler deploy` picked up an auto-generated root `wrangler.jsonc`, now deleted). It serves the `client/` folder (source, no secrets found) and is probably public on workers.dev without Access. Recommend deleting it (`npx wrangler delete --name eta-lobal---eveloper-ackathon-roject` in worker/). Needs the user's OK.
+- Stage 5 full run (~$4 data + ~$2 Modal) then MLC retry (~$1) for a browser-tuned 1B: awaiting go-ahead.
 - When to go public (remove Access); make the HF coach repos public.
 
 ## User-only actions (morning test plan, two windows: normal + incognito, both on https://pets.uryto.dev/)

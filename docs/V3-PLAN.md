@@ -143,3 +143,16 @@ User 2026-10-29: **all three = (a), plan approved.** Stage 5 fine-tune (~$6) is 
    (b) despawn at once (simplest, world shrinks visibly). (c) persist grounds on the server (more storage, below the line).
 3. **Scope room.** (a, recommended) freeze duels/boss/market/Teach and move mobile controls + outdoor decor below the line.
    (b) keep mobile touch controls above the line (~half a day; then only playground + picnic as in-between grounds).
+
+## 10. Added 2026-10-30 (user, morning)
+- **Scene awareness (done, d4dd841):** `client/src/mind/scene.ts`. A villager answering a player sees only what is in view of both
+  (6 tiles: people + activity, pets, props, decor, place, time); a pet sees only what is close (3 tiles) and pet-relevant (people,
+  pets, bowl, bed, mess). The asker builds the scene and it rides the room `ask` relay and `/api/chat` (cleaned, <= 300 chars).
+- **Coach chain restored (done):** v3 Teach = Muse Spark -> tuned local coach (power mode only) -> scripted (the pixel rewrite had
+  dropped the local step).
+- **Tuned model for players without power mode:** power mode needs llama.cpp installed, so judges won't have it; the game already
+  auto-detects a running llama-server. The real fix is a WebLLM build of the tuned 1B: retry the MLC conversion (pinned stable
+  mlc-llm on a Modal GPU, ~$1), after the stage 5 multi-task LoRA so one conversion covers coach + pet + NPC minds. If it works, the
+  browser loads the tuned 1B for everyone (B key), else stock 1B stays.
+- **Codex art backlog (running):** pet modular parts (label masks), A-frame variants (+snow/autumn), held items/props, beach + night
+  themes, party plaza, into `client/public/art/backlog/` (brief `.scratch/v3/b3-codex-brief.md`); wired in when each feature lands.
