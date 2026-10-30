@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VoicePrompt } from "./instinct";
-import { CloudVoice, localAccessState } from "./voices";
+import { CloudVoice, localAccessState, stockId, tunedRecord } from "./voices";
 
 const prompt: VoicePrompt = { system: "Choose a move", user: "Allowed: attack, guard", grammar: "do not send", moves: ["attack", "guard"] };
 const signal = () => new AbortController().signal;
@@ -143,5 +143,15 @@ describe("localAccessState", () => {
 
   it("treats a browser without the permission as ungated", async () => {
     expect(await localAccessState("https:", async () => Promise.reject(new TypeError("no")))).toBe("granted");
+  });
+});
+
+describe("tunedRecord", () => {
+  const list = [32, 16].map((b) => ({ model: "https://huggingface.co/mlc-ai/x", model_id: stockId(b === 16), model_lib: `lib${b}.wasm` }));
+  it("borrows the stock library of the GPU's format for our weights, and is off until a repo is set", () => {
+    expect(tunedRecord(list, "", true)).toBeNull();
+    expect(tunedRecord(list, "me/Llama-3.2-1B-Mindworld", true)).toEqual({ model: "https://huggingface.co/me/Llama-3.2-1B-Mindworld-q4f16_1-MLC", model_id: "Llama-3.2-1B-Mindworld-q4f16_1-MLC", model_lib: "lib16.wasm" });
+    expect(tunedRecord(list, "http://localhost/_mlc/{q}/", false)).toMatchObject({ model: "http://localhost/_mlc/q4f32_1/", model_lib: "lib32.wasm" });
+    expect(tunedRecord([], "me/x", false)).toBeNull();
   });
 });

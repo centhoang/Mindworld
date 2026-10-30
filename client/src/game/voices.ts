@@ -164,8 +164,28 @@ export async function localAccessState(
 
 type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;
 
+// Our fine-tuned 1B (coach + pet + village minds) as MLC weights on Hugging Face (modal/convert_mlc.py), in both of the
+// stock 1B's formats: <repo>-q4f16_1-MLC for GPUs with shader-f16, <repo>-q4f32_1-MLC otherwise. Each runs on the
+// prebuilt stock library of its format, so only the weights differ. Empty repo = not published yet: stock 1B only.
+export const TUNED_1B = { repo: "" };
+const quantOf = (f16: boolean) => (f16 ? "q4f16_1" : "q4f32_1");
+export const stockId = (f16: boolean) => `Llama-3.2-1B-Instruct-${quantOf(f16)}-MLC`;
+
+// The model list entry for the tuned weights, borrowing the stock entry's library and settings. A full URL (dev) may
+// hold "{q}" for the format.
+export function tunedRecord<T extends { model: string; model_id: string }>(list: readonly T[], repo: string, f16: boolean): T | null {
+  const q = quantOf(f16);
+  const stock = list.find((m) => m.model_id === stockId(f16));
+  const model = repo.includes("://") ? repo.replace("{q}", q) : `https://huggingface.co/${repo}-${q}-MLC`;
+  return repo && stock ? { ...stock, model, model_id: `Llama-3.2-1B-Mindworld-${q}-MLC` } : null;
+}
+
+// Dev only: ?tuned=<url> loads weights from anywhere (e.g. the local server) to test a conversion before publishing.
+const tunedRepo = (): string => (import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.search).get("tuned")) || TUNED_1B.repo;
+
 export class WebLlmVoice implements VoiceBackend {
-  readonly label = "Llama 3.2 1B (in browser, WebGPU)";
+  label = "Llama 3.2 1B (in browser, WebGPU)";
+  tuned = false;
   private engine: Engine | null = null;
   private busy = false;
   private loading: Promise<void> | null = null;
@@ -185,12 +205,27 @@ export class WebLlmVoice implements VoiceBackend {
       const webllm = await import("@mlc-ai/web-llm");
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
       if (!adapter) throw new Error("no WebGPU adapter");
-      const id = adapter.features.has("shader-f16") ? "Llama-3.2-1B-Instruct-q4f16_1-MLC" : "Llama-3.2-1B-Instruct-q4f32_1-MLC";
-      const engine = await webllm.CreateMLCEngine(id, { initProgressCallback: (r) => onProgress(r.text, r.progress) });
+      const initProgressCallback = (r: { text: string; progress: number }) => onProgress(r.text, r.progress);
+      const f16 = adapter.features.has("shader-f16");
       // Warm-up: the first generation compiles the shaders (~30 s on a GTX 1050). Do it during the loading
       // toast, so fights and village minds don't spend their deadlines on it.
-      onProgress("Warming up the model (first run compiles shaders)...", 1);
-      await engine.chat.completions.create({ messages: [{ role: "user", content: "hi" }], max_tokens: 1 });
+      const warm = async (e: Engine) => {
+        onProgress("Warming up the model (first run compiles shaders)...", 1);
+        await e.chat.completions.create({ messages: [{ role: "user", content: "hi" }], max_tokens: 1 });
+        return e;
+      };
+      const tuned = tunedRecord(webllm.prebuiltAppConfig.model_list, tunedRepo(), f16);
+      let engine: Engine | null = null;
+      if (tuned) {
+        try {
+          engine = await warm(await webllm.CreateMLCEngine(tuned.model_id, { appConfig: { ...webllm.prebuiltAppConfig, model_list: [tuned] }, initProgressCallback }));
+          this.tuned = true;
+          this.label = "Llama 3.2 1B, tuned by us (in browser, WebGPU)";
+        } catch (e) {
+          console.warn("tuned 1B failed, loading the stock one", e);
+        }
+      }
+      engine ??= await warm(await webllm.CreateMLCEngine(stockId(f16), { initProgressCallback }));
       this.engine = engine;
     })();
     this.loading.catch(() => (this.loading = null));
