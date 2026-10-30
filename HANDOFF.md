@@ -1,4 +1,4 @@
-# HANDOFF: Mindworld v3, tuned 1B live in the browser; next = remove power mode, lift Muse Spark limits, chat privacy (2026-10-30)
+# HANDOFF: Mindworld v3, tuned 1B live in the browser; next = remove power mode, lift limits, setup gate, chat privacy (2026-10-30)
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md. Continue from Next actions, starting with removing power mode. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
@@ -19,20 +19,24 @@
 - 2026-10-30 user: **remove power mode from the game** (keep the GGUFs as published artifacts and for benches): MLC is the one local model, so the flow is simple and works without an install.
 - 2026-10-30 user: **no Muse Spark limits while we work up to judging.** Cost control comes back only after the event, for real players.
 - 2026-10-30 user: the game must live on after the event on the local model; Muse Spark is a bonus. Fallback order above is theirs.
+- 2026-10-30 user: **a setup gate before the game opens.** The game checks the machine first. Capable: guided setup, and the game opens only when the tuned model is ready. Incapable: straight into the game (Muse Spark -> rules), no B step needed. So a judge never plays half set up.
+- 2026-10-30 user: **chat privacy.** A player's chat with a villager or with another player is private to those in it. NPC-to-NPC and pet chatter is public, nearby players only. Anyone in a private chat shows a "talking" status bubble to others, and nobody can start talking with them until it ends. Shared public chat stays public.
 - Earlier ones hold: shared clock, NPCs move to model holders, lines queue.
 
 ## Pending decisions (user)
-- **Conversation privacy over the network.** Recommendation to put to the user: a player's chat with a villager shows only to that player; NPC-to-NPC and pet chatter stays public but only to players nearby, so judges still see a living world. Today lines relay across the room.
 - Submission day: make the GitHub repo + the 4 Mindworld HF repos public, then remove Access. The proxy keeps working either way.
 
 ## User-only actions
 - Play-test, two windows (Chrome normal + incognito; incognito needs Access sign-in): grounds and clock match; villagers greet by name, E chats; B in A then chat from B answers from A's model; close A and B takes over within 15 s; pets' I panel and lines. Plus bubbles, dusk, beds in real play.
+- **Look for free top-down art assets** that could replace the current visuals (more professional and consistent; check the license allows use in a public hackathon entry). Only change the visual direction if a good pack turns up. If one does, Claude uses it as the moodboard (`moodboard` skill) and carries on from it.
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
-## Next actions
+## Next actions (5 this time: all user-approved)
 1. **Remove power mode:** in client/src/pixel/main.ts drop `nativeBrain`, the probes and `localAccessState` start-up; `switchBrain` goes straight to WebLLM. In teach.ts drop `powerMode`/`local` and the Free coach checkbox if it remains. Remove `scripts/power-mode.ps1`, the README/DEMO mentions, and in-game text. Keep `LocalCortex`/`NativeVoice` only if the benches need them (teach-bench, voice-bench use them, so move or keep them under finetune).
 2. **Lift limits:** `new CloudMind(0)` or drop the 6 s gap (keep the failure back-off); raise `MAX_DAILY_USD` and `CLIENT_DAILY_USD`, and `CLIENT_PER_MINUTE` in worker/wrangler.toml so a judge never hits them, keeping the MAX_TOTAL_USD_* totals as the hard stop. Note in the code that caps return after the event.
-3. **Weak GPUs:** B downloads ~0.7 GB before warm-up can fail. Show a clear message, and consider a quick GPU check first (adapter name/limits, "use High performance" hint for dual-GPU Windows). Then privacy once the user decides, then stage 6: VFX polish, demo captures (DEMO.md), README numbers from the stage 5 + browser tables.
+3. **Setup gate (before the game opens):** with B gone, loading becomes this screen. Check WebGPU and the adapter before any download. Capable GPU: show size and progress, warm up, then open the game, and the tuned model stays on for the session. Dual-GPU Windows on the iGPU: a step-by-step guide (Settings > Display > Graphics > Chrome > High performance, restart) with a re-check. Incapable, or warm-up fails: a short note, straight into the game. Decide "capable" from real results: GTX 1050 yes, Intel Gen 9 no. Remember the result so a return visit is instant (the browser caches the weights); keep a skip button only for a failed download.
+4. **Chat privacy + talking status:** lines addressed to a player or between players go only to those in the conversation (server side in worker/src/room.ts, not just hidden on screen). NPC/pet chatter reaches nearby players only. Add a busy state on the room, a "talking" bubble over those in a chat, and refuse new chats with them; it must clear on close, disconnect and a timeout so nobody stays stuck busy.
+5. Then stage 6: VFX polish, demo captures (DEMO.md), README numbers from the stage 5 + browser tables. If the user finds an art pack, that comes before VFX.
 
 ## Gotchas
 - Dual-GPU Windows: Chrome may give the Intel iGPU even for high-performance; it cannot run the model (Intel Gen 9 crashes on stock too). What a player sees: load fails, toast, game goes on with Muse Spark and rules.
