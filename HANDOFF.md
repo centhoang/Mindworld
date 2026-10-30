@@ -6,7 +6,7 @@ Director night of 2026-10-30 finished (queue empty); next session = Normal mode
 
 ## Decisions needing review
 - API spend tonight: $0.0753 (W3 sample, Modal Muse Spark Open; cap $3).
-- Stage 5 full data run (~$4) + Modal training (~$2): commands in FINETUNE.md, awaiting the user's go-ahead.
+- Stage 5 DONE (12a45ec, $4.26 data + ~$2 Modal): tuned 1B 99.5% village checks (stock 48.5%), Teach +22.6 (was +18.4); MLC browser build works via our own NumPy converter (FINETUNE.md stage 5).
 
 # HANDOFF: Mindworld v3, stages 1-4 done + talk/relay polish; user play-test + review pending (2026-10-30 night)
 
@@ -28,7 +28,7 @@ Director night of 2026-10-30 finished (queue empty); next session = Normal mode
 - Minds only pick from `validChoices`; every decision has a fallback; inspector labels the source honestly. Codex = static art only.
 
 ## Pending decisions (user)
-- Stage 5 full run (~$4 data + ~$2 Modal) then MLC retry (~$1) for a browser-tuned 1B: awaiting go-ahead.
+- Publish the Mindworld models to HF (auto mode blocked me): `modal run modal/publish_coach.py --what all --tag village` (private), then make the 1B MLC repos public so the game can load them; then I set `TUNED_1B.repo` (voices.ts), deploy, and switch power-mode.ps1 to the Mindworld GGUF.
 - When to go public (remove Access); make the HF coach repos public.
 
 ## User-only actions (morning test plan, two windows: normal + incognito, both on https://pets.uryto.dev/)
@@ -39,7 +39,7 @@ Director night of 2026-10-30 finished (queue empty); next session = Normal mode
 
 ## Next actions
 1. Apply the user's play-test feedback and decisions (stray Worker, wording, bugs).
-2. Stage 5 full run once approved (FINETUNE.md commands), then village bench. Far-pond fishing not yet seen live.
+2. After publish: set TUNED_1B.repo, verify the f16 build in a fresh app (pane iGPU hit DEVICE_HUNG for stock and tuned alike; restart clears it), deploy, update power-mode.ps1 model pins + README/DEMO numbers. Far-pond fishing not yet seen live.
 3. Stage 6: VFX polish, captures for the demo (DEMO.md shot list), repo public Nov 3 (user).
 
 ## Gotchas
