@@ -1,4 +1,4 @@
-# HANDOFF: Mindworld v3, conversion audited + private /mlc proxy built; waits on the HF_TOKEN Worker secret (2026-10-30)
+# HANDOFF: Mindworld v3, conversion audited + private /mlc proxy live; waits on the user's play-test (2026-10-30)
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
@@ -6,11 +6,11 @@
 - Conversion audit passed (docs/FINETUNE.md "Browser audit"): both MLC repos rebuild byte-identical from the stage 5 merged weights; WebLLM replies = decoded weights on 200/200.
 - Quote the browser's own numbers: WebLLM 1B 98.5% village, Teach +19.1 (6 harmful), 100% voice; GGUF stays +22.6 (1 harmful). Model cards fixed.
 - Fixed: the 190+ token prefill GPU crash (`limitPrefill`, chunk 128; stock weights crash too). Browser 1B is now a Teach coach (it never was before).
-- Private proxy `/mlc/<q>/resolve/main/<file>` is in the Worker (pinned commits, whitelist, cache); client uses it. **Blocked on one user step: the HF_TOKEN Worker secret** (auto-mode blocked the write). Until then the game loads the stock 1B.
+- Private proxy `/mlc/<q>/resolve/main/<file>` is in the Worker (pinned commits, whitelist, cache); client uses it. HF_TOKEN is set from .env HF_TOKEN_READ_ONLY (user-provided, read-only). Same Worker code run locally with it: all files byte-identical to HF, both formats; cache and 404s fine. The site itself is untested: only the user's Access session can reach it.
 - Rules check clean: all 8 HF repos and the GitHub repo answer 401/404 anonymously; no secrets in git.
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **9ccc597a** (2026-10-30, proxy + browser coach; no HF_TOKEN secret yet). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **9ccc597a** (2026-10-30, proxy + browser coach; HF_TOKEN set after it). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
 - **Tests:** client + worker green, tsc clean (mlc.test.ts added).
 - v3 stages 1-4 (life sim, minds, grounds, networked NPC hosts, scene awareness, coach chain Muse Spark -> tuned local -> scripted) are all in. Details: docs/V3-PLAN.md, docs/FINETUNE.md (stage 5 + browser unblock).
 - **Browser model loading** (client/src/game/voices.ts): `tunedRecord(list, repo, f16)` builds a WebLLM model_list entry that reuses the stock 1B wasm with our weights. `repo` = "user/name" (HF; appends `-{q}-MLC`) or a full URL template with `{q}`. It picks f16 when the GPU has shader-f16, and falls back to the stock 1B if the tuned load fails. Dev override: `?tuned=<url with {q}>`.
@@ -26,7 +26,8 @@
 - Submission day: make the GitHub repo + the 4 HF repos public, then remove Access. Switch `TUNED_1B.repo` to `kysupo/Llama-3.2-1B-Mindworld` at the same time, or keep the proxy below.
 
 ## Next actions
-1. After the user sets HF_TOKEN: confirm /mlc returns 200 on the deployed site (fresh window), the game says "tuned by us", then play-test.
+1. User play-test on the live site (signed in to Access): B key, label says "tuned by us", then Teach. Claude cannot sign in to Access, so this is the only live check.
+   Open question for the user: drop the stock 1B fallback in `WebLlmVoice.load`?
 2. Power mode: switch scripts/power-mode.ps1 to the Mindworld GGUFs (size + SHA-256 pins; the private repo needs a token now, so this waits for submission day, or the script uses the local .scratch/finetune GGUFs). Update the README/DEMO numbers with the stage 5 table.
 3. User play-test still owed (two windows: scene-aware chat, relay to host model, pets). Then stage 6: VFX polish, demo captures (DEMO.md).
 
