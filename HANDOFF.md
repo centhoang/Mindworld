@@ -9,9 +9,12 @@
 - Private proxy `/mlc/<q>/resolve/main/<file>` is in the Worker (pinned commits, whitelist, cache); client uses it. HF_TOKEN is set from .env HF_TOKEN_READ_ONLY (user-provided, read-only). Same Worker code run locally with it: all files byte-identical to HF, both formats; cache and 404s fine. The site itself is untested: only the user's Access session can reach it.
 - Rules check clean: all 8 HF repos and the GitHub repo answer 401/404 anonymously; no secrets in git.
 
+- 2026-10-30 evening: **/mlc confirmed live** in the user's signed-in Chrome (200, Cloudflare cache HIT, whitelist 404s). Stock 1B removed: tuned MLC or nothing (f16 retries as f32; a weak GPU now fails during warm-up; a lost GPU drops to rules with a toast). Chains per user: minds/chat = local -> Muse Spark (CloudMind, spaced 6 s, Worker caps) -> rules. Bubbles never overlap (bubbles.ts: held bubbles wait), names and "A > B" header. Smooth tint by hour. Farm beds = plain soil on the biome tile.
+- **The user's Chrome picks the Intel iGPU, which cannot run the model.** For their play-test: Windows Settings > Display > Graphics > Chrome = High performance. Dual-GPU players get the same.
+
 ## State
 - **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **9ccc597a** (2026-10-30, proxy + browser coach; HF_TOKEN set after it). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client + worker green, tsc clean (mlc.test.ts added).
+- **Tests:** client + worker green, tsc clean.
 - v3 stages 1-4 (life sim, minds, grounds, networked NPC hosts, scene awareness, coach chain Muse Spark -> tuned local -> scripted) are all in. Details: docs/V3-PLAN.md, docs/FINETUNE.md (stage 5 + browser unblock).
 - **Browser model loading** (client/src/game/voices.ts): `tunedRecord(list, repo, f16)` builds a WebLLM model_list entry that reuses the stock 1B wasm with our weights. `repo` = "user/name" (HF; appends `-{q}-MLC`) or a full URL template with `{q}`. It picks f16 when the GPU has shader-f16, and falls back to the stock 1B if the tuned load fails. Dev override: `?tuned=<url with {q}>`.
 - Credits: Meta ~$149.9, Modal ~$102 left (approx).
@@ -27,7 +30,7 @@
 
 ## Next actions
 1. User play-test on the live site (signed in to Access): B key, label says "tuned by us", then Teach. Claude cannot sign in to Access, so this is the only live check.
-   Open question for the user: drop the stock 1B fallback in `WebLlmVoice.load`?
+   Open question for the user: remove power mode from the game (recommended; keep the GGUFs as published artifacts and for benches)?
 2. Power mode: switch scripts/power-mode.ps1 to the Mindworld GGUFs (size + SHA-256 pins; the private repo needs a token now, so this waits for submission day, or the script uses the local .scratch/finetune GGUFs). Update the README/DEMO numbers with the stage 5 table.
 3. User play-test still owed (two windows: scene-aware chat, relay to host model, pets). Then stage 6: VFX polish, demo captures (DEMO.md).
 

@@ -27,7 +27,7 @@ import { loadArt } from "./art";
 import { Babbler } from "../game/babble";
 import { voiceFor, type Speaker } from "../game/chatter";
 import { Instinct } from "../game/instinct";
-import { CloudVoice, localAccessState, NativeVoice, WebLlmVoice } from "../game/voices";
+import { CloudMind, CloudVoice, localAccessState, NativeVoice, WebLlmVoice } from "../game/voices";
 import { MINDS_KEY, parseMindsSave } from "../mind/hub";
 import { MindScheduler } from "../mind/scheduler";
 import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "../sim/boss";
@@ -112,7 +112,7 @@ const teach = new TeachScreen({
   },
   petName: () => activeMember().name,
   powerMode: () => instinct.voice === nativeBrain,
-  browserCoach: () => (instinct.voice === webBrain && webBrain.tuned ? (req) => webBrain.completeJson(req) : null),
+  browserCoach: () => (instinct.voice === webBrain ? (req) => webBrain.completeJson(req) : null),
   portrait: () => {
     const m = activeMember();
     return portraits.get(m.genes) ?? portraits.set(m.genes, drawMonster(petLook(m.genes), 48, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;
@@ -229,7 +229,7 @@ function petChatter(dt: number): void {
   const all = members();
   const a = state.active ?? 0;
   const others = all.filter((_, i) => i !== a);
-  if (!others.length || !world.nearHome() || chatWith) return;
+  if (!others.length || !world.nearHome() || chatWith || localBrain()) return; // with a local model the pets' minds do the talking
   const r = Math.floor(Math.random() * others.length);
   const them = others[r]!;
   void askPets({ name: all[a]!.name, trait: traitOf(state.memo) }, { name: them.name, trait: "curious" }).then(({ lines: [mine, theirs] }) => {
@@ -472,8 +472,15 @@ void (async () => {
 // ---- village minds: every pet at your corner has a mind (persona, plan, memory, friends). The same local
 // Llama the B key loads for fights thinks for them through one queue; without it they run on needs + rules.
 const localBrain = () => (instinct.voice === nativeBrain ? nativeBrain : instinct.voice === webBrain ? webBrain : null);
-const mindSched = new MindScheduler(() => localBrain(), { paused: () => mode === "battle" });
-world.attachMinds(mindSched, () => localBrain() !== null, (() => {
+// Local model first, then Muse Spark, then the rules (the scheduler's fallback).
+const cloudMind = new CloudMind();
+void cloudMind.probe();
+webBrain.onLost = () => {
+  if (instinct.voice === webBrain) instinct.voice = null;
+  toast = { text: "The GPU dropped the model. Your pet goes on with rules.", who: "Brain", t: 6 };
+};
+const mindSched = new MindScheduler(() => localBrain() ?? (cloudMind.ready() ? cloudMind : null), { paused: () => mode === "battle" });
+world.attachMinds(mindSched, () => localBrain() !== null || cloudMind.available(), (() => {
   try {
     return parseMindsSave(JSON.parse(localStorage.getItem(MINDS_KEY) ?? "null"));
   } catch {

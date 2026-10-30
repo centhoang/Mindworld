@@ -19,6 +19,7 @@ import { clockLabel, gameTime, phaseOf, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
+import { layoutBubbles, type BubbleBox, type Placed } from "./bubbles";
 import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
 import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
@@ -114,7 +115,7 @@ export class Overworld {
   onMind: ((l: MindLine) => void) | null = null;
   // Speech bubbles: "pet", "me", "r<i>" (resident i), "w<id>" (wild pet), "p:<id>" (an online
   // player), "elder", "boss" -> text and seconds left.
-  private readonly bubbles = new Map<string, { text: string; t: number }>();
+  private readonly bubbles = new Map<string, Bubble>();
 
   constructor(petGenes: Genes, groundSeed = 1) {
     this.layoutIn = { me: { seed: groundSeed, slot: 0 }, roomSeed: 1, day: worldDay() };
@@ -407,11 +408,11 @@ export class Overworld {
       }
     }
     const places = new Set(Object.keys(this.lifeEnv.spots) as (keyof Spots)[]);
-    this.minds = new MindHub(this.life, sched, { say: (id, text) => this.sayAgent(id, text), invite: (id, act) => this.onMind?.({ who: id, invite: { act } }) }, hasModel, places);
+    this.minds = new MindHub(this.life, sched, { say: (id, text, to) => this.sayAgent(id, text, to), invite: (id, act) => this.onMind?.({ who: id, invite: { act } }) }, hasModel, places);
     this.lifeEnv.chooser = this.minds.chooser;
     this.lifeEnv.bias = this.minds.bias;
     this.syncMinds();
-    this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text) => this.say(`n:${id}`, text, text === "..." ? 25 : 5) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
+    this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text, to) => this.say(`n:${id}`, text, text === "..." ? 25 : 5, to) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
     this.npcs.people = () => [{ id: this.npcs?.me ?? "me", name: this.myName, pos: this.player }, ...[...this.peers].map(([id, p]) => ({ id, name: p.name, pos: p.pos }))];
     this.npcs.pets = () => [
       { id: "pet", name: this.petName, pos: this.pet, busy: this.moving },
@@ -480,9 +481,23 @@ export class Overworld {
     }
   }
 
-  private sayAgent(id: string, text: string): void {
+  // The name on a bubble; empty for the player, who knows who they are.
+  private speaker(who: string): string {
+    if (who === "pet") return this.petName;
+    if (who === "elder" || who === "n:elder") return "Elder";
+    if (who.startsWith("n:")) return this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.name ?? "";
+    if (who.startsWith("p:")) return this.peers.get(who.slice(2))?.name ?? "";
+    if (who.startsWith("w")) {
+      const w = this.wilds.find((x) => `w${x.id}` === who);
+      return w ? `Wild ${w.arch}` : "";
+    }
+    if (/^r\d/.test(who)) return this.residents[Number(who.slice(1))]?.agent.name ?? "";
+    return "";
+  }
+
+  private sayAgent(id: string, text: string, to?: string): void {
     const i = this.residents.findIndex((r) => r.agent.id === id);
-    if (i >= 0) this.say(`r${i}`, text, text === "..." ? 25 : 5); // "..." stays up until the line arrives
+    if (i >= 0) this.say(`r${i}`, text, text === "..." ? 25 : 5, to); // "..." stays up until the line arrives
     if (i >= 0 && text !== "...") this.onMind?.({ who: id, say: text });
   }
 
@@ -555,8 +570,9 @@ export class Overworld {
     if (i >= 0) this.wilds.splice(i, 1);
   }
 
-  say(who: string, text: string, secs = 3.5): void {
-    this.bubbles.set(who, { text, t: secs });
+  // `to` = the name of whoever is spoken to, shown on the bubble with the speaker's.
+  say(who: string, text: string, secs = 3.5, to?: string): void {
+    this.bubbles.set(who, { text, t: secs, to, held: false, wait: 0 });
   }
 
   // A wild pet close enough to talk to (but not touching, which starts a fight).
@@ -615,15 +631,16 @@ export class Overworld {
   }
 
   private drawBeds(g: CanvasRenderingContext2D, toScreen: (x: number, z: number) => [number, number], t: number): void {
-    const crops = img("tile-crop-states");
     this.beds.forEach((b, i) => {
       const [sx, sy] = toScreen(b.x, b.z);
       const p = this.farm?.plots[i];
-      g.drawImage(crops, 0, 0, TILE, TILE, sx, sy, TILE, TILE);
-      g.fillStyle = PAL.wood; // rake over the seed mark: soil only
-      g.fillRect(sx + 4, sy + 4, 8, 8);
+      g.fillStyle = PAL.woodD; // soil only, drawn over this ground's own tile: no grass frame on sand or snow
+      g.fillRect(sx + 1, sy + 1, TILE - 2, TILE - 2);
+      g.fillStyle = PAL.wood;
+      g.fillRect(sx + 2, sy + 2, TILE - 4, TILE - 4);
       g.fillStyle = PAL.woodD;
-      g.fillRect(sx + 4, sy + 7, 8, 1);
+      g.fillRect(sx + 3, sy + 5, TILE - 6, 1);
+      g.fillRect(sx + 3, sy + 10, TILE - 6, 1);
       if (p?.crop) drawCrop(g, p.crop, p.stage, sx, sy - 3);
       if (p && p.wetUntil) {
         g.fillStyle = PAL.teal; // wet soil: teal corner marker (STYLE.md farms)
@@ -689,7 +706,8 @@ export class Overworld {
     if (here && here !== this.place) this.bannerT = 2.5;
     this.place = here || this.place;
     this.bannerT = Math.max(0, this.bannerT - dt);
-    for (const [k, b] of this.bubbles) if ((b.t -= dt) <= 0) this.bubbles.delete(k);
+    // A bubble waiting for room keeps its time, so its line is still read, unless the wait grows stale.
+    for (const [k, b] of this.bubbles) if ((b.held ? (b.wait += dt) > 12 : (b.t -= dt) <= 0)) this.bubbles.delete(k);
     this.life.t = worldSeconds() - dt; // the shared clock (stepVillage adds dt back)
     const lifeEv = stepVillage(this.life, dt, this.lifeEnv);
     if (this.npcs) {
@@ -893,19 +911,33 @@ export class Overworld {
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
     const now = gameTime(this.life.t);
-    drawTint(g, now.phase, sw, sh);
+    drawTint(g, now.hour, sw, sh);
     {
       const label = `DAY ${now.day + 1} ${clockLabel(now.hour)}`;
       drawText(g, label, sw - label.length * GLYPH - 6, 6, PAL.panel);
     }
     this.drawMinimap(g, sw);
 
+    const shown: { b: Bubble; head: string; lines: string[]; cx: number; y: number; box: BubbleBox }[] = [];
     for (const [who, b] of this.bubbles) {
       const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" || who === "n:elder" ? this.elder?.pos : who.startsWith("n:") ? this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
       if (!pos) continue;
       const [bx, by] = toScreen(pos.x, pos.z);
-      bubble(g, b.text, bx, by - OVERWORLD_MON - 4, sw);
+      const head = this.speaker(who);
+      const label = head && b.to ? `${head} > ${b.to}` : head;
+      const lines = wrap(b.text, 132).slice(0, 3);
+      const w = Math.max(label.length, ...lines.map((l) => l.length)) * GLYPH + 12;
+      const bottom = by - OVERWORLD_MON - 4;
+      shown.push({ b, head: label, lines, cx: bx, y: bottom, box: { cx: bx, bottom, w, h: (lines.length + (label ? 1 : 0)) * 10 + 8 } });
     }
+    const spots = layoutBubbles(shown.map((s) => s.box), sw, sh);
+    // Leader lines first, so none runs across another bubble's text.
+    shown.forEach((s, i) => spots[i]?.moved && leader(g, s.cx, s.y, s.box.w, s.box.h, spots[i]!));
+    shown.forEach((s, i) => {
+      const spot = spots[i];
+      s.b.held = !spot;
+      if (spot) bubble(g, s.head, s.lines, s.cx, s.box.w, s.box.h, spot);
+    });
     const bed = this.bedNear();
     const hint = this.atDoor()
       ? "E: GO IN"
@@ -940,19 +972,36 @@ function bedHint(f: Farm, i: number): string {
   return needsWater(p) ? "E: WATER" : "GROWING...";
 }
 
+// A bubble pushed aside by another: a dotted line leads back to its speaker.
+function leader(g: CanvasRenderingContext2D, cx: number, bottom: number, w: number, h: number, at: Placed): void {
+  const fx = Math.max(at.x + 4, Math.min(at.x + w - 4, cx));
+  const fy = at.y + h;
+  const steps = Math.max(1, Math.round(Math.hypot(cx - fx, bottom - fy) / 4));
+  g.fillStyle = PAL.ink;
+  for (let i = 1; i <= steps; i++) g.fillRect(Math.round(fx + ((cx - fx) * i) / steps), Math.round(fy + ((bottom - fy) * i) / steps), 2, 2);
+}
+
+interface Bubble {
+  text: string;
+  t: number; // seconds left on screen
+  to?: string;
+  held: boolean; // no free spot right now
+  wait: number; // seconds spent held
+}
+
 // A speech bubble above a sprite: up to 3 wrapped lines, kept on screen, with a small tail.
-function bubble(g: CanvasRenderingContext2D, text: string, cx: number, bottom: number, sw: number): void {
-  const lines = wrap(text, 132).slice(0, 3);
-  const w = Math.max(...lines.map((l) => l.length)) * GLYPH + 12;
-  const h = lines.length * 10 + 8;
-  const x = Math.max(2, Math.min(sw - w - 2, Math.round(cx - w / 2)));
-  const y = Math.max(2, bottom - h);
+function bubble(g: CanvasRenderingContext2D, head: string, lines: readonly string[], cx: number, w: number, h: number, at: Placed): void {
+  const { x, y } = at;
   drawFrame(g, x, y, w, h);
-  g.fillStyle = PAL.panel;
-  g.fillRect(cx - 2, y + h - 1, 4, 2);
-  g.fillStyle = PAL.wood;
-  g.fillRect(cx - 1, y + h + 1, 2, 2);
-  lines.forEach((l, i) => drawText(g, l, x + 6, y + 5 + i * 10));
+  if (!at.moved) {
+    g.fillStyle = PAL.panel;
+    g.fillRect(cx - 2, y + h - 1, 4, 2);
+    g.fillStyle = PAL.wood;
+    g.fillRect(cx - 1, y + h + 1, 2, 2);
+  }
+  if (head) drawText(g, head, x + 6, y + 5, PAL.teal);
+  const top = y + 5 + (head ? 10 : 0);
+  lines.forEach((l, i) => drawText(g, l, x + 6, top + i * 10));
 }
 
 interface Peer {

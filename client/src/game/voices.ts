@@ -80,6 +80,56 @@ export class CloudVoice implements VoiceBackend {
   }
 }
 
+// Minds without a local model: Muse Spark through the Worker, under its daily caps. It only stands in, so it is spaced
+// out here and backs off when the Worker says no; `parse` and the rules fallback handle anything else.
+export class CloudMind {
+  readonly label = "Muse Spark";
+  private ok = false;
+  private failures = 0;
+  private openUntil = 0;
+  private nextAt = 0;
+
+  constructor(private readonly gapMs = 6000, private readonly fetchFn: typeof fetch = (...a) => fetch(...a), private readonly now: () => number = Date.now) {}
+
+  async probe(): Promise<void> {
+    try {
+      const res = await this.fetchFn("/api/health", { signal: AbortSignal.timeout(2500) });
+      const body = (await res.json()) as { providers?: Record<string, unknown> } | null;
+      this.ok = res.ok && Object.values(body?.providers ?? {}).some(Boolean);
+    } catch {
+      this.ok = false;
+    }
+  }
+
+  available(): boolean {
+    return this.ok && this.now() >= this.openUntil;
+  }
+
+  ready(): boolean {
+    return this.available() && this.now() >= this.nextAt;
+  }
+
+  async complete(req: LmRequest, signal: AbortSignal): Promise<string> {
+    this.nextAt = this.now() + this.gapMs;
+    try {
+      const res = await this.fetchFn("/api/llm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        signal,
+        body: JSON.stringify({ kind: "dialogue", system: req.system, prompt: req.user, maxTokens: 400, effort: "low" }),
+      });
+      if (!res.ok) throw new Error(`cloud HTTP ${res.status}`);
+      const body = (await res.json()) as { text?: string; truncated?: boolean };
+      if (body.truncated || !body.text?.trim()) throw new Error("no cloud reply");
+      this.failures = 0;
+      return body.text;
+    } catch (e) {
+      if (++this.failures >= 2) this.openUntil = this.now() + 5 * 60_000;
+      throw e;
+    }
+  }
+}
+
 export class NativeVoice implements VoiceBackend {
   readonly label = "Llama 3.2 3B (native, power mode)";
   private ok = false;
@@ -187,13 +237,14 @@ const tunedRepo = (): string => (import.meta.env.DEV && new URLSearchParams(loca
 // One prefill dispatch of about 190+ tokens crashes the GPU process on a GTX 1050, with mlc-ai's stock weights too
 // (docs/FINETUNE.md), and WebLLM ignores a prefill_chunk_size override. Long prompts survive when set on the pipeline.
 export const PREFILL_CHUNK = 128;
+const WARM_TOKENS = 300;
 export function limitPrefill(engine: unknown): void {
   (engine as { loadedModelIdToPipeline?: Map<string, { prefillChunkSize: number }> }).loadedModelIdToPipeline?.forEach((p) => (p.prefillChunkSize = PREFILL_CHUNK));
 }
 
 export class WebLlmVoice implements VoiceBackend {
-  label = "Llama 3.2 1B (in browser, WebGPU)";
-  tuned = false;
+  label = "Llama 3.2 1B, tuned by us (in browser, WebGPU)";
+  onLost: (() => void) | null = null; // the GPU dropped the model mid-game
   private engine: Engine | null = null;
   private busy = false;
   private loading: Promise<void> | null = null;
@@ -217,25 +268,27 @@ export class WebLlmVoice implements VoiceBackend {
       const f16 = adapter.features.has("shader-f16");
       // Warm-up: the first generation compiles the shaders (~30 s on a GTX 1050). Do it during the loading
       // toast, so fights and village minds don't spend their deadlines on it.
+      // The long prompt also weeds out GPUs that cannot run this model: they fail here, not in the middle of play.
       const warm = async (e: Engine) => {
         limitPrefill(e);
         onProgress("Warming up the model (first run compiles shaders)...", 1);
-        await e.chat.completions.create({ messages: [{ role: "user", content: "hi" }], max_tokens: 1 });
+        await e.chat.completions.create({ messages: [{ role: "user", content: "ok ".repeat(WARM_TOKENS) }], max_tokens: 4 });
         return e;
       };
-      const tuned = tunedRecord(webllm.prebuiltAppConfig.model_list, tunedRepo(), f16);
-      let engine: Engine | null = null;
-      if (tuned) {
+      // f16 is only a capability flag, so a GPU that claims it and fails still gets a try with f32.
+      let failure: unknown = new Error("no tuned model configured");
+      for (const useF16 of f16 ? [true, false] : [false]) {
+        const tuned = tunedRecord(webllm.prebuiltAppConfig.model_list, tunedRepo(), useF16);
+        if (!tuned) continue;
         try {
-          engine = await warm(await webllm.CreateMLCEngine(tuned.model_id, { appConfig: { ...webllm.prebuiltAppConfig, model_list: [tuned] }, initProgressCallback }));
-          this.tuned = true;
-          this.label = "Llama 3.2 1B, tuned by us (in browser, WebGPU)";
+          this.engine = await warm(await webllm.CreateMLCEngine(tuned.model_id, { appConfig: { ...webllm.prebuiltAppConfig, model_list: [tuned] }, initProgressCallback }));
+          return;
         } catch (e) {
-          console.warn("tuned 1B failed, loading the stock one", e);
+          failure = e;
+          console.warn(`tuned 1B (${tuned.model_id}) failed`, e);
         }
       }
-      engine ??= await warm(await webllm.CreateMLCEngine(stockId(f16), { initProgressCallback }));
-      this.engine = engine;
+      throw failure;
     })();
     this.loading.catch(() => (this.loading = null));
     return this.loading;
@@ -263,6 +316,9 @@ export class WebLlmVoice implements VoiceBackend {
       });
       this.tier = tier;
       return reply;
+    } catch (e) {
+      this.checkLost(e);
+      throw e;
     } finally {
       signal.removeEventListener("abort", onAbort);
       this.busy = false;
@@ -285,9 +341,20 @@ export class WebLlmVoice implements VoiceBackend {
         response_format: { type: "json_object", schema: JSON.stringify(req.schema) },
       });
       return { text: r.choices[0]?.message.content ?? "", truncated: r.choices[0]?.finish_reason === "length" };
+    } catch (e) {
+      this.checkLost(e);
+      throw e;
     } finally {
       this.busy = false;
     }
+  }
+
+  // WebGPU device loss surfaces as these errors, and the engine never recovers: let the game go on without it.
+  private checkLost(e: unknown): void {
+    if (!/disposed|not loaded|deleted object|device.*lost/i.test(String(e))) return;
+    this.engine = null;
+    this.loading = null;
+    this.onLost?.();
   }
 
   private mindGrammar = true; // off for the session if xgrammar rejects a mind grammar
@@ -322,6 +389,9 @@ export class WebLlmVoice implements VoiceBackend {
         }
       }
       return await run(undefined);
+    } catch (e) {
+      this.checkLost(e);
+      throw e;
     } finally {
       signal.removeEventListener("abort", onAbort);
       this.busy = false;

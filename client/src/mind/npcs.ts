@@ -17,7 +17,7 @@ import { PRIO, type MindScheduler } from "./scheduler";
 
 export interface NpcOut {
   line(l: MindLine & { mem?: string }): void; // to the room (only for NPCs I host)
-  say(id: Npc, text: string): void; // a bubble over the NPC here
+  say(id: Npc, text: string, to?: string): void; // a bubble over the NPC here; `to` = who is spoken to, by name
 }
 
 const REMOTE_WAIT = 20; // seconds a replaying NPC waits for its host's choice before deciding itself
@@ -76,7 +76,7 @@ export class NpcVillage {
     rng: () => number = Math.random,
   ) {
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
-    this.hub = new MindHub(this.v, sched, { say: (id, text) => this.said(id as Npc, text) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
+    this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
     this.env = { spots, canWalk, route, rng, bias: this.hub.bias, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
     for (const n of NPCS) this.setHost(n, null);
   }
@@ -136,7 +136,7 @@ export class NpcVillage {
     const npc = l.who as Npc;
     if (!NPCS.includes(npc) || this.hosting(npc)) return;
     if (l.act) this.remote.set(npc, l.act);
-    if (l.say) this.out.say(npc, l.say);
+    if (l.say) this.out.say(npc, l.say, VILLAGERS.find((p) => p.id === l.to)?.name ?? this.people().find((p) => p.id === l.to)?.name);
     // Another machine's NPC spoke to an NPC I host: mine answers (a few turns at most).
     const to = l.to as Npc | undefined;
     if (l.say && to && NPCS.includes(to) && this.hosting(to)) {
@@ -163,7 +163,7 @@ export class NpcVillage {
       if (!this.hosting(npc)) return; // moved to another host meanwhile
       c.said.push(`${m.persona.name}: ${ans.value}`);
       m.source = ans.source;
-      this.out.say(npc, ans.value);
+      this.out.say(npc, ans.value, other.name);
       this.out.line({ who: npc, say: ans.value, to });
       const g = gameTime(this.v.t);
       if (c.said.length <= 2) remember(m.mem, g.day, clockLabel(g.hour), `talked with ${other.name}`);
@@ -217,7 +217,7 @@ export class NpcVillage {
         : { value: scriptedPetLine(m.persona, pet.name, k), source: "rules" };
       if (!this.hosting(npc)) return;
       m.source = ans.source;
-      this.out.say(npc, ans.value);
+      this.out.say(npc, ans.value, pet.name);
       this.out.line({ who: npc, say: ans.value });
       const g = gameTime(this.v.t);
       remember(m.mem, g.day, clockLabel(g.hour), `said hello to ${pet.name}`);
@@ -265,8 +265,8 @@ export class NpcVillage {
     return { text: ans.value, source: ans.source };
   }
 
-  private said(npc: Npc, text: string): void {
-    this.out.say(npc, text);
+  private said(npc: Npc, text: string, to?: string): void {
+    this.out.say(npc, text, to);
     if (text !== "..." && this.hosting(npc)) this.out.line({ who: npc, say: text });
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VoicePrompt } from "./instinct";
-import { CloudVoice, limitPrefill, localAccessState, PREFILL_CHUNK, stockId, tunedRecord } from "./voices";
+import { CloudMind, CloudVoice, limitPrefill, localAccessState, PREFILL_CHUNK, stockId, tunedRecord } from "./voices";
 
 const prompt: VoicePrompt = { system: "Choose a move", user: "Allowed: attack, guard", grammar: "do not send", moves: ["attack", "guard"] };
 const signal = () => new AbortController().signal;
@@ -165,5 +165,39 @@ describe("tunedRecord", () => {
     expect(tunedRecord(list, "me/Llama-3.2-1B-Mindworld", true)).toEqual({ model: "https://huggingface.co/me/Llama-3.2-1B-Mindworld-q4f16_1-MLC", model_id: "Llama-3.2-1B-Mindworld-q4f16_1-MLC", model_lib: "lib16.wasm" });
     expect(tunedRecord(list, "http://localhost/_mlc/{q}/", false)).toMatchObject({ model: "http://localhost/_mlc/q4f32_1/", model_lib: "lib32.wasm" });
     expect(tunedRecord([], "me/x", false)).toBeNull();
+  });
+});
+
+describe("CloudMind", () => {
+  const req = { system: "s", user: "u", temperature: 0.7, maxTokens: 40 };
+  const health = () => new Response(JSON.stringify({ providers: { meta: true } }));
+  const sig = new AbortController().signal;
+
+  it("answers through the Worker, spaced out so it stays a stand-in", async () => {
+    let t = 0;
+    const f = vi.fn<typeof fetch>(async (u) => (String(u).includes("health") ? health() : new Response(JSON.stringify({ text: "hi" }))));
+    const m = new CloudMind(6000, f, () => t);
+    await m.probe();
+    expect(m.ready()).toBe(true);
+    expect(await m.complete(req, sig)).toBe("hi");
+    expect(m.ready()).toBe(false);
+    expect(m.available()).toBe(true);
+    t = 6000;
+    expect(m.ready()).toBe(true);
+  });
+
+  it("backs off after two refusals (over budget), and is off when no provider is configured", async () => {
+    let t = 0;
+    const f = vi.fn<typeof fetch>(async (u) => (String(u).includes("health") ? health() : new Response("{}", { status: 429 })));
+    const m = new CloudMind(0, f, () => t);
+    await m.probe();
+    await expect(m.complete(req, sig)).rejects.toThrow();
+    await expect(m.complete(req, sig)).rejects.toThrow();
+    expect(m.available()).toBe(false);
+    t = 301_000;
+    expect(m.available()).toBe(true);
+    const off = new CloudMind(0, vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ providers: { meta: false } }))));
+    await off.probe();
+    expect(off.available()).toBe(false);
   });
 });

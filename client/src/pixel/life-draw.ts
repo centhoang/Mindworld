@@ -2,7 +2,6 @@
 // small props activities use (food bowl, poop, ball) and the time-of-day tint. Palette colours only.
 
 import type { Pose } from "../life/activities";
-import type { Phase } from "../life/clock";
 import { PAL } from "./art";
 
 type Ctx = CanvasRenderingContext2D;
@@ -84,11 +83,27 @@ export function drawBall(g: Ctx, x: number, y: number): void {
 }
 
 // Time-of-day wash over the whole scene (drawn before the UI).
-const TINT: Record<Phase, string | null> = { morning: null, noon: null, evening: "rgba(188,117,107,0.16)", night: "rgba(28,40,70,0.55)" };
-export function drawTint(g: Ctx, phase: Phase, sw: number, sh: number): void {
-  const c = TINT[phase];
-  if (!c) return;
-  g.fillStyle = c;
+// Keyframes by hour, eased between them so dusk and dawn fall gradually: [hour, r, g, b, alpha].
+const DUSK = [188, 117, 107] as const;
+const NIGHT = [28, 40, 70] as const;
+const TINT_KEYS: readonly (readonly [number, number, number, number, number])[] = [
+  [0, ...NIGHT, 0.55], [4.5, ...NIGHT, 0.55], [6.5, ...DUSK, 0.12], [8, ...DUSK, 0], [16, ...DUSK, 0],
+  [18.5, ...DUSK, 0.16], [20, ...DUSK, 0.2], [22.5, ...NIGHT, 0.55], [24, ...NIGHT, 0.55],
+];
+export function tintAt(hour: number): [number, number, number, number] {
+  const h = ((hour % 24) + 24) % 24;
+  const i = TINT_KEYS.findIndex((k, n) => h >= k[0] && h <= TINT_KEYS[n + 1]![0]);
+  const a = TINT_KEYS[i]!;
+  const b = TINT_KEYS[i + 1]!;
+  const u = (h - a[0]) / (b[0] - a[0]);
+  const s = u * u * (3 - 2 * u);
+  const mix = (n: 1 | 2 | 3 | 4) => a[n] + (b[n] - a[n]) * s;
+  return [Math.round(mix(1)), Math.round(mix(2)), Math.round(mix(3)), +mix(4).toFixed(3)];
+}
+export function drawTint(g: Ctx, hour: number, sw: number, sh: number): void {
+  const [r, gr, b, alpha] = tintAt(hour);
+  if (alpha < 0.005) return;
+  g.fillStyle = `rgba(${r},${gr},${b},${alpha})`;
   g.fillRect(0, 0, sw, sh);
 }
 

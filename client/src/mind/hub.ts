@@ -25,7 +25,7 @@ export interface Mind {
 }
 
 export interface HubOut {
-  say(id: string, text: string): void;
+  say(id: string, text: string, to?: string): void; // `to` = who is spoken to, by name
   emote?(id: string, e: Emote): void;
   invite?(id: string, act: string): void; // a mind's group plan just spread: tell the room
 }
@@ -219,13 +219,13 @@ export class MindHub {
     try {
       for (let k = 0; k < turns; k++) {
         const [sp, ls] = k % 2 ? [mb, ma] : [ma, mb];
-        if (this.hasModel()) this.out.say(sp.persona.id, "..."); // typing while the model thinks
+        if (this.hasModel()) this.out.say(sp.persona.id, "...", ls.persona.name); // typing while the model thinks
         const ans = this.hasModel()
           ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: linePrompt(sp.persona, sp.mem, ls.persona, aff, topic, said, this.sceneOf?.(sp.persona.id) ?? ""), parse: (t) => parseLine(t, sp.persona.name), fallback: () => scriptedLine(sp.persona, ls.persona, k, this.v.nextId) })
           : { value: scriptedLine(sp.persona, ls.persona, k, this.v.nextId + k), source: "rules" };
         sp.source = ans.source;
         said.push(`${sp.persona.name}: ${ans.value}`);
-        this.out.say(sp.persona.id, ans.value);
+        this.out.say(sp.persona.id, ans.value, ls.persona.name);
         if (!this.hasModel()) await new Promise((r) => setTimeout(r, 2200));
       }
       const now = this.now();
