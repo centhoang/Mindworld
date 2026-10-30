@@ -167,7 +167,7 @@ type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;
 // Our fine-tuned 1B (coach + pet + village minds) as MLC weights on Hugging Face (modal/convert_mlc.py), in both of the
 // stock 1B's formats: <repo>-q4f16_1-MLC for GPUs with shader-f16, <repo>-q4f32_1-MLC otherwise. Each runs on the
 // prebuilt stock library of its format, so only the weights differ. Empty repo = not published yet: stock 1B only.
-export const TUNED_1B = { repo: "" };
+export const TUNED_1B = { repo: "kysupo/Llama-3.2-1B-Mindworld" };
 const quantOf = (f16: boolean) => (f16 ? "q4f16_1" : "q4f32_1");
 export const stockId = (f16: boolean) => `Llama-3.2-1B-Instruct-${quantOf(f16)}-MLC`;
 
