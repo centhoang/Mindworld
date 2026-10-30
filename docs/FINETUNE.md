@@ -50,6 +50,21 @@ modal run --detach modal/finetune_llama.py --size 1B --epochs 3 --run llama32-1b
 So one 1B now runs coach + pet + village minds, beats its coach-only predecessor on Teach and matches the teacher (+21.6). Bench: `client/src/finetune/village-bench.ts <llama-server url>`.
 
 **Browser (MLC) unblocked:** the mlc_llm wheels still would not install/load (nightly CUDA name gone, stable 0.20 clashes with apache-tvm-ffi), so `modal/mlc_q4.py` writes MLC q4f32_1 and q4f16_1 weights in plain NumPy and `modal/convert_mlc.py --check` proves the format: converting Meta's stock 1B gives the same 163 tensor names/shapes/dtypes as mlc-ai's published weights (f32: 98 byte-exact, the rest ~0.1% of 4-bit values one rounding step off; f16: scales within 1 ulp). Outputs on the volume: `<run>/mlc` and `<run>/mlc-f16`. Verified in the pane: the converted tuned 1B loads in WebLLM 0.2.86 on the stock q4f32_1 library and answers sensibly; later runs hit `DXGI_ERROR_DEVICE_HUNG` on the Intel iGPU for stock and tuned weights alike (driver state, not the weights: a NumPy forward pass of the converted weights is finite with the same activation peaks as the old model). The game loads `<TUNED_1B.repo>-q4f16_1-MLC` on shader-f16 GPUs, else `-q4f32_1-MLC`, falling back to stock; `TUNED_1B.repo` stays empty until the repos are public (user).
+
+**Browser audit (2026-10-30), `modal/verify_mlc.py` + `client/mlc-bench.html`.** The two builds of one model are not the same weights: Q4_K_M and MLC's q4 are different 4-bit formats, so replies differ, and the browser numbers below are the ones to quote for the in-browser model.
+
+| 1B build | village checks (200) | Teach lift (100) | harmful | clean | voice valid | Teach p50 |
+|---|---|---|---|---|---|---|
+| float (merged, torch) | 97.5% | | | | | |
+| llama.cpp Q4_K_M | 99.5% | **+22.6** | 1 | 99% | 100% | 2.4 s |
+| **WebLLM q4f32_1, GTX 1050** | **98.5%** | **+19.1** | 6 | 87% | 100% | 11 s |
+| q4f16_1 decoded in torch (no shader-f16 GPU here could finish a bench) | 98.5% | | | | | |
+
+- Provenance: re-quantizing `llama32-1b-village-e3-r16/merged` reproduces all 21 shards of both repos by md5 (the earlier coach run: 1 of 21, the control). Chat config and tokenizer are mlc-ai's unchanged and tokenize the 200 prompts exactly as in training. Reconstruction error 9.81%, equal to mlc-ai's own stock conversion. The HF GGUFs match the local ones by SHA-256.
+- Runtime: WebLLM's replies equal the decoded weights' on 200/200 prompts, so WebLLM runs what we built, greedy, with the training template. Teach through the browser is lower than GGUF by 3.6 pts (paired SE 1.5), still above the acceptance floor (15.1).
+- **Prefill crash:** one prefill dispatch of about 190+ tokens kills the GPU process (GTX 1050; 180 fine, 200 not), with mlc-ai's stock weights too, so it was never our conversion. The last session's "DEVICE_HUNG, driver state" was very likely this. WebLLM ignores a `prefill_chunk_size` override (it reads the wasm metadata); setting `prefillChunkSize = 128` on the loaded pipeline fixes it (800-token prompts run). `limitPrefill` in `voices.ts`.
+- Intel Gen 9 (the only shader-f16 GPU here): the tuned f16 build loads and answers a short prompt, then the device dies, for stock weights too and at any chunk size. Such machines stay on rules. The tuned f16 build has not finished a bench on a real GPU.
+- The browser model is now a Teach coach too (Muse Spark -> power mode -> tuned 1B in the tab -> scripted). Before this, Teach only reached llama-server, so the browser never coached.
 Publish: `modal run modal/publish_coach.py --what all --tag village` (private repos `Llama-3.2-{3B,1B}-Mindworld-GGUF`, `Llama-3.2-1B-Mindworld-q4f{32,16}_1-MLC`).
 
 ## Acceptance (decided up front)

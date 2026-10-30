@@ -10,6 +10,7 @@ export interface Env {
   BASETEN_API_KEY?: string;
   META_API_KEY?: string;
   MODAL_PROXY_TOKEN?: string;
+  HF_TOKEN?: string; // read-only, for the private tuned 1B weights (src/mlc.ts)
   // plain vars; all optional so a bare `.env` still works
   BASETEN_BASE_URL?: string;
   BASETEN_MODEL?: string;

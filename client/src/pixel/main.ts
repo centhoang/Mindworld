@@ -112,6 +112,7 @@ const teach = new TeachScreen({
   },
   petName: () => activeMember().name,
   powerMode: () => instinct.voice === nativeBrain,
+  browserCoach: () => (instinct.voice === webBrain && webBrain.tuned ? (req) => webBrain.completeJson(req) : null),
   portrait: () => {
     const m = activeMember();
     return portraits.get(m.genes) ?? portraits.set(m.genes, drawMonster(petLook(m.genes), 48, "front", m.arch ? BUILDS[m.arch] : undefined)).get(m.genes)!;

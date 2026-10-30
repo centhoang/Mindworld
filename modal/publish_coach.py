@@ -79,6 +79,9 @@ VILLAGE_RESULTS = """- Village checks without grammar, 200 scenarios: tuned 1B 9
 - Voice: 100% valid for both, lines 1-8 words."""
 
 
+MLC_NOTE = """The results above were measured on the Q4_K_M GGUF. This 4-bit format differs: in WebLLM (q4f32_1, GTX 1050), 98.5% village checks, Teach +19.1 pts with 6 harmful, voice 100% valid."""
+
+
 def card(tag: str, size: str, fmt: str, note: str) -> str:
     if tag == "village":
         return VILLAGE_CARD.format(size=size, fmt=fmt, fmt_note=note, results=VILLAGE_RESULTS)
@@ -118,7 +121,7 @@ def publish_mlc(user: str, token: str, lic: dict, tag: str = "", quant: str = "q
     folder = pathlib.Path("/tmp") / quant
     shutil.copytree(pathlib.Path("/out") / RUNS[tag]["1B"] / ("mlc-f16" if quant == "q4f16_1" else "mlc"), folder)
     repo = f"{user}/Llama-3.2-1B-{NAME[tag]}-{quant}-MLC"
-    note = f"MLC {quant} weights for WebLLM. Use with the prebuilt Llama-3.2-1B-Instruct {quant} WebGPU model library (config and tokenizer from mlc-ai/Llama-3.2-1B-Instruct-{quant}-MLC)."
+    note = f"MLC {quant} weights for WebLLM. Use with the prebuilt Llama-3.2-1B-Instruct {quant} WebGPU model library (config and tokenizer from mlc-ai/Llama-3.2-1B-Instruct-{quant}-MLC). {MLC_NOTE}"
     push(HfApi(token=token), repo, folder, card(tag, "1B", "mlc", note), lic)
     return repo
 

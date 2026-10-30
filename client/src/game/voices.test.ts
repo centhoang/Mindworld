@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VoicePrompt } from "./instinct";
-import { CloudVoice, localAccessState, stockId, tunedRecord } from "./voices";
+import { CloudVoice, limitPrefill, localAccessState, PREFILL_CHUNK, stockId, tunedRecord } from "./voices";
 
 const prompt: VoicePrompt = { system: "Choose a move", user: "Allowed: attack, guard", grammar: "do not send", moves: ["attack", "guard"] };
 const signal = () => new AbortController().signal;
@@ -143,6 +143,18 @@ describe("localAccessState", () => {
 
   it("treats a browser without the permission as ungated", async () => {
     expect(await localAccessState("https:", async () => Promise.reject(new TypeError("no")))).toBe("granted");
+  });
+});
+
+describe("limitPrefill", () => {
+  it("caps the chunk on every loaded pipeline", () => {
+    const pipe = { prefillChunkSize: 1024 };
+    limitPrefill({ loadedModelIdToPipeline: new Map([["m", pipe]]) });
+    expect(pipe.prefillChunkSize).toBe(PREFILL_CHUNK);
+  });
+
+  it("does nothing if a WebLLM update renames the field", () => {
+    expect(() => limitPrefill({})).not.toThrow();
   });
 });
 

@@ -3,7 +3,7 @@
 The mlc_llm wheels would not install or load (four nightly failures earlier, then the pinned 0.20 release clashing with
 apache-tvm-ffi), and the format is small: the layout below was read from mlc-ai/Llama-3.2-1B-Instruct-q4f32_1-MLC's
 tensor-cache.json, and `modal/convert_mlc.py --check` proves it by converting Meta's stock 1B and comparing it with
-mlc-ai's published weights byte for byte.
+mlc-ai's published weights (same layout; about 0.1-0.3% of 4-bit values one rounding step off, scales within 1 ulp).
 
 Layout (group quantization, symmetric, 4 bits, group 32, uint32 storage):
 - every linear W [out, in] -> q_weight uint32 [out, in/8] (element j of a word in bits 4j..4j+3) + q_scale [out, in/32]

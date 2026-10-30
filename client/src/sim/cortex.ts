@@ -214,12 +214,15 @@ export const MEMO_JSON_SCHEMA = {
   additionalProperties: false,
 };
 
-// Teach/Reflect on a local Llama served by llama.cpp's llama-server (OpenAI-compatible endpoint): free,
+// A JSON-schema constrained completion from a model outside llama-server (the browser's WebLLM engine).
+export type JsonCompletion = (req: { system: string; user: string; maxTokens: number; schema: object }) => Promise<{ text: string; truncated: boolean }>;
+
+// Teach/Reflect on a local Llama, served by llama.cpp's llama-server (OpenAI-compatible endpoint) or by `complete`: free,
 // offline, no key. Same prompts as the Muse Spark path, so the two can be compared on the same lessons.
 export class LocalCortex implements Cortex {
   constructor(
     private readonly baseUrl = "http://127.0.0.1:8080",
-    private readonly opts: { grammar?: boolean; maxTokens?: number; fetchFn?: typeof fetch } = {},
+    private readonly opts: { grammar?: boolean; maxTokens?: number; fetchFn?: typeof fetch; complete?: JsonCompletion } = {},
   ) {}
 
   reflect(memo: Memo, replays: Replay[]): Promise<CortexResult> {
@@ -236,23 +239,27 @@ export class LocalCortex implements Cortex {
     let text: string;
     let truncated: boolean;
     try {
-      const res = await fetchFn(`${this.baseUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: p.system },
-            { role: "user", content: p.prompt },
-          ],
-          temperature: 0,
-          max_tokens: this.opts.maxTokens ?? 700,
-          ...(this.opts.grammar === false ? {} : { json_schema: MEMO_JSON_SCHEMA }),
-        }),
-      });
-      if (!res.ok) throw new CortexUnavailable(`llama-server HTTP ${res.status}`);
-      const body = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
-      text = body.choices?.[0]?.message?.content ?? "";
-      truncated = body.choices?.[0]?.finish_reason === "length";
+      if (this.opts.complete) {
+        ({ text, truncated } = await this.opts.complete({ system: p.system, user: p.prompt, maxTokens: this.opts.maxTokens ?? 700, schema: MEMO_JSON_SCHEMA }));
+      } else {
+        const res = await fetchFn(`${this.baseUrl}/v1/chat/completions`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: p.system },
+              { role: "user", content: p.prompt },
+            ],
+            temperature: 0,
+            max_tokens: this.opts.maxTokens ?? 700,
+            ...(this.opts.grammar === false ? {} : { json_schema: MEMO_JSON_SCHEMA }),
+          }),
+        });
+        if (!res.ok) throw new CortexUnavailable(`llama-server HTTP ${res.status}`);
+        const body = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+        text = body.choices?.[0]?.message?.content ?? "";
+        truncated = body.choices?.[0]?.finish_reason === "length";
+      }
     } catch (e) {
       throw e instanceof CortexUnavailable ? e : new CortexUnavailable(`local coach unreachable: ${(e as Error).message}`);
     }

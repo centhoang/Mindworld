@@ -166,8 +166,9 @@ type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;
 
 // Our fine-tuned 1B (coach + pet + village minds) as MLC weights on Hugging Face (modal/convert_mlc.py), in both of the
 // stock 1B's formats: <repo>-q4f16_1-MLC for GPUs with shader-f16, <repo>-q4f32_1-MLC otherwise. Each runs on the
-// prebuilt stock library of its format, so only the weights differ. Empty repo = not published yet: stock 1B only.
-export const TUNED_1B = { repo: "" };
+// prebuilt stock library of its format, so only the weights differ. The repos are private until submission day, so
+// the Worker serves them on this site (worker/src/mlc.ts). Empty repo = stock 1B only.
+export const TUNED_1B = { repo: "/mlc/{q}/" };
 const quantOf = (f16: boolean) => (f16 ? "q4f16_1" : "q4f32_1");
 export const stockId = (f16: boolean) => `Llama-3.2-1B-Instruct-${quantOf(f16)}-MLC`;
 
@@ -181,7 +182,14 @@ export function tunedRecord<T extends { model: string; model_id: string }>(list:
 }
 
 // Dev only: ?tuned=<url> loads weights from anywhere (e.g. the local server) to test a conversion before publishing.
-const tunedRepo = (): string => (import.meta.env.DEV && typeof location !== "undefined" && new URLSearchParams(location.search).get("tuned")) || TUNED_1B.repo;
+const tunedRepo = (): string => (import.meta.env.DEV && new URLSearchParams(location.search).get("tuned")) || (TUNED_1B.repo.startsWith("/") ? location.origin + TUNED_1B.repo : TUNED_1B.repo);
+
+// One prefill dispatch of about 190+ tokens crashes the GPU process on a GTX 1050, with mlc-ai's stock weights too
+// (docs/FINETUNE.md), and WebLLM ignores a prefill_chunk_size override. Long prompts survive when set on the pipeline.
+export const PREFILL_CHUNK = 128;
+export function limitPrefill(engine: unknown): void {
+  (engine as { loadedModelIdToPipeline?: Map<string, { prefillChunkSize: number }> }).loadedModelIdToPipeline?.forEach((p) => (p.prefillChunkSize = PREFILL_CHUNK));
+}
 
 export class WebLlmVoice implements VoiceBackend {
   label = "Llama 3.2 1B (in browser, WebGPU)";
@@ -210,6 +218,7 @@ export class WebLlmVoice implements VoiceBackend {
       // Warm-up: the first generation compiles the shaders (~30 s on a GTX 1050). Do it during the loading
       // toast, so fights and village minds don't spend their deadlines on it.
       const warm = async (e: Engine) => {
+        limitPrefill(e);
         onProgress("Warming up the model (first run compiles shaders)...", 1);
         await e.chat.completions.create({ messages: [{ role: "user", content: "hi" }], max_tokens: 1 });
         return e;
@@ -256,6 +265,27 @@ export class WebLlmVoice implements VoiceBackend {
       return reply;
     } finally {
       signal.removeEventListener("abort", onAbort);
+      this.busy = false;
+    }
+  }
+
+  // The coach: a JSON-schema constrained reply (Teach/Reflect memos). Only the tuned weights can do this job well.
+  async completeJson(req: { system: string; user: string; maxTokens: number; schema: object }): Promise<{ text: string; truncated: boolean }> {
+    const engine = this.engine;
+    if (!engine) throw new Error("model not loaded");
+    this.busy = true;
+    try {
+      const r = await engine.chat.completions.create({
+        messages: [
+          { role: "system", content: req.system },
+          { role: "user", content: req.user },
+        ],
+        temperature: 0,
+        max_tokens: req.maxTokens,
+        response_format: { type: "json_object", schema: JSON.stringify(req.schema) },
+      });
+      return { text: r.choices[0]?.message.content ?? "", truncated: r.choices[0]?.finish_reason === "length" };
+    } finally {
       this.busy = false;
     }
   }

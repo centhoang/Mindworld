@@ -13,7 +13,7 @@ async function hashClient(raw: string): Promise<string> {
   return [...new Uint8Array(digest).slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function buildDeps(env: Env): Deps {
+function buildDeps(env: Env, ctx?: ExecutionContext): Deps {
   const cfg: AppConfig = {
     mock: flag(env.LLM_MOCK),
     defaultProvider: "baseten",
@@ -44,6 +44,14 @@ function buildDeps(env: Env): Deps {
     room: env.ROOM.get(env.ROOM.idFromName("main")),
     assets: env.ASSETS,
     fetch: (input, init) => fetch(input, init),
+    mlc: {
+      token: env.HF_TOKEN,
+      cache: {
+        match: (key) => caches.default.match(new Request(key)),
+        put: (key, res) => caches.default.put(new Request(key), res),
+      },
+      waitUntil: ctx ? (p) => ctx.waitUntil(p) : undefined,
+    },
     newId: () => crypto.randomUUID(),
     random: Math.random,
     now: Date.now,
@@ -52,7 +60,7 @@ function buildDeps(env: Env): Deps {
 }
 
 export default {
-  fetch: (request: Request, env: Env) => handleRequest(request, buildDeps(env)),
+  fetch: (request: Request, env: Env, ctx: ExecutionContext) => handleRequest(request, buildDeps(env, ctx)),
   // Every 6 h: Muse Spark re-teaches the wild pets from what shared ghosts learned (capped, see wild-memos.ts).
   scheduled: async (_controller: ScheduledController, env: Env, ctx: ExecutionContext) => {
     ctx.waitUntil(runWildMemos(buildDeps(env)).then((r) => console.log("wild-memos", JSON.stringify(r))));

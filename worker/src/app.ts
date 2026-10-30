@@ -15,6 +15,7 @@ import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
 import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
 import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
 import { loadWildMemos } from "./wild-memos";
+import { handleMlc, type MlcDeps } from "./mlc";
 import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
 
 export interface SpendClient {
@@ -43,6 +44,7 @@ export interface Deps {
   hashClient(raw: string): Promise<string>;
   room?: { fetch(request: Request): Promise<Response> }; // the live world room (Durable Object)
   chatCache?: OpenerCache; // tests pass their own; the Worker shares one per isolate
+  mlc?: Omit<MlcDeps, "fetch">; // the tuned 1B weights (private repos until submission day)
 }
 
 const sharedChatCache = new OpenerCache();
@@ -112,6 +114,8 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     }
     return fail(404, "not_found");
   }
+
+  if (path.startsWith("/mlc/")) return handleMlc(path, method, { ...deps.mlc, fetch: deps.fetch });
 
   // The pixel build used to live at /pixel.html; it is the main page now.
   if (path === "/pixel.html" || path === "/pixel") return Response.redirect(new URL("/", request.url).toString(), 301);

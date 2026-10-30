@@ -1,16 +1,17 @@
-# HANDOFF: Mindworld v3, stage 5 done + models uploaded to HF (private); next = serve the tuned 1B privately (2026-10-30)
+# HANDOFF: Mindworld v3, conversion audited + private /mlc proxy built; waits on the HF_TOKEN Worker secret (2026-10-30)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md. Continue from Next actions, starting with the private /mlc proxy. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
 ## Morning report
-- Stage 5 done (12a45ec): one tuned Llama 3.2 1B for coach + pets + villagers. Village checks 99.5% (stock 48.5%), Teach +22.6 (old +18.4, 1 harmful). 3B: 98.5%, +21.5. Spend $4.26 data + ~$2 Modal.
-- The browser build works via our own NumPy MLC converter (modal/mlc_q4.py; stock 1B matches mlc-ai's tensor for tensor).
-- Uploaded (PRIVATE, keep private until submission day): kysupo/Llama-3.2-{1B,3B}-Mindworld-GGUF, kysupo/Llama-3.2-1B-Mindworld-{q4f32_1,q4f16_1}-MLC.
-- Not deployed since 8611b544. The game still uses the stock 1B (`TUNED_1B.repo = ""`).
+- Conversion audit passed (docs/FINETUNE.md "Browser audit"): both MLC repos rebuild byte-identical from the stage 5 merged weights; WebLLM replies = decoded weights on 200/200.
+- Quote the browser's own numbers: WebLLM 1B 98.5% village, Teach +19.1 (6 harmful), 100% voice; GGUF stays +22.6 (1 harmful). Model cards fixed.
+- Fixed: the 190+ token prefill GPU crash (`limitPrefill`, chunk 128; stock weights crash too). Browser 1B is now a Teach coach (it never was before).
+- Private proxy `/mlc/<q>/resolve/main/<file>` is in the Worker (pinned commits, whitelist, cache); client uses it. **Blocked on one user step: the HF_TOKEN Worker secret** (auto-mode blocked the write). Until then the game loads the stock 1B.
+- Rules check clean: all 8 HF repos and the GitHub repo answer 401/404 anonymously; no secrets in git.
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **8611b544**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 264, worker 163, tsc clean.
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` (see the last deploy in git log). Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client + worker green, tsc clean (mlc.test.ts added).
 - v3 stages 1-4 (life sim, minds, grounds, networked NPC hosts, scene awareness, coach chain Muse Spark -> tuned local -> scripted) are all in. Details: docs/V3-PLAN.md, docs/FINETUNE.md (stage 5 + browser unblock).
 - **Browser model loading** (client/src/game/voices.ts): `tunedRecord(list, repo, f16)` builds a WebLLM model_list entry that reuses the stock 1B wasm with our weights. `repo` = "user/name" (HF; appends `-{q}-MLC`) or a full URL template with `{q}`. It picks f16 when the GPU has shader-f16, and falls back to the stock 1B if the tuned load fails. Dev override: `?tuned=<url with {q}>`.
 - Credits: Meta ~$149.9, Modal ~$102 left (approx).
@@ -25,16 +26,14 @@
 - Submission day: make the GitHub repo + the 4 HF repos public, then remove Access. Switch `TUNED_1B.repo` to `kysupo/Llama-3.2-1B-Mindworld` at the same time, or keep the proxy below.
 
 ## Next actions
-1. **Private serving of the tuned 1B (Claude decides, no public surface):**
-   - Add a Worker route `/mlc/<quant>/<file>` that fetches `https://huggingface.co/kysupo/Llama-3.2-1B-Mindworld-<quant>-MLC/resolve/main/<file>` with `Authorization: Bearer ${env.HF_TOKEN}` (new Worker secret via `npx wrangler secret put HF_TOKEN` in worker/; never print it).
-   - Whitelist the quant and file names, cache through the Cache API, stream the body.
-   - It stays behind Access.
-   - Set the client to `${location.origin}/mlc/{q}/`, test it (worker test with mocked fetch), deploy, and verify in a fresh app window (the pane's Intel iGPU hit DXGI DEVICE_HUNG last session; an app restart clears it).
-   - Note: WebLLM appends `resolve/main/` only for HF-style URLs. Check `cleanModelUrl` against our URL form.
+1. After the user sets HF_TOKEN: confirm /mlc returns 200 on the deployed site (fresh window), the game says "tuned by us", then play-test.
 2. Power mode: switch scripts/power-mode.ps1 to the Mindworld GGUFs (size + SHA-256 pins; the private repo needs a token now, so this waits for submission day, or the script uses the local .scratch/finetune GGUFs). Update the README/DEMO numbers with the stage 5 table.
 3. User play-test still owed (two windows: scene-aware chat, relay to host model, pets). Then stage 6: VFX polish, demo captures (DEMO.md).
 
 ## Gotchas
+- Bench pages: edits under client/ make Vite reload them; stop Vite after the page loads. After a GPU crash Chrome refuses WebGPU until restarted (.scratch/mlc/clean.sh).
+- A real shader-f16 GPU has never finished a bench of the tuned f16 build (GTX 1050 has none; Intel Gen 9 crashes on stock too). Decoded in torch it scores 98.5%. If play-tests on a newer GPU look wrong, force f32.
+- `client/mlc-bench.html` + `.scratch/mlc/serve.mjs` run the unchanged benches on WebLLM (bridge=1).
 - The auto-mode classifier blocks "make public" actions. That's fine: we don't do that before submission anyway.
 - Modal CLI on Windows: prefix `PYTHONUTF8=1 PYTHONIOENCODING=utf-8`. `--cap` in gen-village is the cumulative ledger total, not per run.
 - **Deploy only from worker/**: a root wrangler config deploys to a different Worker.
@@ -43,4 +42,4 @@
 - Python edits: script file in `.scratch/`. Codex can't run Python in its sandbox; ask it for files only. Never commit `.env`.
 
 ## File map
-modal/{mlc_q4,convert_mlc,publish_coach,train_*}.py · client/src/game/voices.ts (+test) · client/src/finetune/{gen-village,village-bench}.ts · docs/{V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO}.md · client/src/{life,mind,world,pixel}/* · worker/src/{room,room-do,npc,chat}.ts · scripts/{codex,power-mode}.ps1 · .scratch/finetune/*.gguf (local copies) · .scratch/v3/{vbench,cbench}.sh
+modal/{mlc_q4,convert_mlc,verify_mlc,publish_coach,finetune_llama}.py · worker/src/mlc.ts · client/src/game/voices.ts (+test) · client/src/finetune/{gen-village,village-bench}.ts · docs/{V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO}.md · client/src/{life,mind,world,pixel}/* · worker/src/{room,room-do,npc,chat}.ts · scripts/{codex,power-mode}.ps1 · .scratch/finetune/*.gguf (local copies) · .scratch/v3/{vbench,cbench}.sh

@@ -6,7 +6,7 @@ import { COACH_LABEL, runCoach } from "../game/coach";
 import { thinkingLabel } from "../game/thinking";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "../game/voice-input";
 import { NATIVE_URL } from "../game/voices";
-import { FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult } from "../sim/cortex";
+import { FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult, type JsonCompletion } from "../sim/cortex";
 import { describeCond, type Memo } from "../sim/memo";
 import { prove, type ProofReport } from "../sim/proof";
 import type { Replay } from "../sim/types";
@@ -20,16 +20,21 @@ export interface TeachHost {
   petName(): string;
   portrait(): HTMLCanvasElement;
   powerMode(): boolean; // power mode's llama-server (tuned coach) is answering
+  browserCoach(): JsonCompletion | null; // the tuned 1B, when it runs in this tab
 }
 
 const live = new LlmCortex(new FetchLlmClient(""));
 const offline = new ScriptedCortex();
-// Free coach: the Llama distilled from Muse Spark Teach (docs/FINETUNE.md), served by power mode's llama-server.
+// Free coach: the Llama distilled from Muse Spark Teach (docs/FINETUNE.md), served by power mode's llama-server or in this tab.
 const local = new LocalCortex(NATIVE_URL);
 const NAMES = new Map<Cortex, string>([[live, "live coach"], [local, "local coach"]]);
 
-// Who to ask, in order: Muse Spark, then the tuned local coach when power mode runs, then the scripted coach.
-export const coachChain = (power: boolean): Cortex[] => (power ? [live, local, offline] : [live, offline]);
+// Who to ask, in order: Muse Spark, the tuned local coach (power mode's, then this tab's), then the scripted coach.
+export function coachChain(power: boolean, browser: JsonCompletion | null = null): Cortex[] {
+  const inTab = browser && new LocalCortex("", { complete: browser });
+  if (inTab) NAMES.set(inTab, "browser coach");
+  return [live, ...(power ? [local] : []), ...(inTab ? [inTab] : []), offline];
+}
 
 export class TeachScreen {
   open = false;
@@ -102,7 +107,7 @@ export class TeachScreen {
     this.setButtons(true);
     const before = this.host.memo();
     try {
-      const out = await runCoach(coachChain(this.host.powerMode()), run, before, { gated, names: NAMES });
+      const out = await runCoach(coachChain(this.host.powerMode(), this.host.browserCoach()), run, before, { gated, names: NAMES });
       // Players get a short version; the detailed note goes to the console for us.
       if (out.failed.length) console.info("[coach]", out.note);
       const who = out.res ? COACH_LABEL[out.res.source] : "";
