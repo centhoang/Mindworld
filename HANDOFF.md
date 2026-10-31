@@ -53,7 +53,7 @@
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
--1. **Blocked on the user:** add Access Include `IP ranges 171.251.232.193/32` (Zero Trust > Access > Applications > pets.uryto.dev), no CF API token here. Then run the deployed multi-player test (2+ windows from home IP, tuned model loaded) before asking for any play-test.
+-1. **Blocked on the user:** the Access policy has the IP (171.251.232.193/32) but its action is Allow, which still asks for a login; set Action = Bypass. wrangler's login has Workers scopes only, no Access. Then run the deployed multi-player test (2+ windows from home IP, tuned model loaded) before asking for any play-test.
 0. **Look polish after the user's review:** denser tree clusters and rivers/height steps like BuiltDemo, sand islets, ducks and boats, windows and dark floors indoors, roof-fade house entry (Interior.gif) if wanted; prune unused art; docs/STYLE.md still describes the old art.
 1. **N5 rest:** NPC duel and pets (Pip's bought pet follows Pip, decorative), rematch goals, deals with NPCs hosted on another machine (still "Bring it to me in person"), NPC tag removal if any is left. Wild pets art in client/public/art/gen/wild still mostly unused. Prompts are frozen: sim-only changes, or plan a small retrain.
 2. **Submission prep:** demo captures with the user; HF cards: `publish_coach.py` has the new MLC note, but the live private cards still show stage 5 numbers (no huggingface_hub locally: run the Modal publish for cards, or add the note by hand); caps come back down after the event.
