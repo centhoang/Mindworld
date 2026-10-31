@@ -1,10 +1,10 @@
-# HANDOFF: Mindworld v3, NPCs are the star; promises, bonds, jobs live; humans swapped to Sunnyside (2026-10-31)
+# HANDOFF: Mindworld v3, NPCs are the star; promises, bonds, jobs, economy live; N4 model swapped in; Sunnyside art (2026-10-31)
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/NPC-PLAN.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **a8d31e74**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 509, worker 190, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **59290524**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client 527, worker 191, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
 - **Done 2026-10-31:** power mode removed (`finetune/native-voice.ts` keeps the bench client, GGUFs stay). Limits lifted: CloudMind gap 0, MAX_DAILY_USD 30, CLIENT_DAILY_USD 10, CLIENT_PER_MINUTE 120; MAX_TOTAL_USD_* stay the hard stop. Caps come back down after the event.
 - **Setup gate** (pixel/setup.ts, #setup in index.html): checks the adapter first. capable = download + warm-up, then the game; weak Intel on Windows = steps + re-check; none/mobile = straight in. Remembered per GPU in `mindworld.setup.v1`; a return visit opens at once and loads in the background. Dev: `?gpu=switch|capable|none|skip`. Checked in the pane on a real Intel Gen 9 (guide, exit, remembered). The capable path with a real download has NOT been run: user's GTX 1050 is the first test.
 - **Private chats** (worker/src/room.ts): lines to a player reach that player only; other mind lines reach players within HEAR_DIST 14 tiles plus the host of the NPC spoken to; room chat stays public. `talk` = busy state, "talking..." bubble, new chats refused, ends on close, disconnect or 45 s silence (clients renew every 15 s). Checked on the real Durable Object with 3 sockets (worker-mock on port 8799).
@@ -13,9 +13,11 @@
 - **Art rules:** docs/STYLE.md "Pixel size rules by asset type" (59 native samples), `node scripts/check-art.mjs <manifest>`; AGENTS.md makes Codex follow them. Batch 1: 14 pass, ball, goal and floors remade.
 - **Jobs live** (mind/jobs.ts, persona `job`, `sell`/`chop`/`tend` activities, jobOnly): Ama market keeper (morning, noon), Mo fisher (needs a pond spot), Pip wood-cutter, Elder herbalist. Each shift is a choice with a reason (tired, promised, playful day off), decided once per phase, works without a model through `bias`. The stall: closed off hours; Ama refuses a rude or promise-breaking buyer, the chat opens so they can say sorry (main.ts `openStall`, `dealWith`). Manners are remembered locally when another machine hosts Ama. The home shipping crate refuses them too (`shipRefused`).
 - **N3 economy live** (mind/economy.ts, wired in npcs.ts `traded`/`earn`/`quote`): NPC purses travel as `purse|` room lines (the room keeps only the latest). Jobs give goods, `farm` activity grows the crop `bestCrop` picks from board prices, stock sells when the market shift ends. Prices move only with real trades and daily wants (`likes` on personas). Town board: E at the board in the village square (`trade|` lines reach all machines, not the NPC log). In chat, plain words make gifts and deals (`parseOffer` > `judge` bounds > model `deal` or rules); a counter waits for a yes. Refusals: gifts on a grudge, chat when far gone (`refusesChat`, "sorry" gets through). Prices are answered from the books. A birthday guest brings something from stock. Player goods: basket for crops, `state.pack` for fish/wood/herbs. Gap: deals only with NPCs hosted on your own machine ("Bring it to me in person").
-- **Sunnyside ground tiles live** (scripts/art-tiles.mjs, composed path/shore masks from pack pixels).
+- **Sunnyside ground tiles live** (scripts/art-tiles.mjs, composed path/shore masks from pack pixels). **Modular pets live** (pixel/pet-parts.ts, lazy layers, one shared outline, 2x at most, procedural fallback).
+- **Initiative live** (npcs.ts `pitch`, `tookUp`): a villager asks for its want if you carry it, or invites you to something it likes; "ok"/"yes" closes it, and an invite becomes a normal promise.
+- **Prompts FROZEN at af455c4**: any change to brain/promises/economy prompt text needs new data.
 - Known gaps in N1: an invite to an NPC hosted by another player with no model goes to the cloud chat and makes no promise; the place named by the player is ignored (each activity uses its own spot, so tell the player where); other machines replay `do` only when a start event arrives.
-- Tuned 1B: `Llama-3.2-1B-Mindworld-q4f32_1-MLC` via `/mlc`, chunk 128. **Quote the browser's numbers:** 98.5% village, Teach +19.1 (6 harmful), voice 100%. GGUF: 99.5%, +22.6, 1 harmful.
+- **N4 tuned 1B live** (run `llama32-1b-n4-e3-r16`, private HF repos, pinned in worker/src/mlc.ts; URL `/mlc/n4/{q}/`: a NEW path per run, browsers cache weights by URL). 3,300 new rows, village spend total $10.86. GGUF, no grammar, 300 held-out seed 4: 97.0% (old model 85.3%): extract 37/37 (old 12), decide 26/26 (old 20), deal 23/23 (old 13), reply 65/73 (old 70; misses are mostly length). Replies now use real memories and feelings. Teach GGUF 100% valid, +20.9, 5 harmful (old +22.6, 1): accepted, above the +20 floor. NOT benched in WebLLM yet. Old browser numbers (stage 5 weights only): 98.5%, +19.1. The 3B GGUF repo is still stage 5.
 - Runtime chains: mind and chat = local -> Muse Spark (`CloudMind`) -> rules. Combat: memo decides, local voice -> scripted. Teach = Muse Spark -> local -> scripted.
 - Credits: Meta ~$149.9, Modal ~$102 left (approx).
 - Claude weekly quota 74% (resets Nov 1 17:00 UTC): push isolated work to Codex.
@@ -30,7 +32,7 @@
 - Submission day: make the GitHub repo + the 4 Mindworld HF repos public, then remove Access. The proxy keeps working either way.
 
 ## User-only actions
-- Play-test N3: buy nothing yet, press E at the board in the village square; say "here is a carrot for you" to Pip; "sell you a carrot for 20 coins" to Pip, then "ok"; "how much is fish?"; look at I (HAS, WHY).
+- Play-test N3 + N5: stand near Pip in the morning (Pip may ask for a good or invite you); press E at the board in the village square; say "here is a carrot for you" to Pip; "sell you a carrot for 20 coins" to Pip, then "ok"; "how much is fish?"; look at I (HAS, WHY).
 - Play-test N2: promise Pip a party, stay away, then talk: grudge, "why are you mad", refusal, "sorry", accept; I shows FEELS/WHY.
 - Play-test look: all people now use pack sprites; check walking, facing, tools (fishing line, axe) and NPC poses.
 - Play-test jobs: at the stall in the morning E opens the market; be rude to Ama twice, E again = refused, say sorry, E works; at evening it is closed.
@@ -38,9 +40,9 @@
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
-1. **N4 retrain:** prompts FROZEN (commit af455c4; any change to brain/promises/economy prompts now means new data). Data run: seed 3 train (3000), seed 4 val (300), both append to data/finetune/village-{train,val}.jsonl. Then `build-sft --village` (drops old v1/v2 replies), train 1B 3 epochs, convert MLC, audit in browser (`village-bench --seed 4`), swap the model id. Commands in docs/FINETUNE.md stage 5.
-2. **Modular pets** through Codex (.scratch/brief-pets.md): review .scratch/art/pets-check.png, then commit. Wild pets next.
-3. **N5:** gossip through talk, initiative (NPC comes to you, offers a trade, follows up a want), long goals, NPC duel and pets, indistinguishable pass. Then demo captures and README numbers (credit the Sunnyside pack in README).
+1. **N4 browser audit (weights live but unaudited in WebLLM):** run client/mlc-bench.html (`?gpu`, bridge=1, chunk=128, see Gotchas) on the GTX 1050 with seed 4 prompts (bench-prompts come from .scratch/mlc/dump_prompts.ts), and check the model path in the game: extract, decide and deal have only run on llama.cpp so far. Quote browser numbers after this; update the HF cards (publish_coach.py still has stage 5 numbers) and docs/NPC-PLAN.md.
+2. **N5 rest:** gossip travels through talk with its source (today only between minds on one host), long goals (save for a pet, rematch), NPC duel and pets, indistinguishable pass (typing delay, small errors, NPC tag). Deals with NPCs hosted on another machine. Wild pets art (client/public/art/gen/wild) still unused. Prompts are frozen: sim-only changes, or plan a small retrain.
+3. Demo captures, README numbers (credit the Sunnyside pack), docs/DEMO.md script, submission prep. Caps come back down after the event.
 
 ## Gotchas
 - In tests, NPCs that start close begin a chat and hold still on a real-time timer: spread their homes.

@@ -67,6 +67,16 @@ So one 1B now runs coach + pet + village minds, beats its coach-only predecessor
 - The browser model is now a Teach coach too (Muse Spark -> power mode -> tuned 1B in the tab -> scripted). Before this, Teach only reached llama-server, so the browser never coached.
 Publish: `modal run modal/publish_coach.py --what all --tag village` (private repos `Llama-3.2-{3B,1B}-Mindworld-GGUF`, `Llama-3.2-1B-Mindworld-q4f{32,16}_1-MLC`).
 
+## N4 (2026-10-31): feelings, promises, deals in the same model
+Prompts frozen first (commit af455c4). `gen-village --seed 3 --limit 3000` + `--split val --seed 4 --limit 300` (from seed 3 on: villagers with history through the game's own `feel`/`remember`, new tasks extract, decide, deal; extract is kept only if it equals the known truth, decide/deal only if not barred by the sim). `build-sft --village` drops the v1/v2 replies. `modal run modal/finetune_llama.py --size 1B --epochs 3 --run llama32-1b-n4-e3-r16`, `convert_mlc` both formats, `publish_coach --what mlc --tag village`, new revisions in worker/src/mlc.ts.
+
+| 1B Q4_K_M, no grammar | village (300, seed 4) | extract | decide | deal | reply | Teach lift (100) | harmful |
+|---|---|---|---|---|---|---|---|
+| stage 5 | 85.3% | 12/37 | 20/26 | 13/23 | 70/73 | +22.6 | 1 |
+| **N4** | **97.0%** | **37/37** | **26/26** | **23/23** | 65/73 | +20.9 | 5 |
+
+WebLLM audit of the N4 weights is still to do; do not quote these as browser numbers.
+
 ## Acceptance (decided up front)
 - Teach, with grammar-constrained decoding: >= 95% valid memos on 100+ held-out lessons; mean held-out lift >= 70% of the teacher's (teacher ~ +28 pts, so student >= ~+20 pts); win-rate numbers use the same paired seeds and CI as the Muse Spark numbers.
 - Voice: 100% valid with grammar, >= 98% without; line <= 8 words.
