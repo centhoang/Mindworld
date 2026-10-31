@@ -422,12 +422,12 @@ export class Overworld {
         const q = Math.floor(rng() * (n + 1));
         [candidates[n], candidates[q]] = [candidates[q]!, candidates[n]!];
       }
-      const clumps = 2 + Math.floor(rng() * 2);
+      const clumps = (p.ground ? 5 : 2) + Math.floor(rng() * 2);
       for (let c = 0; c < clumps; c++) {
-        const want = 5 + Math.floor(rng() * 5);
+        const want = (p.ground ? 6 : 5) + Math.floor(rng() * 5);
         const available = candidates.filter((v) => !this.trees.some((t) => Math.abs(t.x - v.x) < 3 && Math.abs(t.z - v.z) < 3));
         let best: Vec[] = [];
-        for (const anchor of available) {
+        for (const anchor of available.slice(0, 120)) { // candidates are shuffled; a sample keeps big grounds fast
           const patch = available.filter((v) => Math.abs(v.x - anchor.x) <= CLUMP && Math.abs(v.z - anchor.z) <= CLUMP)
             .sort((a, b) => Math.hypot(a.x - anchor.x, a.z - anchor.z) - Math.hypot(b.x - anchor.x, b.z - anchor.z));
           const group: Vec[] = [anchor];

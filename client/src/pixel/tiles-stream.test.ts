@@ -17,6 +17,9 @@ function roomy(seed: number): WorldMap {
     bridges: [{ a: "home", b: "islet", ax: -12.5, az: 0.5, bx: -26, bz: 0.5, w: 3.2 }] };
 }
 
+const production = (seed: number): WorldMap => generateWorld({ me: { seed, slot: seed % 24 },
+  others: [{ id: "peer", name: "Peer", seed: seed + 30, slot: (seed + 1) % 24 }] });
+
 function flood(m: TileMap, x: number, z: number, poolOnly = false): Set<number> {
   const seen = new Set<number>();
   const stack = [[Math.floor(x - m.ox), Math.floor(z - m.oz)]];
@@ -84,20 +87,27 @@ function check(world: WorldMap): number {
 
 describe("ground streams", () => {
   it.each(Array.from({ length: 30 }, (_, seed) => seed))("preserves deterministic tiles, gates, roads and land thickness for production seed %i", (seed) => {
-    const streams = check(generateWorld({ me: { seed, slot: seed % 24 },
-      others: [{ id: "peer", name: "Peer", seed: seed + 30, slot: (seed + 1) % 24 }] }));
-    // Current 26 x 20 grounds cannot fit this course outside the buffered yard and coast.
-    expect(streams).toBe(0);
+    const streams = check(production(seed));
+    expect(streams).toBeLessThanOrEqual(2);
   });
+
+  it("gives most grounds a stream at production size", () => {
+    let grounds = 0;
+    let streams = 0;
+    for (let seed = 0; seed < 30; seed++) {
+      grounds += 2;
+      streams += check(production(seed));
+    }
+    expect(streams / grounds).toBeGreaterThanOrEqual(0.5);
+  }, 60_000);
 
   it.each(Array.from({ length: 30 }, (_, seed) => seed))("carves at most one safe closed stream for roomy seed %i", (seed) => {
     expect(check(roomy(seed))).toBeLessThanOrEqual(1);
   });
 
-  it("chooses about two thirds of roomy grounds over 30 seeds", () => {
+  it("gives most roomy grounds a stream over 30 seeds", () => {
     const streams = Array.from({ length: 30 }, (_, seed) => buildTileMap(roomy(seed)).kind.includes(T.pool)).filter(Boolean).length;
-    expect(streams).toBeGreaterThanOrEqual(15);
-    expect(streams).toBeLessThanOrEqual(25);
+    expect(streams).toBeGreaterThanOrEqual(20);
   });
 
   it("existing tree and decor placement avoid carved water", () => {

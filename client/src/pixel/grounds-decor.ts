@@ -51,7 +51,7 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
       const b = p.spots.blanket; // a string of lights on two posts behind the blanket (walk-through)
       out.push({ kind: "lights", x: b.x + 0.5, z: b.z - 1.6, tiles: [], platform: p.id });
     }
-    const want = p.ground ? 16 + Math.floor(rng() * 6) : between ? 6 + Math.floor(rng() * 3) : 14 + Math.floor(rng() * 6);
+    const want = p.ground ? 30 + Math.floor(rng() * 10) : between ? 6 + Math.floor(rng() * 3) : 14 + Math.floor(rng() * 6);
     const [x0, z0, w, h] = p.ground ? [...groundOrigin(p), p.ground.w, p.ground.h] : [p.x - p.r, p.z - p.r, p.r * 2, p.r * 2];
     if (p.ground) {
       const gates = Object.values(p.ground.gates).map((g) => [x0 + g.i - m.ox, z0 + g.j - m.oz]);

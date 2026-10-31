@@ -67,7 +67,7 @@ export interface LayoutInput {
   day?: number;
 }
 
-export const CELL = 30; // grid spacing between platform centres: room for a 26x20 ground plus water
+export const CELL = 40; // grid spacing between platform centres: room for a 36x28 ground plus water
 export const BRIDGE_W = 3.2;
 export const SLOT_COUNT = 24;
 const MAX_RING = 5;

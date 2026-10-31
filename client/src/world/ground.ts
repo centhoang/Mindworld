@@ -17,8 +17,8 @@ export interface Ground {
   gates: Record<Side, { i: number; j: number }>;
 }
 
-export const GROUND_W = 26;
-export const GROUND_H = 20;
+export const GROUND_W = 36;
+export const GROUND_H = 28;
 const YARD_RX = 8.5; // tiles: the fixed oval yard in the middle
 const YARD_RY = 6.2;
 
@@ -33,7 +33,7 @@ export function groundFromSeed(seed: number, w = GROUND_W, h = GROUND_H): Ground
   land.fill(1);
   const corners = [[0, 0], [1, 0], [0, 1], [1, 1]] as const;
   for (const [right, bottom] of corners) {
-    const across = 4 + Math.floor(rng() * 6);
+    const across = 4 + Math.floor(rng() * 7);
     const down = 3 + Math.floor(rng() * 3);
     for (const [wide, deep] of [[across, down], [Math.ceil(across / 2), down + 2]] as const)
       for (let b = 0; b < deep; b++)

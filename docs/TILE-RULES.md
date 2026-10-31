@@ -28,7 +28,7 @@ Decide each tile from the land shape alone, with 4 neighbours and then diagonals
 - The light road family is the grass table moved down 4 rows (3.k becomes 7.k, 4.k becomes 8.k). Not used yet.
 - Roads are 3 tiles wide and stay on land.
 - Island outlines are straight edges with stepped corners, never slants or circles: coast, cliff and foam tiles only join on those. Grounds are stepped rectangles (world/ground.ts), other places squares with corner notches (`inBlock` in world/layout.ts). Roads run along one axis, then the other.
-- Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in 2-3 tight clumps per platform, about 2 tiles apart.
+- Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in tight clumps, about 2 tiles apart: 5-6 per player ground, 2-3 on other platforms.
 - Fence rows run on the grass row just north of a straight road of 6+ tiles: segments 3-6 tiles, gaps 2+, kept 2 tiles clear of junctions, gates and bridges (grounds-decor.ts).
 
 ## Cliffs, foam, sea shadow
@@ -43,8 +43,8 @@ Only south edges have a face, worked out per column. Cells below the land, from 
 ## Water
 - Sea: a 4 x 4 repeat of rows 18-21, cols 11-14. The tiles do not animate; life comes from foam and glint sprites.
 - Pond and river: fill 7.22. The bank is drawn on the land cells around the water, not on water cells. Names are by where the land ends: N 8.26, S 7.25, W 8.24, E 7.27, NW 8.22, NE 7.26, SW 7.24, SE 7.23, inner SE 7.29, inner SW 8.25, inner NW 8.28. Inner NE 8.29 is a guess, not read from the room.
-- Player-ground streams are chosen after roads, by a separate RNG seeded from `ground.seed`: two grounds in three are eligible, with at most one course. Channels are two tiles wide, take 6-10 axis steps with square stepped turns, and end in a 4 x 3 pool. All water stays outside a two-tile buffer around roads, bridges, gates, both yard ovals and the largest house stamp; reject courses that narrow land to one tile or disconnect a gate from the centre. Pools remain unwalkable, and existing trees/decor reject them.
-- Closed-stream fallback: the existing tiles have no combined pond-bank/sea-coast mouth, and the renderer gives coast edges priority over banks. Leave two full land tiles between the channel and sea (also around the other banks), rather than draw a broken mouth. If the whole course cannot fit, carve nothing. The current 26 x 20 player grounds have no fitting course in the 30-seed regression sample; larger test grounds exercise successful streams. Increasing production ground size or reducing the requested clearances is a separate change.
+- Player-ground streams are chosen after roads, by a separate RNG seeded from `ground.seed`: every ground tries, with at most one course. Channels are two tiles wide, take 6-10 axis steps with square stepped turns, and end in a 4 x 3 pool. All water stays outside a two-tile buffer around roads, bridges, gates, both yard ovals and the largest house stamp; reject courses that narrow land to one tile or disconnect a gate from the centre. Pools remain unwalkable, and existing trees/decor reject them.
+- Closed-stream fallback: the existing tiles have no combined pond-bank/sea-coast mouth, and the renderer gives coast edges priority over banks. Leave two full land tiles between the channel and sea (also around the other banks), rather than draw a broken mouth. If the whole course cannot fit, carve nothing. Player grounds are 36 x 28 on a 40-tile grid: 26 x 20 had no fitting course, 34 x 26 fit one ground in five.
 
 ## Bridges
 The ends lie one tile up on the land.

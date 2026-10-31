@@ -122,7 +122,6 @@ export function buildTileMap(w: WorldMap): TileMap {
 function carveStream(m: TileMap, p: Platform): void {
   const g = p.ground!;
   const rng = mulberry32(g.seed ^ 0x7374726d);
-  if (rng() >= 2 / 3) return;
   const [ox, oz] = groundOrigin(p);
   const index = (i: number, j: number) => (oz + j - m.oz) * m.w + ox + i - m.ox;
   const on = (i: number, j: number) => i >= 0 && j >= 0 && i < g.w && j < g.h && g.land[j * g.w + i] === 1;

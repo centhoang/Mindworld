@@ -37,7 +37,7 @@ describe("ground from seed", () => {
       themes.add(g.theme);
       const area = landCount(g) / (g.w * g.h);
       expect(area).toBeGreaterThan(0.3);
-      expect(area).toBeLessThan(0.85);
+      expect(area).toBeLessThan(0.93);
     }
     expect(shapes.size).toBe(40);
     expect(themes.size).toBe(THEMES.length);

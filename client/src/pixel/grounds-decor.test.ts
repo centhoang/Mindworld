@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { generateWorld, groundOrigin, type LayoutInput } from "../world/layout";
 import { placeDecor } from "./grounds-decor";
 import { buildTileMap, T, type TileMap } from "./tiles";
@@ -32,6 +32,8 @@ function reach(m: TileMap, blocked: Set<number>, from: number, land?: Set<number
   }
   return seen;
 }
+
+vi.setConfig({ testTimeout: 30_000 }); // forest tests build many worlds
 
 describe("ground decor", () => {
   const world = generateWorld(input);
@@ -105,7 +107,7 @@ describe("ground decor", () => {
         for (let j = 0; j < g.h; j++) {
           let run = 0;
           for (let i = 0; i < g.w; i++) {
-            if (g.land[j * g.w + i]) land.add(index(i, j));
+            if (g.land[j * g.w + i] && map.kind[index(i, j)] !== T.pool) land.add(index(i, j));
             run = map.kind[index(i, j)] === T.path ? run + 1 : 0;
             if (run >= 6) hasRun = true;
           }
@@ -198,7 +200,7 @@ describe("ground decor", () => {
           const [i, j] = [Math.floor(t.x - ox), Math.floor(t.z - oz)];
           return i >= 0 && j >= 0 && i < p.ground!.w && j < p.ground!.h && p.ground!.land[j * p.ground!.w + i] === 1;
         });
-        expect(trees.length).toBeLessThanOrEqual(27);
+        expect(trees.length).toBeLessThanOrEqual(60);
         const remaining = new Set(trees);
         let clumps = 0;
         while (remaining.size) {
@@ -214,10 +216,10 @@ describe("ground decor", () => {
             }
           }
           expect(size).toBeGreaterThanOrEqual(2); // cramped coasts cannot always fit five safely
-          expect(size).toBeLessThanOrEqual(9);
+          expect(size).toBeLessThanOrEqual(10);
           clumps++;
         }
-        expect(clumps).toBeLessThanOrEqual(3);
+        expect(clumps).toBeLessThanOrEqual(6);
         for (const t of trees) {
           const i = Math.floor(t.x - map.ox), j = Math.floor(t.z - map.oz);
           expect(Math.hypot((t.x - p.x) / 7.5, (t.z - p.z + 1) / 5)).toBeGreaterThanOrEqual(1);
@@ -235,7 +237,7 @@ describe("ground decor", () => {
     }
   });
 
-  it("fits two or three clumps of five to nine trees when a ground has room", () => {
+  it("fits four to six clumps of five to ten trees when a ground has room", () => {
     for (let seed = 0; seed < 20; seed++) {
       const p = generateWorld({ me: { seed, slot: 0 } }).platforms.find((q) => q.ground)!;
       p.ground!.land.fill(1); // rectangular test ground without narrow corner cuts
@@ -260,11 +262,11 @@ describe("ground decor", () => {
           }
         }
         expect(size, `seed ${seed}`).toBeGreaterThanOrEqual(5);
-        expect(size).toBeLessThanOrEqual(9);
+        expect(size).toBeLessThanOrEqual(10);
         clumps++;
       }
-      expect(clumps, `seed ${seed}`).toBeGreaterThanOrEqual(2);
-      expect(clumps).toBeLessThanOrEqual(3);
+      expect(clumps, `seed ${seed}`).toBeGreaterThanOrEqual(4);
+      expect(clumps).toBeLessThanOrEqual(6);
     }
   });
 });
