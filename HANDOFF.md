@@ -1,6 +1,6 @@
 # HANDOFF: Mindworld v3, NPCs are the star; N1-N4 live and audited in the browser; gossip chains, long goals, human typing added (2026-10-31)
 
-**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/NPC-PLAN.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
+**Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/TILE-RULES.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; proof = deployed build with 2+ players; local model only)."
 
 ## State
 - **Visual rebuild 2026-10-31 evening (after the user's review rejected the look):** whole-number pixel scale (`lowSize`); islands rectilinear (ground.ts stepped rectangles, `inBlock`), roads on axes, trees inland in clumps, more decor, no sea shadow or foam lips; smoke per house (`CHIMNEY`); bubbles show the whole line, stay longer; house = Interior.gif at 1x (scripts/art-interior.py, game/house.ts floor plan, roof fade). Checked at 1280x720 on localhost only: NOT proven until deployed multi-player. Still short of BuiltDemo: rivers and height steps, fences along roads, sand islets, ducks and boats, stamps with stray bits (house-green, house-bluesmall, house-redsmall carry neighbours), big HINT panel. Island shape is new: re-check bridges, spots and NPC routes in the deployed test.
@@ -53,7 +53,7 @@
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
--1. **Blocked on the user:** the Access policy has the IP (171.251.232.193/32) but its action is Allow, which still asks for a login; set Action = Bypass. wrangler's login has Workers scopes only, no Access. Then run the deployed multi-player test (2+ windows from home IP, tuned model loaded) before asking for any play-test.
+-1. **Do first:** Access is now Bypass for the home IP 171.251.232.193 (no login from this machine; others still get the login page). Run the deployed two-player test with the tuned model loaded (LOCAL_ONLY on): bridges, spots and NPC routes on the new island shapes, private chat, host hand-over, promise, deal, gossip across machines. Fix what it finds, then work through the BuiltDemo gaps listed under State. Ask for a play-test only after this passes and the look matches BuiltDemo.
 0. **Look polish after the user's review:** denser tree clusters and rivers/height steps like BuiltDemo, sand islets, ducks and boats, windows and dark floors indoors, roof-fade house entry (Interior.gif) if wanted; prune unused art; docs/STYLE.md still describes the old art.
 1. **N5 rest:** NPC duel and pets (Pip's bought pet follows Pip, decorative), rematch goals, deals with NPCs hosted on another machine (still "Bring it to me in person"), NPC tag removal if any is left. Wild pets art in client/public/art/gen/wild still mostly unused. Prompts are frozen: sim-only changes, or plan a small retrain.
 2. **Submission prep:** demo captures with the user; HF cards: `publish_coach.py` has the new MLC note, but the live private cards still show stage 5 numbers (no huggingface_hub locally: run the Modal publish for cards, or add the note by hand); caps come back down after the event.
