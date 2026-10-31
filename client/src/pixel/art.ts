@@ -8,7 +8,7 @@ import { THEMES } from "../world/ground";
 export const PAL = {
   ink: "#39463F",
   grassD: "#537D59", grass: "#9FC66A", grassM: "#BFDA82", grassL: "#DDE8A3", grassS: "#78A05D",
-  waterD: "#519F95", water: "#6CBAB2", waterL: "#9ED7CA", foam: "#D4EADD", teal: "#43847C",
+  waterD: "#519F95", water: "#32DCE8", waterL: "#9ED7CA", foam: "#D4EADD", teal: "#43847C",
   sandD: "#A57954", sand: "#E0BC85", sandL: "#FFF3D8",
   woodD: "#795849", wood: "#A57954", woodM: "#C69A67", woodL: "#E0BC85", cream: "#F4DEC6",
   stoneD: "#7A8F89", stone: "#9CAC9B", stoneM: "#BFC7AF", stoneL: "#DDE1C6",
@@ -57,8 +57,19 @@ export function loadArt(base = "/art/"): Promise<void> {
 // Ground themes by recolour: the meadow greens of any sheet swapped for autumn or snow palette entries
 // (index = THEMES order; 0 = meadow = the art as drawn). Cached per image and theme.
 const SWAP: Record<number, Record<string, string>> = {
-  1: { [PAL.grassD]: PAL.coral, [PAL.grassS]: PAL.furD, [PAL.grass]: PAL.fur, [PAL.grassM]: PAL.furM, [PAL.grassL]: PAL.furL },
-  2: { [PAL.grassD]: PAL.stone, [PAL.grassS]: PAL.stoneM, [PAL.grass]: PAL.stoneL, [PAL.grassM]: PAL.sandL, [PAL.grassL]: PAL.sandL },
+  1: {
+    [PAL.grassD]: PAL.coral, [PAL.grassS]: PAL.furD, [PAL.grass]: PAL.fur, [PAL.grassM]: PAL.furM, [PAL.grassL]: PAL.furL,
+    // Native Sunnyside grass, path/shore rims and detail overlays (art-tiles.mjs).
+    "#63C74D": PAL.fur, "#87CF5E": PAL.furM, "#7BCF5C": PAL.furM,
+    "#54B263": PAL.furD, "#4FA748": PAL.furD, "#4EA647": PAL.furD, "#4DA76F": PAL.furD,
+    "#489956": PAL.coral, "#3E8948": PAL.coral, "#3D8847": PAL.coral, "#3F8E4F": PAL.coral,
+  },
+  2: {
+    [PAL.grassD]: PAL.stone, [PAL.grassS]: PAL.stoneM, [PAL.grass]: PAL.stoneL, [PAL.grassM]: PAL.sandL, [PAL.grassL]: PAL.sandL,
+    "#63C74D": PAL.stoneL, "#87CF5E": PAL.sandL, "#7BCF5C": PAL.sandL,
+    "#54B263": PAL.stoneM, "#4FA748": PAL.stoneM, "#4EA647": PAL.stoneM, "#4DA76F": PAL.stoneM,
+    "#489956": PAL.stone, "#3E8948": PAL.stone, "#3D8847": PAL.stone, "#3F8E4F": PAL.stone,
+  },
 };
 const themedCache = new Map<string, HTMLCanvasElement>();
 const hex = (r: number, g: number, b: number) => `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1).toUpperCase()}`;

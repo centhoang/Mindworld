@@ -1,3 +1,4 @@
+import { DAY_SECONDS } from "../life/clock";
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sim/rng";
 import type { Bond } from "./bonds";
@@ -173,6 +174,18 @@ describe("deals in the village", () => {
     mem.bonds.Kai = bond(-30);
     expect((await nv.reply("pip", "Kai", "nice weather"))?.text).toContain("nothing to say");
     expect((await nv.reply("pip", "Kai", "I am so sorry"))?.text ?? "").not.toContain("nothing to say");
+  });
+
+  it("left alone for three days, the town works, plants and sells", () => {
+    const homes = { elder: { x: 0, z: 0 }, mo: { x: 12, z: 0 }, ama: { x: 0, z: 12 }, pip: { x: 12, z: 12 } };
+    const here = [{ x: 6, z: 6 }];
+    const spots = { home: [{ x: 0, z: 0 }], bed: [{ x: -3, z: 0 }], stall: here, woods: [{ x: 9, z: 9 }], pond: [{ x: 3, z: 9 }], lawn: [{ x: 6, z: 0 }] };
+    const nv = new NpcVillage(new MindScheduler(() => null), () => false, { line: () => {}, say: () => {} }, homes, spots, () => true, undefined, mulberry32(7));
+    for (let s = 0; s < 3 * DAY_SECONDS; s += 0.5) nv.step(0.5, nv.v.t + 0.5);
+    const log = [...nv.hub.minds.values()].flatMap((m) => m.mem.log.map((e) => e.text));
+    expect(log.some((t) => /^planted /.test(t) || /^harvested /.test(t))).toBe(true);
+    expect(log.some((t) => /at the market for/.test(t))).toBe(true);
+    expect(nv.market.trades.length).toBeGreaterThan(0);
   });
 
   it("the economy runs over days: goods are earned and sold, coins rise, purses reach the room", () => {
