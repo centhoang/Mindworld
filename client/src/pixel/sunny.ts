@@ -2,6 +2,7 @@
 // where are in sunny-terrain.ts; art comes from scripts/art-sunny.py (client/public/art/sunny).
 
 import { recoloured } from "./art";
+import { mulberry32 } from "../sim/rng";
 import { bridgeLayers, buildTerrain, CELL_ID, FLIP, MIRROR, tile, type Terrain } from "./sunny-terrain";
 import { AWAY, hash2, T, TILE, type TileMap } from "./tiles";
 
@@ -69,10 +70,64 @@ export interface SunnyWorld {
   terrain: Terrain;
   deck: Int32Array;
   rail: Int32Array;
+  seaLife: SeaLife[];
 }
 
 export function buildSunny(m: TileMap): SunnyWorld {
-  return { terrain: buildTerrain(m), ...bridgeLayers(m) };
+  return { terrain: buildTerrain(m), ...bridgeLayers(m), seaLife: placeSeaLife(m) };
+}
+
+export interface SeaLife {
+  kind: "boat" | "duck";
+  x: number; // world tiles, centred on a sea tile
+  z: number;
+  phase: number;
+  flip: boolean;
+}
+
+// Hash geometry only: local themes and away flags must not change shared decoration.
+export function placeSeaLife(m: TileMap): SeaLife[] {
+  let seed = 2166136261;
+  for (const n of [m.w, m.h, m.ox, m.oz, ...m.kind]) seed = Math.imul(seed ^ n, 16777619);
+  const rng = mulberry32(seed);
+  const candidates: [number, number][] = [];
+  for (let j = 2; j < m.h - 2; j++) for (let i = 2; i < m.w - 2; i++) {
+    let clear = true;
+    // Include diagonals and bridges: even a boat's full native canvas stays clear of the deck.
+    for (let dz = -2; dz <= 2 && clear; dz++) for (let dx = -2; dx <= 2; dx++) {
+      if (m.kind[(j + dz) * m.w + i + dx] !== T.water) { clear = false; break; }
+    }
+    if (clear) candidates.push([m.ox + i + 0.5, m.oz + j + 0.5]);
+  }
+  const out: SeaLife[] = [];
+  const boats = 2 + Math.floor(rng() * 3);
+  const ducks = 3 + Math.floor(rng() * 4);
+  // Sample without replacement, with room between silhouettes. Tiny/no-sea maps can run out.
+  while (candidates.length && out.length < boats + ducks) {
+    const at = Math.floor(rng() * candidates.length);
+    const [x, z] = candidates[at]!;
+    candidates[at] = candidates[candidates.length - 1]!;
+    candidates.pop();
+    if (out.some((p) => Math.hypot(x - p.x, z - p.z) < 3)) continue;
+    out.push({ kind: out.length < boats ? "boat" : "duck", x, z, phase: rng(), flip: rng() < 0.5 });
+  }
+  return out;
+}
+
+export function drawSeaLife(g: Ctx, life: SeaLife[], camX: number, camY: number, sw: number, sh: number, t: number): void {
+  for (const p of life) {
+    // Unchanged pack exports: Elements/Other/spr_deco_coracle_strip4.png and
+    // Elements/Animals/spr_deco_duck_01_strip4.png (48x37 and 16x16 per frame).
+    const name = p.kind === "boat" ? "spr_deco_coracle_strip4" : "spr_deco_duck_01_strip4";
+    const img = images.get(name);
+    if (!img) continue;
+    const w = img.width / STRIPS[name]!.frames;
+    const bob = Math.sin((t + p.phase) * Math.PI * 2) >= 0 ? 0 : 1;
+    const x = Math.round(p.x * TILE - camX - w / 2);
+    const y = Math.round(p.z * TILE - camY - img.height / 2) + bob;
+    if (x + w < 0 || y + img.height < 0 || x > sw || y > sh) continue;
+    strip(g, name, x, y, Math.floor(t * 4 + p.phase * 4) % 4, p.flip);
+  }
 }
 
 const SKY = tile(18, 1);

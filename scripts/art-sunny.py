@@ -32,11 +32,12 @@ def tile(v):
     if v >> 29 & 1: t = t.transpose(Image.FLIP_TOP_BOTTOM)
     if v >> 30 & 1: t = t.transpose(Image.ROTATE_270)
     return t
-def stamp(layers, x0, y0, x1, y1):
+def stamp(layers, x0, y0, x1, y1, omit=None):
     im = Image.new('RGBA', ((x1 - x0) * 16, (y1 - y0) * 16))
     for n in layers:
         for y in range(y0, y1):
             for x in range(x0, x1):
+                if omit and (n, x, y) in omit: continue
                 t = tile(LAYERS[n][y * 86 + x])
                 if t: im.alpha_composite(t, ((x - x0) * 16, (y - y0) * 16))
     return im
@@ -46,7 +47,7 @@ DEC = ['decoration_01']
 STAMPS = {
     'house-blue': (HOUSE, 39, 24, 46, 31), 'house-red': (HOUSE, 32, 18, 37, 24), 'house-green': (HOUSE, 21, 25, 25, 29),
     'house-redsmall': (HOUSE, 30, 26, 34, 30), 'house-purple': (HOUSE, 13, 26, 19, 32), 'house-orange': (HOUSE, 54, 24, 60, 29),
-    'house-orangelong': (HOUSE, 55, 31, 61, 35), 'house-bluesmall': (HOUSE, 51, 6, 55, 10), 'house-greentall': (HOUSE, 40, 32, 45, 38),
+    'house-orangelong': (HOUSE, 55, 31, 61, 35), 'house-bluesmall': (HOUSE, 51, 6, 56, 10), 'house-greentall': (HOUSE, 40, 32, 45, 38),
     'stall-red': (HOUSE, 64, 27, 68, 30), 'stall-white': (HOUSE, 33, 28, 37, 31),
     'pine': (DEC, 4, 2, 6, 5), 'bush': (DEC, 20, 12, 22, 14), 'bush-berry': (DEC, 23, 12, 25, 14), 'bush-red': (DEC, 52, 13, 54, 15),
     'rock-big': (DEC, 63, 18, 65, 20), 'rock-small': (DEC, 54, 21, 56, 22), 'sign': (DEC, 9, 36, 10, 37), 'stump': (DEC, 26, 15, 27, 17), 'fence-a': (DEC, 9, 21, 12, 22), 'fence-b': (DEC, 12, 21, 15, 22),
@@ -54,6 +55,13 @@ STAMPS = {
     'crates': (DEC, 62, 22, 65, 25), 'crate': (DEC, 70, 26, 72, 28), 'soil': (DEC, 9, 8, 10, 9), 'bench': (DEC, 11, 33, 14, 34),
 }
 LOOSE = {'fence-a', 'fence-b'}  # several pieces on purpose
+# These neighbours touch the house, so largest() cannot separate them. Omit their room cells
+# before compositing; keep the house's own windows and chimney. Blue also needs its east eave.
+STAMP_OMIT = {
+    'house-green': {('decoration_02', 24, 27), ('decoration_02', 24, 28)},
+    'house-redsmall': {('decoration_02', 33, 29), ('decoration_03', 33, 28), ('decoration_03', 33, 29)},
+    'house-bluesmall': {('decoration_02', 51, 7), ('decoration_02', 51, 8), ('decoration_02', 51, 9), ('decoration_02', 55, 9)},
+}
 def largest(im):
     # Keep the biggest connected blob: the rects catch bits of neighbouring props.
     a = im.getchannel('A').load()
@@ -78,7 +86,7 @@ def largest(im):
     return out
 boxes = {}
 for name, (layers, x0, y0, x1, y1) in STAMPS.items():
-    im = stamp(layers, x0, y0, x1, y1)
+    im = stamp(layers, x0, y0, x1, y1, STAMP_OMIT.get(name))
     b = im.getbbox()
     if not b:
         print('EMPTY', name)

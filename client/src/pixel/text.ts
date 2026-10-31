@@ -87,6 +87,19 @@ export function drawFrame(g: CanvasRenderingContext2D, x: number, y: number, w: 
   g.drawImage(f, 8, 8, 4, 4, x + w - 4, y + h - 4, 4, 4);
 }
 
+// Speakerless toasts use a compact strip; dialogue retains its portrait/name layout.
+export function drawToast(g: CanvasRenderingContext2D, screenW: number, screenH: number, text: string, who?: string): void {
+  if (who) return drawDialogue(g, screenW, screenH, text, who);
+  const maxW = Math.min(screenW - 16, 368);
+  const lines = wrap(text, maxW - 8).slice(0, 2);
+  const w = Math.max(12, Math.min(maxW, Math.max(0, ...lines.map((l) => l.length)) * GLYPH + 8));
+  const h = 12 + Math.max(0, lines.length - 1) * LINE;
+  const x = Math.floor((screenW - w) / 2);
+  const y = screenH - h - 8;
+  drawFrame(g, x, y, w, h);
+  lines.forEach((l, i) => drawText(g, l, x + 4, y + 2 + i * LINE));
+}
+
 // Bottom dialogue box (STYLE.md: 368x48 at y 160 on a 384 screen): optional 32x32 portrait, speaker name in
 // wood on the first line, then up to 3 lines (2 with a name).
 export function drawDialogue(

@@ -14,7 +14,7 @@ import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, drawTinyText, GLYPH, wrap } from "./text";
 import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileWalkable, type TileMap } from "./tiles";
-import { buildSunny, characterShadow, drawCropArt, drawHighClouds, drawLand, drawLowClouds, drawSea, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
+import { buildSunny, characterShadow, drawCropArt, drawHighClouds, drawLand, drawLowClouds, drawSea, drawSeaLife, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
 import { ACTIVITY } from "../life/activities";
 import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
@@ -925,6 +925,7 @@ export class Overworld {
     const camY = Math.round(this.cam.z * TILE - sh / 2);
     const toScreen = (x: number, z: number): [number, number] => [Math.round(x * TILE) - camX, Math.round(z * TILE) - camY];
     drawSea(g, m, camX, camY, sw, sh, t);
+    drawSeaLife(g, this.sunny.seaLife, camX, camY, sw, sh, t);
     drawLowClouds(g, m, camX, camY, sw, sh, t);
     drawLand(g, m, this.sunny, camX, camY, sw, sh, t);
     this.drawBeds(g, toScreen, t);

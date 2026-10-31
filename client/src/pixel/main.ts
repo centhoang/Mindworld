@@ -23,7 +23,7 @@ import { makePresenter } from "./crt";
 import { LOCAL_ONLY, NO_LOCAL } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
 import { NAME_MAX, Overworld, type Wild } from "./overworld";
-import { drawDialogue, drawFrame, drawText } from "./text";
+import { drawDialogue, drawFrame, drawText, drawToast } from "./text";
 import { humanLook } from "./humans";
 import { PIXEL_HINTS, pixelGoals } from "../game/onboard";
 import { loadArt } from "./art";
@@ -982,7 +982,7 @@ function update(dt: number, t: number): void {
     else if (board) drawMenu(g, low.width, low.height, "Town board", world.npcs?.board() ?? [], -1, t, "Prices move with real trades. Esc: close");
     else if (toast) {
       toast.t -= dt;
-      if (!hidden("hints")) drawDialogue(g, low.width, low.height, toast.text, toast.who);
+      if (!hidden("hints")) drawToast(g, low.width, low.height, toast.text, toast.who === "Hint" ? undefined : toast.who);
       if (toast.t <= 0) nextToast();
     }
   } else if (mode === "home") {
