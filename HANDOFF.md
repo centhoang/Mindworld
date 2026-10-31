@@ -3,8 +3,8 @@
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/NPC-PLAN.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **228e2711**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 477, worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **4da5da7b**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client 479, worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
 - **Done 2026-10-31:** power mode removed (`finetune/native-voice.ts` keeps the bench client, GGUFs stay). Limits lifted: CloudMind gap 0, MAX_DAILY_USD 30, CLIENT_DAILY_USD 10, CLIENT_PER_MINUTE 120; MAX_TOTAL_USD_* stay the hard stop. Caps come back down after the event.
 - **Setup gate** (pixel/setup.ts, #setup in index.html): checks the adapter first. capable = download + warm-up, then the game; weak Intel on Windows = steps + re-check; none/mobile = straight in. Remembered per GPU in `mindworld.setup.v1`; a return visit opens at once and loads in the background. Dev: `?gpu=switch|capable|none|skip`. Checked in the pane on a real Intel Gen 9 (guide, exit, remembered). The capable path with a real download has NOT been run: user's GTX 1050 is the first test.
 - **Private chats** (worker/src/room.ts): lines to a player reach that player only; other mind lines reach players within HEAR_DIST 14 tiles plus the host of the NPC spoken to; room chat stays public. `talk` = busy state, "talking..." bubble, new chats refused, ends on close, disconnect or 45 s silence (clients renew every 15 s). Checked on the real Durable Object with 3 sockets (worker-mock on port 8799).
@@ -34,7 +34,7 @@
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
-1. **Art swap:** batches 1 + 2 accepted and committed (client/public/art/gen, pets/ and wild/; manifest .scratch/art/gen/batch2-manifest.json). Pet parts need the manifest's shared outline pass. Use them in-game: Sunnyside tiles, layered humans so NPCs share the player's sprites, the new stall.
+1. **Art swap:** step 1 live (stall, notice board, dance floor, soccer, birthday props; client/src/pixel/generated-sprites.ts, PNG with procedural fallback). Step 2 running in Codex (brief .scratch/brief-swap2.md, report .scratch/swap2-report.md): layered humans shared by player, peers, NPCs. Then Sunnyside tiles and modular pets (parts need the shared outline pass, manifest .scratch/art/gen/batch2-manifest.json).
 2. **N3 rest:** more jobs and refusals (gifts, chats, trades) on the jobs.ts pattern; NPC wallet, farm, market prices, town board.
 3. **N4 retrain by Nov 2 night:** add extract, decide, deal + reply/line with feelings to gen-village, freeze prompts first. N5, then demo captures and README numbers (credit the Sunnyside pack in README).
 
