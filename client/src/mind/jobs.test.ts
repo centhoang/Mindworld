@@ -81,14 +81,17 @@ describe("the market keeper in the village", () => {
     const { nv, bubbles, a } = make();
     toWork(nv);
     expect(nv.dealWith("Kai").ok).toBe(true);
+    expect(nv.shipRefused("Kai")).toBeNull();
     await nv.reply("ama", "Kai", "shut up, you are annoying");
     await nv.reply("ama", "Kai", "you are useless, go away");
     Object.assign(a, { act: "sell", state: "do" });
     expect(nv.dealWith("Kai")).toMatchObject({ ok: false, refused: true, npc: "ama" });
     expect(bubbles.at(-1)![1]).toContain("you were rude to me");
     expect(nv.hub.minds.get("ama")!.mem.why).toContain("refused to deal");
+    expect(nv.shipRefused("Kai")).toContain("Ama won't take your goods");
     await nv.reply("ama", "Kai", "I am sorry");
     expect(nv.dealWith("Kai").ok).toBe(true);
+    expect(nv.shipRefused("Kai")).toBeNull();
   });
 
   it("remembers manners even when another machine hosts the keeper", async () => {

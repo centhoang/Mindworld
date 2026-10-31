@@ -143,7 +143,11 @@ const interior = new Interior({
   },
   petSprite: () => world.petSprite,
   residents: () => world.residentSprites(),
-  useCrate: () => (crate = { cursor: 0 }),
+  useCrate: () => {
+    const no = world.npcs?.shipRefused(liveName(myGenes()));
+    if (no) toast = { text: no, t: 4 };
+    else crate = { cursor: 0 };
+  },
   leave: () => {
     mode = "world";
     world.exitHouse();

@@ -359,6 +359,12 @@ export class NpcVillage {
     return { ok: false, npc, refused: true, text };
   }
 
+  // The home crate ships through the keeper too: someone it refuses gets no way around it. Null = fine.
+  shipRefused(player: string): string | null {
+    const keeper = VILLAGERS.find((p) => p.job?.act === "sell")!;
+    return refusesDeal(keeper, bondOf(this.memOf(keeper.id as Npc), player)) ? `${keeper.name} won't take your goods. Go and make it up with ${keeper.name} at the stall.` : null;
+  }
+
   // What a line tells the NPC about the speaker: how they treat it, and what they like.
   private listen(npc: Npc, p: Persona, mem: MindMemory, player: string, line: string, day: number): void {
     const tone = toneOf(line);
