@@ -1,10 +1,10 @@
-# HANDOFF: Mindworld v3, NPCs are the star; promises + bonds live, pixel rules in force (2026-10-31)
+# HANDOFF: Mindworld v3, NPCs are the star; promises, bonds, jobs live; humans swapped to Sunnyside (2026-10-31)
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/NPC-PLAN.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **4da5da7b**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 479, worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **6130946c**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client 485, worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
 - **Done 2026-10-31:** power mode removed (`finetune/native-voice.ts` keeps the bench client, GGUFs stay). Limits lifted: CloudMind gap 0, MAX_DAILY_USD 30, CLIENT_DAILY_USD 10, CLIENT_PER_MINUTE 120; MAX_TOTAL_USD_* stay the hard stop. Caps come back down after the event.
 - **Setup gate** (pixel/setup.ts, #setup in index.html): checks the adapter first. capable = download + warm-up, then the game; weak Intel on Windows = steps + re-check; none/mobile = straight in. Remembered per GPU in `mindworld.setup.v1`; a return visit opens at once and loads in the background. Dev: `?gpu=switch|capable|none|skip`. Checked in the pane on a real Intel Gen 9 (guide, exit, remembered). The capable path with a real download has NOT been run: user's GTX 1050 is the first test.
 - **Private chats** (worker/src/room.ts): lines to a player reach that player only; other mind lines reach players within HEAR_DIST 14 tiles plus the host of the NPC spoken to; room chat stays public. `talk` = busy state, "talking..." bubble, new chats refused, ends on close, disconnect or 45 s silence (clients renew every 15 s). Checked on the real Durable Object with 3 sockets (worker-mock on port 8799).
@@ -29,12 +29,13 @@
 
 ## User-only actions
 - Play-test N2: promise Pip a party, stay away, then talk: grudge, "why are you mad", refusal, "sorry", accept; I shows FEELS/WHY.
+- Play-test look: all people now use pack sprites; check walking, facing, tools (fishing line, axe) and NPC poses.
 - Play-test jobs: at the stall in the morning E opens the market; be rude to Ama twice, E again = refused, say sorry, E works; at evening it is closed.
 - Play-test: setup gate on the GTX 1050; two windows for private chat (E on a player > Say something; a third party sees "talking..." only).
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
-1. **Art swap:** step 1 live (stall, notice board, dance floor, soccer, birthday props; client/src/pixel/generated-sprites.ts, PNG with procedural fallback). Step 2 running in Codex (brief .scratch/brief-swap2.md, report .scratch/swap2-report.md): layered humans shared by player, peers, NPCs. Then Sunnyside tiles and modular pets (parts need the shared outline pass, manifest .scratch/art/gen/batch2-manifest.json).
+1. **Art swap:** steps 1 + 2 live: props (generated-sprites.ts, PNG with procedural fallback) and layered Sunnyside humans for player, peers and NPCs (pixel/humans.ts + humans.manifest.json, 55 native PNGs in public/art/humans; no native sit, sweep, dance, cook or sleep strips, nearest action used). scripts/check-art.mjs is for new art: native pack strips fail it, ignore that. Left: Sunnyside tiles, modular pets (parts need the shared outline pass, manifest .scratch/art/gen/batch2-manifest.json), wild pets. All through Codex.
 2. **N3 rest:** more jobs and refusals (gifts, chats, trades) on the jobs.ts pattern; NPC wallet, farm, market prices, town board.
 3. **N4 retrain by Nov 2 night:** add extract, decide, deal + reply/line with feelings to gen-village, freeze prompts first. N5, then demo captures and README numbers (credit the Sunnyside pack in README).
 
