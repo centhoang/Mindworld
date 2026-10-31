@@ -4,15 +4,17 @@
 // spoken lines and memories go out too, so a host change keeps the NPC's memory (stored in the room).
 // No host known (offline, alone) = the NPCs pick by the utility score here, like a mind without a model.
 
+import { ACTIVITY } from "../life/activities";
 import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, newVillage, stepVillage, type Agent, type Choice, type Env, type LifeEvent, type Spots, type Village } from "../life/village";
 import type { Vec } from "../world/movement";
 import { NPCS, type MindLine, type Npc } from "../world/live";
-import { MindHub } from "./hub";
+import { MindHub, type Mind } from "./hub";
 import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
-import { emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
+import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { VILLAGERS, type Persona } from "./persona";
-import { pairKey } from "../life/relations";
+import { addCommitment, answerLine, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
+import { bump, pairKey } from "../life/relations";
 import { PRIO, type MindScheduler } from "./scheduler";
 
 export interface NpcOut {
@@ -30,6 +32,9 @@ const PET_DIST = 3; // a resting pet this close may get a line
 const PET_GAP = 180; // sim seconds before the same NPC talks to the same pet again
 const PET_NPC_GAP = 30; // sim seconds between one NPC's pet lines (several pets around: not one after another)
 const SCRIPT_GAP_MS = 3200; // without a model, wait a little before answering (the room allows 1 line / 3 s)
+const PROMISE_PULL = 3; // score added to a promised activity while it is due: it beats any need
+const PROMISE_DIST = 7; // the one who invited is here if they are this close
+const INVITE_HINT = /\b(party|birthday|danc|soccer|football|fish|picnic|lunch)/i; // only these lines cost a model call
 
 // A pet the NPCs can see (mine, at home or following me, or an online player's). `busy` = walking or doing
 // something, so it isn't spoken to.
@@ -64,6 +69,8 @@ export class NpcVillage {
   private readonly lastChat = new Map<Npc, number>(); // sim time of the NPC's last NPC chat
   private readonly chats = new Map<Npc, { with: Npc; said: string[]; turns: number }>(); // NPC chats over the room
   private readonly busy = new Set<Npc>(); // a line is being made
+  private readonly leaving = new Set<string>(); // promises the NPC already set off for
+  private readonly arrived = new Set<string>(); // promises the NPC turned up for
 
   constructor(
     private readonly sched: MindScheduler,
@@ -77,7 +84,7 @@ export class NpcVillage {
   ) {
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
     this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
-    this.env = { spots, canWalk, route, rng, bias: this.hub.bias, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
+    this.env = { spots, canWalk, route, rng, bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0), chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
     for (const n of NPCS) this.setHost(n, null);
   }
 
@@ -121,12 +128,18 @@ export class NpcVillage {
     const mem = emptyMemory();
     const day = gameTime(this.v.t).day;
     for (const l of log) {
+      const c = parsePromiseLine(l);
+      if (c) {
+        mem.promises = [...mem.promises.filter((o) => o.id !== c.id), c]; // the latest state of each promise
+        continue;
+      }
       const m = /^(\d\d:\d\d) (.*)$/.exec(l);
       mem.log.push({ day, time: m ? m[1]! : "", text: (m ? m[2]! : l).slice(0, 100) });
     }
     const mind = this.hub.minds.get(npc);
     if (mind) {
       mind.mem.log = [...mem.log, ...mind.mem.log].slice(-30);
+      mind.mem.promises = mem.promises;
       this.sent.set(npc, mind.mem.log.at(-1) ?? null);
     } else this.mems.set(npc, mem);
   }
@@ -228,7 +241,10 @@ export class NpcVillage {
   }
 
   private choose(npc: Npc, a: Agent, cs: Choice[], v: Village): string | null | undefined {
-    if (this.hosting(npc)) return this.hub.chooser(a, cs);
+    if (this.hosting(npc)) {
+      const due = this.dueAct(npc);
+      return due && cs.some((c) => c.act === due) ? due : this.hub.chooser(a, cs);
+    }
     const host = this.hosts.get(npc);
     if (!host) return null; // nobody runs this mind: utility here
     const act = this.remote.get(npc);
@@ -257,13 +273,107 @@ export class NpcVillage {
   async reply(npc: Npc, player: string, line: string, to?: string, scene?: string): Promise<{ text: string; source: string } | null> {
     const m = this.hub.minds.get(npc);
     this.hold(npc);
-    if (!m || !this.hosting(npc) || !this.hasModel()) return null;
-    const ans = await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
+    if (!m || !this.hosting(npc)) return null;
+    const answer = await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    if (!this.hasModel() && !answer) return null;
+    const ans = this.hasModel()
+      ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => answer })
+      : { value: answer, source: "rules" };
     if (!ans.value) return null;
     const g = gameTime(this.v.t);
     remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);
     if (this.hosting(npc)) this.out.line(to ? { who: npc, say: ans.value, to } : { who: npc, say: ans.value });
     return { text: ans.value, source: ans.source };
+  }
+
+  // Is this line an invitation? If so the NPC decides from who it is and how it feels about the player, and an
+  // accepted one becomes a promise. Returns the plain answer, for when no model words it.
+  private async invited(npc: Npc, m: Mind, player: string, playerId: string, line: string): Promise<string | null> {
+    if (!INVITE_HINT.test(line)) return null;
+    const today = gameTime(this.v.t).day;
+    const rules = extractRules(line, today);
+    m.thinking = "whether to go";
+    try {
+      const said = this.hasModel()
+        ? (await this.sched.ask({ prio: PRIO.talk, timeoutMs: 15000, req: extractPrompt(line), parse: (t) => parseExtract(t, today), fallback: () => rules })).value
+        : rules;
+      if (!said) return null;
+      const invite = { ...said, occasion: rules?.occasion ?? "" };
+      if (!this.env.spots[ACTIVITY.get(invite.act)!.place]?.length) {
+        remember(m.mem, today, clockLabel(gameTime(this.v.t).hour), `${player} asked me to ${invite.act}, but there is nowhere for it here`);
+        return `I would, ${player}, but there is nowhere to ${invite.act} around here.`;
+      }
+      const conflicts = dueNow(m.mem.promises, invite.day, invite.phase).length;
+      const score = inviteScore(m.persona, this.v.rel.get(pairKey(npc, player)) ?? 0, invite.act, conflicts);
+      const decision = this.hasModel()
+        ? (await this.sched.ask({ prio: PRIO.talk, timeoutMs: 15000, req: decidePrompt(m.persona, m.mem, invite, player, score), parse: parseDecision, fallback: () => ruleDecision(score) })).value
+        : ruleDecision(score);
+      const g = gameTime(this.v.t);
+      if (decision === "accept") {
+        const c: Commitment = { ...invite, id: `${npc}${this.v.nextId++}`, from: player, fromId: playerId, state: "open", importance: invite.occasion ? 8 : 5 };
+        m.mem.promises = addCommitment(m.mem.promises, c);
+        this.out.line({ who: npc, mem: promiseLine(c) });
+      }
+      const event = invite.occasion || invite.act;
+      remember(m.mem, g.day, clockLabel(g.hour), `${player} invited me to ${event}, ${invite.day === g.day ? "today" : "tomorrow"} ${invite.phase}. I ${decision === "accept" ? "promised to go" : decision === "counter" ? "asked for another time" : "said no"}`);
+      return answerLine(decision, invite, player);
+    } finally {
+      m.thinking = "";
+    }
+  }
+
+  // The activity this NPC promised for right now, if any.
+  private dueAct(npc: string): string | null {
+    const m = this.hub.minds.get(npc);
+    if (!m) return null;
+    const g = gameTime(this.v.t);
+    return dueNow(m.mem.promises, g.day, g.phase)[0]?.act ?? null;
+  }
+
+  private settlePromise(npc: Npc, m: Mind, c: Commitment, state: "kept" | "broken"): void {
+    m.mem.promises = settle(m.mem.promises, c.id, state);
+    const g = gameTime(this.v.t);
+    const text = outcomeMemory(c, state);
+    remember(m.mem, g.day, clockLabel(g.hour), text);
+    addFact(m.mem, text);
+    bump(this.v.rel, npc, c.from, outcomeAffinity(m.persona, state));
+    this.out.line({ who: npc, mem: promiseLine({ ...c, state }) });
+  }
+
+  // Promises at work: leave for it when it is due, and end it by who actually showed up.
+  private keepPromises(): void {
+    const g = gameTime(this.v.t);
+    for (const npc of NPCS) {
+      const m = this.hub.minds.get(npc);
+      const a = this.v.agents.find((x) => x.id === npc);
+      if (!m || !a || !this.hosting(npc)) continue;
+      for (const c of missed(m.mem.promises, g.day, g.phase)) {
+        // Only someone who was there can be stood up; a place that went missing is nobody's fault.
+        if (!this.arrived.has(c.id)) {
+          m.mem.promises = settle(m.mem.promises, c.id, "cancelled");
+          this.out.line({ who: npc, mem: promiseLine({ ...c, state: "cancelled" }) });
+          continue;
+        }
+        this.settlePromise(npc, m, c, "broken");
+        this.said(npc, `${c.from} never came...`);
+      }
+      for (const c of dueNow(m.mem.promises, g.day, g.phase)) {
+        if (!this.leaving.has(c.id)) {
+          this.leaving.add(c.id);
+          this.said(npc, `Time to go, I promised ${c.from}!`);
+        }
+        const there = a.act === c.act && (a.state === "wait" || a.state === "do");
+        if (there) this.arrived.add(c.id);
+        const guest = there && this.people().find((p) => (p.id === c.fromId || p.name === c.from) && Math.hypot(p.pos.x - a.pos.x, p.pos.z - a.pos.z) < PROMISE_DIST);
+        if (!guest) continue;
+        // The player counts as company, so the activity starts without waiting for another villager.
+        const party = this.v.gatherings.find((x) => x.id === a.gather);
+        if (party) party.started = true;
+        a.state = "do";
+        this.settlePromise(npc, m, c, "kept");
+        this.said(npc, /birthday/.test(c.occasion) ? `Happy birthday, ${c.from}!` : `Glad you came, ${c.from}!`);
+      }
+    }
   }
 
   private said(npc: Npc, text: string, to?: string): void {
@@ -277,6 +387,7 @@ export class NpcVillage {
     const ev = stepVillage(this.v, dt, this.env);
     this.hub.onEvents(ev);
     this.hub.tick();
+    this.keepPromises();
     this.social();
     for (const e of ev) if (e.kind === "start" && this.hosting(e.who as Npc)) this.out.line({ who: e.who, act: e.act });
     // New memories of the NPCs I host go to the room, so the next host remembers them.

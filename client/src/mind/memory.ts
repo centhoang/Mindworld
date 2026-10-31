@@ -3,6 +3,7 @@
 // browser model's prompt.
 
 import type { Phase } from "../life/clock";
+import type { Commitment } from "./promises";
 
 export const LOG_MAX = 30;
 export const FACTS_MAX = 6;
@@ -19,10 +20,11 @@ export interface MindMemory {
   plan: Partial<Record<Phase, string[]>>;
   planDay: number; // the day the plan was made (-1 = never)
   reflectDay: number;
+  promises: Commitment[]; // what this mind agreed to (promises.ts)
 }
 
 export function emptyMemory(): MindMemory {
-  return { log: [], facts: [], plan: {}, planDay: -1, reflectDay: -1 };
+  return { log: [], facts: [], plan: {}, planDay: -1, reflectDay: -1, promises: [] };
 }
 
 export function remember(m: MindMemory, day: number, time: string, text: string): void {
@@ -64,5 +66,6 @@ export function parseMemory(raw: unknown): MindMemory {
   if (r.plan && typeof r.plan === "object") m.plan = r.plan;
   if (typeof r.planDay === "number") m.planDay = r.planDay;
   if (typeof r.reflectDay === "number") m.reflectDay = r.reflectDay;
+  if (Array.isArray(r.promises)) m.promises = r.promises.filter((c) => c && typeof c.id === "string" && typeof c.act === "string" && typeof c.day === "number");
   return m;
 }

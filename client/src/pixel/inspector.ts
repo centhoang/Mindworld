@@ -30,6 +30,8 @@ export function drawInspector(g: Ctx, m: Mind, a: Agent, rel: Map<string, number
   const now = m.thinking ? `THINKING: ${m.thinking}...` : a.act ? `NOW: ${ACTIVITY.get(a.act)?.label ?? a.act}${a.state === "walk" ? " (on the way)" : a.state === "wait" ? " (waiting for friends)" : ""}` : "NOW: deciding";
   add(now, PAL.woodD);
   add(`PLAN: ${PLAN_PHASES.map((ph) => `${SHORT[ph]} ${m.mem.plan[ph]?.[0] ?? "-"}`).join("  ")}`);
+  const promised = m.mem.promises.filter((c) => c.state === "open").slice(0, 2);
+  if (promised.length) add(`PROMISED: ${promised.map((c) => `${c.from}, ${c.occasion || c.act}, day ${c.day + 1} ${c.phase}`).join("; ")}`);
   const fr = friends(rel, p.id, 1).slice(0, 3);
   add(`FRIENDS: ${fr.length ? fr.map((f) => `${names(f.id)} ${f.affinity}`).join(", ") : "none yet"}`);
   if (m.mem.facts.length) add(`KNOWS: ${m.mem.facts[m.mem.facts.length - 1]}`, PAL.woodD);

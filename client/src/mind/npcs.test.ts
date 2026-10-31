@@ -1,3 +1,5 @@
+import { DAY_SECONDS, gameTime } from "../life/clock";
+import { pairKey } from "../life/relations";
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sim/rng";
 import type { MindLine } from "../world/live";
@@ -195,5 +197,92 @@ describe("NpcVillage talks to pets", () => {
     expect(said().length).toBe(2); // both pets talked to recently
     await tick(200);
     expect(said().length).toBe(3); // the pair gap is over
+  });
+
+  describe("promises", () => {
+    const LINE = "come to my birthday party tomorrow evening, we will dance!";
+    const setup = () => {
+      const m = make();
+      m.nv.people = () => [];
+      return { ...m, pip: m.nv.hub.minds.get("pip")! };
+    };
+    const eveningOf = (day: number) => {
+      let t = day * DAY_SECONDS;
+      while (gameTime(t).phase !== "evening") t += 10;
+      return t;
+    };
+    const tick = (nv: NpcVillage, seconds: number) => {
+      for (let i = 0; i < seconds * 4; i++) nv.step(0.25, nv.v.t + 0.25);
+    };
+
+    it("turns an invitation into a promise, without a model too", async () => {
+      const { nv, pip, lines } = setup();
+      const r = await nv.reply("pip", "Kai", LINE);
+      expect(r?.text).toContain("Yes, Kai");
+      expect(pip.mem.promises[0]).toMatchObject({ from: "Kai", act: "dance", occasion: "birthday party", phase: "evening", day: 1, state: "open" });
+      expect(lines.some((l) => (l as { mem?: string }).mem?.startsWith("promise|"))).toBe(true);
+    });
+
+    it("lets a stranger with no interest decline, so no promise is made", async () => {
+      const { nv } = setup();
+      nv.v.rel.set(pairKey("elder", "Kai"), -100);
+      const r = await nv.reply("elder", "Kai", "come fishing tomorrow morning");
+      expect(r?.text).not.toContain("Yes");
+      expect(nv.hub.minds.get("elder")!.mem.promises).toEqual([]);
+    });
+
+    it("goes when it is due, and a player who shows up keeps it", async () => {
+      const { nv, pip } = setup();
+      await nv.reply("pip", "Kai", LINE);
+      nv.v.t = eveningOf(1);
+      const a = nv.v.agents.find((x) => x.id === "pip")!;
+      Object.assign(a, { state: "idle", act: null, idle: 0, gather: null });
+      nv.people = () => [{ id: "me", name: "Kai", pos: a.pos }];
+      tick(nv, 40);
+      expect(pip.mem.promises[0]!.state).toBe("kept");
+      expect(nv.v.rel.get(pairKey("pip", "Kai"))).toBeGreaterThan(0);
+      expect(pip.mem.facts.join()).toContain("I went and Kai came");
+    });
+
+    it("remembers being stood up, and likes the player less", async () => {
+      const { nv, pip } = setup();
+      await nv.reply("pip", "Kai", LINE);
+      nv.v.t = eveningOf(1);
+      const a = nv.v.agents.find((x) => x.id === "pip")!;
+      Object.assign(a, { state: "idle", act: null, idle: 0, gather: null });
+      tick(nv, 10);
+      nv.v.t = eveningOf(2);
+      tick(nv, 1);
+      expect(pip.mem.promises[0]!.state).toBe("broken");
+      expect(nv.v.rel.get(pairKey("pip", "Kai"))).toBeLessThan(0);
+      expect(pip.mem.facts.join()).toContain("Kai stood me up");
+    });
+
+    it("does not blame the player when the NPC never got there", async () => {
+      const { nv, pip } = setup();
+      await nv.reply("pip", "Kai", LINE);
+      nv.v.t = eveningOf(2);
+      tick(nv, 1);
+      expect(pip.mem.promises[0]!.state).toBe("cancelled");
+      expect(nv.v.rel.get(pairKey("pip", "Kai")) ?? 0).toBe(0);
+    });
+
+    it("says so when there is nowhere to do it, and promises nothing", async () => {
+      const { nv, pip } = setup();
+      nv.setSpots({ ...nv.env.spots, lawn: [] });
+      const r = await nv.reply("pip", "Kai", LINE);
+      expect(r?.text).toContain("nowhere");
+      expect(pip.mem.promises).toEqual([]);
+    });
+
+    it("hands an open promise to the next host through the room log", async () => {
+      const { nv, pip, lines } = setup();
+      await nv.reply("pip", "Kai", LINE);
+      const line = (lines.map((l) => (l as { mem?: string }).mem).find((x) => x?.startsWith("promise|")))!;
+      pip.mem.promises = [];
+      nv.setMemory("pip", ["08:10 ate", line]);
+      expect(pip.mem.promises[0]).toMatchObject({ from: "Kai", state: "open" });
+      expect(pip.mem.log.map((e) => e.text).join()).not.toContain("promise|");
+    });
   });
 });
