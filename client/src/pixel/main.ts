@@ -407,6 +407,14 @@ out.addEventListener("pointerdown", (e) => {
 });
 resize();
 
+// The stall is a person: closed outside the keeper's hours, and the keeper may refuse you (then you can talk it out).
+function openStall(): void {
+  const deal = world.npcs?.dealWith(liveName(myGenes()));
+  if (!deal || deal.ok) crate = { cursor: 0 };
+  else if (deal.refused) openChat(deal.npc);
+  else world.say("me", deal.text, 4);
+}
+
 function menuKey(k: string): void {
   if (!menu) {
     if (k === "e" || k === "enter") {
@@ -418,8 +426,8 @@ function menuKey(k: string): void {
         toast = null;
         interior.enter();
       } else if (bed >= 0) useBed(bed);
+      else if (world.nearStall()) openStall();
       else if (world.npcNear()) openChat(world.npcNear()!);
-      else if (world.nearStall()) crate = { cursor: 0 };
       else if (world.messNear() !== null) {
         world.cleanMess(world.messNear()!);
         world.say("me", "All clean!", 1.5);

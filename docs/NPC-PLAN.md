@@ -40,6 +40,8 @@ floor, come?" Then, with no script:
 | **Initiative** | greet | NPCs come to you: offer a trade, invite you to soccer, challenge you, ask for help, follow up on what you said |
 | **Indistinguishable** | NPC tag, different sprites | Same layered sprites (base + hair + tools), same speed, same name style, same bubbles, typing delay, small human errors. Inspector stays as the proof tool |
 
+**Jobs and the right to say no (user, 2026-10-31).** A job holder works its hours and lives its own life outside them: Ama keeps the market stall (morning, noon), Mo fishes, Pip cuts wood, the Elder tends herbs. Nothing is forced: any NPC can decide to do or not do anything, with a reason. It can skip a shift (tired, promised someone, feels like playing). It can refuse a deal: a buyer who was rude, now or before, or who broke a promise, gets turned away by the keeper until they make it up. Next: more jobs and refusals (gifts, chats, trades) on the same pattern, and the `deal` model task in N4.
+
 Example reasoning chains to support: A has few coins and sees carrots priced high on the board, so A plants carrots, then
 offers them to the player who "likes carrots". A lost a duel to B, so A trains and asks for a rematch. A trusts C less
 after a broken promise, so A asks C to pay first. A heard of a wild pet by the pond from Mo, saves, and goes to tame it.

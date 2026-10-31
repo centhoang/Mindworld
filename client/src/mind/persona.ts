@@ -3,6 +3,7 @@
 // authored cards. Traits also bias the needs sim, so personality shows even when no model is loaded.
 
 import type { Genes } from "../sim/ghost";
+import type { Phase } from "../life/clock";
 import type { Kind } from "../life/needs";
 
 export interface Persona {
@@ -13,6 +14,13 @@ export interface Persona {
   hobbies: string[];
   habit: string;
   background: string;
+  job?: Job;
+}
+
+export interface Job {
+  title: string;
+  act: string; // the activity that is the work
+  phases: Phase[]; // working hours
 }
 
 const TRAITS = ["playful", "sleepy", "greedy", "tidy", "chatty", "curious", "grumpy", "gentle"] as const;
@@ -42,10 +50,10 @@ export function petPersona(name: string, g: Genes): Persona {
 
 // The village's people (stage 4 places them on the map; their minds are hosted by players).
 export const VILLAGERS: readonly Persona[] = [
-  { id: "elder", name: "Elder", kind: "human", traits: ["wise", "gentle", "chatty"], hobbies: ["telling old stories", "tending herbs"], habit: "naps after lunch", background: "The Elder has lived on the islands longest and remembers every pet." },
-  { id: "mo", name: "Mo", kind: "human", traits: ["calm", "curious", "patient"], hobbies: ["fishing", "whittling"], habit: "fishes at dawn", background: "Mo the fisher knows every pond and shares the catch at picnics." },
-  { id: "ama", name: "Ama", kind: "human", traits: ["tidy", "generous", "chatty"], hobbies: ["cooking", "throwing parties"], habit: "cleans up after everyone", background: "Ama cooks for the whole village and loves a good party." },
-  { id: "pip", name: "Pip", kind: "human", traits: ["playful", "loud", "curious"], hobbies: ["soccer", "dancing"], habit: "challenges everyone to a game", background: "Pip is the village kid who never stops running." },
+  { id: "elder", name: "Elder", kind: "human", traits: ["wise", "gentle", "chatty"], hobbies: ["telling old stories", "tending herbs"], habit: "naps after lunch", background: "The Elder has lived on the islands longest and remembers every pet.", job: { title: "herbalist", act: "tend", phases: ["morning"] } },
+  { id: "mo", name: "Mo", kind: "human", traits: ["calm", "curious", "patient"], hobbies: ["fishing", "whittling"], habit: "fishes at dawn", background: "Mo the fisher knows every pond and shares the catch at picnics.", job: { title: "fisher", act: "fish", phases: ["morning"] } },
+  { id: "ama", name: "Ama", kind: "human", traits: ["tidy", "generous", "chatty"], hobbies: ["cooking", "throwing parties"], habit: "cleans up after everyone", background: "Ama keeps the market stall, cooks for the whole village and loves a good party.", job: { title: "market keeper", act: "sell", phases: ["morning", "noon"] } },
+  { id: "pip", name: "Pip", kind: "human", traits: ["playful", "loud", "curious"], hobbies: ["soccer", "dancing"], habit: "challenges everyone to a game", background: "Pip cuts wood for the village and never stops running.", job: { title: "wood-cutter", act: "chop", phases: ["noon"] } },
 ];
 
 // Small nudges on the needs sim's scores: who someone is changes what they pick, model or not.
@@ -69,5 +77,5 @@ export function traitBias(p: Persona, act: string): number {
 
 // The persona as prompt text (kept short: the browser model has a small context).
 export function personaCard(p: Persona): string {
-  return `${p.name} (${p.kind}). Traits: ${p.traits.join(", ")}. Hobbies: ${p.hobbies.join(", ")}. Habit: ${p.habit}. ${p.background}`;
+  return `${p.name} (${p.kind}). Traits: ${p.traits.join(", ")}. Hobbies: ${p.hobbies.join(", ")}. Habit: ${p.habit}. ${p.background}${p.job ? ` Works as ${p.job.title}, ${p.job.phases.join(" and ")}.` : ""}`;
 }

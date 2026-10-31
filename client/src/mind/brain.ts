@@ -165,7 +165,7 @@ export function scriptedLine(p: Persona, other: Persona, turn: number, k: number
 const PAST: Record<string, string> = {
   eat: "ate at the bowl", sleep: "slept", nap: "took a nap", poop: "pooped on the lawn", groom: "groomed", ball: "played ball",
   dance: "danced", wander: "wandered around", cook: "cooked", clean: "cleaned up a mess", feed: "fed the pets", fish: "went fishing",
-  picnic: "had a picnic", soccer: "played soccer",
+  picnic: "had a picnic", soccer: "played soccer", sell: "worked the market stall", chop: "chopped wood", tend: "tended the herbs",
 };
 export function eventText(act: string, mates: readonly string[]): string {
   const verb = PAST[act] ?? ACTIVITY.get(act)?.label ?? act;

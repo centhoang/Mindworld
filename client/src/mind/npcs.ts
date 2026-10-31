@@ -14,6 +14,7 @@ import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, script
 import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, holdsGrudge, hurt, parseBeliefLine, parseBondLine, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { VILLAGERS, type Persona } from "./persona";
+import { JOB_PULL, refuseLine, refusesDeal, shiftChoice, type Duty } from "./jobs";
 import { addCommitment, answerLine, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
 import { PRIO, type MindScheduler } from "./scheduler";
@@ -24,6 +25,7 @@ export interface NpcOut {
   think?(id: Npc, text: string): void; // a thought bubble: only this screen sees it
 }
 
+const personaOf = (id: string): Persona | undefined => VILLAGERS.find((p) => p.id === id);
 const SPOT_NAME: Record<string, string> = { lawn: "the lawn", picnic: "the picnic spot", playground: "the playground", pond: "the pond" }; // places told to a guest
 
 const REMOTE_WAIT = 20; // seconds a replaying NPC waits for its host's choice before deciding itself
@@ -56,6 +58,8 @@ export interface Person {
   pos: Vec;
 }
 
+export type Deal = { ok: true } | { ok: false; npc: Npc; refused: boolean; text: string };
+
 export class NpcVillage {
   readonly v = newVillage();
   readonly env: Env;
@@ -77,6 +81,7 @@ export class NpcVillage {
   private readonly arrived = new Set<string>(); // promises the NPC turned up for
   private readonly wired = new Map<string, Set<string>>(); // npc -> bond and belief lines the room has
   private readonly raised = new Set<string>(); // grudges the NPC already brought up to the person's face
+  private readonly duties = new Map<string, Duty>(); // "npc:day:phase" -> what it chose for that shift
 
   constructor(
     private readonly sched: MindScheduler,
@@ -90,7 +95,7 @@ export class NpcVillage {
   ) {
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
     this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
-    this.env = { spots, canWalk, route, rng, bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0), chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
+    this.env = { spots, canWalk, route, rng, bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
     for (const n of NPCS) this.setHost(n, null);
   }
 
@@ -262,7 +267,7 @@ export class NpcVillage {
 
   private choose(npc: Npc, a: Agent, cs: Choice[], v: Village): string | null | undefined {
     if (this.hosting(npc)) {
-      const due = this.dueAct(npc);
+      const due = this.dueAct(npc) ?? (this.duty(a).work ? personaOf(npc)?.job?.act ?? null : null);
       return due && cs.some((c) => c.act === due) ? due : this.hub.chooser(a, cs);
     }
     const host = this.hosts.get(npc);
@@ -293,9 +298,9 @@ export class NpcVillage {
   async reply(npc: Npc, player: string, line: string, to?: string, scene?: string): Promise<{ text: string; source: string } | null> {
     const m = this.hub.minds.get(npc);
     this.hold(npc);
-    if (!m || !this.hosting(npc)) return null;
     const g0 = gameTime(this.v.t);
-    this.listen(npc, m, player, line, g0.day);
+    this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
+    if (!m || !this.hosting(npc)) return null;
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
     const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     if (!this.hasModel() && !answer) return null;
@@ -308,12 +313,58 @@ export class NpcVillage {
     return { text: ans.value, source: ans.source };
   }
 
+  // A shift is decided once, when it starts, and the reason stays in the NPC's memory.
+  private duty(a: Agent): Duty {
+    const p = personaOf(a.id);
+    const g = gameTime(this.v.t);
+    const key = `${a.id}:${g.day}:${g.phase}`;
+    const known = this.duties.get(key);
+    if (known || !p) return known ?? { work: false, why: "" };
+    const m = this.hub.minds.get(a.id);
+    const promised = m ? dueNow(m.mem.promises, g.day, g.phase)[0]?.from ?? "" : "";
+    const d = shiftChoice(p, a.needs, g.phase, g.day, promised);
+    this.duties.set(key, d);
+    if (m && d.why) {
+      m.mem.why = d.why;
+      if (!d.work) remember(m.mem, g.day, clockLabel(g.hour), d.why.split(" > ").slice(1).join(", "));
+      this.out.think?.(a.id as Npc, d.work ? `Time for work.` : d.why.split(" > ")[1]!);
+    }
+    return d;
+  }
+
+  // Memory of an NPC whether or not its mind runs here: a player's manners still count when someone else hosts it.
+  private memOf(npc: Npc): MindMemory {
+    const m = this.hub.minds.get(npc)?.mem ?? this.mems.get(npc) ?? emptyMemory();
+    if (!this.hub.minds.has(npc)) this.mems.set(npc, m);
+    return m;
+  }
+
+  // The player wants to trade at the stall: is the keeper there, and will it deal with them?
+  dealWith(player: string): Deal {
+    const keeper = VILLAGERS.find((p) => p.job?.act === "sell")!;
+    const npc = keeper.id as Npc;
+    const a = this.v.agents.find((x) => x.id === npc);
+    if (!a) return { ok: true };
+    const open = a.act === "sell" && a.state !== "walk";
+    if (!open) return { ok: false, npc, refused: false, text: `The stall is closed. ${keeper.name} ${ACTIVITY.get(a.act ?? "")?.label ?? "is away"}. Open ${keeper.job!.phases.join(" and ")}.` };
+    const mem = this.memOf(npc);
+    const b = bondOf(mem, player);
+    if (!refusesDeal(keeper, b)) return { ok: true };
+    const text = refuseLine(b, player);
+    const g = gameTime(this.v.t);
+    mem.why = `${b?.why.at(-1)?.text ?? "bad blood"} > ${b ? feelWord(b) : "wary of"} ${player} > refused to deal`;
+    remember(mem, g.day, clockLabel(g.hour), `refused to deal with ${player}`, 5);
+    this.hold(npc);
+    this.said(npc, text, player);
+    return { ok: false, npc, refused: true, text };
+  }
+
   // What a line tells the NPC about the speaker: how they treat it, and what they like.
-  private listen(npc: Npc, m: Mind, player: string, line: string, day: number): void {
+  private listen(npc: Npc, p: Persona, mem: MindMemory, player: string, line: string, day: number): void {
     const tone = toneOf(line);
-    if (tone === "sorry" ? bondOf(m.mem, player) : tone) bump(this.v.rel, npc, player, feel(m.mem, m.persona, player, tone!, day, tone === "sorry" ? `${player} said sorry` : `${player} was ${tone} to me`));
+    if (tone === "sorry" ? bondOf(mem, player) : tone) bump(this.v.rel, npc, player, feel(mem, p, player, tone!, day, tone === "sorry" ? `${player} said sorry` : `${player} was ${tone} to me`));
     const belief = beliefFrom(line);
-    if (belief) addBelief(m.mem, { about: player, text: belief, source: "", conf: 0.8, day });
+    if (belief) addBelief(mem, { about: player, text: belief, source: "", conf: 0.8, day });
   }
 
   // Is this line an invitation? If so the NPC decides from who it is and how it feels about the player, and an

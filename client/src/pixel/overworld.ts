@@ -235,7 +235,8 @@ export class Overworld {
     const ring = (c: Platform | undefined, r: number, n: number, dz = 0) =>
       c ? Array.from({ length: n }, (_, i) => ({ x: c.x + Math.cos((i / n) * Math.PI * 2) * r, z: c.z + dz + Math.sin((i / n) * Math.PI * 2) * r * 0.8 })).filter((q) => this.canWalk(q.x, q.z)) : [];
     const away = this.betweenSpots(hub.map((p) => p.cell), plaza ? { x: plaza.x, z: plaza.z + 2 } : undefined);
-    const out: Spots = { ...away, home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 3.5, 10), picnic: [...ring(plaza, 2, 6, 2), ...(away.picnic ?? [])] };
+    const out: Spots = { ...away, home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 3.5, 10), picnic: [...ring(plaza, 2, 6, 2), ...(away.picnic ?? [])], woods: ring(plaza, 5.5, 10) };
+    if (this.stall) out.stall = [{ x: this.stall.x, z: this.stall.z + 1.2 }];
     for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
     return out;
   }
@@ -955,7 +956,7 @@ export class Overworld {
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
-        : this.npcNear() ? "E: TALK" : this.nearStall() ? "E: MARKET" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
+        : this.nearStall() ? "E: MARKET" : this.npcNear() ? "E: TALK" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
     if (hint) {
       const w = hint.length * GLYPH + 12;
       drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);

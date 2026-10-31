@@ -97,7 +97,7 @@ export function bondText(m: MindMemory, who: string): string {
 // "My" reason, said to the person: "Kai stood me up" -> "you stood me up".
 export const toYou = (text: string, who: string): string => text.split(`${who}'s`).join("your").split(who).join("you").replace("you was", "you were");
 
-const WHY_BAD = /\bwhy\b.*\b(?:hate|dislike|don't (?:you )?like|do not like|mad|angry|upset|cold|cool|avoid\w*|ignor\w*|don't trust|sad)\b|\bare you (?:mad|angry|upset)\b/i;
+const WHY_BAD = /\bwhy\b.*\b(?:hate|dislike|don't (?:you )?like|do not like|mad|angry|upset|cold|cool|avoid\w*|ignor\w*|don't trust|sad|won't|wont|refus\w*)\b|\bare you (?:mad|angry|upset)\b/i;
 const WHY_GOOD = /\bwhy\b.*\b(?:like|trust|love)\b.*\bme\b/i;
 
 // A question about the relationship gets its real reason, with or without a model. Null = not such a question.

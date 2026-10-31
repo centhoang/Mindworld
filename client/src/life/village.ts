@@ -69,6 +69,7 @@ export interface Env {
   // undefined = still thinking (the agent waits a moment and asks again).
   chooser?: (a: Agent, choices: Choice[], v: Village) => string | null | undefined;
   bias?: (a: Agent, act: string) => number; // personality nudge on the scores
+  jobOf?: (a: Agent) => string | null; // the job activity only this agent may do
   route?: (from: Vec, to: Vec) => Vec[] | null; // waypoints around water (null = no route: walk straight)
 }
 
@@ -110,6 +111,7 @@ export function validChoices(a: Agent, v: Village, env: Env): Choice[] {
     if (def.place === "mess") {
       if (!v.messes.some((m) => !claimed(v, m.id))) continue;
     } else if (!env.spots[def.place]?.length) continue;
+    if (def.jobOnly && env.jobOf?.(a) !== def.id) continue;
     const s = score(a, def, v, phase) + (env.bias?.(a, def.id) ?? 0);
     if (def.min > 1) {
       const open = v.gatherings.find((g) => g.act === def.id && g.members.length > 0 && g.members.length < def.max); // late joiners welcome

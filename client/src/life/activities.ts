@@ -6,7 +6,7 @@ import type { Kind, Needs } from "./needs";
 import type { Phase } from "./clock";
 
 // Spots on a ground. "home" = anywhere on your own ground; the others are props placed by the world.
-export type Place = "home" | "bowl" | "bed" | "lawn" | "mess" | "pet" | "playground" | "picnic" | "pond" | "plaza";
+export type Place = "home" | "bowl" | "bed" | "lawn" | "mess" | "pet" | "playground" | "picnic" | "pond" | "plaza" | "stall" | "woods";
 export type Pose = "stand" | "sleep" | "eat" | "dance" | "kick" | "squat" | "sit" | "fish" | "sweep" | "wiggle" | "cook";
 
 export interface ActivityDef {
@@ -22,6 +22,7 @@ export interface ActivityDef {
   phases?: Phase[]; // only at these times of day
   makes?: "poop"; // leaves a mess where it ended
   needsMess?: boolean; // only when a mess exists (clean)
+  jobOnly?: boolean; // only for the villager who has this job
 }
 
 export const ACTIVITIES: readonly ActivityDef[] = [
@@ -38,6 +39,9 @@ export const ACTIVITIES: readonly ActivityDef[] = [
   { id: "cook", label: "cooks", who: "human", place: "home", minutes: 50, min: 1, max: 2, fx: { hunger: 50, fun: 10 }, pose: "cook", phases: ["morning", "noon", "evening"] },
   { id: "clean", label: "cleans up", who: "human", place: "mess", minutes: 15, min: 1, max: 1, fx: { fun: -3, hygiene: -5 }, pose: "sweep", needsMess: true },
   { id: "feed", label: "feeds the pets", who: "human", place: "bowl", minutes: 15, min: 1, max: 1, fx: { social: 15 }, pose: "stand" },
+  { id: "sell", label: "runs the market stall", who: "human", place: "stall", minutes: 120, min: 1, max: 1, fx: { social: 25, fun: 5 }, pose: "stand", jobOnly: true },
+  { id: "chop", label: "chops wood", who: "human", place: "woods", minutes: 90, min: 1, max: 1, fx: { fun: 10, energy: -15 }, pose: "sweep", jobOnly: true },
+  { id: "tend", label: "tends herbs", who: "human", place: "home", minutes: 90, min: 1, max: 1, fx: { fun: 15 }, pose: "stand", jobOnly: true },
   { id: "fish", label: "fishes", who: "human", place: "pond", minutes: 90, min: 1, max: 3, fx: { fun: 35, hunger: 10 }, pose: "fish", phases: ["morning", "noon", "evening"] },
   { id: "picnic", label: "has a picnic", who: "any", place: "picnic", minutes: 60, min: 2, max: 6, fx: { hunger: 40, social: 40, fun: 20 }, pose: "sit", phases: ["noon", "evening"] },
   { id: "soccer", label: "plays soccer", who: "any", place: "playground", minutes: 60, min: 2, max: 6, fx: { fun: 55, social: 30, energy: -25, hygiene: -10 }, pose: "kick", phases: ["morning", "noon", "evening"] },

@@ -150,7 +150,7 @@ export class MindHub {
   tick(): void {
     this.sched.pump();
     const now = this.now();
-    const options = [...new Set([...ACTIVITY.values()].filter((d) => d.id !== "poop" && d.id !== "sleep" && this.places.has(d.place)).map((d) => d.id))];
+    const options = [...new Set([...ACTIVITY.values()].filter((d) => d.id !== "poop" && d.id !== "sleep" && !d.jobOnly && this.places.has(d.place)).map((d) => d.id))];
     for (const a of this.v.agents) {
       const m = this.minds.get(a.id);
       if (!m) continue;
