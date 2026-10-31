@@ -3,11 +3,13 @@
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/NPC-PLAN.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **7c9766d6**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 278, worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **e02624d8**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client 449 (164 are promises.test.ts), worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
 - **Done 2026-10-31:** power mode removed (`finetune/native-voice.ts` keeps the bench client, GGUFs stay). Limits lifted: CloudMind gap 0, MAX_DAILY_USD 30, CLIENT_DAILY_USD 10, CLIENT_PER_MINUTE 120; MAX_TOTAL_USD_* stay the hard stop. Caps come back down after the event.
 - **Setup gate** (pixel/setup.ts, #setup in index.html): checks the adapter first. capable = download + warm-up, then the game; weak Intel on Windows = steps + re-check; none/mobile = straight in. Remembered per GPU in `mindworld.setup.v1`; a return visit opens at once and loads in the background. Dev: `?gpu=switch|capable|none|skip`. Checked in the pane on a real Intel Gen 9 (guide, exit, remembered). The capable path with a real download has NOT been run: user's GTX 1050 is the first test.
 - **Private chats** (worker/src/room.ts): lines to a player reach that player only; other mind lines reach players within HEAR_DIST 14 tiles plus the host of the NPC spoken to; room chat stays public. `talk` = busy state, "talking..." bubble, new chats refused, ends on close, disconnect or 45 s silence (clients renew every 15 s). Checked on the real Durable Object with 3 sockets (worker-mock on port 8799).
+- **N1 Promises live** (mind/promises.ts, wired in mind/npcs.ts `invited` + `keepPromises`): chat line -> extract (model, keyword fallback) -> decide from persona + relationship -> Commitment in `mem.promises` -> at the time the NPC announces and goes -> player within 7 tiles = kept (+affinity, fact, "Happy birthday"); NPC there and player absent = broken (-affinity by personality, fact "stood me up", shows in later replies through memory); NPC never got there = cancelled, no blame. No spot on the map = says so, no promise. Inspector shows PROMISED. Open promises travel to the next host as `promise|...` lines in the room log. Tested by unit tests + the real game objects; not yet played by hand, and the model path (extract/decide) has not run on the tuned 1B or Muse Spark in the browser.
+- Known gaps in N1: an invite to an NPC hosted by another player with no model goes to the cloud chat and makes no promise; the place named by the player is ignored (each activity uses its own spot, so tell the player where); other machines replay `do` only when a start event arrives.
 - Tuned 1B: `Llama-3.2-1B-Mindworld-q4f32_1-MLC` via `/mlc`, chunk 128. **Quote the browser's numbers:** 98.5% village, Teach +19.1 (6 harmful), voice 100%. GGUF: 99.5%, +22.6, 1 harmful.
 - Runtime chains: mind and chat = local -> Muse Spark (`CloudMind`) -> rules. Combat: memo decides, local voice -> scripted. Teach = Muse Spark -> local -> scripted.
 - Credits: Meta ~$149.9, Modal ~$102 left (approx).
@@ -27,12 +29,12 @@
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
-1. **Art:** check Codex's docs/STYLE.md v2 (.scratch/codex-style.md has its note), then brief Codex on gap assets, feed one batch at a time, review on a contact sheet. Keep working meanwhile.
-2. **N1 Promises** (docs/NPC-PLAN.md section 2): Commitment module, extract + decide prompts, calendar drives plans, kept/broken outcomes. The birthday slice is the demo.
-3. **N2 memory + relationships, N3 verbs**, art swap in parallel, **N4 retrain by Nov 2 night** (freeze prompts first), N5, then demo captures and README numbers.
+1. **Art:** review .scratch/art/gen/batch1-sheet.png (Codex art batch 1; note in .scratch/codex-art1.md), accept or send back. Commit client/public/art/gen once accepted (already `git status` untracked until then). Next batches: market stall, modular pets, wild pets. Then the art swap: Sunnyside tiles + layered humans so NPCs share the player's sprites.
+2. **N2 memory + relationships with reasons;** inspector "why" trail; thought bubbles; NPC tells the place when accepting; gossip of broken promises.
+3. **N3 verbs** (NPC farm, wallet, market, town board, trade). **N4 retrain by Nov 2 night:** add extract + decide (and N2/N3 prompts) to gen-village, freeze prompts first. N5, then demo captures and README numbers (credit the Sunnyside pack in README).
 
 ## Gotchas
-- Codex: `scripts/codex.ps1` from the PowerShell tool only (bash has no `powershell`), and a brief with double quotes breaks argument passing: put the brief in `.scratch/brief-*.md` and pass "Read .scratch/brief-x.md and carry it out exactly."
+- Codex: `scripts/codex.ps1` by absolute path (the shell cwd drifts), from the PowerShell tool only (bash has no `powershell`), and a brief with double quotes breaks argument passing: put the brief in `.scratch/brief-*.md` and pass "Read .scratch/brief-x.md and carry it out exactly."
 - worker-mock preview runs on port 8799; raw WebSockets from the page test the room cheaply (`/api/room`, hello first).
 - Dual-GPU Windows: Chrome may give the Intel iGPU even for high-performance; it cannot run the model.
 - Bench pages: edits under client/ make Vite reload them; stop Vite after the page loads. After a GPU crash Chrome refuses WebGPU until restarted (.scratch/mlc/clean.sh).
