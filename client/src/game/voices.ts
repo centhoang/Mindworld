@@ -132,7 +132,7 @@ type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;
 // stock 1B's formats: <repo>-q4f16_1-MLC for GPUs with shader-f16, <repo>-q4f32_1-MLC otherwise. Each runs on the
 // prebuilt stock library of its format, so only the weights differ. The repos are private until submission day, so
 // the Worker serves them on this site (worker/src/mlc.ts). Empty repo = stock 1B only.
-export const TUNED_1B = { repo: "/mlc/{q}/" };
+export const TUNED_1B = { repo: "/mlc/n4/{q}/" }; // a new path per training run: browsers cache weights by URL
 const quantOf = (f16: boolean) => (f16 ? "q4f16_1" : "q4f32_1");
 export const stockId = (f16: boolean) => `Llama-3.2-1B-Instruct-${quantOf(f16)}-MLC`;
 

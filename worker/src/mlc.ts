@@ -4,8 +4,8 @@
 
 const REPO = (q: string) => `kysupo/Llama-3.2-1B-Mindworld-${q}-MLC`;
 export const MLC_REVISIONS: Record<string, string> = {
-  q4f32_1: "9ef99eef40b1a0f77915a6f7343f5ad625bd03a0",
-  q4f16_1: "5d54acb23442fd287da27cc436c1d2dd1deca79e",
+  q4f32_1: "cdaa34b96006e69aa5e77541fc1b4a23979a9a24",
+  q4f16_1: "4538e9ad9198a93aba009250d0777cddf45dd867",
 };
 const FILE = /^(params_shard_\d{1,3}\.bin|tensor-cache\.json|ndarray-cache\.json|mlc-chat-config\.json|tokenizer\.json|tokenizer_config\.json)$/;
 const MAX_REDIRECTS = 3;
@@ -39,7 +39,7 @@ async function fetchHf(url: string, token: string, get: MlcDeps["fetch"]): Promi
 
 export async function handleMlc(path: string, method: string, deps: MlcDeps): Promise<Response> {
   if (method !== "GET") return status(405, "method_not_allowed");
-  const m = /^\/mlc\/([^/]+)\/resolve\/main\/([^/]+)$/.exec(path);
+  const m = /^\/mlc\/(?:n4\/)?([^/]+)\/resolve\/main\/([^/]+)$/.exec(path);
   const rev = m && Object.hasOwn(MLC_REVISIONS, m[1]!) ? MLC_REVISIONS[m[1]!] : undefined;
   if (!m || !rev || !FILE.test(m[2]!)) return status(404, "not_found");
   if (!deps.token) return status(503, "no_token");

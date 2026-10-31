@@ -15,7 +15,7 @@ import pathlib
 
 import modal
 
-RUNS = {"": {"3B": "llama32-3b-e2-r16", "1B": "llama32-1b-e3-r16"}, "village": {"3B": "llama32-3b-village-e2-r16", "1B": "llama32-1b-village-e3-r16"}}
+RUNS = {"": {"3B": "llama32-3b-e2-r16", "1B": "llama32-1b-e3-r16"}, "village": {"3B": "llama32-3b-village-e2-r16", "1B": "llama32-1b-n4-e3-r16"}}
 NAME = {"": "PetMind-Coach", "village": "Mindworld"}  # repo names; the stage 5 model is coach + every village mind
 
 image = modal.Image.debian_slim(python_version="3.12").uv_pip_install("huggingface_hub==0.35.3")

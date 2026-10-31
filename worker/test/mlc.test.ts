@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { handleMlc, type MlcCache, type MlcDeps } from "../src/mlc";
 
 const PATH = "/mlc/q4f32_1/resolve/main/params_shard_0.bin";
+const NEW_PATH = "/mlc/n4/q4f32_1/resolve/main/params_shard_0.bin";
 const ok = (body = "weights") => new Response(body, { headers: { "content-length": String(body.length) } });
 const deps = (over: Partial<MlcDeps> = {}) => ({ token: "secret", fetch: vi.fn<MlcDeps["fetch"]>(async () => ok()), ...over });
 
