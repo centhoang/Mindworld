@@ -43,7 +43,9 @@ export interface MindLine {
   who: string; // one of my pets' names, or an NPC I host
   act?: string;
   say?: string;
-  to?: string; // who the line is said to: a player's live id or an NPC
+  to?: string; // who the line is said to: a player's live id (private) or an NPC
+  x?: number; // where the speaker stands: public lines carry to players nearby
+  z?: number;
   emote?: Emote;
   invite?: { act: string; to?: string };
 }
@@ -54,7 +56,9 @@ const MIND_QUEUE_MS = 12_000;
 export type LiveStatus = "connecting" | "online" | "offline" | "full";
 
 export interface LiveHandlers {
-  welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[], npcs?: Partial<Record<Npc, string>>): void;
+  welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[], npcs?: Partial<Record<Npc, string>>, talks?: [string, string][]): void;
+  talking?(id: string, withWho: string, on: boolean): void; // a private chat started or ended
+  talkNo?(withWho: string): void; // they are busy: my chat did not open
   mind?(from: string, line: MindLine): void; // from = the sender's live id
   npcHost?(npc: Npc, host: string | null): void;
   npcState?(npc: Npc, log: string[]): void; // we host it now: its memory so far
@@ -155,7 +159,19 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
       const id = str(m.id, 16);
       if (!id || !Array.isArray(m.peers)) return;
       const aways = (Array.isArray(m.aways) ? m.aways : []).map(parseAway).filter((a): a is LiveAway => !!a).slice(0, SLOT_COUNT);
-      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, 32), aways, parseNpcs(m.npcs));
+      const talks = (Array.isArray(m.talks) ? m.talks : []).flatMap((t: unknown): [string, string][] => {
+        const [a, b] = Array.isArray(t) ? [str(t[0], 16), str(t[1], 16)] : [null, null];
+        return a && b ? [[a, b]] : [];
+      });
+      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, 32), aways, parseNpcs(m.npcs), talks);
+    }
+    case "talking": {
+      const id = str(m.id, 16), w = str(m.with, 16);
+      return id && w ? h.talking?.(id, w, m.on === true) : undefined;
+    }
+    case "talkNo": {
+      const w = str(m.with, 16);
+      return w ? h.talkNo?.(w) : undefined;
     }
     case "mind": {
       const id = str(m.id, 16), line = parseMind(m);
@@ -353,9 +369,15 @@ export class LiveLink {
     return this.send({ t: "cap", tps, webgpu });
   }
 
-  say(text: string): boolean {
+  // `to` = a player in an open private chat; without it the line is public room chat.
+  say(text: string, to?: string): boolean {
     const t = text.replace(/\s+/g, " ").trim().slice(0, SAY_MAX);
-    return t ? this.send({ t: "say", text: t }) : false;
+    return t ? this.send(to ? { t: "say", text: t, to } : { t: "say", text: t }) : false;
+  }
+
+  // Opens or renews a private chat with a player or an NPC; no argument ends mine.
+  talk(withWho?: string): boolean {
+    return this.send(withWho ? { t: "talk", with: withWho } : { t: "talk" });
   }
 
   // Duels carry the memo rules only (no summary or notes) and the genes.

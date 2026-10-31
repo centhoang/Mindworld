@@ -50,7 +50,7 @@ describe("live messages", () => {
     dispatch(JSON.stringify({ t: "full" }), h);
     for (const bad of ["{", JSON.stringify({ t: "pos", id: "a1", x: "1" }), JSON.stringify({ t: "emote", id: "a1", e: "<b>" }), JSON.stringify({ t: "nuke" })]) dispatch(bad, h);
     expect(log.map((l) => l[0])).toEqual(["welcome", "join", "pos", "emote", "leave", "status"]);
-    expect(log[0]).toEqual(["welcome", "me", 1, [peer], [{ slot: 2, name: "Mo", seed: 9, ttl: 5000 }], {}]);
+    expect(log[0]).toEqual(["welcome", "me", 1, [peer], [{ slot: 2, name: "Mo", seed: 9, ttl: 5000 }], {}, []]);
   });
 
   it("builds ws/wss urls", () => {

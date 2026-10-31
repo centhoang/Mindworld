@@ -163,7 +163,8 @@ export class NpcVillage {
       if (!this.hosting(npc)) return; // moved to another host meanwhile
       c.said.push(`${m.persona.name}: ${ans.value}`);
       m.source = ans.source;
-      this.out.say(npc, ans.value, other.name);
+      // A line to another player is theirs alone: their machine shows it, the host's does not.
+      if (!to || to === this.me || NPCS.includes(to as Npc)) this.out.say(npc, ans.value, other.name);
       this.out.line({ who: npc, say: ans.value, to });
       const g = gameTime(this.v.t);
       if (c.said.length <= 2) remember(m.mem, g.day, clockLabel(g.hour), `talked with ${other.name}`);

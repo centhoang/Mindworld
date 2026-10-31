@@ -5,6 +5,9 @@
 .scratch/
 .claude/settings.local.json
 
+# full art pack: only the sprites the game uses are copied to client/public/art
+VisualAssetPack/
+
 # raw event snapshots (not part of the submission repo)
 EventDetails/
 EventFrontPage/

@@ -37,6 +37,7 @@ import { Interior } from "./interior";
 import { defaultRoom } from "../game/room";
 import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water } from "../game/farm";
 import { drawMenu, type MenuRow } from "./menu";
+import { runSetup, storeSetup } from "./setup";
 import { TeachScreen } from "./teach";
 
 export const LOW_H = 216;
@@ -153,21 +154,39 @@ const interior = new Interior({
 // capped and cached; scripted lines when offline). The pet stops wandering while you talk.
 const chatForm = document.getElementById("chat") as HTMLFormElement;
 const chatInput = chatForm.querySelector("input")!;
-let chatWith: Wild | Npc | "room" | null = null;
-const chatKey = (w: Wild | Npc | "room") => (w === "room" ? "me" : typeof w === "string" ? `n:${w}` : `w${w.id}`);
+interface PeerChat { peer: string }
+type ChatTarget = Wild | Npc | "room" | PeerChat;
+let chatWith: ChatTarget | null = null;
+const isPeerChat = (w: ChatTarget | null): w is PeerChat => typeof w === "object" && w !== null && "peer" in w;
+const chatKey = (w: ChatTarget) => (w === "room" || isPeerChat(w) ? "me" : typeof w === "string" ? `n:${w}` : `w${w.id}`);
+const talkTarget = (w: ChatTarget | null) => (isPeerChat(w) ? w.peer : typeof w === "string" && w !== "room" ? w : null);
+// Private chats: others see a talking status and can't start a chat with those in one (the room enforces it).
+const talks = new Map<string, string>(); // who opened the chat -> who it is with
+const talkKey = (who: string) => (isNpc(who) ? `n:${who}` : `p:${who}`);
+const inMyTalk = (a: string, b: string) => !!world.npcs?.me && (a === world.npcs.me || b === world.npcs.me);
+setInterval(() => {
+  for (const [a, b] of talks) if (!inMyTalk(a, b)) for (const who of [a, b]) world.say(talkKey(who), "talking...", 3);
+}, 2000);
+setInterval(() => {
+  const to = talkTarget(chatWith);
+  if (to && live.status === "online") live.talk(to); // renewal: a silent chat ends on the room's timeout
+}, 15_000);
 const GREET: Record<Npc, string> = { elder: "Ah, a visitor. Ask me anything.", mo: "Shh... the fish are listening. Hello!", ama: "Oh, hello dear! Hungry?", pip: "Hi! Wanna play?" };
-function openChat(w: Wild | Npc | "room"): void {
+function openChat(w: ChatTarget): void {
+  const to = talkTarget(w);
+  if (to && live.status === "online") live.talk(to);
   chatWith = w;
-  if (typeof w !== "string") w.wait = 999;
+  if (typeof w !== "string" && !isPeerChat(w)) w.wait = 999;
   keys.clear();
   chatForm.hidden = false;
   chatInput.value = "";
   chatInput.focus();
-  if (w !== "room") world.say(chatKey(w), typeof w === "string" ? GREET[w] : "?", 3);
+  if (w !== "room" && !isPeerChat(w)) world.say(chatKey(w), typeof w === "string" ? GREET[w] : "?", 3);
   if (typeof w === "string" && w !== "room") world.npcs?.hold(w);
 }
 function closeChat(): void {
-  if (chatWith && typeof chatWith !== "string") chatWith.wait = 1;
+  if (talkTarget(chatWith) && live.status === "online") live.talk();
+  if (chatWith && typeof chatWith !== "string" && !isPeerChat(chatWith)) chatWith.wait = 1;
   chatWith = null;
   chatForm.hidden = true;
   chatInput.blur();
@@ -178,6 +197,11 @@ chatForm.addEventListener("submit", (e) => {
   const line = chatInput.value.trim();
   if (w === "room") {
     if (line && live.say(line.slice(0, SAY_MAX))) world.say("me", line.slice(0, SAY_MAX), 5);
+    chatInput.value = "";
+    return;
+  }
+  if (isPeerChat(w)) {
+    if (line && live.say(line.slice(0, SAY_MAX), w.peer)) world.say("me", line.slice(0, SAY_MAX), 5);
     chatInput.value = "";
     return;
   }
@@ -450,6 +474,7 @@ async function switchBrain(): Promise<void> {
     instinct.voice = webBrain;
     toast = { text: "Llama 3.2 1B runs in this tab now. B again: back to rules only.", who: "Brain", t: 5 };
   } catch (e) {
+    storeSetup(null, false); // next visit runs the setup gate again
     toast = { text: `Could not load the model (${(e as Error).message}). Rules only.`, who: "Brain", t: 5 };
   }
 }
@@ -531,7 +556,9 @@ function setNpcHost(npc: Npc, host: string | null): void {
   world.npcs?.setHost(npc, host);
 }
 const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()), genes: myGenes(), groundSeed: state.groundSeed, ...world.me }), {
-  welcome: (id, corner, peers, awayList, npcs = {}) => {
+  welcome: (id, corner, peers, awayList, npcs = {}, open = []) => {
+    talks.clear();
+    for (const [a, b] of open) talks.set(a, b);
     npcHosts.clear();
     if (world.npcs) world.npcs.me = id;
     for (const n of NPCS) setNpcHost(n, npcs[n] ?? null);
@@ -555,6 +582,22 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()),
   mind: (from, l) => {
     world.hearMind(from, l);
     if (l.say && l.to && l.to === world.npcs?.me && isNpc(l.who)) asking.get(l.who)?.(l.say); // my relayed question's answer
+  },
+  talking: (id, withWho, on) => {
+    const me = world.npcs?.me;
+    if (on) talks.set(id, withWho);
+    else talks.delete(id);
+    if (!me) return;
+    if (on && withWho === me && (!chatWith || chatWith === "room")) {
+      toast = { text: `${world.peers.get(id)?.name ?? "Someone"} is talking to you. Esc ends the chat.`, t: 4 };
+      openChat({ peer: id });
+    }
+    if (!on && (id === me || withWho === me) && isPeerChat(chatWith)) closeChat();
+  },
+  talkNo: (withWho) => {
+    if (talkTarget(chatWith) !== withWho) return;
+    closeChat();
+    toast = { text: "They are talking with someone right now. Try again soon.", t: 3 };
   },
   ask: (npc, from, name, text, scene) => void world.npcs?.reply(npc, name, text, from, scene),
   askNo: (npc) => asking.get(npc)?.(null),
@@ -585,7 +628,7 @@ const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()),
 live.connect();
 // Minds online: my pets' activity starts and lines go to the room; others' come back as bubbles. The cap
 // heartbeat tells the room how fast my local model is, so it can pick me to host village NPCs.
-world.onMind = (l) => void (live.status === "online" && live.mind(l));
+world.onMind = (l) => void (live.status === "online" && live.mind(l.say ? { ...l, ...world.speakerAt(l.who) } : l));
 setInterval(() => {
   const brain = localBrain();
   if (live.status === "online") live.cap(brain ? mindSched.tps(12) : 0, "gpu" in navigator);
@@ -620,7 +663,7 @@ function peerKey(k: string): void {
     duelOut = { name: p.name, timer: window.setTimeout(() => duelEnded("gone"), DUEL_WAIT_MS) };
     toast = { text: `You challenged ${p.name}. Waiting for an answer...`, t: 4 };
     world.say("pet", "A duel? I'm ready!", 2);
-  } else if (row === "Say something") openChat("room");
+  } else if (row === "Say something") openChat({ peer: m.id });
   else if (row !== "Close" && row !== "Duel") sendEmote(row.toLowerCase() as Emote);
 }
 function duelInvited(duel: string, _from: string, name: string): void {
@@ -827,8 +870,13 @@ function update(dt: number, t: number): void {
   presenter.present(low, crt ? 1 : 0);
 }
 
-// Tiles, props, frame and font PNGs (docs/STYLE.md) load before the first frame.
-void loadArt().then(() => requestAnimationFrame(frame));
+// Tiles, props, frame and font PNGs (docs/STYLE.md) load before the first frame, and the setup gate runs first.
+const setup = runSetup({
+  load: (progress) => webBrain.load(progress),
+  ready: () => (instinct.voice = webBrain),
+  background: () => void switchBrain(),
+});
+void Promise.all([loadArt(), setup]).then(() => requestAnimationFrame(frame));
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
 (window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain };

@@ -501,6 +501,12 @@ export class Overworld {
     if (i >= 0 && text !== "...") this.onMind?.({ who: id, say: text });
   }
 
+  // Where a mind that speaks stands: an NPC, or me for my pets (they stay around me or my ground).
+  speakerAt(who: string): { x: number; z: number } {
+    const a = this.npcs?.v.agents.find((x) => x.id === who);
+    return { x: a?.pos.x ?? this.player.x, z: a?.pos.z ?? this.player.z };
+  }
+
   // Another player's mind line (a pet's spoken line or invitation) shows over that player; NPC lines over the NPC.
   hearMind(from: string, l: MindLine): void {
     if (isNpc(l.who)) return void this.npcs?.hear(l);

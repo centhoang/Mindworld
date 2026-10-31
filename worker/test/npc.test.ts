@@ -115,7 +115,7 @@ describe("room minds", () => {
     const elderHost = r.board.hostOf("elder")!;
     const other = elderHost === "a" ? "b" : "a";
     const ok = send(r, elderHost, { t: "mind", who: "elder", act: "picnic", say: "Picnic at noon!", invite: { act: "picnic", to: "Mo" } });
-    expect(ok.out).toEqual([{ to: "others", msg: { t: "mind", id: elderHost, who: "elder", act: "picnic", say: "Picnic at noon!", invite: { act: "picnic", to: "Mo" } } }]);
+    expect(ok.out[0]!.msg).toEqual({ t: "mind", id: elderHost, who: "elder", act: "picnic", say: "Picnic at noon!", invite: { act: "picnic", to: "Mo" } });
     expect(send(r, other, { t: "mind", who: "elder", say: "I am the elder now" }).out).toEqual([]);
     expect(r.peers.get(other)!.strikes).toBe(1);
     expect(send(r, other, { t: "mind", who: "Mochi", emote: "heart" }).out[0]!.msg).toEqual({ t: "mind", id: other, who: "Mochi", emote: "heart" });

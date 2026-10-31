@@ -25,6 +25,15 @@
       #teach button { font: inherit; padding: 8px 10px; color: #f7dfc8; background: #a85f2a; border: 3px solid #45301f; cursor: pointer; }
       #teach button[data-act=close] { background: #7a4628; }
       #teach button:disabled, #teach input:disabled { opacity: 0.55; cursor: default; }
+      #setup { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: #08080c; font: 11px/1.9 "Press Start 2P", monospace; color: #FFF3D8; z-index: 2; }
+      #setup[hidden], #setup [hidden] { display: none; }
+      #setup section { width: min(100%, 620px); padding: 18px; background: #39463F; border: 3px solid #795849; box-sizing: border-box; }
+      #setup h1 { margin: 0 0 12px; font: inherit; font-size: 14px; }
+      #setup p { margin: 0 0 14px; white-space: pre-line; }
+      #setup [data-bar] { height: 14px; margin-bottom: 14px; background: #FFF3D8; border: 3px solid #795849; }
+      #setup [data-fill] { height: 100%; width: 0; background: #A57954; }
+      #setup [data-buttons] { display: flex; flex-wrap: wrap; gap: 8px; }
+      #setup button { font: inherit; padding: 8px 10px; color: #FFF3D8; background: #A57954; border: 3px solid #795849; cursor: pointer; }
     </style>
   </head>
   <body>
@@ -42,6 +51,14 @@
       <button type="button" data-act="close">Bye</button>
     </form>
     <button id="crt" type="button">CRT on</button>
+    <div id="setup" hidden>
+      <section>
+        <h1>Mindworld</h1>
+        <p></p>
+        <div data-bar hidden><div data-fill></div></div>
+        <div data-buttons></div>
+      </section>
+    </div>
     <script type="module" src="/src/pixel/main.ts"></script>
   </body>
 </html>

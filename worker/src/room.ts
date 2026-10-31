@@ -18,6 +18,11 @@ import { cleanCap, cleanMem, isNpc, MIND_ACTS, NpcBoard, type Cap, type HostChan
 // (model speed, <= 1 / 10 s) as their heartbeat. A player's question to an NPC hosted elsewhere is relayed to
 // that host (`ask`) when its machine has a local model; else the asker hears `askNo` at once (cloud answer).
 //
+// Privacy: a line said to a player goes to that player only, enforced here, not just hidden on screen. Other mind
+// lines reach players within HEAR_DIST of the speaker (and the host of an NPC being spoken to, so its mind can
+// answer). Plain room chat stays public. `talk` marks a private chat: both sides are busy, others see that they are
+// talking and can't start a chat with them. It ends on close, on disconnect, or after TALK_TTL_MS of silence.
+//
 // Billing note (Cloudflare free plan): incoming WebSocket messages count 20:1 as requests, so clients send
 // positions at <= 10 Hz and only while moving; the server drops anything faster.
 
@@ -32,6 +37,8 @@ export const AWAY_MS = 10 * 60_000;
 export const EMOTES = ["wave", "heart", "dance", "laugh"] as const;
 export const MIND_SAY_GAP_MS = 3000;
 export const ASK_GAP_MS = 3000;
+export const HEAR_DIST = 14; // tiles: how far a public mind line carries
+export const TALK_TTL_MS = 45_000; // clients renew an open chat every 15 s
 const CAP_GAP_MS = 9000;
 export type Emote = (typeof EMOTES)[number];
 const WORLD_LIMIT = 160; // |x|, |z| bound of the ground ring, with margin
@@ -97,7 +104,9 @@ export interface Away {
 export type PublicAway = Omit<Away, "until"> & { ttl: number }; // ms left (clients' clocks differ)
 
 export type ServerMsg =
-  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[]; npcs: Partial<Record<Npc, string>> }
+  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[]; npcs: Partial<Record<Npc, string>>; talks: [string, string][] }
+  | { t: "talking"; id: string; with: string; on: boolean }
+  | { t: "talkNo"; with: string }
   | { t: "npcHost"; npc: Npc; host: string | null }
   | { t: "npcState"; npc: Npc; log: string[] }
   | { t: "mind"; id: string; who: string; act?: string; say?: string; to?: string; emote?: Emote; invite?: { act: string; to?: string } }
@@ -154,6 +163,9 @@ export class Room {
   aways: Away[] = []; // ghost grounds (the DO stores them: they outlive every socket)
   awaysChanged = false;
   private readonly dirty = new Set<string>(); // peers changed as a side effect (persist their attachment)
+  // peer -> who they opened a private chat with (a peer id or an NPC). Lost on a Durable Object restart, which
+  // only means the talking bubbles stop until the next `talk` renewal.
+  private readonly talks = new Map<string, { with: string; at: number }>();
 
   constructor(private readonly random: () => number = Math.random) {}
 
@@ -167,6 +179,59 @@ export class Room {
   restore(p: Peer) {
     p.cap ??= { webgpu: false, tps: 0 }; // attachments from before minds
     this.peers.set(p.id, p);
+  }
+
+  private busy(who: string): boolean {
+    if (this.talks.has(who)) return true;
+    for (const t of this.talks.values()) if (t.with === who) return true;
+    return false;
+  }
+
+  // Tells every player, the two in the chat included.
+  private talkOuts(id: string, withWho: string, on: boolean): Out[] {
+    const msg: ServerMsg = { t: "talking", id, with: withWho, on };
+    return [...this.peers.keys()].map((p) => ({ to: { id: p }, msg }));
+  }
+
+  // Ends the chats `who` is in, on either side.
+  private endTalks(who: string): Out[] {
+    const out: Out[] = [];
+    for (const [id, t] of this.talks) {
+      if (id !== who && t.with !== who) continue;
+      this.talks.delete(id);
+      out.push(...this.talkOuts(id, t.with, false));
+    }
+    return out;
+  }
+
+  // No timers in the room: every message is a chance to end a chat that went quiet.
+  private expireTalks(now: number): Out[] {
+    const out: Out[] = [];
+    for (const [id, t] of this.talks) {
+      if (now - t.at <= TALK_TTL_MS) continue;
+      this.talks.delete(id);
+      out.push(...this.talkOuts(id, t.with, false));
+    }
+    return out;
+  }
+
+  private talk(peer: Peer, o: Record<string, unknown>, now: number): MessageResult {
+    if (o.with === undefined) return { out: this.endTalks(peer.id), changed: true };
+    const to = typeof o.with === "string" && (isNpc(o.with) || this.peers.has(o.with)) && o.with !== peer.id ? o.with : null;
+    if (!to) return this.strike(peer);
+    const mine = this.talks.get(peer.id);
+    if (mine?.with === to) {
+      mine.at = now;
+      return { out: [] };
+    }
+    const partner = this.talks.get(to);
+    if (partner?.with === peer.id) {
+      partner.at = now;
+      return { out: [] };
+    }
+    if (this.busy(to) || this.busy(peer.id)) return { out: [{ to: "self", msg: { t: "talkNo", with: to } }] };
+    this.talks.set(peer.id, { with: to, at: now });
+    return { out: this.talkOuts(peer.id, to, true), changed: true };
   }
 
   // Who hosts which NPC, told to everyone (skipSelf: the sender already knows, e.g. from its welcome); the
@@ -233,7 +298,7 @@ export class Room {
     return {
       peer,
       out: [
-        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)), npcs: this.board.hostsMap() } },
+        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)), npcs: this.board.hostsMap(), talks: [...this.talks].map(([a, t]) => [a, t.with]) } },
         { to: "others", msg: { t: "join", peer: publicPeer(peer) } },
         ...this.hostOuts(elected, true),
       ],
@@ -244,7 +309,7 @@ export class Room {
     const me = this.peers.get(id);
     if (!me) return [];
     this.peers.delete(id);
-    const out: Out[] = [{ to: "others", msg: { t: "leave", id } }];
+    const out: Out[] = [{ to: "others", msg: { t: "leave", id } }, ...this.endTalks(id)];
     if (me.corner !== null) {
       const away: Away = { slot: me.corner, name: me.name, seed: me.seed, until: now + AWAY_MS };
       this.setAways([...this.aways.filter((a) => a.until > now && a.slot !== me.corner), away]);
@@ -268,6 +333,8 @@ export class Room {
     // Every message is a chance to notice a host that went quiet (no timers in the room).
     const elected = this.peers.has(id) ? this.board.elect(this.peers, now) : [];
     if (elected.length) r.out = [...this.hostOuts(elected, false), ...r.out];
+    const ended = this.expireTalks(now);
+    if (ended.length) r.out = [...ended, ...r.out];
     return r;
   }
 
@@ -301,14 +368,23 @@ export class Room {
       const text = cleanSay(o.text);
       if (text === null) return { out: [{ to: "self", msg: { t: "notice", text: "Links are not allowed in chat." } }], changed: true };
       peer.sayAt = now;
-      return { out: [{ to: "others", msg: { t: "say", id, text } }], changed: true };
+      if (o.to === undefined) return { out: [{ to: "others", msg: { t: "say", id, text } }], changed: true };
+      // A private line needs an open chat between the two; it renews that chat.
+      const to = typeof o.to === "string" ? o.to : "";
+      const chat = this.talks.get(id)?.with === to ? this.talks.get(id) : this.talks.get(to)?.with === id ? this.talks.get(to) : undefined;
+      if (!chat || !this.peers.has(to)) return { out: [{ to: "self", msg: { t: "talkNo", with: to.slice(0, 16) } }], changed: true };
+      chat.at = now;
+      return { out: [{ to: { id: to }, msg: { t: "say", id, text } }], changed: true };
     }
+    if (o.t === "talk") return this.talk(peer, o, now);
     if (o.t === "mind") return this.mind(peer, o, now);
     if (o.t === "ask") {
       const text = cleanSay(o.text);
       if (!isNpc(o.npc) || !text) return this.strike(peer);
       if (peer.askAt !== undefined && now - peer.askAt < ASK_GAP_MS) return { out: [{ to: "self", msg: { t: "askNo", npc: o.npc } }] };
       peer.askAt = now;
+      const chat = this.talks.get(id);
+      if (chat?.with === o.npc) chat.at = now;
       const host = this.board.hostOf(o.npc);
       const h = host && host !== id ? this.peers.get(host) : undefined;
       if (!h || h.cap.tps <= 0) return { out: [{ to: "self", msg: { t: "askNo", npc: o.npc } }], changed: true };
@@ -372,8 +448,26 @@ export class Room {
       if (line) this.board.remember(npc, line);
     }
     if (npc) this.board.beat(peer.id, now);
-    const relay = msg.act || msg.say || msg.emote || msg.invite;
-    return { out: relay ? [{ to: "others", msg }] : [], changed: true };
+    const { say, to, ...rest } = msg;
+    const others = rest.act || rest.emote || rest.invite ? rest : null; // what travels without the spoken line
+    if (!say) return { out: others ? [{ to: "others", msg: others }] : [], changed: true };
+    return { out: this.hearers(peer, msg, others, o), changed: true };
+  }
+
+  // A spoken line by who it is for: the player it is said to, or everyone close to the speaker plus the host of the
+  // NPC spoken to. The rest get what is left of the message, if anything.
+  private hearers(peer: Peer, msg: Extract<ServerMsg, { t: "mind" }>, others: ServerMsg | null, o: Record<string, unknown>): Out[] {
+    const toPeer = msg.to && this.peers.has(msg.to) ? msg.to : null;
+    const x = coord(o.x) ?? peer.x, z = coord(o.z) ?? peer.z;
+    const toHost = isNpc(msg.to) ? this.board.hostOf(msg.to) : null;
+    const out: Out[] = [];
+    for (const p of this.peers.values()) {
+      if (p.id === peer.id) continue;
+      const hears = toPeer ? p.id === toPeer : p.id === toHost || Math.hypot(p.x - x, p.z - z) <= HEAR_DIST;
+      if (hears) out.push({ to: { id: p.id }, msg });
+      else if (others) out.push({ to: { id: p.id }, msg: others });
+    }
+    return out;
   }
 
   private challenge(peer: Peer, o: Record<string, unknown>, now: number): MessageResult {
