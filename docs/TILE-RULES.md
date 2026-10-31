@@ -49,6 +49,9 @@ One raised block per player ground where it fits (about 4 grounds in 5), chosen 
 - Player-ground streams are chosen after roads, by a separate RNG seeded from `ground.seed`: every ground tries, with at most one course. Channels are two tiles wide, take 6-10 axis steps with square stepped turns, and end in a 4 x 3 pool. All water stays outside a two-tile buffer around roads, bridges, gates, both yard ovals and the largest house stamp; reject courses that narrow land to one tile or disconnect a gate from the centre. Pools remain unwalkable, and existing trees/decor reject them.
 - Closed-stream fallback: the existing tiles have no combined pond-bank/sea-coast mouth, and the renderer gives coast edges priority over banks. Leave two full land tiles between the channel and sea (also around the other banks), rather than draw a broken mouth. If the whole course cannot fit, carve nothing. Player grounds are 36 x 28 on a 40-tile grid: 26 x 20 had no fitting course, 34 x 26 fit one ground in five.
 
+## Sea islets
+Sand and green islets are whole pictures from the tileset (`isle-sand` 28.4, `isle-green` 28.0 in `FURNITURE`), placed with boats and ducks in `placeSeaLife`: 4-7 per map, 5 clear sea tiles around each. Decoration only: the tiles under them stay water, so nobody walks there. They cover the sea, never land or bridges. After art-sunny.py run art-interior.py, or interior.png reverts.
+
 ## Bridges
 The ends lie one tile up on the land.
 - Vertical, 3 wide: deck 12.39 / 12.40 / 12.41; top cap 11.39-41; bottom cap 11.41mF / 11.40mF / 11.39mF. Rails on the two outer columns: 1.40 top, 3.40 middle, 4.40 bottom.

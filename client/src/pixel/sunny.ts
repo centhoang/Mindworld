@@ -18,7 +18,7 @@ const STRIPS: Record<string, { frames: number }> = {
   spr_deco_duck_01_strip4: { frames: 4 }, spr_deco_chicken_01_strip4: { frames: 4 }, spr_deco_sheep_01_strip4: { frames: 4 }, spr_deco_pig_01_strip4: { frames: 4 }, spr_deco_cow_strip4: { frames: 4 },
   spr_deco_bird_01_strip4: { frames: 4 }, spr_deco_windmill_withshadow_strip9: { frames: 9 }, spr_deco_fire_01_strip4: { frames: 4 }, spr_deco_coracle_strip4: { frames: 4 },
 };
-const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "label_left", "label_middle", "label_right", "itemdisc_01", "itemdisc_02", "interior", "interior-roof", "spr_deco_rug_01",
+const SINGLES = ["tiles", "f-isle-sand", "f-isle-green", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "label_left", "label_middle", "label_right", "itemdisc_01", "itemdisc_02", "interior", "interior-roof", "spr_deco_rug_01",
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture"];
 export const CROPS_ART = ["wheat", "carrot", "beetroot", "cabbage", "cauliflower", "kale", "parsnip", "potato", "pumpkin", "radish"] as const;
 
@@ -78,7 +78,7 @@ export function buildSunny(m: TileMap): SunnyWorld {
 }
 
 export interface SeaLife {
-  kind: "boat" | "duck";
+  kind: "boat" | "duck" | "isle-sand" | "isle-green";
   x: number; // world tiles, centred on a sea tile
   z: number;
   phase: number;
@@ -90,32 +90,48 @@ export function placeSeaLife(m: TileMap): SeaLife[] {
   let seed = 2166136261;
   for (const n of [m.w, m.h, m.ox, m.oz, ...m.kind]) seed = Math.imul(seed ^ n, 16777619);
   const rng = mulberry32(seed);
-  const candidates: [number, number][] = [];
-  for (let j = 2; j < m.h - 2; j++) for (let i = 2; i < m.w - 2; i++) {
-    let clear = true;
-    // Include diagonals and bridges: even a boat's full native canvas stays clear of the deck.
-    for (let dz = -2; dz <= 2 && clear; dz++) for (let dx = -2; dx <= 2; dx++) {
-      if (m.kind[(j + dz) * m.w + i + dx] !== T.water) { clear = false; break; }
+  // Open sea around (i, j), in tiles: every cell within `reach` is water. Bridges count, so nothing touches a deck.
+  const open = (reach: number) => {
+    const cells: [number, number][] = [];
+    for (let j = reach; j < m.h - reach; j++) for (let i = reach; i < m.w - reach; i++) {
+      let clear = true;
+      for (let dz = -reach; dz <= reach && clear; dz++) for (let dx = -reach; dx <= reach; dx++) {
+        if (m.kind[(j + dz) * m.w + i + dx] !== T.water) { clear = false; break; }
+      }
+      if (clear) cells.push([m.ox + i + 0.5, m.oz + j + 0.5]);
     }
-    if (clear) candidates.push([m.ox + i + 0.5, m.oz + j + 0.5]);
-  }
+    return cells;
+  };
   const out: SeaLife[] = [];
+  const room = (p: SeaLife) => (p.kind.startsWith("isle") ? 7 : 3);
+  // Sample without replacement, with room between silhouettes. Tiny/no-sea maps can run out.
+  const fill = (candidates: [number, number][], count: number, kind: (n: number) => SeaLife["kind"]) => {
+    for (let n = 0; candidates.length && n < count;) {
+      const at = Math.floor(rng() * candidates.length);
+      const [x, z] = candidates[at]!;
+      candidates[at] = candidates[candidates.length - 1]!;
+      candidates.pop();
+      if (out.some((p) => Math.hypot(x - p.x, z - p.z) < room(p))) continue;
+      out.push({ kind: kind(n++), x, z, phase: rng(), flip: rng() < 0.5 });
+    }
+  };
   const boats = 2 + Math.floor(rng() * 3);
   const ducks = 3 + Math.floor(rng() * 4);
-  // Sample without replacement, with room between silhouettes. Tiny/no-sea maps can run out.
-  while (candidates.length && out.length < boats + ducks) {
-    const at = Math.floor(rng() * candidates.length);
-    const [x, z] = candidates[at]!;
-    candidates[at] = candidates[candidates.length - 1]!;
-    candidates.pop();
-    if (out.some((p) => Math.hypot(x - p.x, z - p.z) < 3)) continue;
-    out.push({ kind: out.length < boats ? "boat" : "duck", x, z, phase: rng(), flip: rng() < 0.5 });
-  }
+  const isles = 4 + Math.floor(rng() * 4);
+  fill(open(5), isles, (n) => (n % 3 === 2 ? "isle-green" : "isle-sand"));
+  fill(open(2), boats + ducks, (n) => (n < boats ? "boat" : "duck"));
   return out;
 }
 
 export function drawSeaLife(g: Ctx, life: SeaLife[], camX: number, camY: number, sw: number, sh: number, t: number): void {
   for (const p of life) {
+    if (p.kind.startsWith("isle")) {
+      const img = images.get(`f-${p.kind}`);
+      if (!img) continue;
+      const [x, y] = [Math.round(p.x * TILE - camX - img.width / 2), Math.round(p.z * TILE - camY - img.height / 2)];
+      if (x + img.width >= 0 && y + img.height >= 0 && x <= sw && y <= sh) g.drawImage(img, x, y);
+      continue;
+    }
     // Unchanged pack exports: Elements/Other/spr_deco_coracle_strip4.png and
     // Elements/Animals/spr_deco_duck_01_strip4.png (48x37 and 16x16 per frame).
     const name = p.kind === "boat" ? "spr_deco_coracle_strip4" : "spr_deco_duck_01_strip4";

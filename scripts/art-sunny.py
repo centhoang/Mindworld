@@ -97,7 +97,7 @@ for name, (layers, x0, y0, x1, y1) in STAMPS.items():
     boxes[name] = [im.width, im.height]
 
 # Furniture, straight from the tileset: [row, col, w, h] in tiles.
-FURNITURE = {'bed': (33, 40, 2, 2), 'rug': (35, 40, 3, 3), 'table': (35, 50, 2, 3), 'stool': (33, 49, 1, 2), 'shelf': (33, 42, 1, 2), 'vase': (32, 47, 1, 1), 'sunflower': (32, 52, 1, 2), 'picture': (33, 54, 1, 1), 'cupboard': (33, 46, 1, 2), 'sidetable': (33, 47, 1, 2)}
+FURNITURE = {'isle-sand': (28, 4, 5, 5), 'isle-green': (28, 0, 4, 5), 'bed': (33, 40, 2, 2), 'rug': (35, 40, 3, 3), 'table': (35, 50, 2, 3), 'stool': (33, 49, 1, 2), 'shelf': (33, 42, 1, 2), 'vase': (32, 47, 1, 1), 'sunflower': (32, 52, 1, 2), 'picture': (33, 54, 1, 1), 'cupboard': (33, 46, 1, 2), 'sidetable': (33, 47, 1, 2)}
 for name, (r, c, w, h) in FURNITURE.items():
     im = sheet.crop((c * 16, r * 16, (c + w) * 16, (r + h) * 16))
     im = im.crop(im.getbbox())
