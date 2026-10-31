@@ -624,6 +624,7 @@ const addPeer = (p: LivePeer) => {
 const grounds = new Map<string, GroundOwner>(); // live id -> ground
 const aways = new Map<number, { g: GroundOwner; until: number }>(); // slot -> ghost ground
 let mySlot = 0;
+let slotKnown = false; // the room told me my slot: a reconnect asks for it back
 // Testing: pop in a stand-in player's island (the buttons show on localhost or with ?dev).
 const fakes: GroundOwner[] = [];
 function fakeIsle(add: boolean): void {
@@ -663,7 +664,7 @@ function setNpcHost(npc: Npc, host: string | null): void {
   world.npcs?.setHost(npc, host);
 }
 const DROP_GRACE_MS = 20_000;
-const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: state.groundSeed, ...world.me }), {
+const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: state.groundSeed, slot: slotKnown ? mySlot : undefined, ...world.me }), {
   welcome: (id, corner, peers, awayList, npcs = {}, open = []) => {
     talks.clear();
     for (const [a, b] of open) talks.set(a, b);
@@ -674,6 +675,7 @@ const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myG
     grounds.clear();
     aways.clear();
     mySlot = corner ?? 0;
+    slotKnown = corner !== null;
     for (const a of awayList) aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
     for (const p of peers) (addPeer(p), trackGround(p));
     relayoutGrounds();

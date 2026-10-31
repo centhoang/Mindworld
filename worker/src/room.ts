@@ -259,14 +259,16 @@ export class Room {
     this.aways = next;
   }
 
-  // A slot for a new player: their own ghost ground first (same seed, back within AWAY_MS), else the first
-  // slot nobody holds, else the ghost ground closest to expiring.
-  private takeSlot(seed: number, now: number): number | null {
+  // A slot for a new player: their own ghost ground first (same seed, back within AWAY_MS), else the slot they
+  // just had (a dropped socket, even if the room restarted and lost its ghosts), else the first slot nobody
+  // holds, else the ghost ground closest to expiring.
+  private takeSlot(seed: number, now: number, was: number | null): number | null {
     this.setAways(this.aways.filter((a) => a.until > now));
     const used = new Set([...this.peers.values()].map((p) => p.corner));
     const mine = seed ? this.aways.find((a) => a.seed === seed && !used.has(a.slot)) : undefined;
     const held = new Set([...used, ...this.aways.map((a) => a.slot)]);
-    let slot = mine?.slot ?? null;
+    const back = was !== null && was < CORNERS && !held.has(was) ? was : null;
+    let slot = mine?.slot ?? back;
     for (let c = 0; slot === null && c < CORNERS; c++) if (!held.has(c)) slot = c;
     if (slot === null) slot = [...this.aways].sort((a, b) => a.until - b.until).find((a) => !used.has(a.slot))?.slot ?? null;
     if (slot !== null) this.setAways(this.aways.filter((a) => a.slot !== slot));
@@ -285,7 +287,7 @@ export class Room {
       z: coord(o.z) ?? 0.5,
       px: coord(o.px) ?? -1,
       pz: coord(o.pz) ?? 2.5,
-      corner: this.takeSlot(cleanSeed(o.groundSeed), now),
+      corner: this.takeSlot(cleanSeed(o.groundSeed), now, typeof o.slot === "number" && Number.isInteger(o.slot) && o.slot >= 0 ? o.slot : null),
       seed: cleanSeed(o.groundSeed),
       tokens: BURST,
       at: now,

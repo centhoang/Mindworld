@@ -389,31 +389,62 @@ export class Overworld {
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
   private placeTrees(): void {
     const m = this.map;
-    for (let j = 1; j < m.h - 1; j++) {
-      for (let i = 1; i < m.w - 1; i++) {
+    const kindAt = (i: number, j: number) => i < 0 || j < 0 || i >= m.w || j >= m.h ? T.water : m.kind[j * m.w + i];
+    for (const p of this.world.platforms) {
+      if (p.kind === "islet") continue;
+      const rng = mulberry32((p.ground?.seed ?? Math.floor(hash2(...p.cell, 10) * 2 ** 32)) ^ 0x71ee);
+      const [x0, z0] = p.ground ? groundOrigin(p) : [Math.floor(p.x - p.r), Math.floor(p.z - p.r)];
+      const [w, h] = p.ground ? [p.ground.w, p.ground.h] : [Math.ceil(p.r * 2), Math.ceil(p.r * 2)];
+      const candidates: Vec[] = [];
+      for (let j = z0 - m.oz; j < z0 - m.oz + h; j++) for (let i = x0 - m.ox; i < x0 - m.ox + w; i++) {
         const k = m.kind[j * m.w + i];
         if (k !== T.grass && k !== T.tall) continue;
         const x = m.ox + i + 0.5;
         const z = m.oz + j + 0.5;
-        const p = platformAt(this.world, x, z);
-        if (!p || p.kind === "islet") continue;
+        if (platformAt(this.world, x, z)?.id !== p.id) continue;
         // Trees stand well inland (canopies must not hang over a cliff) and grow in clumps, as in the pack's scenes.
-        if (SHORE.some(([di, dj]) => { const c = m.kind[(j + dj) * m.w + i + di]; return c === undefined || c === T.water || c === T.pool || c === T.bridge; })) continue;
-        const clump = hash2(Math.floor((i + m.ox) / CLUMP), Math.floor((j + m.oz) / CLUMP), 10) < 0.5;
-        const h = hash2(i + m.ox, j + m.oz, 9);
-        if (!(clump ? h < 0.6 : h < 0.015)) continue;
+        if (SHORE.some(([di, dj]) => { const c = kindAt(i + di, j + dj); return c === T.water || c === T.pool || c === T.bridge; })) continue;
+        if (p.ground && Math.hypot((x - p.x) / 7.5, (z - p.z + 1) / 5) < 1) continue;
         if (p.spots && Object.values(p.spots).some((s) => Math.abs(s.x - x) < 3.5 && Math.abs(s.z - z) < 3.5)) continue;
         if (p.kind === "plaza" && Math.abs(x - p.x) < 4 && Math.abs(z - p.z) < 3) continue;
         if (this.noticeBoard && Math.abs(x - this.noticeBoard.x) < 2 && Math.abs(z - this.noticeBoard.z) < 2) continue;
         if (this.houses.some((hs) => Math.abs(x - hs.x) < 5 && Math.abs(z - hs.z + 2) < 5)) continue;
         if (this.nearPath(i, j)) continue;
-        if (this.trees.some((t) => Math.abs(t.x - x) < 2 && Math.abs(t.z - z) < 2)) continue;
         if (Math.abs(x - this.house.x) < 6 && Math.abs(z - this.house.z + 2) < 6) continue;
         if (this.stall && Math.abs(x - this.stall.x) < 3.5 && Math.abs(z - this.stall.z + 1) < 3.5) continue;
         if (this.landmarks.some((l) => Math.abs(x - l.x) < 3.5 && Math.abs(z - l.z + 1) < 3.5)) continue;
         if (this.beds.some((b) => Math.abs(b.x + 0.5 - x) < 2.5 && Math.abs(b.z + 0.5 - z) < 2.5)) continue;
-        this.trees.push({ x, z });
-        this.treeTiles.add(j * m.w + i);
+        candidates.push({ x, z });
+      }
+      // Shuffle once per platform, then grow compact patches with trees about two tiles apart. The draw code's
+      // position hash continues to mix the existing tree kinds. No isolated outliers fill the gaps.
+      for (let n = candidates.length - 1; n > 0; n--) {
+        const q = Math.floor(rng() * (n + 1));
+        [candidates[n], candidates[q]] = [candidates[q]!, candidates[n]!];
+      }
+      const clumps = 2 + Math.floor(rng() * 2);
+      for (let c = 0; c < clumps; c++) {
+        const want = 5 + Math.floor(rng() * 5);
+        const available = candidates.filter((v) => !this.trees.some((t) => Math.abs(t.x - v.x) < 3 && Math.abs(t.z - v.z) < 3));
+        let best: Vec[] = [];
+        for (const anchor of available) {
+          const patch = available.filter((v) => Math.abs(v.x - anchor.x) <= CLUMP && Math.abs(v.z - anchor.z) <= CLUMP)
+            .sort((a, b) => Math.hypot(a.x - anchor.x, a.z - anchor.z) - Math.hypot(b.x - anchor.x, b.z - anchor.z));
+          const group: Vec[] = [anchor];
+          while (group.length < want) {
+            const v = patch.find((q) => group.every((t) => Math.max(Math.abs(t.x - q.x), Math.abs(t.z - q.z)) >= 2) && group.some((t) => Math.max(Math.abs(t.x - q.x), Math.abs(t.z - q.z)) === 2));
+            if (!v) break;
+            group.push(v);
+          }
+          if (group.length > best.length) best = group;
+          if (best.length === want) break;
+        }
+        // Crowded islands may have less room; clearances take priority over the target count.
+        if (best.length < 2) break;
+        for (const t of best) {
+          this.trees.push(t);
+          this.treeTiles.add(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox));
+        }
       }
     }
   }

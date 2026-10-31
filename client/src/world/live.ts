@@ -261,7 +261,7 @@ export class LiveLink {
 
   constructor(
     private readonly url: string,
-    private readonly hello: () => { name: string; genes: Genes; groundSeed?: number } & Me,
+    private readonly hello: () => { name: string; genes: Genes; groundSeed?: number; slot?: number } & Me,
     private readonly h: LiveHandlers,
     private readonly open: (url: string) => SocketLike = (u) => new WebSocket(u) as unknown as SocketLike,
   ) {}
