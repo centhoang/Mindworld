@@ -11,6 +11,7 @@ import type { Vec } from "../world/movement";
 import { NPCS, type MindLine, type Npc } from "../world/live";
 import { MindHub, type Mind } from "./hub";
 import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
+import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, holdsGrudge, hurt, parseBeliefLine, parseBondLine, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { VILLAGERS, type Persona } from "./persona";
 import { addCommitment, answerLine, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
@@ -20,7 +21,10 @@ import { PRIO, type MindScheduler } from "./scheduler";
 export interface NpcOut {
   line(l: MindLine & { mem?: string }): void; // to the room (only for NPCs I host)
   say(id: Npc, text: string, to?: string): void; // a bubble over the NPC here; `to` = who is spoken to, by name
+  think?(id: Npc, text: string): void; // a thought bubble: only this screen sees it
 }
+
+const SPOT_NAME: Record<string, string> = { lawn: "the lawn", picnic: "the picnic spot", playground: "the playground", pond: "the pond" }; // places told to a guest
 
 const REMOTE_WAIT = 20; // seconds a replaying NPC waits for its host's choice before deciding itself
 const GREET_DIST = 3; // a player this close may get greeted
@@ -71,6 +75,8 @@ export class NpcVillage {
   private readonly busy = new Set<Npc>(); // a line is being made
   private readonly leaving = new Set<string>(); // promises the NPC already set off for
   private readonly arrived = new Set<string>(); // promises the NPC turned up for
+  private readonly wired = new Map<string, Set<string>>(); // npc -> bond and belief lines the room has
+  private readonly raised = new Set<string>(); // grudges the NPC already brought up to the person's face
 
   constructor(
     private readonly sched: MindScheduler,
@@ -133,13 +139,26 @@ export class NpcVillage {
         mem.promises = [...mem.promises.filter((o) => o.id !== c.id), c]; // the latest state of each promise
         continue;
       }
+      const bond = parseBondLine(l, day);
+      if (bond) {
+        mem.bonds[bond.who] = bond.bond; // the latest line wins
+        continue;
+      }
+      const belief = parseBeliefLine(l, day);
+      if (belief) {
+        addBelief(mem, belief);
+        continue;
+      }
       const m = /^(\d\d:\d\d) (.*)$/.exec(l);
       mem.log.push({ day, time: m ? m[1]! : "", text: (m ? m[2]! : l).slice(0, 100) });
     }
+    for (const [who, b] of Object.entries(mem.bonds)) if (!this.v.rel.has(pairKey(npc, who))) this.v.rel.set(pairKey(npc, who), b.fondness);
     const mind = this.hub.minds.get(npc);
     if (mind) {
       mind.mem.log = [...mem.log, ...mind.mem.log].slice(-30);
       mind.mem.promises = mem.promises;
+      mind.mem.bonds = mem.bonds;
+      mind.mem.beliefs = mem.beliefs;
       this.sent.set(npc, mind.mem.log.at(-1) ?? null);
     } else this.mems.set(npc, mem);
   }
@@ -197,6 +216,7 @@ export class NpcVillage {
       const guest = this.people().find((p) => near(p.pos, GREET_DIST) && this.v.t - (this.greeted.get(`${npc}:${p.id}`) ?? -1e9) > GREET_GAP);
       if (guest) {
         this.greeted.set(`${npc}:${guest.id}`, this.v.t);
+        if (this.bringUp(npc, guest)) continue;
         const visitor: Persona = { id: guest.id, name: guest.name, kind: "human", traits: [], hobbies: [], habit: "", background: "" };
         void this.speak(npc, visitor, guest.id === "me" ? "" : guest.id, { said: [], turns: 0 });
         continue;
@@ -274,16 +294,26 @@ export class NpcVillage {
     const m = this.hub.minds.get(npc);
     this.hold(npc);
     if (!m || !this.hosting(npc)) return null;
-    const answer = await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    const g0 = gameTime(this.v.t);
+    this.listen(npc, m, player, line, g0.day);
+    // Grounded answers come straight from the sim: a free model line could contradict what was decided.
+    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     if (!this.hasModel() && !answer) return null;
-    const ans = this.hasModel()
-      ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => answer })
-      : { value: answer, source: "rules" };
+    const ans = answer ? { value: answer, source: "rules" }
+      : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
     if (!ans.value) return null;
     const g = gameTime(this.v.t);
     remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);
     if (this.hosting(npc)) this.out.line(to ? { who: npc, say: ans.value, to } : { who: npc, say: ans.value });
     return { text: ans.value, source: ans.source };
+  }
+
+  // What a line tells the NPC about the speaker: how they treat it, and what they like.
+  private listen(npc: Npc, m: Mind, player: string, line: string, day: number): void {
+    const tone = toneOf(line);
+    if (tone === "sorry" ? bondOf(m.mem, player) : tone) bump(this.v.rel, npc, player, feel(m.mem, m.persona, player, tone!, day, tone === "sorry" ? `${player} said sorry` : `${player} was ${tone} to me`));
+    const belief = beliefFrom(line);
+    if (belief) addBelief(m.mem, { about: player, text: belief, source: "", conf: 0.8, day });
   }
 
   // Is this line an invitation? If so the NPC decides from who it is and how it feels about the player, and an
@@ -293,6 +323,7 @@ export class NpcVillage {
     const today = gameTime(this.v.t).day;
     const rules = extractRules(line, today);
     m.thinking = "whether to go";
+    this.out.think?.(npc, `Should I go with ${player}?`);
     try {
       const said = this.hasModel()
         ? (await this.sched.ask({ prio: PRIO.talk, timeoutMs: 15000, req: extractPrompt(line), parse: (t) => parseExtract(t, today), fallback: () => rules })).value
@@ -304,10 +335,13 @@ export class NpcVillage {
         return `I would, ${player}, but there is nowhere to ${invite.act} around here.`;
       }
       const conflicts = dueNow(m.mem.promises, invite.day, invite.phase).length;
-      const score = inviteScore(m.persona, this.v.rel.get(pairKey(npc, player)) ?? 0, invite.act, conflicts);
-      const decision = this.hasModel()
+      const bond = bondOf(m.mem, player);
+      const score = inviteScore(m.persona, (this.v.rel.get(pairKey(npc, player)) ?? 0) + wariness(bond), invite.act, conflicts);
+      const grudge = holdsGrudge(bond);
+      const chosen = this.hasModel()
         ? (await this.sched.ask({ prio: PRIO.talk, timeoutMs: 15000, req: decidePrompt(m.persona, m.mem, invite, player, score), parse: parseDecision, fallback: () => ruleDecision(score) })).value
         : ruleDecision(score);
+      const decision = grudge && chosen === "accept" ? "counter" : chosen; // a hurt NPC promises nothing until it is made up
       const g = gameTime(this.v.t);
       if (decision === "accept") {
         const c: Commitment = { ...invite, id: `${npc}${this.v.nextId++}`, from: player, fromId: playerId, state: "open", importance: invite.occasion ? 8 : 5 };
@@ -315,8 +349,14 @@ export class NpcVillage {
         this.out.line({ who: npc, mem: promiseLine(c) });
       }
       const event = invite.occasion || invite.act;
-      remember(m.mem, g.day, clockLabel(g.hour), `${player} invited me to ${event}, ${invite.day === g.day ? "today" : "tomorrow"} ${invite.phase}. I ${decision === "accept" ? "promised to go" : decision === "counter" ? "asked for another time" : "said no"}`);
-      return answerLine(decision, invite, player);
+      const did = decision === "accept" ? "promised to go" : decision === "counter" ? "asked for another time" : "said no";
+      remember(m.mem, g.day, clockLabel(g.hour), `${player} invited me to ${event}, ${invite.day === g.day ? "today" : "tomorrow"} ${invite.phase}. I ${did}`, invite.occasion ? 7 : 5);
+      const past = bond?.why.at(-1)?.text ?? "nothing between us yet";
+      m.mem.why = `${past} > ${bond ? feelWord(bond) : "neutral about"} ${player} > ${did}`;
+      feel(m.mem, m.persona, player, "invited", g.day, ""); // a small warmth, not a reason worth keeping
+      const sore = grudge && bond ? hurt(bond) : undefined;
+      if (grudge) return `Why should I, ${player}?${sore ? ` Last time, ${toYou(sore.text, player)}.` : ""}`;
+      return answerLine(decision, invite, player, decision === "accept" ? SPOT_NAME[ACTIVITY.get(invite.act)!.place] ?? "" : "");
     } finally {
       m.thinking = "";
     }
@@ -334,9 +374,12 @@ export class NpcVillage {
     m.mem.promises = settle(m.mem.promises, c.id, state);
     const g = gameTime(this.v.t);
     const text = outcomeMemory(c, state);
-    remember(m.mem, g.day, clockLabel(g.hour), text);
+    remember(m.mem, g.day, clockLabel(g.hour), text, 8);
     addFact(m.mem, text);
+    feel(m.mem, m.persona, c.from, state, g.day, text);
+    addBelief(m.mem, { about: c.from, text: state === "kept" ? "keeps promises" : "broke a promise", source: "", conf: 0.9, day: g.day });
     bump(this.v.rel, npc, c.from, outcomeAffinity(m.persona, state));
+    m.mem.why = `${text} > ${state === "kept" ? "trust" : "trust less"} ${c.from}`;
     this.out.line({ who: npc, mem: promiseLine({ ...c, state }) });
   }
 
@@ -361,6 +404,7 @@ export class NpcVillage {
         if (!this.leaving.has(c.id)) {
           this.leaving.add(c.id);
           this.said(npc, `Time to go, I promised ${c.from}!`);
+          this.out.think?.(npc, `${c.from} is counting on me.`);
         }
         const there = a.act === c.act && (a.state === "wait" || a.state === "do");
         if (there) this.arrived.add(c.id);
@@ -374,6 +418,17 @@ export class NpcVillage {
         this.said(npc, /birthday/.test(c.occasion) ? `Happy birthday, ${c.from}!` : `Glad you came, ${c.from}!`);
       }
     }
+  }
+
+  // The first meeting after a broken promise: the NPC says so to their face, once for each grudge.
+  private bringUp(npc: Npc, guest: Person): boolean {
+    const m = this.hub.minds.get(npc);
+    const r = m && bondOf(m.mem, guest.name)?.why.filter((x) => x.beat === "broken").at(-1);
+    const key = `${npc}:${r?.text}`;
+    if (!r || this.raised.has(key)) return false;
+    this.raised.add(key);
+    this.said(npc, `${guest.name}, ${toYou(r.text, guest.name)}.`, guest.name);
+    return true;
   }
 
   private said(npc: Npc, text: string, to?: string): void {
@@ -396,6 +451,13 @@ export class NpcVillage {
       const from = last ? m.mem.log.indexOf(last) + 1 : 0;
       for (const e of m.mem.log.slice(from)) this.out.line({ who: id, mem: `${e.time || clockLabel(gameTime(this.v.t).hour)} ${e.text}` });
       this.sent.set(id, m.mem.log.at(-1) ?? null);
+      const wired = this.wired.get(id) ?? new Set<string>();
+      this.wired.set(id, wired);
+      for (const l of [...Object.entries(m.mem.bonds).map(([who, b]) => bondLine(who, b)), ...m.mem.beliefs.map(beliefLine)]) {
+        if (wired.has(l)) continue;
+        wired.add(l);
+        this.out.line({ who: id, mem: l });
+      }
     }
     return ev;
   }

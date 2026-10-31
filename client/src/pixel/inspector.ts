@@ -3,6 +3,7 @@
 // judges) see that the village is run by minds, not scripts.
 
 import { ACTIVITY } from "../life/activities";
+import { feelWord } from "../mind/bonds";
 import { PLAN_PHASES } from "../mind/brain";
 import type { Mind } from "../mind/hub";
 import { friends } from "../life/relations";
@@ -34,6 +35,11 @@ export function drawInspector(g: Ctx, m: Mind, a: Agent, rel: Map<string, number
   if (promised.length) add(`PROMISED: ${promised.map((c) => `${c.from}, ${c.occasion || c.act}, day ${c.day + 1} ${c.phase}`).join("; ")}`);
   const fr = friends(rel, p.id, 1).slice(0, 3);
   add(`FRIENDS: ${fr.length ? fr.map((f) => `${names(f.id)} ${f.affinity}`).join(", ") : "none yet"}`);
+  const bond = Object.entries(m.mem.bonds).sort(([, x], [, y]) => Math.abs(y.fondness) + Math.abs(y.trust) - Math.abs(x.fondness) - Math.abs(x.trust))[0];
+  if (bond) add(`FEELS: ${feelWord(bond[1])} ${bond[0]} (trust ${bond[1].trust}), ${bond[1].why.at(-1)?.text ?? ""}`, PAL.coral);
+  const belief = m.mem.beliefs.at(-1);
+  if (belief) add(`THINKS: ${belief.about} ${belief.text}${belief.source ? ` (${belief.source} said)` : ""}`);
+  if (m.mem.why) add(`WHY: ${m.mem.why}`, PAL.woodD);
   if (m.mem.facts.length) add(`KNOWS: ${m.mem.facts[m.mem.facts.length - 1]}`, PAL.woodD);
   add("REMEMBERS:", PAL.coral);
   for (const e of m.mem.log.slice(-4).reverse()) add(` ${e.time} ${e.text}`);

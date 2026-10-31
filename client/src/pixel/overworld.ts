@@ -412,7 +412,7 @@ export class Overworld {
     this.lifeEnv.chooser = this.minds.chooser;
     this.lifeEnv.bias = this.minds.bias;
     this.syncMinds();
-    this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text, to) => this.say(`n:${id}`, text, text === "..." ? 25 : 5, to) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
+    this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text, to) => this.say(`n:${id}`, text, text === "..." ? 25 : 5, to), think: (id, text) => this.think(`n:${id}`, text) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
     this.npcs.people = () => [{ id: this.npcs?.me ?? "me", name: this.myName, pos: this.player }, ...[...this.peers].map(([id, p]) => ({ id, name: p.name, pos: p.pos }))];
     this.npcs.pets = () => [
       { id: "pet", name: this.petName, pos: this.pet, busy: this.moving },
@@ -579,6 +579,12 @@ export class Overworld {
   // `to` = the name of whoever is spoken to, shown on the bubble with the speaker's.
   say(who: string, text: string, secs = 3.5, to?: string): void {
     this.bubbles.set(who, { text, t: secs, to, held: false, wait: 0 });
+  }
+
+  // A thought, not speech: never covers a line being said, and only this screen sees it.
+  think(who: string, text: string): void {
+    const b = this.bubbles.get(who);
+    if (!b || b.thought) this.bubbles.set(who, { text, t: 3.5, held: false, wait: 0, thought: true });
   }
 
   // A wild pet close enough to talk to (but not touching, which starts a fight).
@@ -930,7 +936,7 @@ export class Overworld {
       if (!pos) continue;
       const [bx, by] = toScreen(pos.x, pos.z);
       const head = this.speaker(who);
-      const label = head && b.to ? `${head} > ${b.to}` : head;
+      const label = b.thought ? `${head} thinks` : head && b.to ? `${head} > ${b.to}` : head;
       const lines = wrap(b.text, 132).slice(0, 3);
       const w = Math.max(label.length, ...lines.map((l) => l.length)) * GLYPH + 12;
       const bottom = by - OVERWORLD_MON - 4;
@@ -942,7 +948,7 @@ export class Overworld {
     shown.forEach((s, i) => {
       const spot = spots[i];
       s.b.held = !spot;
-      if (spot) bubble(g, s.head, s.lines, s.cx, s.box.w, s.box.h, spot);
+      if (spot) bubble(g, s.head, s.lines, s.cx, s.box.w, s.box.h, spot, s.b.thought);
     });
     const bed = this.bedNear();
     const hint = this.atDoor()
@@ -991,15 +997,22 @@ interface Bubble {
   text: string;
   t: number; // seconds left on screen
   to?: string;
+  thought?: boolean; // drawn with a trail of dots instead of a tail
   held: boolean; // no free spot right now
   wait: number; // seconds spent held
 }
 
 // A speech bubble above a sprite: up to 3 wrapped lines, kept on screen, with a small tail.
-function bubble(g: CanvasRenderingContext2D, head: string, lines: readonly string[], cx: number, w: number, h: number, at: Placed): void {
+function bubble(g: CanvasRenderingContext2D, head: string, lines: readonly string[], cx: number, w: number, h: number, at: Placed, thought = false): void {
   const { x, y } = at;
   drawFrame(g, x, y, w, h);
-  if (!at.moved) {
+  if (thought) {
+    if (!at.moved) {
+      g.fillStyle = PAL.ink;
+      g.fillRect(cx - 1, y + h + 1, 3, 2);
+      g.fillRect(cx, y + h + 4, 1, 1);
+    }
+  } else if (!at.moved) {
     g.fillStyle = PAL.panel;
     g.fillRect(cx - 2, y + h - 1, 4, 2);
     g.fillStyle = PAL.wood;

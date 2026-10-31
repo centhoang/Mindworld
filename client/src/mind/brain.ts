@@ -8,6 +8,7 @@ import { ACTIVITY } from "../life/activities";
 import type { Phase } from "../life/clock";
 import type { Needs } from "../life/needs";
 import { EMOTES, type Emote } from "../world/live";
+import { bondText } from "./bonds";
 import { fmt, recent, relevant, type MindMemory } from "./memory";
 import { personaCard, type Persona } from "./persona";
 
@@ -29,12 +30,13 @@ function needsText(n: Needs): string {
   return low.length ? `Feels low on: ${low.join(", ")}.` : "Feels fine.";
 }
 
-function memoryText(m: MindMemory, topic = "", n = 4): string {
-  const picked = topic ? relevant(m, topic, 2) : [];
+function memoryText(m: MindMemory, topic = "", n = 4, who = ""): string {
+  const picked = topic ? relevant(m, topic, 2, who) : [];
   const rest = recent(m, n).filter((e) => !picked.includes(e));
   const lines = [...picked, ...rest].map(fmt);
   const facts = m.facts.length ? `Known facts: ${m.facts.join("; ")}.\n` : "";
-  return `${facts}${lines.length ? `Recent memories:\n${lines.join("\n")}` : "No memories yet."}`;
+  const feeling = who ? bondText(m, who) : "";
+  return `${facts}${lines.length ? `Recent memories:\n${lines.join("\n")}` : "No memories yet."}${feeling ? `\n${feeling}` : ""}`;
 }
 
 // --- plan: one activity per part of the day -------------------------------------------------------
@@ -79,7 +81,7 @@ export function linePrompt(p: Persona, m: MindMemory, other: Persona, affinity: 
   const convo = said.length ? `The conversation so far:\n${said.join("\n")}\n` : `${p.name} starts the conversation.\n`;
   return {
     system: SYSTEM,
-    user: `${personaCard(p)}\n${memoryText(m, `${topic} ${other.name}`, 2)}\n${p.name} meets ${other.name}, ${feel}. Topic: ${topic}.\n${sceneLine(scene)}${convo}Write ${p.name}'s next line: one short sentence, under 15 words, no emoji.`,
+    user: `${personaCard(p)}\n${memoryText(m, `${topic} ${other.name}`, 2, other.name)}\n${p.name} meets ${other.name}, ${feel}. Topic: ${topic}.\n${sceneLine(scene)}${convo}Write ${p.name}'s next line: one short sentence, under 15 words, no emoji.`,
     grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,
     maxTokens: 24,
     temperature: 0.9,
@@ -103,7 +105,7 @@ export function replyPrompt(p: Persona, m: MindMemory, player: string, line: str
   return {
     system: SYSTEM,
     user: `${personaCard(p)}
-${memoryText(m, line, 3)}
+${memoryText(m, line, 3, player)}
 ${sceneLine(scene)}A visitor, ${player}, says to ${p.name}: "${line.slice(0, 140)}"
 Write ${p.name}'s answer: one or two short friendly sentences, under 25 words, in character, no emoji.${scene ? " If they ask about something around you, answer only from what is listed there." : ""}`,
     grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,

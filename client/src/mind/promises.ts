@@ -136,9 +136,9 @@ export function outcomeMemory(c: Commitment, state: Commitment["state"]): string
 }
 
 // What a mind says when it answers an invitation (the model's own line replaces it when one is running).
-export function answerLine(d: Decision, c: Invite, from: string): string {
+export function answerLine(d: Decision, c: Invite, from: string, place = ""): string {
   const event = c.occasion || (c.act === "fish" ? "fishing" : c.act);
-  if (d === "accept") return `Yes, ${from}! I will be there for the ${event}.`.replace("the fishing", "fishing");
+  if (d === "accept") return `Yes, ${from}! I will be there for the ${event}.`.replace("the fishing", "fishing") + (place ? ` Meet me at ${place}.` : "");
   return d === "counter" ? `Maybe, ${from}. Can we do it another time?` : `Sorry ${from}, not this time.`;
 }
 

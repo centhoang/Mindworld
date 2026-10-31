@@ -284,5 +284,77 @@ describe("NpcVillage talks to pets", () => {
       expect(pip.mem.promises[0]).toMatchObject({ from: "Kai", state: "open" });
       expect(pip.mem.log.map((e) => e.text).join()).not.toContain("promise|");
     });
+
+    const stoodUp = async () => {
+      const made = setup();
+      const { nv } = made;
+      await nv.reply("pip", "Kai", LINE);
+      nv.v.t = eveningOf(1);
+      Object.assign(nv.v.agents.find((x) => x.id === "pip")!, { state: "idle", act: null, idle: 0, gather: null });
+      tick(nv, 10);
+      nv.v.t = eveningOf(2);
+      tick(nv, 1);
+      return made;
+    };
+
+    it("gives the real reason when asked, and trust costs the next yes", async () => {
+      const { nv, pip } = await stoodUp();
+      expect(pip.mem.bonds.Kai!.trust).toBeLessThan(0);
+      expect(pip.mem.why).toContain("stood me up");
+      expect((await nv.reply("pip", "Kai", "why are you mad at me?"))?.text).toContain("you stood me up");
+      const r = await nv.reply("pip", "Kai", "come dance tomorrow evening?");
+      expect(pip.mem.promises.filter((c) => c.state === "open")).toEqual([]);
+      expect(r?.text).toContain("Last time, you stood me up");
+      await nv.reply("pip", "Kai", "I am sorry about that");
+      expect((await nv.reply("pip", "Kai", "come dance tomorrow evening?"))?.text).toContain("Yes, Kai");
+    });
+
+    it("tells the place when it accepts, and says the grudge to your face once", async () => {
+      const { nv, bubbles } = await stoodUp();
+      const a = nv.v.agents.find((x) => x.id === "pip")!;
+      expect((await setup().nv.reply("pip", "Kai", LINE))?.text).toContain("Meet me at the lawn");
+      const pipSays = () => bubbles.filter(([id, t]) => id === "pip" && t.includes("you stood me up"));
+      nv.people = () => [{ id: "me", name: "Kai", pos: a.pos }];
+      Object.assign(a, { state: "idle", act: null, idle: 5, gather: null });
+      nv.step(0.25, nv.v.t + 0.25);
+      expect(pipSays()).toHaveLength(1);
+      (nv as unknown as { greeted: Map<string, number> }).greeted.clear();
+      Object.assign(a, { state: "idle", act: null, idle: 5, gather: null });
+      nv.step(0.25, nv.v.t + 0.25);
+      expect(pipSays()).toHaveLength(1);
+    });
+
+    it("learns what a player likes and how they treat it", async () => {
+      const { nv, pip } = setup();
+      await nv.reply("pip", "Kai", "I love carrots, thank you");
+      expect(pip.mem.beliefs[0]).toMatchObject({ about: "Kai", text: "likes carrots", source: "" });
+      expect(pip.mem.bonds.Kai!.fondness).toBeGreaterThan(0);
+    });
+
+    it("hands bonds and beliefs to the next host through the room log", async () => {
+      const { nv, pip, lines } = await stoodUp();
+      const mem = lines.map((l) => (l as { mem?: string }).mem ?? "").filter((x) => /^(bond|belief)\|/.test(x));
+      expect(mem.every((x) => x.length <= 120)).toBe(true);
+      const trust = pip.mem.bonds.Kai!.trust;
+      pip.mem.bonds = {};
+      pip.mem.beliefs = [];
+      nv.v.rel.clear();
+      nv.setMemory("pip", mem);
+      expect(pip.mem.bonds.Kai!.trust).toBe(trust);
+      expect(pip.mem.beliefs.map((b) => b.text)).toContain("broke a promise");
+      expect(nv.v.rel.get(pairKey("pip", "Kai"))).toBeLessThan(0);
+      expect((await nv.reply("pip", "Kai", "are you mad?"))?.text).toContain("you stood me up");
+    });
+
+    it("gossips a broken promise to a friend, who trusts the player less", async () => {
+      const { nv, pip } = await stoodUp();
+      const mo = nv.hub.minds.get("mo")!;
+      nv.hub.minds.get("pip")!.lastTalk = -1e9;
+      await nv.hub.talk(nv.v.agents.find((x) => x.id === "pip")!, nv.v.agents.find((x) => x.id === "mo")!);
+      expect(mo.mem.beliefs[0]).toMatchObject({ about: "Kai", text: "broke a promise", source: "Pip" });
+      expect(mo.mem.bonds.Kai!.trust).toBeLessThan(0);
+      expect(mo.mem.why).toContain("Pip told me");
+      expect(pip.mem.bonds.Mo).toBeUndefined();
+    }, 20000);
   });
 });

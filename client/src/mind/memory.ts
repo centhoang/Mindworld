@@ -3,15 +3,18 @@
 // browser model's prompt.
 
 import type { Phase } from "../life/clock";
+import type { Belief, Bond } from "./bonds";
 import type { Commitment } from "./promises";
 
 export const LOG_MAX = 30;
 export const FACTS_MAX = 6;
+const KEEP_IMP = 7; // memories this important outlive the everyday ones
 
 export interface MemoryEntry {
   day: number;
   time: string; // "08:10"
   text: string;
+  imp?: number; // how much it mattered, 1..10 (default 3)
 }
 
 export interface MindMemory {
@@ -21,17 +24,23 @@ export interface MindMemory {
   planDay: number; // the day the plan was made (-1 = never)
   reflectDay: number;
   promises: Commitment[]; // what this mind agreed to (promises.ts)
+  bonds: Record<string, Bond>; // how it feels about each person, and why (bonds.ts)
+  beliefs: Belief[]; // what it holds true about people
+  why: string; // its last decision: memory > feeling > choice, shown in the inspector
 }
 
 export function emptyMemory(): MindMemory {
-  return { log: [], facts: [], plan: {}, planDay: -1, reflectDay: -1, promises: [] };
+  return { log: [], facts: [], plan: {}, planDay: -1, reflectDay: -1, promises: [], bonds: {}, beliefs: [], why: "" };
 }
 
-export function remember(m: MindMemory, day: number, time: string, text: string): void {
+export function remember(m: MindMemory, day: number, time: string, text: string, imp?: number): void {
   const last = m.log[m.log.length - 1];
   if (last && last.text === text && last.day === day) return; // no "ate, ate, ate"
-  m.log.push({ day, time, text: text.slice(0, 100) });
-  if (m.log.length > LOG_MAX) m.log.splice(0, m.log.length - LOG_MAX);
+  m.log.push({ day, time, text: text.slice(0, 100), ...(imp ? { imp } : {}) });
+  while (m.log.length > LOG_MAX) {
+    const small = m.log.findIndex((e) => (e.imp ?? 3) < KEEP_IMP);
+    m.log.splice(Math.max(0, small), 1); // the small stuff goes first; what mattered stays
+  }
 }
 
 export function addFact(m: MindMemory, fact: string): void {
@@ -43,12 +52,16 @@ export function addFact(m: MindMemory, fact: string): void {
 
 export const recent = (m: MindMemory, n: number): MemoryEntry[] => m.log.slice(-n);
 
-// The memories that share the most words with a topic (ties: newest first). Cheap retrieval for prompts.
-export function relevant(m: MindMemory, topic: string, n: number): MemoryEntry[] {
+// Cheap retrieval for prompts: memories sharing words with a topic or naming `who`, the ones that mattered first
+// (Smallville's relevance + importance + recency, with no embeddings; ties: newest first).
+export function relevant(m: MindMemory, topic: string, n: number, who = ""): MemoryEntry[] {
   const words = new Set(topic.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3));
+  const name = who.toLowerCase();
+  if (name) words.add(name);
   return m.log
     .map((e, i) => ({ e, i, s: e.text.toLowerCase().split(/[^a-z]+/).filter((w) => words.has(w)).length }))
     .filter((x) => x.s > 0)
+    .map((x) => ({ ...x, s: x.s + (x.e.imp ?? 3) / 10 }))
     .sort((a, b) => b.s - a.s || b.i - a.i)
     .slice(0, n)
     .map((x) => x.e);
@@ -67,5 +80,8 @@ export function parseMemory(raw: unknown): MindMemory {
   if (typeof r.planDay === "number") m.planDay = r.planDay;
   if (typeof r.reflectDay === "number") m.reflectDay = r.reflectDay;
   if (Array.isArray(r.promises)) m.promises = r.promises.filter((c) => c && typeof c.id === "string" && typeof c.act === "string" && typeof c.day === "number");
+  if (r.bonds && typeof r.bonds === "object") m.bonds = r.bonds;
+  if (Array.isArray(r.beliefs)) m.beliefs = r.beliefs.filter((b) => b && typeof b.about === "string" && typeof b.text === "string");
+  if (typeof r.why === "string") m.why = r.why;
   return m;
 }

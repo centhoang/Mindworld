@@ -10,6 +10,7 @@ import { bump, pairKey } from "../life/relations";
 import type { Agent, Choice, LifeEvent, Village } from "../life/village";
 import type { Emote } from "../world/live";
 import { choosePrompt, emotePrompt, eventText, linePrompt, parseChoice, parseEmote, parseLine, parsePlan, planPrompt, PLAN_PHASES, reflectPrompt, scriptedLine } from "./brain";
+import { addBelief, feel, gossipFrom } from "./bonds";
 import { addFact, emptyMemory, parseMemory, remember, type MindMemory } from "./memory";
 import { traitBias, type Persona } from "./persona";
 import { PRIO, type MindScheduler } from "./scheduler";
@@ -232,12 +233,28 @@ export class MindHub {
       remember(ma.mem, now.day, now.time, `talked with ${mb.persona.name} about ${topic}`);
       remember(mb.mem, now.day, now.time, `talked with ${ma.persona.name} about ${topic}`);
       bump(this.v.rel, a.id, b.id, 2);
+      this.gossip(ma, mb);
+      this.gossip(mb, ma);
       this.spreadPlan(ma, mb, b, aff);
       for (const x of [a, b]) x.needs = { ...x.needs, social: Math.min(100, x.needs.social + 20) };
     } finally {
       ma.talking = mb.talking = false;
       for (const x of [a, b]) if (x.state === "idle") x.idle = 1;
     }
+  }
+
+  // A broken promise travels: the listener now believes it, with its source, and cools toward that person.
+  private gossip(from: Mind, to: Mind): void {
+    const news = gossipFrom(from.mem, from.persona, to.persona.name);
+    if (!news) return;
+    const now = this.now();
+    const text = "broke a promise";
+    if (!addBelief(to.mem, { about: news.about, text, source: from.persona.name, conf: 0.6, day: now.day })) return;
+    const heard = `${from.persona.name} told me: ${news.text}`;
+    remember(to.mem, now.day, now.time, heard, 6);
+    bump(this.v.rel, to.persona.id, news.about, feel(to.mem, to.persona, news.about, "gossip", now.day, heard));
+    this.out.say(from.persona.id, `${news.about} broke a promise to me, you know.`, to.persona.name);
+    to.mem.why = `${from.persona.name} told me > ${news.about} ${text} > trust ${news.about} less`;
   }
 
   // What the opener talks about: a group plan coming up (an invitation), else the latest memory.
