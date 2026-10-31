@@ -78,6 +78,7 @@ export type Deal = { ok: true } | { ok: false; npc: Npc; refused: boolean; text:
 
 export class NpcVillage {
   readonly v = newVillage();
+  readonly hasPet: Record<Npc, boolean> = { elder: false, mo: false, ama: false, pip: false };
   readonly env: Env;
   readonly hub: MindHub; // holds only the minds I host
   private readonly hosts = new Map<Npc, string | null>();
@@ -185,6 +186,7 @@ export class NpcVillage {
       mem.log.push({ day, time: m ? m[1]! : "", text: (m ? m[2]! : l).slice(0, 100) });
     }
     for (const [who, b] of Object.entries(mem.bonds)) if (!this.v.rel.has(pairKey(npc, who))) this.v.rel.set(pairKey(npc, who), b.fondness);
+    if (npc === "pip" && (mem.purse?.goals ?? 0) >= 1) this.hasPet[npc] = true;
     const mind = this.hub.minds.get(npc);
     if (mind) {
       mind.mem.log = [...mem.log, ...mind.mem.log].slice(-30);
@@ -202,6 +204,7 @@ export class NpcVillage {
     if (trade) record(this.market, trade);
     const npc = l.who as Npc;
     if (!NPCS.includes(npc) || this.hosting(npc)) return;
+    if (npc === "pip" && l.say?.includes("I bought a pet of my own")) this.hasPet[npc] = true;
     if (l.act) this.remote.set(npc, l.act);
     if (l.say) this.out.say(npc, l.say, VILLAGERS.find((p) => p.id === l.to)?.name ?? this.people().find((p) => p.id === l.to)?.name);
     // Another machine's NPC spoke to an NPC I host: mine answers (a few turns at most).
@@ -762,9 +765,8 @@ export class NpcVillage {
         addFact(m.mem, text);
         m.mem.why = `${goal!.cost} coins saved > ${text}`;
         this.said(id as Npc, `At last! I bought ${goal!.what}!`);
-        continue;
-      }
-      if (goal) addFact(m.mem, `saving up for ${goal.what}`);
+      } else if (goal) addFact(m.mem, `saving up for ${goal.what}`);
+      if (id === "pip" && (purse.goals ?? 0) >= 1) this.hasPet.pip = true;
     }
   }
 

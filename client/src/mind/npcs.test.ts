@@ -380,6 +380,42 @@ describe("NpcVillage talks to pets", () => {
   });
 
   describe("long goals", () => {
+    it("shows Pip's pet after buying it on the host", () => {
+      const { nv } = make();
+      expect(nv.hasPet.pip).toBe(false);
+      nv.purseOf("pip").coins = 45;
+      run(nv, 0.25);
+      expect(nv.purseOf("pip").goals).toBe(1);
+      expect(nv.hasPet.pip).toBe(true);
+      expect(nv.hasPet.mo).toBe(false);
+    });
+
+    it("shows Pip's pet when a non-host hears the purchase", () => {
+      const { nv } = make();
+      nv.me = "me";
+      nv.setHost("pip", "other");
+      expect(nv.hasPet.pip).toBe(false);
+      nv.hear({ who: "pip", say: "I am saving for a pet of my own." });
+      expect(nv.hasPet.pip).toBe(false);
+      nv.hear({ who: "pip", say: "At last! I bought a pet of my own!" });
+      expect(nv.hasPet.pip).toBe(true);
+      expect(nv.hub.minds.has("pip")).toBe(false);
+    });
+
+    it("restores Pip's pet from the saved purse on any machine", () => {
+      for (const remote of [false, true]) {
+        const { nv } = make();
+        if (remote) {
+          nv.me = "me";
+          nv.setHost("pip", "other");
+        }
+        nv.setMemory("pip", ["purse|5||0||0"]);
+        expect(nv.hasPet.pip).toBe(false);
+        nv.setMemory("pip", ["purse|5||0||1"]);
+        expect(nv.hasPet.pip).toBe(true);
+      }
+    });
+
     it("saves, buys, says so, and moves on; the count travels with the purse", () => {
       const { nv, bubbles, lines } = make();
       const pip = nv.hub.minds.get("pip")!;

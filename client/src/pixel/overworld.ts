@@ -31,7 +31,7 @@ import { drawInspector } from "./inspector";
 import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
 import { petScene, sharedScene, type Seen } from "../mind/scene";
-import { generatedSprites } from "./generated-sprites";
+import { generatedSprites, SpriteImages } from "./generated-sprites";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, humanSprites, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
@@ -96,6 +96,8 @@ export class Overworld {
   private moving = false;
   private readonly playerMotion = newHumanMotion(this.player);
   private readonly npcMotions = new Map<Npc, HumanMotion>();
+  private readonly npcPets = new Map<Npc, Vec>();
+  private readonly npcPetImages = new SpriteImages();
   private place = "";
   private bannerT = 0;
   private sprite: Sprite | null = null;
@@ -822,6 +824,14 @@ export class Overworld {
       for (const a of this.npcs.v.agents) if (!this.npcMotions.has(a.id as Npc)) this.npcMotions.set(a.id as Npc, newHumanMotion(a.pos));
       for (const e of this.npcs.step(dt, this.life.t)) if (e.kind === "start" && e.act !== "wander") this.say(`n:${e.who}`, ACTIVITY.get(e.act)!.label, 2.5);
       for (const a of this.npcs.v.agents) stepHumanMotion(this.npcMotions.get(a.id as Npc)!, a.pos, dt, a.state === "do" ? ACTIVITY.get(a.act!)?.pose ?? null : null);
+      for (const a of this.npcs.v.agents) {
+        const id = a.id as Npc;
+        if (!this.npcs.hasPet[id]) continue;
+        const pet = this.npcPets.get(id);
+        const pos = pet && this.canWalk(pet.x, pet.z) ? pet : slide(a.pos, -0.8, 0.8, this.canWalk);
+        const next = followStep(pos, a.pos, dt, this.canWalk);
+        if (this.canWalk(next.x, next.z)) this.npcPets.set(id, next);
+      }
       const ea = this.npcs.v.agents.find((a) => a.id === "elder");
       if (ea && this.elder) this.elder.pos = ea.pos;
     }
@@ -994,6 +1004,15 @@ export class Overworld {
     const [qx, qy] = toScreen(this.pet.x, this.pet.z);
     const hop = Math.floor(t * 4) % 2;
     items.push({ z: this.pet.z, draw: () => g.drawImage(this.petSprite, qx - half, qy - OVERWORLD_MON + 2 - hop) });
+    for (const [id, pos] of this.npcPets) {
+      if (!this.npcs?.hasPet[id]) continue;
+      const [nx, ny] = toScreen(pos.x, pos.z);
+      if (nx < -24 || ny < -24 || nx > sw + 24 || ny > sh + 24) continue;
+      items.push({ z: pos.z, draw: () => {
+        const image = this.npcPetImages.get("/art/gen/wild/forest-sprig-16-front-idle.png");
+        if (image) g.drawImage(image, nx - 8, ny - 14 - hop);
+      } });
+    }
     for (const w of this.wilds) {
       const [wx, wy] = toScreen(w.pos.x, w.pos.z);
       if (wx < -24 || wy < -24 || wx > sw + 24 || wy > sh + 24) continue;
