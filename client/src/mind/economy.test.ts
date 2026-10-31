@@ -1,4 +1,4 @@
-import { DAY_SECONDS } from "../life/clock";
+import { DAY_SECONDS, gameTime } from "../life/clock";
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sim/rng";
 import type { Bond } from "./bonds";
@@ -185,6 +185,34 @@ describe("deals in the village", () => {
     mem.bonds.Kai = bond(-30);
     expect((await nv.reply("pip", "Kai", "nice weather"))?.text).toContain("nothing to say");
     expect((await nv.reply("pip", "Kai", "I am so sorry"))?.text ?? "").not.toContain("nothing to say");
+  });
+
+  it("a villager comes to you for what it wants, and your ok closes the deal", async () => {
+    const { nv, mine } = town();
+    const pip = nv.hub.minds.get("pip")!;
+    const today = gameTime(nv.v.t).day;
+    const want = wantOf(pip.persona, today)!;
+    mine.goods[want] = 1;
+    nv.purseOf("pip").coins = 100;
+    (nv.env as { rng: () => number }).rng = () => 0.9;
+    const pitch = (nv as unknown as { pitch(n: string, g: unknown): boolean }).pitch.bind(nv);
+    expect(pitch("pip", { id: "me", name: "Kai", pos: { x: 0, z: 0 } })).toBe(true);
+    const r = await nv.reply("pip", "Kai", "ok");
+    expect(r?.text).toContain("Deal");
+    expect(mine.goods[want]).toBe(0);
+    expect(mine.coins).toBeGreaterThan(50);
+  });
+
+  it("an invitation from a villager becomes a promise on your yes", async () => {
+    const { nv, mine } = town();
+    mine.goods = {};
+    nv.setSpots({ ...nv.env.spots, playground: [{ x: 5, z: 5 }] });
+    (nv.env as { rng: () => number }).rng = () => 0.9;
+    const pitch = (nv as unknown as { pitch(n: string, g: unknown): boolean }).pitch.bind(nv);
+    nv.v.t = 8 * (DAY_SECONDS / 24); // a morning
+    if (!pitch("pip", { id: "me", name: "Kai", pos: { x: 0, z: 0 } })) throw new Error(`no pitch in ${gameTime(nv.v.t).phase}`);
+    await nv.reply("pip", "Kai", "yes");
+    expect(nv.hub.minds.get("pip")!.mem.promises.map((c) => c.act)).toEqual(["soccer"]);
   });
 
   it("left alone for three days, the town works, plants and sells", () => {

@@ -13,10 +13,10 @@ import { MindHub, type Mind } from "./hub";
 import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
 import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, holdsGrudge, hurt, parseBeliefLine, parseBondLine, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
-import { VILLAGERS, type Persona } from "./persona";
-import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, purseLine, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
+import { traitBias, VILLAGERS, type Persona } from "./persona";
+import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
 import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
-import { addCommitment, answerLine, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
+import { addCommitment, answerLine, type Invite, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
 import { PRIO, type MindScheduler } from "./scheduler";
 
@@ -41,6 +41,8 @@ const PET_NPC_GAP = 30; // sim seconds between one NPC's pet lines (several pets
 const SCRIPT_GAP_MS = 3200; // without a model, wait a little before answering (the room allows 1 line / 3 s)
 const PROMISE_PULL = 3; // score added to a promised activity while it is due: it beats any need
 const PROMISE_DIST = 7; // the one who invited is here if they are this close
+const PITCH_SKIP = 0.4; // most meetings are just a hello or a chat
+const PITCH_ACTS = ["soccer", "dance", "picnic", "fish"];
 const FARM_PULL = 0.5; // a villager short of coins or with a crop in the ground goes to its garden
 const FARM_COINS = 30;
 const YES = /^\s*(ok|okay|deal|yes|yep|sure|fine|agreed)\b/i;
@@ -97,6 +99,7 @@ export class NpcVillage {
   pocket: Pocket | null = null;
   private readonly offers = new Map<string, { o: Offer; price: number }>(); // "npc:player" -> the counter it made
   private readonly purses = new Map<string, string>(); // npc -> purse line the room has
+  private readonly asked = new Map<string, Invite>(); // "npc:player" -> what it invited them to
 
   constructor(
     private readonly sched: MindScheduler,
@@ -244,7 +247,7 @@ export class NpcVillage {
       const guest = this.people().find((p) => near(p.pos, GREET_DIST) && this.v.t - (this.greeted.get(`${npc}:${p.id}`) ?? -1e9) > GREET_GAP);
       if (guest) {
         this.greeted.set(`${npc}:${guest.id}`, this.v.t);
-        if (this.bringUp(npc, guest)) continue;
+        if (this.bringUp(npc, guest) || this.pitch(npc, guest)) continue;
         const visitor: Persona = { id: guest.id, name: guest.name, kind: "human", traits: [], hobbies: [], habit: "", background: "" };
         void this.speak(npc, visitor, guest.id === "me" ? "" : guest.id, { said: [], turns: 0 });
         continue;
@@ -325,7 +328,7 @@ export class NpcVillage {
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
     if (!m || !this.hosting(npc)) return null;
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
-    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? this.quote(npc, line) ?? await this.traded(npc, m, player, line, to) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? this.quote(npc, line) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     if (!this.hasModel() && !answer) return null;
     const ans = answer ? { value: answer, source: "rules" }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
@@ -655,6 +658,46 @@ export class NpcVillage {
     addGood(purse, good, -1);
     this.pocket.change(0, good, 1);
     return ` I brought you ${good}.`;
+  }
+
+  // Initiative: the villager comes to you. It asks for what it is after today if it knows you have some, or asks
+  // you along to what it likes. Either one waits for your yes. Only a person on good terms gets asked.
+  private pitch(npc: Npc, guest: Person): boolean {
+    const m = this.hub.minds.get(npc);
+    if (!m || this.env.rng() < PITCH_SKIP || (guest.id !== "me" && guest.id !== this.myId)) return false;
+    const b = bondOf(m.mem, guest.name);
+    if (b && (b.fondness < 0 || holdsGrudge(b))) return false;
+    const g = gameTime(this.v.t);
+    openDay(this.market, g.day, VILLAGERS);
+    const want = wantOf(m.persona, g.day);
+    const purse = this.purseOf(npc);
+    if (want && this.pocket?.count(want) && purse.coins >= priceOf(this.market, want) && this.market.wanted[want]?.includes(m.persona.name)) {
+      const price = priceOf(this.market, want);
+      this.offers.set(`${npc}:${guest.name}`, { o: { kind: "sell", good: want, qty: 1, price }, price });
+      m.mem.why = `want ${want} today > ${guest.name} has some > offered ${price}c`;
+      this.said(npc, `${guest.name}, I am after ${want} today. ${price} coins for one?`, guest.name);
+      return true;
+    }
+    const act = PITCH_ACTS.find((a) => traitBias(m.persona, a) > 0 && this.env.spots[ACTIVITY.get(a)!.place]?.length);
+    if (!act || g.phase === "evening" || g.phase === "night" || dueNow(m.mem.promises, g.day, "evening").length) return false;
+    this.asked.set(`${npc}:${guest.name}`, { act, occasion: "", day: g.day, phase: "evening" });
+    m.mem.why = `feel like ${act} > ${guest.name} is around > asked them along`;
+    this.said(npc, `${guest.name}, ${act} this evening? Say yes if you are in.`, guest.name);
+    return true;
+  }
+
+  // The player said yes to what the villager asked: now it is a promise like any other.
+  private tookUp(npc: Npc, m: Mind, player: string, playerId: string, line: string): string | null {
+    const key = `${npc}:${player}`;
+    const invite = this.asked.get(key);
+    this.asked.delete(key);
+    if (!invite || !YES.test(line)) return null;
+    const c: Commitment = { ...invite, id: `${npc}${this.v.nextId++}`, from: player, fromId: playerId, state: "open", importance: 5 };
+    m.mem.promises = addCommitment(m.mem.promises, c);
+    this.out.line({ who: npc, mem: promiseLine(c) });
+    const g = gameTime(this.v.t);
+    remember(m.mem, g.day, clockLabel(g.hour), `${player} agreed to ${invite.act} with me this evening`, 6);
+    return answerLine("accept", invite, player, SPOT_NAME[ACTIVITY.get(invite.act)!.place] ?? "");
   }
 
   // The first meeting after a broken promise: the NPC says so to their face, once for each grudge.
