@@ -105,6 +105,24 @@ export function buildTerrain(m: TileMap): Terrain {
   return out;
 }
 
+const RAIL_DEPTH = 0.3; // how far a rail reaches into its tile
+
+// Rails stop a walker but leave the middle of the tile free, so routes through tile centres still work.
+export function railBlocks(m: TileMap, x: number, z: number): boolean {
+  const [fx, fz] = [x - m.ox, z - m.oz];
+  const [i, j] = [Math.floor(fx), Math.floor(fz)];
+  const on = (a: number, b: number) => a >= 0 && b >= 0 && a < m.w && b < m.h && m.kind[b * m.w + a] === T.bridge;
+  if (!on(i, j)) return false;
+  const reach = (di: number, dj: number) => {
+    let n = 0;
+    while (n < 9 && on(i + di * (n + 1), j + dj * (n + 1))) n++;
+    return n;
+  };
+  const [u, v] = [fx - i, fz - j];
+  if (reach(1, 0) + reach(-1, 0) >= reach(0, 1) + reach(0, -1)) return (!on(i, j - 1) && v < RAIL_DEPTH) || (!on(i, j + 1) && v > 1 - RAIL_DEPTH);
+  return (!on(i - 1, j) && u < RAIL_DEPTH) || (!on(i + 1, j) && u > 1 - RAIL_DEPTH);
+}
+
 // Bridge planks and rails for the whole map. Ends lie one tile up on the land, as the pack's bridges do.
 export function bridgeLayers(m: TileMap): { deck: Int32Array; rail: Int32Array } {
   const deck = new Int32Array(m.w * m.h);

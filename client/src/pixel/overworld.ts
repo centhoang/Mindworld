@@ -20,6 +20,7 @@ import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/cl
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
+import { railBlocks } from "./sunny-terrain";
 import { layoutBubbles, type BubbleBox, type Placed } from "./bubbles";
 import { liveName } from "../world/live";
 import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
@@ -748,8 +749,10 @@ export class Overworld {
     });
   }
 
+  underBubbles?: () => void; // the screen's own panels: speech draws over them
+
   readonly canWalk = (x: number, z: number): boolean => {
-    if (!tileWalkable(this.map, x, z)) return false;
+    if (!tileWalkable(this.map, x, z) || railBlocks(this.map, x, z)) return false;
     const [hw, hd] = this.footprint(HOME_ART);
     if (Math.abs(x - this.house.x) < hw && z < this.house.z + 0.2 && z > this.house.z - hd) return false;
     for (const h of this.houses) {
@@ -1071,6 +1074,7 @@ export class Overworld {
     if (this.ui.map) this.drawMinimap(g, sw);
     if (this.ui.names) this.drawNames(g, toScreen, sw, sh);
 
+    this.underBubbles?.();
     const shown: { b: Bubble; head: string; lines: string[]; cx: number; y: number; box: BubbleBox }[] = [];
     for (const [who, b] of this.bubbles) {
       const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" || who === "n:elder" ? this.elder?.pos : who.startsWith("n:") ? this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;

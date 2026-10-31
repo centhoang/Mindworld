@@ -10,6 +10,7 @@ import { bump, pairKey } from "../life/relations";
 import type { Agent, Choice, LifeEvent, Village } from "../life/village";
 import type { Emote } from "../world/live";
 import { choosePrompt, emotePrompt, eventText, linePrompt, parseChoice, parseEmote, parseLine, parsePlan, planPrompt, PLAN_PHASES, reflectPrompt, scriptedLine } from "./brain";
+import { humanize } from "./human";
 import { addBelief, feel, gossipFrom, gossipLine, heardFrom } from "./bonds";
 import { addFact, emptyMemory, parseMemory, remember, type MindMemory } from "./memory";
 import { traitBias, type Persona } from "./persona";
@@ -226,7 +227,7 @@ export class MindHub {
           : { value: scriptedLine(sp.persona, ls.persona, k, this.v.nextId + k), source: "rules" };
         sp.source = ans.source;
         said.push(`${sp.persona.name}: ${ans.value}`);
-        this.out.say(sp.persona.id, ans.value, ls.persona.name);
+        this.out.say(sp.persona.id, humanize(ans.value, sp.persona), ls.persona.name);
         if (!this.hasModel()) await new Promise((r) => setTimeout(r, 2200));
       }
       const now = this.now();

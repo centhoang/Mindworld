@@ -16,6 +16,7 @@ import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } fro
 import { traitBias, VILLAGERS, type Persona } from "./persona";
 import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
 import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
+import { humanize } from "./human";
 import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
 import { addCommitment, answerLine, type Invite, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
@@ -232,9 +233,10 @@ export class NpcVillage {
       if (!this.hosting(npc)) return; // moved to another host meanwhile
       c.said.push(`${m.persona.name}: ${ans.value}`);
       m.source = ans.source;
+      const say = humanize(ans.value, m.persona);
       // A line to another player is theirs alone: their machine shows it, the host's does not.
-      if (!to || to === this.me || NPCS.includes(to as Npc)) this.out.say(npc, ans.value, other.name);
-      this.out.line({ who: npc, say: ans.value, to });
+      if (!to || to === this.me || NPCS.includes(to as Npc)) this.out.say(npc, say, other.name);
+      this.out.line({ who: npc, say, to });
       const g = gameTime(this.v.t);
       if (c.said.length <= 2) remember(m.mem, g.day, clockLabel(g.hour), `talked with ${other.name}`);
     } finally {
@@ -356,8 +358,9 @@ export class NpcVillage {
     if (!ans.value) return null;
     const g = gameTime(this.v.t);
     remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);
-    if (this.hosting(npc)) this.out.line(to ? { who: npc, say: ans.value, to } : { who: npc, say: ans.value });
-    return { text: ans.value, source: ans.source };
+    const say = answer ? ans.value : humanize(ans.value, m.persona); // the sim's answers stay exact
+    if (this.hosting(npc)) this.out.line(to ? { who: npc, say, to } : { who: npc, say });
+    return { text: say, source: ans.source };
   }
 
   // A shift is decided once, when it starts, and the reason stays in the NPC's memory.

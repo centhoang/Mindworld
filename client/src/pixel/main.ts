@@ -1,6 +1,7 @@
 // The game's entry (index.html): a low-res canvas, the scene stack (overworld, battle, interior, teach) and
 // the CRT presenter, wired to the save, the pet brain, Meta-model chat/coach and the live room.
 
+import { typingMs } from "../mind/human";
 import { parseGenes, petLook, randomGenes } from "../game/genes";
 import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
 import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
@@ -246,7 +247,15 @@ chatForm.querySelector("[data-act=close]")!.addEventListener("click", closeChat)
 // a scripted line.
 const ASK_WAIT_MS = 15_000;
 const asking = new Map<Npc, (text: string | null) => void>();
+// Nobody answers instantly: a reply takes as long as typing it would, however fast the mind was.
 async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string }> {
+  const t0 = performance.now();
+  const answer = await villagerMind(npc, line);
+  await new Promise((r) => setTimeout(r, typingMs(answer.text) - (performance.now() - t0)));
+  return answer;
+}
+
+async function villagerMind(npc: Npc, line: string): Promise<{ text: string }> {
   const scene = world.sceneWithMe(npc); // what we both see here, so "what's by the pond?" gets a real answer
   const here = await world.npcs?.reply(npc, myName(), line, undefined, scene);
   if (here) return here;
@@ -932,9 +941,11 @@ function update(dt: number, t: number): void {
         save(state);
       }
     }
+    world.underBubbles = () => {
+      if (!menu && !crate && !board && !peerMenu && !duelIn) drawGoals();
+    };
     world.draw(g, low.width, low.height, t);
     if (world.npcs) world.npcs.pocket = pocket;
-    if (!menu && !crate && !board && !peerMenu && !duelIn) drawGoals();
     if (met) void fight(met);
     if (menu) {
       const a = state.active ?? 0;
