@@ -2,13 +2,8 @@ import { completeTiered, isGrammarError, type GrammarTier } from "./grammar";
 import type { LmRequest } from "../mind/brain";
 import { splitReply, type VoiceBackend, type VoicePrompt, type VoiceReply } from "./instinct";
 
-// Two Instinct backends, both Meta Llama 3.2 on the player's own machine:
-// - NativeVoice ("power mode"): a llama.cpp `llama-server` on localhost running Llama 3.2 3B (spike B-native:
-//   ~0.5 s per decision on a GTX 1050, follows the memo). Needs a one-time local install.
-// - WebLlmVoice: Llama 3.2 1B in this tab via WebGPU. No install, but slower and weaker, so it only picks among
-//   the allowed moves and voices them.
-
-export const NATIVE_URL = "http://127.0.0.1:8080";
+// The Instinct backends. WebLlmVoice is the one local model: our tuned Llama 3.2 1B in this tab via WebGPU, no
+// install; it picks among the allowed moves and voices them.
 
 export class CloudVoice implements VoiceBackend {
   readonly timeoutMs = 3000; // runs during the previous turn's animation; only when no memo rule fires
@@ -80,8 +75,9 @@ export class CloudVoice implements VoiceBackend {
   }
 }
 
-// Minds without a local model: Muse Spark through the Worker, under its daily caps. It only stands in, so it is spaced
-// out here and backs off when the Worker says no; `parse` and the rules fallback handle anything else.
+// Minds without a local model: Muse Spark through the Worker. No spacing while we work up to judging (a gap comes back
+// after the event, for real players); it still backs off when the Worker says no, and `parse` and the rules fallback
+// handle anything else.
 export class CloudMind {
   readonly label = "Muse Spark";
   private ok = false;
@@ -89,7 +85,7 @@ export class CloudMind {
   private openUntil = 0;
   private nextAt = 0;
 
-  constructor(private readonly gapMs = 6000, private readonly fetchFn: typeof fetch = (...a) => fetch(...a), private readonly now: () => number = Date.now) {}
+  constructor(private readonly gapMs = 0, private readonly fetchFn: typeof fetch = (...a) => fetch(...a), private readonly now: () => number = Date.now) {}
 
   async probe(): Promise<void> {
     try {
@@ -128,88 +124,6 @@ export class CloudMind {
       throw e;
     }
   }
-}
-
-export class NativeVoice implements VoiceBackend {
-  readonly label = "Llama 3.2 3B (native, power mode)";
-  private ok = false;
-
-  constructor(private readonly base = NATIVE_URL) {}
-
-  ready(): boolean {
-    return this.ok;
-  }
-
-  // True if a llama-server answers on this machine. From an https page Chrome holds the request until
-  // the player answers its local-network prompt, so a probe the player started waits much longer.
-  async probe(timeoutMs = 800): Promise<boolean> {
-    try {
-      const res = await fetch(`${this.base}/health`, { signal: AbortSignal.timeout(timeoutMs) });
-      this.ok = res.ok;
-    } catch {
-      this.ok = false;
-    }
-    return this.ok;
-  }
-
-  async pick(p: VoicePrompt, signal: AbortSignal): Promise<VoiceReply> {
-    const res = await fetch(`${this.base}/v1/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      signal,
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: p.system },
-          { role: "user", content: p.user },
-        ],
-        temperature: 0.7,
-        max_tokens: 24,
-        grammar: p.grammar,
-      }),
-    });
-    if (!res.ok) throw new Error(`llama-server HTTP ${res.status}`);
-    const body = (await res.json()) as { choices: { message: { content: string } }[] };
-    return splitReply(body.choices[0]?.message.content ?? "");
-  }
-
-  // Any village-mind decision (mind/brain.ts builds the prompt and the GBNF grammar).
-  async complete(req: LmRequest, signal: AbortSignal): Promise<string> {
-    const res = await fetch(`${this.base}/v1/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      signal,
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: req.system },
-          { role: "user", content: req.user },
-        ],
-        temperature: req.temperature,
-        max_tokens: req.maxTokens,
-        ...(req.grammar ? { grammar: req.grammar } : {}),
-      }),
-    });
-    if (!res.ok) throw new Error(`llama-server HTTP ${res.status}`);
-    const body = (await res.json()) as { choices: { message: { content: string } }[] };
-    return body.choices[0]?.message.content ?? "";
-  }
-}
-
-// Chrome's Local Network Access: an https page must ask the player before it may reach 127.0.0.1.
-// "prompt" means a request would pop that question, so the game never probes silently in that state.
-export type LocalAccess = "granted" | "prompt" | "denied";
-export async function localAccessState(
-  protocol = location.protocol,
-  query = (name: string) => navigator.permissions.query({ name: name as PermissionName }),
-): Promise<LocalAccess> {
-  if (protocol !== "https:") return "granted"; // dev on http://localhost: same address space, no prompt
-  for (const name of ["loopback-network", "local-network-access"]) {
-    try {
-      return (await query(name)).state;
-    } catch {
-      // older or newer Chrome names the permission differently; try the next one
-    }
-  }
-  return "granted"; // no such permission in this browser: requests are not gated
 }
 
 type Engine = import("@mlc-ai/web-llm").MLCEngineInterface;

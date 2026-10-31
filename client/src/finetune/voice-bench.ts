@@ -1,9 +1,9 @@
 // Voice benchmark for the local coach (docs/FINETUNE.md acceptance: 100% valid with grammar, >= 98% without,
 // line <= 8 words). Observations come from simulated fights under val teacher memos (or none), on seeds the
-// training set never used; each prompt goes to a llama-server exactly as power mode sends it (NativeVoice).
+// training set never used; each prompt goes to a llama-server (NativeVoice).
 // Usage: npx tsx src/finetune/voice-bench.ts <llama-server url> [--free] [--n 200] [--label x]
 import { allowedMoves, buildVoicePrompt, parseVoice } from "../game/instinct";
-import { NativeVoice } from "../game/voices";
+import { NativeVoice } from "./native-voice";
 import { runBattle } from "../sim/battle";
 import { EMPTY_MEMO, type Memo } from "../sim/memo";
 import { memoPolicy } from "../sim/policy";

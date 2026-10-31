@@ -27,7 +27,7 @@ import { loadArt } from "./art";
 import { Babbler } from "../game/babble";
 import { voiceFor, type Speaker } from "../game/chatter";
 import { Instinct } from "../game/instinct";
-import { CloudMind, CloudVoice, localAccessState, NativeVoice, WebLlmVoice } from "../game/voices";
+import { CloudMind, CloudVoice, WebLlmVoice } from "../game/voices";
 import { MINDS_KEY, parseMindsSave } from "../mind/hub";
 import { MindScheduler } from "../mind/scheduler";
 import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "../sim/boss";
@@ -111,7 +111,6 @@ const teach = new TeachScreen({
     save(state);
   },
   petName: () => activeMember().name,
-  powerMode: () => instinct.voice === nativeBrain,
   browserCoach: () => (instinct.voice === webBrain ? (req) => webBrain.completeJson(req) : null),
   portrait: () => {
     const m = activeMember();
@@ -431,26 +430,19 @@ function side(m: Member): Side {
 
 // A fight against a wild pet, or "boss": The Reader, which reads your memo rules and counters them until
 // it runs out of focus (sim/boss.ts); a dazed boss can be befriended.
-// ---- pet brain: rules only by default; B switches to Llama 3.2 1B in the browser (WebGPU) or power mode
-// (Llama 3.2 3B via llama.cpp on 127.0.0.1:8080). Per-move cloud picks are opt-in with ?cloudmoves.
+// ---- pet brain: rules only by default; B switches to our tuned Llama 3.2 1B in the browser (WebGPU).
+// Per-move cloud picks are opt-in with ?cloudmoves.
 const instinct = new Instinct(null);
 const webBrain = new WebLlmVoice();
-const nativeBrain = new NativeVoice();
-const brainTag = () => (instinct.voice === nativeBrain ? "llama 3b" : instinct.voice === webBrain ? "llama 1b" : "cloud");
+const brainTag = () => (instinct.voice === webBrain ? "llama 1b" : "cloud");
 async function switchBrain(): Promise<void> {
   if (instinct.voice) {
     instinct.voice = null;
     toast = { text: "Brain: rules only (the measured memo policy).", who: "Brain", t: 3 };
     return;
   }
-  toast = { text: "Looking for power mode (llama.cpp on this computer)... allow local access if Chrome asks.", who: "Brain", t: 30 };
-  if (await nativeBrain.probe(20_000)) {
-    instinct.voice = nativeBrain;
-    toast = { text: "Power mode: Llama 3.2 3B on this computer picks moves the memo allows and talks.", who: "Brain", t: 5 };
-    return;
-  }
   if (!WebLlmVoice.supported()) {
-    toast = { text: "No power mode and no WebGPU here, so your pet stays on rules.", who: "Brain", t: 5 };
+    toast = { text: "No WebGPU here, so your pet stays on rules.", who: "Brain", t: 5 };
     return;
   }
   try {
@@ -462,8 +454,7 @@ async function switchBrain(): Promise<void> {
   }
 }
 void (async () => {
-  if ((await localAccessState()) === "granted" && (await nativeBrain.probe(800))) instinct.voice = nativeBrain;
-  if (!instinct.voice && new URLSearchParams(location.search).has("cloudmoves")) {
+  if (new URLSearchParams(location.search).has("cloudmoves")) {
     const cloud = new CloudVoice({ provider: "modal" });
     if (await cloud.probe()) instinct.voice = cloud;
   }
@@ -471,7 +462,7 @@ void (async () => {
 
 // ---- village minds: every pet at your corner has a mind (persona, plan, memory, friends). The same local
 // Llama the B key loads for fights thinks for them through one queue; without it they run on needs + rules.
-const localBrain = () => (instinct.voice === nativeBrain ? nativeBrain : instinct.voice === webBrain ? webBrain : null);
+const localBrain = () => (instinct.voice === webBrain ? webBrain : null);
 // Local model first, then Muse Spark, then the rules (the scheduler's fallback).
 const cloudMind = new CloudMind();
 void cloudMind.probe();
@@ -597,7 +588,7 @@ live.connect();
 world.onMind = (l) => void (live.status === "online" && live.mind(l));
 setInterval(() => {
   const brain = localBrain();
-  if (live.status === "online") live.cap(brain ? mindSched.tps(brain === nativeBrain ? 30 : 12) : 0, "gpu" in navigator);
+  if (live.status === "online") live.cap(brain ? mindSched.tps(12) : 0, "gpu" in navigator);
 }, 10_000);
 onPetChange = () => {
   world.myName = liveName(myGenes());

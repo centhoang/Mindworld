@@ -45,9 +45,9 @@ then I next to Mo shows `RUNS ON: this computer, for all` and the same memories.
 > with a model are always preferred."
 
 **2:05-2:35. Teach your pet to fight (Muse Spark Open + tuned Llama).** Bump a wild pet, lose once, press T: "when the
-big one winds up, guard". Proof panel: win-rate lift on fights the coach never saw. Quick cut: power mode, Free coach.
+big one winds up, guard". Proof panel: win-rate lift on fights the coach never saw.
 > "You can also teach your own pet in plain words. Muse Spark Open turns the lesson into a few checked rules, and the game
-> proves it on fights it never saw. I distilled that coach into a fine-tuned Llama 3.2 that runs on your own GPU for free."
+> proves it on fights it never saw. I distilled that coach into a fine-tuned Llama 3.2 that runs in your browser for free."
 
 **2:35-2:50. Honest costs.** Show the inspector line `MIND: RULES (B: LOAD LLAMA)` on a pet with no model, then the model
 label after B.
@@ -66,7 +66,7 @@ label after B.
 | 4 | 0:50-1:20 | Window B asks Mo; answer from A's model; same bubble in A | Both windows online, side by side |
 | 5 | 1:20-1:45 | Picnic invite in both windows; walk over the bridge; sitting on the blanket | 2+ pets at home in A; a picnic hill next to A's ground (it is rolled per day: check the minimap) |
 | 6 | 1:45-2:05 | Close A; B keeps the villagers; B loads the model; inspector shows the same memories | Wait ~15 s for the hand-over |
-| 7 | 2:05-2:35 | Battle, Teach, Proof bars; power mode Free coach cut | Power mode running for the cut |
+| 7 | 2:05-2:35 | Battle, Teach, Proof bars | |
 | 8 | 2:35-2:50 | Inspector `RULES` vs model label | |
 | 9 | 2:50-3:00 | Close on the village + URL | |
 
@@ -78,8 +78,8 @@ label after B.
   fine-tune and the village data set (Modal).
 - **Muse Spark 1.3** (Meta Model API): "Learn from my fights" review.
 - **Muse Voice Transcribe** (Meta Model API): teaching by voice.
-- **Llama 3.2 3B / 1B, fine-tuned** (LoRA on Modal, distilled from Muse Spark Open): free local coach in power mode; 3B
-  +23.8 pts held-out lift (teacher +21.6, untuned 3B -3.0).
+- **Llama 3.2 1B, fine-tuned** (LoRA on Modal, distilled from Muse Spark Open): free coach and minds in the tab; browser
+  bench Teach +19.1 pts held-out lift, 98.5% valid village decisions.
 
 ## Submission text
 **Name:** Mindworld

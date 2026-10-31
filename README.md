@@ -18,7 +18,7 @@ behind an access gate.
 |---|---|
 | WASD / arrows | Walk. Your pet follows you. |
 | E | Talk to a villager (Elder, Mo, Ama, Pip) or a wild pet; use beds, the market stall, your door |
-| B | Load **Llama 3.2 1B** into this tab (WebGPU), or use power mode if it is running. Press B again for rules only |
+| B | Load our tuned **Llama 3.2 1B** into this tab (WebGPU). Press B again for rules only |
 | I | Open the Mind inspector next to a pet or villager: its plan, what it is doing, friends, memories, which model decides and where it runs |
 | T | Teach your pet (a lesson in plain words becomes a few checked rules) |
 | P | Your pets |
@@ -39,7 +39,7 @@ Things to try:
 | **Muse Spark Open** | Villager chat when no player in the room has a model loaded; Teach (lesson to rule memo); teacher for fine-tuning the coach and the village data set | Cloud (Baseten / Modal), behind our capped Worker |
 | **Muse Spark** (Meta Model API) | "Learn from my fights": reviews recent fights and proposes a revised memo | Cloud, behind our capped Worker |
 | **Muse Voice Transcribe** | Teaching by voice | Cloud |
-| **Llama 3.2 3B / 1B, fine-tuned** (LoRA, distilled from Muse Spark Open) | Free local coach and fight voice in power mode ([model card](https://huggingface.co/kysupo/Llama-3.2-3B-PetMind-Coach-GGUF)) | The player's own GPU (llama.cpp) |
+| **Llama 3.2 1B, fine-tuned** (LoRA, distilled from Muse Spark Open) | Free local coach, fight voice and village minds ([model card](https://huggingface.co/kysupo/Llama-3.2-3B-PetMind-Coach-GGUF)) | In the player's browser tab (WebLLM) |
 
 Every decision has a fallback: local model, then the cloud model where it makes sense, then scripted rules. The inspector
 shows which one actually decided (`MIND: ...`), so a scripted answer is never presented as a model's.
@@ -70,15 +70,6 @@ npm run dev:mock     # http://127.0.0.1:8787 serves the built game; no keys, can
 ```
 With real cloud models, copy `.env.example` to `.env` (gitignored), fill in your own keys, and run `npm run dev` in `worker/`.
 The in-browser Llama needs no key. `npm run dev` in `client/` runs the Vite dev server.
-
-## Power mode (optional, local GPU)
-Runs Llama 3.2 natively with llama.cpp for faster minds and a free coach. On Windows, from the repo folder:
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\power-mode.ps1
-```
-The first run downloads a pinned llama.cpp build and the fine-tuned coach model, both checked by SHA-256, into
-`%LOCALAPPDATA%\PetMind`. Then press B in the game and allow Chrome's local-network prompt. The model runs entirely on your
-machine, and the server listens on 127.0.0.1 only. Options: `-Model coach1b|3b|1b`, `-Backend vulkan|cpu`, `-Port`.
 
 ## Credits and licenses
 - **Built with Llama.** Llama 3.2 is licensed under the Llama 3.2 Community License; see `licenses/` (license and

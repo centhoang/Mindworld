@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VoicePrompt } from "./instinct";
-import { CloudMind, CloudVoice, limitPrefill, localAccessState, PREFILL_CHUNK, stockId, tunedRecord } from "./voices";
+import { CloudMind, CloudVoice, limitPrefill, PREFILL_CHUNK, stockId, tunedRecord } from "./voices";
 
 const prompt: VoicePrompt = { system: "Choose a move", user: "Allowed: attack, guard", grammar: "do not send", moves: ["attack", "guard"] };
 const signal = () => new AbortController().signal;
@@ -123,26 +123,6 @@ describe("CloudVoice", () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-});
-
-describe("localAccessState", () => {
-  it("is granted off https (dev on localhost) without asking", async () => {
-    let asked = false;
-    expect(await localAccessState("http:", async () => ((asked = true), { state: "prompt" }) as PermissionStatus)).toBe("granted");
-    expect(asked).toBe(false);
-  });
-
-  it("falls back to the older permission name and reports its state", async () => {
-    const q = async (name: string) => {
-      if (name === "loopback-network") throw new TypeError("unknown permission");
-      return { state: "prompt" } as PermissionStatus;
-    };
-    expect(await localAccessState("https:", q)).toBe("prompt");
-  });
-
-  it("treats a browser without the permission as ungated", async () => {
-    expect(await localAccessState("https:", async () => Promise.reject(new TypeError("no")))).toBe("granted");
   });
 });
 
