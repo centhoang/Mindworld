@@ -16,6 +16,10 @@ function memoryCache() {
 }
 
 describe("/mlc proxy", () => {
+  it("serves a training run's versioned path", async () => {
+    expect((await handleMlc(NEW_PATH, "GET", deps({ fetch: vi.fn<MlcDeps["fetch"]>(async () => ok()) }))).status).toBe(200);
+  });
+
   it("fetches a whitelisted file from the private repo with the token and streams it", async () => {
     const f = vi.fn<MlcDeps["fetch"]>(async () => ok());
     const res = await handleMlc(PATH, "GET", deps({ fetch: f }));
