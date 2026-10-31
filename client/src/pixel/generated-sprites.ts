@@ -13,26 +13,36 @@ const ROOTS = {
 } as const;
 export type GeneratedSprite = keyof typeof ROOTS;
 
-export class GeneratedSprites {
-  private readonly images = new Map<GeneratedSprite, { image: HTMLImageElement; ready: boolean }>();
+// Shared by props and layered humans. A failed request is cached just like a pending one.
+export class SpriteImages {
+  private readonly images = new Map<string, { image: HTMLImageElement; ready: boolean }>();
 
-  // First draw starts one request. Pending/failed files keep the previous drawing forever if necessary.
-  draw(g: CanvasRenderingContext2D, name: GeneratedSprite, x: number, y: number, fallback: () => void = () => {}): void {
-    let entry = this.images.get(name);
+  get(src: string): HTMLImageElement | null {
+    let entry = this.images.get(src);
     if (!entry && typeof Image !== "undefined") {
       const image = new Image();
       const loading = { image, ready: false };
-      this.images.set(name, loading);
+      this.images.set(src, loading);
       image.onload = () => { loading.ready = true; };
       image.onerror = () => { loading.ready = false; };
-      image.src = `/art/gen/${name}.png`;
+      image.src = src;
       entry = loading;
     }
-    if (!entry?.ready) return fallback();
+    return entry?.ready ? entry.image : null;
+  }
+}
+
+export class GeneratedSprites {
+  private readonly images = new SpriteImages();
+
+  // First draw starts one request. Pending/failed files keep the previous drawing forever if necessary.
+  draw(g: CanvasRenderingContext2D, name: GeneratedSprite, x: number, y: number, fallback: () => void = () => {}): void {
+    const image = this.images.get(`/art/gen/${name}.png`);
+    if (!image) return fallback();
     const [rx, ry] = ROOTS[name];
     g.save();
     g.imageSmoothingEnabled = false;
-    g.drawImage(entry.image, Math.round(x - rx), Math.round(y - ry));
+    g.drawImage(image, Math.round(x - rx), Math.round(y - ry));
     g.restore();
   }
 }

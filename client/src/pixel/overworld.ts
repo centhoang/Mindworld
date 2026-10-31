@@ -29,12 +29,11 @@ import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
 import { petScene, sharedScene, type Seen } from "../mind/scene";
 import { generatedSprites } from "./generated-sprites";
+import { HUMAN_WALK_SPEED, humanLook, humanSprites, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanMotion } from "./humans";
 
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
 const DECOR_NAME: Record<DecorPiece["kind"], string> = { bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
 const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "the lawn", playground: "the playground slide and goal", picnic: "the picnic blanket", pond: "the fishing pond", plaza: "the village square" };
-
-type Dir = 0 | 1 | 2 | 3; // down, left, right, up (sprite rows)
 
 export const OVERWORLD_MON = 20; // px: monsters in the overworld
 const WILD_PER_MEADOW = 3;
@@ -72,9 +71,9 @@ export class Overworld {
   houses: Vec[] = []; // other players' A-frames (props only; yours is `house`)
   player: Vec = { x: 0, z: 0 };
   pet: Vec = { x: 0, z: 0 };
-  private dir: Dir = 0;
   private moving = false;
-  private walkT = 0;
+  private readonly playerMotion = newHumanMotion(this.player);
+  private readonly npcMotions = new Map<Npc, HumanMotion>();
   private place = "";
   private bannerT = 0;
   private sprite: Sprite | null = null;
@@ -635,19 +634,21 @@ export class Overworld {
     this.player = { x: this.house.x, z: this.house.z + 0.9 };
     this.pet = { x: this.house.x + 0.8, z: this.house.z + 1.4 };
     this.cam = { ...this.player };
-    this.dir = 0;
+    this.playerMotion.dir = 0;
+    this.playerMotion.flip = false;
+    this.playerMotion.pos = { ...this.player };
   }
 
   // The bed the player is standing next to and facing (or on), if any.
   bedNear(): number {
-    const f = [[0, 0.7], [-0.7, 0], [0.7, 0], [0, -0.7]][this.dir]!;
+    const f = [[0, 0.7], [-0.7, 0], [0.7, 0], [0, -0.7]][this.playerMotion.dir]!;
     const x = this.player.x + f[0]!;
     const z = this.player.z + f[1]!;
     return this.beds.findIndex((b) => x >= b.x && x < b.x + 1 && z >= b.z && z < b.z + 1);
   }
 
   atDoor(): boolean {
-    return Math.abs(this.player.x - this.house.x) < 0.8 && this.player.z > this.house.z && this.player.z < this.house.z + 1.2 && this.dir === 3;
+    return Math.abs(this.player.x - this.house.x) < 0.8 && this.player.z > this.house.z && this.player.z < this.house.z + 1.2 && this.playerMotion.dir === 3;
   }
 
   private drawBeds(g: CanvasRenderingContext2D, toScreen: (x: number, z: number) => [number, number], t: number): void {
@@ -700,7 +701,7 @@ export class Overworld {
   }
 
   addPeer(id: string, name: string, genes: Genes, x: number, z: number, px: number, pz: number): void {
-    this.peers.set(id, { name, pos: { x, z }, pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front") });
+    this.peers.set(id, { name, pos: { x, z }, motion: newHumanMotion({ x, z }), pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front") });
   }
 
   movePeer(id: string, x: number, z: number, px: number, pz: number): void {
@@ -716,10 +717,10 @@ export class Overworld {
     const d = keyDir(keys);
     this.moving = d.x !== 0 || d.z !== 0;
     if (this.moving) {
-      this.player = slide(this.player, d.x * WALK_SPEED * dt, d.z * WALK_SPEED * dt, this.canWalk);
-      this.dir = Math.abs(d.x) > Math.abs(d.z) ? (d.x < 0 ? 1 : 2) : d.z < 0 ? 3 : 0;
-      this.walkT += dt;
+      this.player = slide(this.player, d.x * HUMAN_WALK_SPEED * dt, d.z * HUMAN_WALK_SPEED * dt, this.canWalk);
     }
+    stepHumanMotion(this.playerMotion, this.player, dt);
+    this.moving = this.playerMotion.walking;
     this.pet = followStep(this.pet, this.player, dt, this.canWalk);
     // Camera eases toward the player; drawing snaps it to whole pixels.
     const k = 1 - Math.exp(-dt * 8);
@@ -733,7 +734,9 @@ export class Overworld {
     this.life.t = worldSeconds() - dt; // the shared clock (stepVillage adds dt back)
     const lifeEv = stepVillage(this.life, dt, this.lifeEnv);
     if (this.npcs) {
+      for (const a of this.npcs.v.agents) if (!this.npcMotions.has(a.id as Npc)) this.npcMotions.set(a.id as Npc, newHumanMotion(a.pos));
       for (const e of this.npcs.step(dt, this.life.t)) if (e.kind === "start" && e.act !== "wander") this.say(`n:${e.who}`, ACTIVITY.get(e.act)!.label, 2.5);
+      for (const a of this.npcs.v.agents) stepHumanMotion(this.npcMotions.get(a.id as Npc)!, a.pos, dt, a.state === "do" ? ACTIVITY.get(a.act!)?.pose ?? null : null);
       const ea = this.npcs.v.agents.find((a) => a.id === "elder");
       if (ea && this.elder) this.elder.pos = ea.pos;
     }
@@ -762,8 +765,10 @@ export class Overworld {
     }
     const k8 = 1 - Math.exp(-dt * 8);
     for (const p of this.peers.values()) {
-      p.pos.x += (p.to.x - p.pos.x) * k8;
-      p.pos.z += (p.to.z - p.pos.z) * k8;
+      const step = stepToward(p.pos, p.to, HUMAN_WALK_SPEED * dt);
+      p.pos.x += step.dx;
+      p.pos.z += step.dz;
+      stepHumanMotion(p.motion, p.pos, dt);
       p.pet.x += (p.to.px - p.pet.x) * k8;
       p.pet.z += (p.to.pz - p.pet.z) * k8;
     }
@@ -866,16 +871,16 @@ export class Overworld {
       }
     }
     const [px, py] = toScreen(this.player.x, this.player.z);
-    const pf = spriteFrame(this.playerSprite, this.moving, this.walkT, t);
-    items.push({ z: this.player.z, draw: () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px - 8, py - 22, 16, 24) });
+    const pf = spriteFrame(this.playerSprite, this.moving, this.playerMotion.walkTime, t);
+    items.push({ z: this.player.z, draw: () => humanSprites.draw(g, humanLook(this.myName), this.playerMotion, px, py, t,
+      () => g.drawImage(this.playerSprite.img, pf * 16, this.playerMotion.dir * 24, 16, 24, px - 8, py - 22, 16, 24)) });
     const half = OVERWORLD_MON / 2;
     for (const p of this.peers.values()) {
       const [ax, ay] = toScreen(p.pos.x, p.pos.z);
       const [bx, by] = toScreen(p.pet.x, p.pet.z);
       items.push({ z: p.pos.z, draw: () => {
-        g.globalAlpha = 0.85;
-        g.drawImage(this.playerSprite.img, spriteFrame(this.playerSprite, false, 0, t) * 16, 0, 16, 24, ax - 8, ay - 22, 16, 24);
-        g.globalAlpha = 1;
+        humanSprites.draw(g, humanLook(p.name), p.motion, ax, ay, t,
+          () => g.drawImage(this.playerSprite.img, spriteFrame(this.playerSprite, p.motion.walking, p.motion.walkTime, t) * 16, p.motion.dir * 24, 16, 24, ax - 8, ay - 22, 16, 24));
         const tag = p.name.slice(0, 10).toUpperCase();
         drawText(g, tag, ax - (tag.length * GLYPH) / 2, ay - 32, PAL.panel);
       } });
@@ -885,13 +890,15 @@ export class Overworld {
       const [mx, my] = toScreen(this.stall.x, this.stall.z);
       items.push({ z: this.stall.z, draw: () => generatedSprites.draw(g, "market-stall", mx, my + 4, () => drawProp(g, MARKET_STALL, mx, my + 4)) });
     }
-    if (this.elder && hasArt("elder-npc")) {
-      // ImageGen Elder: two 16x24 idle frames, 500 ms each.
+    if (this.elder && !this.npcs?.v.agents.some(a => a.id === "elder")) {
+      // The Elder also uses the shared human path before the NPC sim is attached.
       const [nx, ny] = toScreen(this.elder.pos.x, this.elder.pos.z);
-      const f = Math.floor(t * 2) % 2;
-      items.push({ z: this.elder.pos.z, draw: () => g.drawImage(img("elder-npc"), f * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24) });
+      items.push({ z: this.elder.pos.z, draw: () => humanSprites.draw(g, NPC_LOOKS.elder, newHumanMotion(this.elder!.pos), nx, ny, t, () => {
+        if (hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
+        else g.drawImage(this.elder!.sprite, nx - 12, ny - 22);
+      }) });
     }
-    for (const npc of [this.boss, hasArt("elder-npc") ? null : this.elder, this.ghostStone]) {
+    for (const npc of [this.boss, this.ghostStone]) {
       if (!npc) continue;
       const [nx, ny] = toScreen(npc.pos.x, npc.pos.z);
       const s = npc.sprite;
@@ -921,20 +928,21 @@ export class Overworld {
       const pose = a.state === "do" ? ACTIVITY.get(a.act!)!.pose : null;
       items.push({ z: a.pos.z, draw: () => drawPetPose(g, r.sprite, rx, ry, pose, a.state === "walk", t, k) });
     });
-    // The village people (the Elder is drawn above with her own art): the player sheet in their colours.
+    // Every villager, including the Elder, follows the same human drawing path as online players.
     for (const a of this.npcs?.v.agents ?? []) {
-      if (a.id === "elder") continue;
       const [nx, ny] = toScreen(a.pos.x, a.pos.z);
       if (nx < -24 || ny < -40 || nx > sw + 24 || ny > sh + 24) continue;
       const s = this.npcSprite(a.id as Npc);
-      const walking = a.state === "walk";
-      const way = a.path?.[0] ?? a.target;
-      const [dx, dz] = [way.x - a.pos.x, way.z - a.pos.z];
-      const dir = !walking ? 0 : Math.abs(dx) > Math.abs(dz) ? (dx < 0 ? 1 : 2) : dz < 0 ? 3 : 0;
+      const motion = this.npcMotions.get(a.id as Npc) ?? newHumanMotion(a.pos);
+      const { walking, dir } = motion;
       const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep");
-      const f = spriteFrame(s, walking, t + NPCS.indexOf(a.id as Npc), t);
+      const f = spriteFrame(s, walking, motion.walkTime, t);
       const frame = sit ? sitFrame(s.img, (s.idle ?? 0) * 16, dir * 24, dir === 3) : null; // seated: still, legs bent
-      items.push({ z: a.pos.z, draw: () => (frame ? g.drawImage(frame, nx - 8, ny - 22) : g.drawImage(s.img, f * 16, dir * 24, 16, 24, nx - 8, ny - 22, 16, 24)) });
+      items.push({ z: a.pos.z, draw: () => humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, nx, ny, t, () => {
+        if (a.id === "elder" && hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
+        else if (frame) g.drawImage(frame, nx - 8, ny - 22);
+        else g.drawImage(s.img, f * 16, dir * 24, 16, 24, nx - 8, ny - 22, 16, 24);
+      }) });
     }
     for (const sg of this.signs) {
       const [sx, sy] = toScreen(sg.x, sg.z);
@@ -1073,6 +1081,7 @@ function bubble(g: CanvasRenderingContext2D, head: string, lines: readonly strin
 interface Peer {
   name: string;
   pos: Vec;
+  motion: HumanMotion;
   pet: Vec;
   to: { x: number; z: number; px: number; pz: number };
   sprite: HTMLCanvasElement;
