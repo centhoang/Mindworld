@@ -259,6 +259,17 @@ export function giftLine(p: Persona, g: Good, m: Market, who: string): string {
   return (p.likes ?? []).includes(g) ? `I love ${g}. Thank you, ${who}!` : `For me? That is kind, ${who}.`;
 }
 
+// A question about prices or stock is answered from the books, never from a model's guess.
+export function priceAnswer(line: string, m: Market, p: Purse): string | null {
+  const l = line.toLowerCase();
+  if (!/\b(how much|price|cost|worth)\b/.test(l) && !/\bwhat (?:do you have|are you selling|have you got)\b/.test(l)) return null;
+  const g = GOOD_WORD.exec(l)?.[1]?.replace(/s$/, "");
+  const good = g === "tomatoe" || g === "tomato" ? "tomato" : g === "herb" || g === "herbs" ? "herbs" : g;
+  if (good && isGood(good)) return `${good[0]!.toUpperCase()}${good.slice(1)} is ${priceOf(m, good)} coins on the board today.`;
+  const stock = GOOD_IDS.filter((x) => p.goods[x]).map((x) => `${p.goods[x]} ${x}`).join(", ");
+  return stock ? `I have ${stock}. Prices are on the board.` : `Nothing right now. Prices are on the board.`;
+}
+
 // ---- the board
 
 export interface BoardRow {

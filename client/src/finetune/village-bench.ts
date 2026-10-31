@@ -31,7 +31,7 @@ async function main() {
   const rows: { id: string; task: Task; ok: boolean; text: string }[] = [];
   const ms: number[] = [];
   for (let i = 0; i < n; i++) {
-    const it = villageItem(2, i);
+    const it = villageItem(Number(opt("--seed") ?? 2), i);
     const { text, ms: t } = await ask(it.req.system, it.req.user);
     const ok = validate(it, text) !== null;
     per[it.task].n++;

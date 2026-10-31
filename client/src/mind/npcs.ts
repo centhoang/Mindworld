@@ -14,7 +14,7 @@ import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, script
 import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, holdsGrudge, hurt, parseBeliefLine, parseBondLine, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { VILLAGERS, type Persona } from "./persona";
-import { add as addGood, bestCrop, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, purseLine, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
+import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, purseLine, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
 import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
 import { addCommitment, answerLine, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
@@ -325,7 +325,7 @@ export class NpcVillage {
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
     if (!m || !this.hosting(npc)) return null;
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
-    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? await this.traded(npc, m, player, line, to) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? this.quote(npc, line) ?? await this.traded(npc, m, player, line, to) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     if (!this.hasModel() && !answer) return null;
     const ans = answer ? { value: answer, source: "rules" }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
@@ -404,6 +404,11 @@ export class NpcVillage {
     m.mem.why = `${b!.why.at(-1)?.text ?? "bad blood"} > ${feelWord(b!)} ${player} > won't talk`;
     remember(m.mem, g.day, clockLabel(g.hour), `would not talk to ${player}`, 4);
     return `I have nothing to say to you, ${player}.`;
+  }
+
+  private quote(npc: Npc, line: string): string | null {
+    openDay(this.market, gameTime(this.v.t).day, VILLAGERS);
+    return priceAnswer(line, this.market, this.purseOf(npc));
   }
 
   // A villager's purse: it travels with the mind, and every villager starts with a little.

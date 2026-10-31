@@ -2,7 +2,7 @@ import { DAY_SECONDS } from "../life/clock";
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sim/rng";
 import type { Bond } from "./bonds";
-import { bestCrop, boardRows, judge, newMarket, newPurse, openDay, parseOffer, parsePurseLine, parseTradeLine, priceOf, purseLine, record, sellStock, tradeLine, wantOf, type Good } from "./economy";
+import { bestCrop, boardRows, judge, newMarket, newPurse, openDay, parseOffer, parsePurseLine, parseTradeLine, priceAnswer, priceOf, purseLine, record, sellStock, tradeLine, wantOf, type Good } from "./economy";
 import { refusesChat } from "./jobs";
 import { MindScheduler } from "./scheduler";
 import { NpcVillage, type Pocket } from "./npcs";
@@ -65,6 +65,17 @@ describe("market", () => {
     const t = { who: "Kai", good: "carrot" as Good, qty: 2, price: 6 };
     expect(parseTradeLine(tradeLine(t))).toEqual(t);
     expect(parseTradeLine("10:00 trade|x")).toBeNull();
+  });
+});
+
+describe("prices are read from the books", () => {
+  it("names the board price, or what is in stock", () => {
+    const m = market();
+    const p = newPurse();
+    p.goods = { fish: 2 };
+    expect(priceAnswer("how much is a carrot?", m, p)).toContain(`${priceOf(m, "carrot")} coins`);
+    expect(priceAnswer("what do you have?", m, p)).toContain("2 fish");
+    expect(priceAnswer("nice carrots", m, p)).toBeNull();
   });
 });
 

@@ -103,7 +103,7 @@ export function voiceExamples(n: number, memos: Memo[], lines: Lines, seed: numb
 
 // Village rows hold the game's exact prompt (mind/brain.ts) and the validated teacher answer.
 export const villageExamples = (rows: readonly VillageRow[]): Example[] =>
-  rows.filter((r) => r.ok && r.target).map((r) => ({ task: "village", messages: [{ role: "system", content: r.system }, { role: "user", content: r.user }, { role: "assistant", content: r.target! }] }));
+  rows.filter((r) => r.ok && r.target && !(r.task === "reply" && /^v[12]-/.test(r.id))).map((r) => ({ task: "village", messages: [{ role: "system", content: r.system }, { role: "user", content: r.user }, { role: "assistant", content: r.target! }] }));
 
 function shuffle<T>(xs: T[], seed: number): T[] {
   const r = mulberry32(seed);

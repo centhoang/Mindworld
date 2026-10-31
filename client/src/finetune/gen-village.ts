@@ -15,15 +15,21 @@ import { randomGenes } from "../game/genes";
 import { mulberry32 } from "../sim/rng";
 import { EMOTES } from "../world/live";
 import { choosePrompt, emotePrompt, eventText, LINE_MAX, linePrompt, parseChoice, parseLine, parsePlan, petLinePrompt, planPrompt, reflectPrompt, replyPrompt, type LmRequest } from "../mind/brain";
+import { addBelief, feel, wariness, type Beat } from "../mind/bonds";
+import { dealPrompt, dealScore, GOOD_IDS, judge, newMarket, newPurse, openDay, parseDeal, type Good, type Offer, type OfferKind } from "../mind/economy";
 import { emptyMemory, addFact, remember, type MindMemory } from "../mind/memory";
+import { decidePrompt, extractPrompt, inviteScore, parseDecision } from "../mind/promises";
 import { petPersona, VILLAGERS, type Persona } from "../mind/persona";
 import { DATA_DIR } from "./gen-lessons";
 import { BudgetExceeded, ModalClient, pool } from "./modal-client";
 
-export const TASKS = ["plan", "choose", "line", "petline", "reply", "emote", "reflect"] as const;
+export const TASKS = ["plan", "choose", "line", "petline", "reply", "emote", "reflect", "extract", "decide", "deal"] as const;
 export type Task = (typeof TASKS)[number];
 // Share of each task in a run (the game asks choose and line most often).
 const MIX: [Task, number][] = [["plan", 0.12], ["choose", 0.28], ["line", 0.2], ["petline", 0.08], ["reply", 0.1], ["emote", 0.08], ["reflect", 0.14]];
+// From seed 3 on (N4): villagers with feelings, promises and a market; replies are the weak task, so they get the most.
+const MIX_N4: [Task, number][] = [["plan", 0.06], ["choose", 0.16], ["line", 0.14], ["petline", 0.03], ["reply", 0.25], ["emote", 0.02], ["reflect", 0.04], ["extract", 0.12], ["decide", 0.1], ["deal", 0.08]];
+const N4_SEED = 3;
 const WORDS: Partial<Record<Task, number>> = { line: 15, petline: 12, reply: 25, reflect: 15 };
 
 export interface VillageItem {
@@ -32,6 +38,9 @@ export interface VillageItem {
   who: string;
   req: LmRequest;
   options?: string[]; // plan/choose/emote: the grammar's alternatives
+  truth?: string; // extract: the only right answer
+  score?: number; // decide/deal: how willing the sim says this villager is
+  barred?: string; // decide/deal: the answer the sim rules out here
 }
 
 export interface VillageRow {
@@ -55,6 +64,10 @@ const QUESTIONS = [
   "who is the oldest here?", "can you teach me something?", "why is the pond so quiet?", "are you tired?", "what is your favourite food?",
   "have you seen my pet around?", "tell me a story", "what happened yesterday?", "do you ever leave the islands?", "hi!",
 ];
+const FEELING_QUESTIONS = [
+  "are you mad at me?", "do you remember me?", "what do you think of me?", "how was your day?", "are we still friends?", "did I do something wrong?",
+  "what did I give you?", "did you miss me?", "can I trust you?", "what have you been doing?", "who do you like most here?", "what do you remember about me?",
+];
 const TIMES = ["07:10", "08:30", "09:40", "11:20", "12:05", "13:30", "15:10", "16:45", "18:20", "19:30", "20:50"];
 const FACTS = ["likes picnics best", "is afraid of deep water", "makes friends quickly", "naps after lunch", "loves the pond at dawn", "thinks Pip is too loud", "keeps losing the ball"];
 
@@ -68,7 +81,7 @@ function someone(r: () => number): Persona {
 }
 
 // The activities the game offers this persona (hub.ts plan options: no poop/sleep, by kind).
-const forKind = (p: Persona) => ACTIVITIES.filter((a) => a.id !== "poop" && a.id !== "sleep" && (a.who === "any" || a.who === p.kind)).map((a) => a.id);
+const forKind = (p: Persona) => ACTIVITIES.filter((a) => a.id !== "poop" && a.id !== "sleep" && (!a.jobOnly || p.job?.act === a.id) && (a.who === "any" || a.who === p.kind)).map((a) => a.id);
 
 function memoryFor(r: () => number, p: Persona, day: number): MindMemory {
   const m = emptyMemory();
@@ -83,6 +96,41 @@ function memoryFor(r: () => number, p: Persona, day: number): MindMemory {
   return m;
 }
 
+// Things that happened between a villager and a player, through the game's own bookkeeping.
+const HISTORY: [Beat, string, string][] = [
+  ["broken", "{p} stood me up at the {e}", "broke a promise"],
+  ["kept", "{p} came to the {e} as promised", "keeps promises"],
+  ["rude", "{p} was rude to me", ""],
+  ["kind", "{p} was kind to me", ""],
+  ["gift", "{p} gave me {g}", "gives {g}"],
+  ["sorry", "{p} said sorry", ""],
+];
+
+function withHistory(r: () => number, m: MindMemory, p: Persona, who: string, day: number): void {
+  const n = 1 + Math.floor(r() * 2);
+  for (let i = 0; i < n; i++) {
+    const [beat, text, belief] = pick(r, HISTORY);
+    const say = (s: string) => s.replace("{p}", who).replace("{e}", pick(r, ["dance", "picnic", "soccer game"])).replace("{g}", pick(r, GOOD_IDS));
+    const said = say(text);
+    feel(m, p, who, beat, day, said);
+    remember(m, day, pick(r, TIMES), said, 7);
+    if (belief) addBelief(m, { about: who, text: say(belief), source: "", conf: 0.9, day });
+  }
+}
+
+const ACT_WORDS: [string, string[]][] = [["dance", ["party", "birthday party", "dance", "dance party"]], ["soccer", ["soccer game", "football match", "game of soccer"]], ["fish", ["fishing trip", "fishing"]], ["picnic", ["picnic", "lunch"]]];
+const WHENS: [string, string, string][] = [["tomorrow evening", "tomorrow", "evening"], ["tomorrow morning", "tomorrow", "morning"], ["tomorrow at noon", "tomorrow", "noon"], ["tonight", "today", "evening"], ["this evening", "today", "evening"], ["this morning", "today", "morning"], ["at noon", "today", "noon"], ["tomorrow", "tomorrow", "evening"], ["", "today", "evening"]];
+const ASKS = ["my {w} is {t}, come?", "want to join my {w} {t}?", "come to the {w} {t}!", "let's go to a {w} {t}", "can you come to the {w} {t}?", "I'm having a {w} {t}, will you come?", "hey, {w} {t}, you in?", "join us for a {w} {t}"];
+const NOT_ASKS = ["I went to a {w} yesterday", "the {w} last night was fun", "did you like the {w}?", "I love a good {w}", "the {w} was great", "I never go to a {w}", "don't come to the {w}", "hi there", "nice weather today", "where is the pond?", "what do you do all day?", "I saw a big fish"];
+
+function extractItem(r: () => number): { line: string; truth: string } {
+  const [act, words] = pick(r, ACT_WORDS);
+  const w = pick(r, words);
+  if (r() < 0.3) return { line: pick(r, NOT_ASKS).replace("{w}", w), truth: "none" };
+  const [t, day, phase] = pick(r, WHENS);
+  return { line: pick(r, ASKS).replace("{w}", w).replace(" {t}", t ? ` ${t}` : ""), truth: `${act},${day},${phase}` };
+}
+
 function needs(r: () => number): Needs {
   return Object.fromEntries(NEEDS.map((k) => [k, Math.round(r() < 0.3 ? r() * 40 : 40 + r() * 60)])) as Needs;
 }
@@ -91,10 +139,13 @@ function needs(r: () => number): Needs {
 export function villageItem(seed: number, i: number): VillageItem {
   const r = mulberry32((Math.imul(seed + 1, 2654435761) ^ Math.imul(i + 7, 40503)) >>> 0);
   let u = r();
-  const task = MIX.find(([, w]) => (u -= w) < 0)?.[0] ?? "choose";
-  const p = task === "line" || task === "reply" || task === "petline" ? (task === "line" ? someone(r) : pick(r, VILLAGERS)) : someone(r);
+  const n4 = seed >= N4_SEED;
+  const task = (n4 ? MIX_N4 : MIX).find(([, w]) => (u -= w) < 0)?.[0] ?? "choose";
+  const p = task === "reply" || task === "petline" || task === "decide" || task === "deal" ? pick(r, VILLAGERS) : someone(r);
   const day = 1 + Math.floor(r() * 5);
   const m = memoryFor(r, p, day);
+  const player = pick(r, PLAYERS);
+  if (n4 && p.kind === "human" && r() < 0.7) withHistory(r, m, p, player, day);
   const id = `v${seed}-${i}`;
   const base = { id, task, who: p.name };
   switch (task) {
@@ -110,7 +161,7 @@ export function villageItem(seed: number, i: number): VillageItem {
       return { ...base, req: choosePrompt(p, m, needs(r), phase, choices, company), options: choices };
     }
     case "line": {
-      let other = someone(r);
+      let other = n4 && m.bonds[player] ? ({ id: player, name: player, kind: "human", traits: [], hobbies: [], habit: "", background: "" } as Persona) : someone(r);
       while (other.name === p.name) other = someone(r);
       const aff = Math.round(r() * 100 - 40);
       const said = r() < 0.4 ? [`${other.name}: ${pick(r, ["Nice day, right?", "Want to play later?", "I caught a big fish!", "Have you eaten?", "Let's have a picnic."])}`] : [];
@@ -120,7 +171,34 @@ export function villageItem(seed: number, i: number): VillageItem {
     case "petline":
       return { ...base, req: petLinePrompt(p, m, pick(r, PET_NAMES)) };
     case "reply":
-      return { ...base, req: replyPrompt(p, m, pick(r, PLAYERS), pick(r, QUESTIONS)) };
+      return { ...base, req: replyPrompt(p, m, player, pick(r, n4 && r() < 0.6 ? FEELING_QUESTIONS : QUESTIONS)) };
+    case "extract": {
+      const { line, truth } = extractItem(r);
+      return { ...base, req: extractPrompt(line), truth };
+    }
+    case "decide": {
+      const [act, words] = pick(r, ACT_WORDS);
+      const phase = pick<Phase>(r, ["morning", "noon", "evening"]);
+      const invite = { act, occasion: act === "dance" ? pick(r, words) : "", day: day + Math.floor(r() * 2), phase };
+      const score = inviteScore(p, Math.round(r() * 80 - 30) + wariness(m.bonds[player]), act, r() < 0.2 ? 1 : 0);
+      return { ...base, req: decidePrompt(p, m, invite, player, score), score, ...(score >= 0.75 ? { barred: "decline" } : score <= 0.25 ? { barred: "accept" } : {}) };
+    }
+    case "deal": {
+      const market = newMarket();
+      openDay(market, day, VILLAGERS);
+      const kind = pick<OfferKind>(r, ["sell", "buy"]);
+      const purse = { ...newPurse(), coins: 20 + Math.floor(r() * 60) };
+      const pool: readonly Good[] = kind === "sell" ? (p.job?.act === "sell" ? GOOD_IDS : (p.likes as Good[])) : GOOD_IDS;
+      const good = pick(r, pool);
+      purse.goods[good] = 3;
+      const o: Offer = { kind, good, qty: 1 + Math.floor(r() * 2), price: null };
+      const fair = judge(p, m.bonds[player], purse, market, o, player, 99, 3).price || 5;
+      o.price = Math.max(1, Math.round(fair * (0.7 + r() * 0.75)));
+      const v = judge(p, m.bonds[player], purse, market, o, player, 99, 3);
+      if (v.fixed) return { ...base, task: "emote", req: emotePrompt(p, `${p.name} just ${eventText(pick(r, forKind(p)), [])}.`), options: [...EMOTES, "none"] }; // nothing to choose here
+      const score = dealScore(p, m.bonds[player]);
+      return { ...base, req: dealPrompt(p, o, v, player, score), score, ...(v.answer === "counter" ? { barred: "accept" } : {}) };
+    }
     case "emote": {
       const options = [...EMOTES, "none"];
       const mates = [pick(r, [...VILLAGERS.map((v) => v.name), ...PET_NAMES].filter((x) => x !== p.name))];
@@ -135,6 +213,11 @@ export function villageItem(seed: number, i: number): VillageItem {
 export function validate(item: VillageItem, raw: string): string | null {
   const t = raw.trim();
   if (!t) return null;
+  if (item.task === "extract") return t.toLowerCase().replace(/[.!]$/, "") === item.truth ? item.truth! : null;
+  if (item.task === "decide" || item.task === "deal") {
+    const a = item.task === "deal" ? parseDeal(t) : parseDecision(t);
+    return a && a !== item.barred ? a : null;
+  }
   if (item.task === "plan") {
     const plan = parsePlan(t, item.options!);
     return plan && t.split(/\s*,\s*/).length === 3 ? `${plan.morning![0]},${plan.noon![0]},${plan.evening![0]}` : null;

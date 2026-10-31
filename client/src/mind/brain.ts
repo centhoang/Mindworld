@@ -107,7 +107,7 @@ export function replyPrompt(p: Persona, m: MindMemory, player: string, line: str
     user: `${personaCard(p)}
 ${memoryText(m, line, 3, player)}
 ${sceneLine(scene)}A visitor, ${player}, says to ${p.name}: "${line.slice(0, 140)}"
-Write ${p.name}'s answer: one or two short friendly sentences, under 25 words, in character, no emoji.${scene ? " If they ask about something around you, answer only from what is listed there." : ""}`,
+Write ${p.name}'s answer: one or two short sentences, under 25 words, in character, no emoji. Use only the memories above and never invent events; show how you feel.${scene ? " If they ask about something around you, answer only from what is listed there." : ""}`,
     grammar: `root ::= ${LINE_CHARS}{2,${LINE_MAX}}`,
     maxTokens: 40,
     temperature: 0.8,

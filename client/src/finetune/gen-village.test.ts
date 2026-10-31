@@ -32,7 +32,12 @@ describe("village teacher data", () => {
   it("scenarios are deterministic, cover every task and use the game's prompt builders", () => {
     expect(villageItem(1, 5)).toEqual(villageItem(1, 5));
     expect(villageItem(2, 5)).not.toEqual(villageItem(1, 5));
-    for (const t of TASKS) expect(items.some((x) => x.task === t), t).toBe(true);
+    const n4 = Array.from({ length: 600 }, (_, i) => villageItem(3, i));
+    for (const t of TASKS) expect(n4.some((x) => x.task === t), t).toBe(true);
+    expect(Math.max(...n4.map((x) => x.req.system.length + x.req.user.length))).toBeLessThan(1500); // about 300 tokens, what the GTX 1050 warm-up proved
+    expect(validate(n4.find((x) => x.task === "extract")!, n4.find((x) => x.task === "extract")!.truth!)).toBeTruthy();
+    const barred = n4.find((x) => x.task === "decide" && x.barred)!;
+    expect(validate(barred, barred.barred!)).toBeNull();
     expect(of("choose").req.user).toContain("Answer with one option.");
     expect(of("plan").req.grammar).toMatch(/^root ::= act "," act "," act/);
     expect(of("emote").options).toContain("none");
