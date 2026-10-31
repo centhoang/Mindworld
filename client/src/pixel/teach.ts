@@ -9,6 +9,7 @@ import { FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, ty
 import { describeCond, type Memo } from "../sim/memo";
 import { prove, type ProofReport } from "../sim/proof";
 import type { Replay } from "../sim/types";
+import { LOCAL_ONLY } from "../game/test-mode";
 import { PAL } from "./art";
 import { drawFrame, drawText, GLYPH, LINE, wrap } from "./text";
 
@@ -31,6 +32,11 @@ export function coachChain(browser: JsonCompletion | null = null): Cortex[] {
   const inTab = browser && new LocalCortex("", { complete: browser });
   if (inTab) NAMES.set(inTab, "browser coach");
   return [live, ...(inTab ? [inTab] : []), offline];
+}
+
+// Development period: the tuned model in this tab or nothing, so a weak lesson is the model's own.
+function localCoachChain(browser: JsonCompletion | null): Cortex[] {
+  return coachChain(browser).filter((c) => c instanceof LocalCortex);
 }
 
 export class TeachScreen {
@@ -104,7 +110,7 @@ export class TeachScreen {
     this.setButtons(true);
     const before = this.host.memo();
     try {
-      const out = await runCoach(coachChain(this.host.browserCoach()), run, before, { gated, names: NAMES });
+      const out = await runCoach(LOCAL_ONLY ? localCoachChain(this.host.browserCoach()) : coachChain(this.host.browserCoach()), run, before, { gated, names: NAMES });
       // Players get a short version; the detailed note goes to the console for us.
       if (out.failed.length) console.info("[coach]", out.note);
       const who = out.res ? COACH_LABEL[out.res.source] : "";

@@ -3,7 +3,7 @@
 // water. Walking checks read this grid, so what you see is exactly where you can walk.
 
 import { THEMES } from "../world/ground";
-import { groundOrigin, type Platform, type WorldMap } from "../world/layout";
+import { inBlock, groundOrigin, type Platform, type WorldMap } from "../world/layout";
 
 export const TILE = 16;
 
@@ -90,17 +90,18 @@ export function buildTileMap(w: WorldMap): TileMap {
       }
 
   // Paths from each plaza to its bridges, so the eye follows the way out: 3 tiles wide, on land only.
+  const pathBlock = (cx: number, cz: number) => {
+    for (let dz = -1; dz <= 1; dz++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const at = idx(cx + dx, cz + dz);
+        if (!wet(at) && kind[at] !== T.pool) kind[at] = T.path;
+      }
+  };
+  // Along one axis, then the other: a road never runs on a slant.
   const pathLine = (x0: number, z0: number, x1: number, z1: number) => {
-    const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0));
-    for (let s = 0; s <= n; s++) {
-      const cx = Math.floor(x0 + ((x1 - x0) * s) / n);
-      const cz = Math.floor(z0 + ((z1 - z0) * s) / n);
-      for (let dz = -1; dz <= 1; dz++)
-        for (let dx = -1; dx <= 1; dx++) {
-          const at = idx(cx + dx, cz + dz);
-          if (!wet(at) && kind[at] !== T.pool) kind[at] = T.path;
-        }
-    }
+    const [ax, az, bx, bz] = [Math.floor(x0), Math.floor(z0), Math.floor(x1), Math.floor(z1)];
+    for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) pathBlock(x, az);
+    for (let z = Math.min(az, bz); z <= Math.max(az, bz); z++) pathBlock(bx, z);
   };
   const byId = new Map(w.platforms.map((p) => [p.id, p]));
   for (const b of w.bridges) {
@@ -131,17 +132,10 @@ function landKind(p: Platform, x: number, z: number): TileKind | null {
     if (d < 2.6) return T.path;
     return r < 0.06 ? T.flowers : T.grass;
   }
-  if (d > p.r + bulge(p, cx, cz)) return null;
-  if (d < 2.6 && p.kind !== "wild" && p.kind !== "islet" && p.kind !== "picnic") return T.path; // a little plaza in the middle
+  if (!inBlock(p, cx, cz)) return null;
+  if (Math.max(Math.abs(cx - p.x), Math.abs(cz - p.z)) < 2.6 && p.kind !== "wild" && p.kind !== "islet" && p.kind !== "picnic") return T.path; // a little plaza in the middle
   if (p.kind === "wild" && r < 0.22) return T.tall;
   return r < (p.kind === "picnic" ? 0.12 : 0.06) ? T.flowers : T.grass;
-}
-
-// Round places get a lumpy outline, as the pack's islands have. It only adds land, so bridges still reach it.
-function bulge(p: Platform, x: number, z: number): number {
-  const a = Math.atan2(z - p.z, x - p.x);
-  const s = hash2(p.cell[0], p.cell[1], 7) * 6.28;
-  return Math.max(0, 1.2 * Math.sin(a * 3 + s) + 0.9 * Math.sin(a * 5 + s * 2) + 0.5);
 }
 
 function nearSegment(ax: number, az: number, bx: number, bz: number, x: number, z: number, half: number): boolean {

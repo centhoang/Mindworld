@@ -17,7 +17,7 @@ const STRIPS: Record<string, { frames: number }> = {
   spr_deco_duck_01_strip4: { frames: 4 }, spr_deco_chicken_01_strip4: { frames: 4 }, spr_deco_sheep_01_strip4: { frames: 4 }, spr_deco_pig_01_strip4: { frames: 4 }, spr_deco_cow_strip4: { frames: 4 },
   spr_deco_bird_01_strip4: { frames: 4 }, spr_deco_windmill_withshadow_strip9: { frames: 9 }, spr_deco_fire_01_strip4: { frames: 4 }, spr_deco_coracle_strip4: { frames: 4 },
 };
-const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "label_left", "label_middle", "label_right", "itemdisc_01", "itemdisc_02", "interior", "spr_deco_rug_01",
+const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "label_left", "label_middle", "label_right", "itemdisc_01", "itemdisc_02", "interior", "interior-roof", "spr_deco_rug_01",
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture"];
 export const CROPS_ART = ["wheat", "carrot", "beetroot", "cabbage", "cauliflower", "kale", "parsnip", "potato", "pumpkin", "radish"] as const;
 
@@ -158,6 +158,29 @@ export function drawTree(g: Ctx, seed: number, footX: number, footY: number, t: 
   const w = img.width / 4;
   const f = Math.floor(t * 2.5 + seed) % 4;
   g.drawImage(theme ? recoloured(img, theme) : img, f * w, 0, w, img.height, Math.round(footX - w / 2), Math.round(footY - img.height + 2), w, img.height);
+}
+
+// Whole-pixel grass over the screen, for what lies around the house picture.
+export function drawGrass(g: Ctx, sw: number, sh: number): void {
+  const base = sheetFor(0);
+  for (let y = 0; y < sh; y += TILE) for (let x = 0; x < sw; x += TILE) drawCell(g, base, tile(3, 1), x, y);
+}
+
+// Part of a sprite at full strength, or faded (the roof lifting as you come in).
+export function drawFaded(g: Ctx, name: string, x: number, y: number, alpha: number): void {
+  const i = images.get(name);
+  if (!i || alpha <= 0) return;
+  g.globalAlpha = alpha;
+  g.drawImage(i, x, y);
+  g.globalAlpha = 1;
+}
+
+// Repeat a band of a sprite sideways from its edges, so a road in the picture runs on off screen.
+export function extendBand(g: Ctx, name: string, x: number, y: number, bandY: number, bandH: number, sw: number): void {
+  const i = images.get(name);
+  if (!i) return;
+  for (let a = x - TILE; a > -TILE; a -= TILE) g.drawImage(i, 0, bandY, TILE, bandH, a, y + bandY, TILE, bandH);
+  for (let a = x + i.width; a < sw; a += TILE) g.drawImage(i, i.width - TILE, bandY, TILE, bandH, a, y + bandY, TILE, bandH);
 }
 
 export function characterShadow(g: Ctx, footX: number, footY: number): void {

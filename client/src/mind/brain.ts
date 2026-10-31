@@ -4,6 +4,7 @@
 // parser rejects anything outside the allowed set, and every decision has a scripted fallback, so the sim
 // never depends on the model. Pure: tested without a GPU.
 
+import { LOCAL_ONLY, NO_LOCAL } from "../game/test-mode";
 import { ACTIVITY } from "../life/activities";
 import type { Phase } from "../life/clock";
 import type { Needs } from "../life/needs";
@@ -154,9 +155,10 @@ export function reflectPrompt(p: Persona, m: MindMemory, day: number): LmRequest
 const OPENERS = ["Hi {o}! Nice day, right?", "Hey {o}, want to play later?", "{o}! I was looking for you.", "Oh, hello {o}."];
 const REPLIES = ["Sure, sounds fun!", "Maybe after my nap.", "Hi! I just ate, I'm so full.", "Yes! Let's go!"];
 const PET_LINES = ["Hello, little {o}!", "{o}, you look sleepy today.", "Who's a good one? You are, {o}!", "Careful by the water, {o}.", "{o}! Did you eat yet?"];
-export const scriptedPetLine = (p: Persona, pet: string, k: number): string => PET_LINES[(k + p.name.length + pet.length) % PET_LINES.length]!.replace("{o}", pet);
+export const scriptedPetLine = (p: Persona, pet: string, k: number): string => LOCAL_ONLY ? NO_LOCAL : PET_LINES[(k + p.name.length + pet.length) % PET_LINES.length]!.replace("{o}", pet);
 
 export function scriptedLine(p: Persona, other: Persona, turn: number, k: number): string {
+  if (LOCAL_ONLY) return NO_LOCAL;
   const pool = turn === 0 ? OPENERS : REPLIES;
   return pool[(k + p.name.length) % pool.length]!.replace("{o}", other.name);
 }

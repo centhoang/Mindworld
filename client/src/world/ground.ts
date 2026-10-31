@@ -1,5 +1,5 @@
 // A player's ground: a unique island shape from a seed, so every client draws the same ground for the same
-// player without sending the map. Radial-noise blob in tiles, one connected land mass with no holes, a
+// player without sending the map. A stepped rectangle in tiles, one connected land mass with no holes, a
 // theme, and four gates (N/E/S/W) where bridges attach. Pure: tested without a scene.
 
 import { mulberry32 } from "../sim/rng";
@@ -25,21 +25,23 @@ const YARD_RY = 6.2;
 export function groundFromSeed(seed: number, w = GROUND_W, h = GROUND_H): Ground {
   const rng = mulberry32(seed ^ 0x5bd1e995);
   const theme = THEMES[Math.floor(rng() * THEMES.length)]!;
-  // radius per angle: a base plus three seeded harmonics (lumps, bays, a long side), never past the border
-  const harm = [2, 3, 5].map((k) => ({ k, amp: 0.04 + rng() * 0.07, ph: rng() * Math.PI * 2 }));
-  const stretch = 0.85 + rng() * 0.3;
+  // A rectangle with stepped corners: the pack's coast tiles only join on straight edges and small steps, so a
+  // ground never has a long diagonal. Each corner gets its own seeded steps; the oval yard is always kept.
   const cx = (w - 1) / 2;
   const cy = (h - 1) / 2;
   const land = new Uint8Array(w * h);
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) {
-      const dx = (i - cx) / (cx * stretch);
-      const dy = (j - cy) / (cy / stretch);
-      const a = Math.atan2(dy, dx);
-      const r = 0.84 + harm.reduce((s, x) => s + x.amp * Math.sin(x.k * a + x.ph), 0);
-      // plus a fixed oval yard in the middle, so the house, farm beds and plaza always fit
-      if (Math.hypot(dx, dy) < r || Math.hypot((i - cx) / YARD_RX, (j - cy) / YARD_RY) < 1) land[j * w + i] = 1;
-    }
+  land.fill(1);
+  const corners = [[0, 0], [1, 0], [0, 1], [1, 1]] as const;
+  for (const [right, bottom] of corners) {
+    const across = 4 + Math.floor(rng() * 6);
+    const down = 3 + Math.floor(rng() * 3);
+    for (const [wide, deep] of [[across, down], [Math.ceil(across / 2), down + 2]] as const)
+      for (let b = 0; b < deep; b++)
+        for (let a = 0; a < wide; a++) {
+          const i = right ? w - 1 - a : a;
+          const j = bottom ? h - 1 - b : b;
+          if (Math.hypot((i - cx) / YARD_RX, (j - cy) / YARD_RY) >= 1) land[j * w + i] = 0;
+        }
   }
   keepMainland(land, w, h, Math.round(cx), Math.round(cy));
   fillHoles(land, w, h);

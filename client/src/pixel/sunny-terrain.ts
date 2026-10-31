@@ -1,6 +1,6 @@
 // Sunnyside terrain rules, read off the pack's example room: which tile goes where, from the land shape alone.
-// Land edges are one tile family and roads a matching one; a south edge drops two rows of cliff and ends in foam,
-// and the foam throws a shadow on the sea. Pure, so a shape can be checked without a canvas.
+// Land edges are one tile family and roads a matching one; a south edge drops two rows of cliff and ends in foam.
+// Pure, so a shape can be checked without a canvas.
 
 import { hash2, T, type TileMap } from "./tiles";
 
@@ -82,7 +82,7 @@ export function buildTerrain(m: TileMap): Terrain {
         out.road[k] = e ? ROAD[e] : ROAD_FILL[Math.floor(hash2(i, j, 23) * ROAD_FILL.length)]!;
       }
       if (dry(i, j + 1)) continue;
-      // The south face of this column, then its foam, then its shadow on the sea.
+      // The south face of this column, then its foam.
       const west = edge === "sw";
       const east = edge === "se";
       const face = west ? [tile(4, 10), tile(2, 19, MIRROR), tile(6, 19, MIRROR)] : east ? [tile(4, 10, MIRROR), tile(2, 19), tile(6, 19)] : [CLIFF(i, j + 1), CLIFF(i, j + 2), tile(2, 20)];
@@ -92,15 +92,6 @@ export function buildTerrain(m: TileMap): Terrain {
         put(out.land, i, j + n + 1, cell);
         last = j + n + 1;
       });
-      if (last === j + 3) for (const d of [0, 1]) if (free(i, last + d)) put(out.shade, i, last + d, tile(1, 12));
-      // A corner standing out on its own gets a lip of foam around it.
-      if ((west || east) && !dry(i + (west ? -1 : 1), j - 1)) {
-        const x = i + (west ? -1 : 1);
-        const lip = west ? [tile(6, 19, MIRROR | FLIP), tile(2, 20), tile(6, 19, MIRROR)] : [tile(6, 19, FLIP), tile(2, 20, FLIP), tile(6, 19)];
-        lip.forEach((cell, n) => {
-          if (free(x, j + n) && !out.land[(j + n) * m.w + x]) put(out.land, x, j + n, cell);
-        });
-      }
     }
   return out;
 }

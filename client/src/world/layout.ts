@@ -251,8 +251,20 @@ function bridgeEnd(p: Platform, side: Side): [number, number] {
   return [p.x + 0.5 + out[0]! * d, p.z + 0.5 + out[1]! * d];
 }
 
+// Places without a seeded ground are squares with a notch at each corner: straight coasts, as the pack's tiles need.
+// (x, z) is any point; the notches are seeded by the place, so all clients agree.
+export function inBlock(p: Platform, x: number, z: number): boolean {
+  const dx = Math.abs(x - p.x);
+  const dz = Math.abs(z - p.z);
+  if (dx > p.r || dz > p.r) return false;
+  const seed = (p.cell[0] * 7 + p.cell[1] * 13 + (x > p.x ? 3 : 0) + (z > p.z ? 5 : 0)) >>> 0;
+  const across = Math.min(p.r / 2, 2 + (seed * 2654435761 >>> 28) % 4);
+  const down = Math.min(p.r / 2, 2 + (seed * 40503 >>> 4) % 3);
+  return !(dx > p.r - across && dz > p.r - down);
+}
+
 export function onGround(p: Platform, x: number, z: number): boolean {
-  if (!p.ground) return Math.hypot(x - p.x, z - p.z) <= p.r;
+  if (!p.ground) return inBlock(p, x, z);
   const [ox, oz] = groundOrigin(p);
   return isLand(p.ground, Math.floor(x - ox), Math.floor(z - oz));
 }

@@ -27,15 +27,16 @@ Decide each tile from the land shape alone, with 4 neighbours and then diagonals
 
 - The light road family is the grass table moved down 4 rows (3.k becomes 7.k, 4.k becomes 8.k). Not used yet.
 - Roads are 3 tiles wide and stay on land.
-- Outlines are octagonal: every outer corner is a 45 degree cut. Right-angle concave corners are fine.
+- Island outlines are straight edges with stepped corners, never slants or circles: coast, cliff and foam tiles only join on those. Grounds are stepped rectangles (world/ground.ts), other places squares with corner notches (`inBlock` in world/layout.ts). Roads run along one axis, then the other.
+- Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in clumps.
 
 ## Cliffs, foam, sea shadow
 Only south edges have a face, worked out per column. Cells below the land, from the top:
 - S edge: cliff, cliff, foam 2.20. Cliff alternates 3.11 and 4.11 by (i + j) parity.
 - SW corner: 4.10, 2.19m, 6.19m.
 - SE corner: 4.10m, 2.19, 6.19.
-- A corner standing alone gets a foam lip in the next column, top to bottom. West: 6.19mF, 2.20, 6.19m. East: 6.19F, 2.20F, 6.19.
-- Sea shadow 1.12 covers the foam row and one row below, drawn under bridge decks. The room also has end pieces (1.13, 1.14) that we do not use yet.
+- No foam lip beside a corner: the room's lip only joins its own coast shapes, and on ours it floated as a loose dash.
+- No sea shadow under cliffs: 1.12 and its end pieces 1.13/1.14 only read right on the room's own coast; on ours they showed as hard blocks.
 - Foam animates: tileset animation pairs such as 147/150 and 148/151, about 2 flips per second (`anims` in sunny.json).
 
 ## Water
@@ -60,9 +61,13 @@ The ends lie one tile up on the land.
 - Furniture: rows 33-37 of the tileset, listed in `FURNITURE`. Big rug is at 35.40, table at 35.50.
 
 ## Interiors
-Rim 9.8 / 9.4 / 9.8m, side walls 9.6 / 9.6m, plank floor 9.1, front wall 10.6 / 10.5 / 10.6m, outer wall 10.8, door 11.12. The room in Room1 is cut off by the map edge, so it is composed in art-sunny.py rather than stamped.
+The house is BuiltDemo/Interior.gif at 1x: `python scripts/art-interior.py` (after art-sunny.py) writes interior.png and interior-roof.png, the people removed. The roof fades out over 0.7 s on entry. Where feet can go is game/house.ts, in pixels of that picture: change it together with the art. The road carries on past the picture (`extendBand`).
+
+## Chimney smoke
+The smoke's mouth is per house: `CHIMNEY` in overworld.ts, pixels from the stamp's top left. A house with no chimney on its stamp has no smoke.
 
 ## Rules for changes
 - Use pack pixels. Make new art only for real gaps, and only by the rules in docs/STYLE.md.
 - Do not recolour tiles with palette swaps: they gave broken checker grass. Seasonal looks need real art.
 - After a visual change, compare a daytime shot with BuiltDemo (`__px.world.alwaysDay = true`).
+- One art pixel is always a whole number of screen pixels (`lowSize` in main.ts). Never scale the picture by a fraction.

@@ -34,6 +34,13 @@ import { petScene, sharedScene, type Seen } from "../mind/scene";
 import { generatedSprites, SpriteImages } from "./generated-sprites";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, humanSprites, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
+const CLUMP = 6; // tiles: trees gather in cells of this size
+const SHORE: readonly (readonly [number, number])[] = [[-2, 0], [2, 0], [-1, 0], [1, 0], [0, -2], [-2, 1], [2, 1], [0, 1], [0, 2], [0, 3], [-2, 3], [2, 3]];
+// The mouth of each house's chimney, in pixels from the stamp's top left. Houses not listed have none.
+const CHIMNEY: Record<string, [number, number]> = { "house-blue": [63, 11], "house-red": [15, 1], "house-orange": [15, 22], "house-orangelong": [63, 18], "house-bluesmall": [55, 7] };
+const SMOKE_W = 15;
+const SMOKE_H = 37;
+const READ_CHARS = 12; // a bubble stays long enough to read at this many characters a second
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
 export const NAME_MAX = 10;
 const DECOR_NAME: Record<DecorPiece["kind"], string> = { stump: "a tree stump", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
@@ -327,8 +334,10 @@ export class Overworld {
   // A house with its chimney smoke.
   private drawHouse(g: CanvasRenderingContext2D, art: string, x: number, y: number, t: number): void {
     stand(g, art, x, y);
+    const top = CHIMNEY[art];
+    if (!top) return;
     const [w, h] = stampSize(art);
-    strip(g, "chimneysmoke_01_strip30", x + w / 2 - 34, y - h - 18, Math.floor(t * 10));
+    strip(g, "chimneysmoke_01_strip30", x - w / 2 + top[0] - SMOKE_W / 2, y - h + top[1] - SMOKE_H + 3, Math.floor(t * 10));
   }
 
   // A small name over every person, players and villagers alike.
@@ -388,12 +397,11 @@ export class Overworld {
         const z = m.oz + j + 0.5;
         const p = platformAt(this.world, x, z);
         if (!p || p.kind === "islet") continue;
-        const d = Math.hypot(x - p.x, z - p.z);
-        const ring = p.ground
-          ? [[-3, 0], [3, 0], [0, -3], [0, 3]].some(([di, dj]) => m.kind[(j + dj!) * m.w + i + di!] === T.water)
-          : d > p.r - 4 && d < p.r - 1;
+        // Trees stand well inland (canopies must not hang over a cliff) and grow in clumps, as in the pack's scenes.
+        if (SHORE.some(([di, dj]) => { const c = m.kind[(j + dj) * m.w + i + di]; return c === undefined || c === T.water || c === T.pool || c === T.bridge; })) continue;
+        const clump = hash2(Math.floor((i + m.ox) / CLUMP), Math.floor((j + m.oz) / CLUMP), 10) < 0.5;
         const h = hash2(i + m.ox, j + m.oz, 9);
-        if (!(ring ? h < 0.34 : h < 0.02)) continue;
+        if (!(clump ? h < 0.6 : h < 0.015)) continue;
         if (p.spots && Object.values(p.spots).some((s) => Math.abs(s.x - x) < 3.5 && Math.abs(s.z - z) < 3.5)) continue;
         if (p.kind === "plaza" && Math.abs(x - p.x) < 4 && Math.abs(z - p.z) < 3) continue;
         if (this.noticeBoard && Math.abs(x - this.noticeBoard.x) < 2 && Math.abs(z - this.noticeBoard.z) < 2) continue;
@@ -657,7 +665,7 @@ export class Overworld {
 
   // `to` = the name of whoever is spoken to, shown on the bubble with the speaker's.
   say(who: string, text: string, secs = 3.5, to?: string): void {
-    this.bubbles.set(who, { text, t: secs, to, held: false, wait: 0 });
+    this.bubbles.set(who, { text, t: Math.max(secs, text.length / READ_CHARS), to, held: false, wait: 0 });
   }
 
   // A thought, not speech: never covers a line being said, and only this screen sees it.
@@ -1102,7 +1110,7 @@ export class Overworld {
       if (bx < -10 || by < -10 || bx > sw + 10 || by > sh + 40) continue; // someone out of sight stays out of sight
       const head = this.speaker(who);
       const label = b.thought ? `${head} thinks` : head && b.to ? `${head} > ${b.to}` : head;
-      const lines = wrap(b.text, 120).slice(0, 3);
+      const lines = wrap(b.text, Math.min(180, sw - 24));
       const w = Math.max(label.length, ...lines.map((l) => l.length)) * GLYPH + 12;
       const bottom = by - OVERWORLD_MON - 12;
       shown.push({ b, head: label, lines, cx: bx, y: bottom, box: { cx: bx, bottom, w, h: (lines.length + (label ? 1 : 0)) * 10 + 8, first: who === "me" || b.to === this.myName } });

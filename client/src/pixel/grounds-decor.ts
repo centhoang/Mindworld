@@ -51,9 +51,9 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
       const b = p.spots.blanket; // a string of lights on two posts behind the blanket (walk-through)
       out.push({ kind: "lights", x: b.x + 0.5, z: b.z - 1.6, tiles: [], platform: p.id });
     }
-    const want = p.ground ? 9 + Math.floor(rng() * 4) : between ? 3 + Math.floor(rng() * 2) : 8 + Math.floor(rng() * 4);
+    const want = p.ground ? 16 + Math.floor(rng() * 6) : between ? 6 + Math.floor(rng() * 3) : 14 + Math.floor(rng() * 6);
     const [x0, z0, w, h] = p.ground ? [...groundOrigin(p), p.ground.w, p.ground.h] : [p.x - p.r, p.z - p.r, p.r * 2, p.r * 2];
-    for (let tries = 0, placed = 0; tries < 200 && placed < want; tries++) {
+    for (let tries = 0, placed = 0; tries < 500 && placed < want; tries++) {
       const kind = PICK[Math.floor(rng() * PICK.length)]!;
       const len = kind === "fence" ? 2 + Math.floor(rng() * 2) : WIDTH[kind];
       const i0 = Math.floor(x0 + rng() * w) - m.ox;
@@ -82,7 +82,7 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
 }
 
 function onPlatform(p: Platform, x: number, z: number): boolean {
-  if (!p.ground) return Math.hypot(x - p.x, z - p.z) <= p.r - 1.5;
+  if (!p.ground) return Math.max(Math.abs(x - p.x), Math.abs(z - p.z)) <= p.r - 1.5;
   const [ox, oz] = groundOrigin(p);
   const i = Math.floor(x - ox);
   const j = Math.floor(z - oz);

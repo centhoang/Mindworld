@@ -20,6 +20,7 @@ import { ENEMIES } from "../sim/enemies";
 import { DEFAULT_PET, type Intent, type Outcome } from "../sim/types";
 import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
+import { LOCAL_ONLY, NO_LOCAL } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
 import { NAME_MAX, Overworld, type Wild } from "./overworld";
 import { drawDialogue, drawFrame, drawText } from "./text";
@@ -47,10 +48,11 @@ import { TeachScreen } from "./teach";
 
 export const LOW_H = 216;
 
-// Low-res width follows the window's aspect so phones and wide screens both fill, height stays 216.
-export function lowSize(cssW: number, cssH: number): { w: number; h: number } {
-  const w = Math.round((LOW_H * cssW) / Math.max(1, cssH));
-  return { w: Math.max(216, Math.min(480, w)), h: LOW_H };
+// One art pixel is always a whole number of screen pixels, or pixels come out in different sizes. The scale that
+// shows at least LOW_H rows wins, and the low-res picture takes whatever size fills the screen at that scale.
+export function lowSize(devW: number, devH: number): { w: number; h: number; scale: number } {
+  const scale = Math.max(1, Math.floor(Math.max(1, devH) / LOW_H));
+  return { w: Math.max(1, Math.floor(devW / scale)), h: Math.max(1, Math.floor(devH / scale)), scale };
 }
 
 const TELL: Record<Intent, string> = {
@@ -232,7 +234,8 @@ chatForm.addEventListener("submit", (e) => {
   if (!w || !who || !line) return;
   chatInput.value = "";
   world.say(chatKey(w), "...", 20);
-  void (typeof w === "string" ? villagerAnswer(w as Npc, line) : askNpc(who, line, "", undefined, undefined, world.wildScene(w))).then((r) => {
+  const answer = typeof w === "string" ? villagerAnswer(w as Npc, line) : LOCAL_ONLY ? Promise.resolve({ text: NO_LOCAL }) : askNpc(who, line, "", undefined, undefined, world.wildScene(w));
+  void answer.then((r) => {
     world.say(chatKey(w), r.text, 6);
     if (!state.muted) {
       const v = voiceFor(typeof w === "string" ? (w as Npc) : w.arch);
@@ -272,6 +275,7 @@ async function villagerMind(npc: Npc, line: string): Promise<{ text: string }> {
     });
     if (text) return { text };
   }
+  if (LOCAL_ONLY) return { text: NO_LOCAL };
   return askNpc(npc, line, "", undefined, undefined, scene);
 }
 
@@ -406,12 +410,14 @@ crtBtn.addEventListener("click", () => setCrt(!crt));
 setCrt(crt);
 
 function resize(): void {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  out.width = Math.round(window.innerWidth * dpr);
-  out.height = Math.round(window.innerHeight * dpr);
-  const s = lowSize(window.innerWidth, window.innerHeight);
+  const dpr = window.devicePixelRatio || 1;
+  const s = lowSize(Math.round(window.innerWidth * dpr), Math.round(window.innerHeight * dpr));
   low.width = s.w;
   low.height = s.h;
+  out.width = s.w * s.scale;
+  out.height = s.h * s.scale;
+  out.style.width = `${out.width / dpr}px`; // to the device pixel: any stretch here would undo the whole-number scale
+  out.style.height = `${out.height / dpr}px`;
   g.imageSmoothingEnabled = false;
 }
 
@@ -572,8 +578,8 @@ webBrain.onLost = () => {
   if (instinct.voice === webBrain) instinct.voice = null;
   toast = { text: "The GPU dropped the model. Your pet goes on with rules.", who: "Brain", t: 6 };
 };
-const mindSched = new MindScheduler(() => localBrain() ?? (cloudMind.ready() ? cloudMind : null), { paused: () => mode === "battle" });
-world.attachMinds(mindSched, () => localBrain() !== null || cloudMind.available(), (() => {
+const mindSched = new MindScheduler(() => localBrain() ?? (!LOCAL_ONLY && cloudMind.ready() ? cloudMind : null), { paused: () => mode === "battle" });
+world.attachMinds(mindSched, () => localBrain() !== null || (!LOCAL_ONLY && cloudMind.available()), (() => {
   try {
     return parseMindsSave(JSON.parse(localStorage.getItem(MINDS_KEY) ?? "null"));
   } catch {
