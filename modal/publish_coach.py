@@ -79,7 +79,7 @@ VILLAGE_RESULTS = """- Village checks without grammar, 200 scenarios: tuned 1B 9
 - Voice: 100% valid for both, lines 1-8 words."""
 
 
-MLC_NOTE = """The results above were measured on the Q4_K_M GGUF. This 4-bit format differs: in WebLLM (q4f32_1, GTX 1050), 98.5% village checks, Teach +19.1 pts with 6 harmful, voice 100% valid."""
+MLC_NOTE = """The results above were measured on the Q4_K_M GGUF. This 4-bit format differs. N4 weights in WebLLM (q4f32_1, GTX 1050, seed 4): 97.0% valid (plan, choose, line, emote, reflect, decide, deal all 100%; extract 32/37, reply 69/73), p50 1.9 s. Teach with grammar: 100% valid, +18.9 pts, 5 harmful, p50 10.8 s."""
 
 
 def card(tag: str, size: str, fmt: str, note: str) -> str:

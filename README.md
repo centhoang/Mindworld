@@ -1,11 +1,13 @@
 # Mindworld
 
-A cozy pixel village in the browser where **every pet and villager has a mind of its own**. Each one plans its day, picks
-what to do next, chats, gestures and remembers, decided by a small Meta Llama model running on the players' own devices.
-Players who are online together share one world. Each player has their own island ground, with playgrounds, picnic hills
-and ponds between the grounds. The villagers' minds run on whichever player's machine has a model loaded, and they move
-to another machine when that player leaves, keeping their memories. You can also teach your pet how to fight, in plain
-words, and the game measures whether the lesson worked.
+A cozy pixel village in the browser where **the villagers are as alive as the players**. Invite Pip to your birthday and
+Pip decides whether to come, skips work for it, walks there on time, and remembers if you never show up. Then Pip tells Ama,
+and Ama won't sell to you until you say sorry. They keep jobs, trade at prices set by real deals, hold grudges with
+real reasons, and save up for things over days. The game does the reasoning from typed state; a tuned Meta Llama, running on
+the players' own devices, decides among valid options and speaks.
+
+Players online together share one world. Minds run on whichever player's machine has a model and move, memories included,
+when that player leaves. You can also teach your pet to fight in plain words, and the game proves whether the lesson worked.
 
 Built for the Meta Global AI Developer Hackathon, **Oct 27 – Nov 4, 2026**. Everything in this repository was written
 during the event.
@@ -16,20 +18,23 @@ behind an access gate.
 ## How to play
 | Key | What it does |
 |---|---|
-| WASD / arrows | Walk. Your pet follows you. |
-| E | Talk to a villager (Elder, Mo, Ama, Pip) or a wild pet; use beds, the market stall, your door |
-| B | Load our tuned **Llama 3.2 1B** into this tab (WebGPU). Press B again for rules only |
-| I | Open the Mind inspector next to a pet or villager: its plan, what it is doing, friends, memories, which model decides and where it runs |
+| WASD / arrows | Walk. Shift runs. Your pet follows you. |
+| E | Talk to a villager (Elder, Mo, Ama, Pip) or a wild pet; use beds, the market stall, the town board, your door |
+| B | Load or unload our tuned **Llama 3.2 1B** in this tab (WebGPU; the setup screen does this on capable machines) |
+| I | Open the Mind inspector next to a villager or pet: plan, promises, purse, goal, feelings, beliefs, and why it chose what it did |
 | T | Teach your pet (a lesson in plain words becomes a few checked rules) |
+| N | Set your name |
 | P | Your pets |
 | 1-4 | Emotes when online (wave, heart, dance, laugh) |
-| G / M / C | Goals panel / mute voices / CRT filter |
+| G / M | Goals panel / mute voices |
 
 Things to try:
-- Watch your pets at home: they eat, nap, play ball, poop (and villagers clean up), and invite each other to picnics.
-- Walk to the square: villagers greet you by name and chat with each other and with your pet. Press E to ask them anything.
-- Open a second window. Each player spawns on their own ground, the clock and day/night match in both windows, and an
-  invitation sent in one window shows up in the other.
+- Say to Pip: "my birthday party is this evening at the dance floor, come?". Then come, or don't, and talk to Pip after.
+- Ask "why are you mad?": the answer comes from what actually happened. Say "sorry" to mend it.
+- Press E at the board in the square: prices move only with real trades. Tell Pip "here is a carrot for you", or "sell you a
+  carrot for 20 coins", then "ok". Ask "what are you saving for?".
+- Be rude to Ama twice, then try the stall.
+- Open a second window. Each player spawns on their own ground, with one shared clock.
 - Bump a wild pet to battle; press T to teach your pet, and the Proof panel replays paired fights the coach never saw.
 
 ## Meta models: where each one is used
@@ -47,8 +52,9 @@ shows which one actually decided (`MIND: ...`), so a scripted answer is never pr
 ## How it works
 - **Sim** (`client/src/life/`): a deterministic village sim: shared world clock, needs, 14 activities, relationships,
   group activities that wait for friends. It runs without any model.
-- **Minds** (`client/src/mind/`): persona, memory and five small prompts (`brain.ts`). Each answer is checked against the
-  allowed set before the sim uses it. One scheduler per machine queues the model calls with priorities, timeouts and a duty
+- **Minds** (`client/src/mind/`): persona, memory and small prompts (`brain.ts`), plus typed state for promises, bonds with
+  reasons, beliefs with their source, jobs, a purse and long goals. Each answer is checked against the allowed set before
+  the sim uses it. One scheduler per machine queues the model calls with priorities, timeouts and a duty
   cap so the game keeps its frame rate.
 - **World** (`client/src/world/`): seeded island grounds on a ring of slots, in-between grounds rolled per day, bridges, and
   seeded decor. Every client builds the same map from a few numbers, so no map data is sent.
@@ -74,6 +80,7 @@ The in-browser Llama needs no key. `npm run dev` in `client/` runs the Vite dev 
 ## Credits and licenses
 - **Built with Llama.** Llama 3.2 is licensed under the Llama 3.2 Community License; see `licenses/` (license and
   acceptable use policy). Muse models are used through their providers' APIs.
-- Pixel art: our own style guide (`docs/STYLE.md`). The sprite sheets and tiles were made with OpenAI Codex image
-  generation from that guide and reviewed against it; walk cycles, poses, recolours and effects are drawn in code.
+- Pixel art: the **Sunnyside World** asset pack (free and commercial use, with thanks to its author) for the world and
+  people. Pieces the pack lacks, such as the modular pets, were generated with OpenAI Codex in that style and reviewed
+  against `docs/STYLE.md`.
 - Libraries: WebLLM (MLC), llama.cpp, Cloudflare Workers, Vite, Vitest, TRL / PEFT on Modal for fine-tuning.

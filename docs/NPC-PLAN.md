@@ -9,7 +9,7 @@ A 1B model cannot reason freely about a town, and it does not have to. **The sim
 and speaks.** The sim keeps typed state (promises, beliefs, prices, relationships), works out what is possible, and
 retrieves what matters. The model gets a short prompt with a few valid options and picks one or writes one line. The
 result looks like deep reasoning because every step is grounded in real state, and each step can be shown in the
-inspector. This is the same shape as our village minds, which already reach 98.5% valid in the browser.
+inspector. This is the same shape as our village minds, which reach 97.0% valid in the browser across ten tasks (N4).
 
 Honest limit: free chat from a tuned 1B stays the weakest part (replies were the weakest task in stage 5, 130/202 kept).
 Muse Spark can improve chat during judging; after the event, chat stays simple but the behaviour does not.

@@ -75,7 +75,8 @@ Prompts frozen first (commit af455c4). `gen-village --seed 3 --limit 3000` + `--
 | stage 5 | 85.3% | 12/37 | 20/26 | 13/23 | 70/73 | +22.6 | 1 |
 | **N4** | **97.0%** | **37/37** | **26/26** | **23/23** | 65/73 | +20.9 | 5 |
 
-WebLLM audit of the N4 weights is still to do; do not quote these as browser numbers.
+**Browser audit (2026-10-31, these are the numbers to quote):** N4 weights in WebLLM (q4f32_1, GTX 1050, seed 4): 97.0% valid (plan, choose, line, emote, reflect, decide, deal all 100%; extract 32/37, reply 69/73), p50 1.9 s. Teach with grammar: 100% valid, +18.9 pts, 5 harmful, p50 10.8 s.
+Only 140/300 outputs match the GGUF exactly: 4-bit MLC weights differ. The 5 extract misses are covered in the game by the keyword fallback (`extractRules`). Teach sits under the +20 floor, level with stage 5 in the browser (+19.1).
 
 ## Acceptance (decided up front)
 - Teach, with grammar-constrained decoding: >= 95% valid memos on 100+ held-out lessons; mean held-out lift >= 70% of the teacher's (teacher ~ +28 pts, so student >= ~+20 pts); win-rate numbers use the same paired seeds and CI as the Muse Spark numbers.
