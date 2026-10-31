@@ -14,7 +14,8 @@ import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, script
 import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, holdsGrudge, hurt, parseBeliefLine, parseBondLine, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { VILLAGERS, type Persona } from "./persona";
-import { JOB_PULL, refuseLine, refusesDeal, shiftChoice, type Duty } from "./jobs";
+import { add as addGood, bestCrop, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, purseLine, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
+import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
 import { addCommitment, answerLine, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
 import { PRIO, type MindScheduler } from "./scheduler";
@@ -40,6 +41,9 @@ const PET_NPC_GAP = 30; // sim seconds between one NPC's pet lines (several pets
 const SCRIPT_GAP_MS = 3200; // without a model, wait a little before answering (the room allows 1 line / 3 s)
 const PROMISE_PULL = 3; // score added to a promised activity while it is due: it beats any need
 const PROMISE_DIST = 7; // the one who invited is here if they are this close
+const FARM_PULL = 0.5; // a villager short of coins or with a crop in the ground goes to its garden
+const FARM_COINS = 30;
+const YES = /^\s*(ok|okay|deal|yes|yep|sure|fine|agreed)\b/i;
 const INVITE_HINT = /\b(party|birthday|danc|soccer|football|fish|picnic|lunch)/i; // only these lines cost a model call
 
 // A pet the NPCs can see (mine, at home or following me, or an online player's). `busy` = walking or doing
@@ -56,6 +60,13 @@ export interface Person {
   id: string;
   name: string;
   pos: Vec;
+}
+
+// What the player owns, as far as a deal with a villager goes.
+export interface Pocket {
+  coins(): number;
+  count(g: Good): number;
+  change(coins: number, g: Good, n: number): void; // both signed
 }
 
 export type Deal = { ok: true } | { ok: false; npc: Npc; refused: boolean; text: string };
@@ -82,6 +93,10 @@ export class NpcVillage {
   private readonly wired = new Map<string, Set<string>>(); // npc -> bond and belief lines the room has
   private readonly raised = new Set<string>(); // grudges the NPC already brought up to the person's face
   private readonly duties = new Map<string, Duty>(); // "npc:day:phase" -> what it chose for that shift
+  readonly market: Market = newMarket();
+  pocket: Pocket | null = null;
+  private readonly offers = new Map<string, { o: Offer; price: number }>(); // "npc:player" -> the counter it made
+  private readonly purses = new Map<string, string>(); // npc -> purse line the room has
 
   constructor(
     private readonly sched: MindScheduler,
@@ -95,7 +110,7 @@ export class NpcVillage {
   ) {
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
     this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
-    this.env = { spots, canWalk, route, rng, bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
+    this.env = { spots, canWalk, route, rng, bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0) + (act === "farm" ? this.farmPull(a.id) : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
     for (const n of NPCS) this.setHost(n, null);
   }
 
@@ -144,6 +159,11 @@ export class NpcVillage {
         mem.promises = [...mem.promises.filter((o) => o.id !== c.id), c]; // the latest state of each promise
         continue;
       }
+      const purse = parsePurseLine(l);
+      if (purse) {
+        mem.purse = purse;
+        continue;
+      }
       const bond = parseBondLine(l, day);
       if (bond) {
         mem.bonds[bond.who] = bond.bond; // the latest line wins
@@ -164,12 +184,15 @@ export class NpcVillage {
       mind.mem.promises = mem.promises;
       mind.mem.bonds = mem.bonds;
       mind.mem.beliefs = mem.beliefs;
+      if (mem.purse) mind.mem.purse = mem.purse;
       this.sent.set(npc, mind.mem.log.at(-1) ?? null);
     } else this.mems.set(npc, mem);
   }
 
   // Another machine's line about an NPC: its host started an activity (replayed here) or spoke.
   hear(l: MindLine): void {
+    const trade = l.trade ? parseTradeLine(l.trade) : null;
+    if (trade) record(this.market, trade);
     const npc = l.who as Npc;
     if (!NPCS.includes(npc) || this.hosting(npc)) return;
     if (l.act) this.remote.set(npc, l.act);
@@ -302,7 +325,7 @@ export class NpcVillage {
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
     if (!m || !this.hosting(npc)) return null;
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
-    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? await this.traded(npc, m, player, line, to) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     if (!this.hasModel() && !answer) return null;
     const ans = answer ? { value: answer, source: "rules" }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
@@ -371,6 +394,148 @@ export class NpcVillage {
     if (tone === "sorry" ? bondOf(mem, player) : tone) bump(this.v.rel, npc, player, feel(mem, p, player, tone!, day, tone === "sorry" ? `${player} said sorry` : `${player} was ${tone} to me`));
     const belief = beliefFrom(line);
     if (belief) addBelief(mem, { about: player, text: belief, source: "", conf: 0.8, day });
+  }
+
+  // Far enough gone, the NPC does not chat at all. "Sorry" still gets through (and has just moved the bond).
+  private coldShoulder(m: Mind, player: string, line: string): string | null {
+    const b = bondOf(m.mem, player);
+    if (toneOf(line) === "sorry" || !refusesChat(m.persona, b)) return null;
+    const g = gameTime(this.v.t);
+    m.mem.why = `${b!.why.at(-1)?.text ?? "bad blood"} > ${feelWord(b!)} ${player} > won't talk`;
+    remember(m.mem, g.day, clockLabel(g.hour), `would not talk to ${player}`, 4);
+    return `I have nothing to say to you, ${player}.`;
+  }
+
+  // A villager's purse: it travels with the mind, and every villager starts with a little.
+  purseOf(npc: string): Purse {
+    const m = this.memOf(npc as Npc);
+    return (m.purse ??= newPurse());
+  }
+
+  board(): BoardRow[] {
+    openDay(this.market, gameTime(this.v.t).day, VILLAGERS);
+    return boardRows(this.market);
+  }
+
+  // Goods shipped through the crate reach the same market as everyone else's.
+  shipped(who: string, sold: readonly { good: Good; qty: number; price: number }[]): void {
+    for (const s of sold) this.trade({ who, ...s });
+  }
+
+  private trade(t: Trade, by: Npc = NPCS[0]!): void {
+    record(this.market, t);
+    this.out.line({ who: by, mem: tradeLine(t) });
+  }
+
+  // The player offers a gift or a deal in their own words. The sim settles what is possible; with a model, the NPC
+  // chooses among what is left. Returns the answer, or null if the line is no offer.
+  private async traded(npc: Npc, m: Mind, player: string, line: string, to?: string): Promise<string | null> {
+    const key = `${npc}:${player}`;
+    const pending = this.offers.get(key);
+    if (pending) {
+      this.offers.delete(key);
+      if (YES.test(line)) return this.closeDeal(npc, m, player, pending.o, pending.price);
+    }
+    const o = parseOffer(line);
+    if (!o) return null;
+    const pocket = !to ? this.pocket : null;
+    if (!pocket) return `Bring it to me in person, ${player}.`;
+    const g = gameTime(this.v.t);
+    openDay(this.market, g.day, VILLAGERS);
+    const purse = this.purseOf(npc);
+    const bond = bondOf(m.mem, player);
+    const v = judge(m.persona, bond, purse, this.market, o, player, pocket.coins(), pocket.count(o.good));
+    if (v.answer === "refuse") {
+      m.mem.why = `${player} offered ${o.good} > ${v.why}`;
+      remember(m.mem, g.day, clockLabel(g.hour), `turned down ${player}'s ${o.kind} of ${o.good}`, 4);
+      return v.why;
+    }
+    if (o.kind === "gift") return this.takeGift(npc, m, player, o);
+    this.out.think?.(npc, `Is that a fair price?`);
+    const answer = v.fixed || !this.hasModel() ? v.answer
+      : (await this.sched.ask({ prio: PRIO.talk, timeoutMs: 15000, req: dealPrompt(m.persona, o, v, player, dealScore(m.persona, bond)), parse: parseDeal, fallback: () => v.answer })).value;
+    if (answer === "accept" && v.answer === "accept") return this.closeDeal(npc, m, player, o, v.price);
+    if (answer === "refuse") {
+      m.mem.why = `${v.why} > ${player} > refused the deal`;
+      return dealLine("refuse", o, v.price, player);
+    }
+    this.offers.set(key, { o, price: v.price });
+    m.mem.why = `${v.why} > offered ${v.price}c`;
+    return dealLine("counter", o, v.price, player);
+  }
+
+  private takeGift(npc: Npc, m: Mind, player: string, o: Offer): string {
+    const g = gameTime(this.v.t);
+    const text = `${player} gave me ${o.qty} ${o.good}`;
+    this.pocket!.change(0, o.good, -o.qty);
+    addGood(this.purseOf(npc), o.good, o.qty);
+    bump(this.v.rel, npc, player, feel(m.mem, m.persona, player, "gift", g.day, text));
+    remember(m.mem, g.day, clockLabel(g.hour), text, 6);
+    addBelief(m.mem, { about: player, text: `gives ${o.good}`, source: "", conf: 0.9, day: g.day });
+    m.mem.why = `${text} > warmer to ${player}`;
+    const line = giftLine(m.persona, o.good, this.market, player);
+    this.market.wanted[o.good] = this.market.wanted[o.good]?.filter((n) => n !== m.persona.name);
+    return line;
+  }
+
+  private closeDeal(npc: Npc, m: Mind, player: string, o: Offer, price: number): string {
+    const g = gameTime(this.v.t);
+    const purse = this.purseOf(npc);
+    const pocket = this.pocket;
+    const total = price * o.qty;
+    const sells = o.kind === "sell"; // the player sells to the NPC
+    if (!pocket || (sells ? pocket.count(o.good) < o.qty || purse.coins < total : pocket.coins() < total || (purse.goods[o.good] ?? 0) < o.qty)) return `That no longer works, ${player}.`;
+    pocket.change(sells ? total : -total, o.good, sells ? -o.qty : o.qty);
+    purse.coins += sells ? -total : total;
+    addGood(purse, o.good, sells ? o.qty : -o.qty);
+    this.trade({ who: sells ? player : m.persona.name, good: o.good, qty: sells ? o.qty : -o.qty, price }, npc);
+    if (sells) this.market.wanted[o.good] = this.market.wanted[o.good]?.filter((n) => n !== m.persona.name);
+    remember(m.mem, g.day, clockLabel(g.hour), `${sells ? "bought" : "sold"} ${o.qty} ${o.good} ${sells ? "from" : "to"} ${player} for ${total}c`, 5);
+    m.mem.why = `${o.good} ${price}c each > fair > deal with ${player}`;
+    return dealLine("accept", o, price, player);
+  }
+
+  private farmPull(npc: string): number {
+    const p = this.hub.minds.get(npc)?.mem.purse;
+    return !p || p.crop || p.coins < FARM_COINS ? FARM_PULL : 0;
+  }
+
+  // A hosted villager's work pays: goods from its job and garden, coins from the market at the end of the shift.
+  private earn(e: Extract<LifeEvent, { kind: "start" | "done" }>): void {
+    const m = this.hub.minds.get(e.who);
+    if (!m || !this.hosting(e.who as Npc)) return;
+    const g = gameTime(this.v.t);
+    openDay(this.market, g.day, VILLAGERS);
+    const purse = (m.mem.purse ??= newPurse());
+    const time = clockLabel(g.hour);
+    if (e.act === "farm" && e.kind === "start" && !purse.crop) {
+      const pick = bestCrop(this.market, purse.coins);
+      if (!pick) return;
+      plantCrop(purse, pick.good);
+      m.mem.why = pick.why;
+      remember(m.mem, g.day, time, `planted ${pick.good}, it sells well`);
+      this.out.think?.(e.who as Npc, `${pick.good[0]!.toUpperCase()}${pick.good.slice(1)} sells well. I'll plant some.`);
+    }
+    if (e.kind !== "done") return;
+    const good = JOB_GOOD[e.act];
+    if (good) {
+      addGood(purse, good, WORK_YIELD);
+      remember(m.mem, g.day, time, `got ${WORK_YIELD} ${good} from work`);
+    }
+    if (e.act === "farm" && purse.crop && ++purse.grown >= GROW_STEPS) {
+      addGood(purse, purse.crop, HARVEST_YIELD);
+      remember(m.mem, g.day, time, `harvested ${HARVEST_YIELD} ${purse.crop}`);
+      purse.crop = null;
+      purse.grown = 0;
+    }
+    // The stall closes: everyone on this machine sells to it.
+    if (e.act === "sell") for (const [id, o] of this.hub.minds) {
+      const p = (o.mem.purse ??= newPurse());
+      for (const t of sellStock(this.market, p, o.persona)) {
+        remember(o.mem, g.day, time, `sold ${t.qty} ${t.good} at the market for ${t.qty * t.price}c`, 4);
+        this.out.line({ who: id, mem: tradeLine(t) });
+      }
+    }
   }
 
   // Is this line an invitation? If so the NPC decides from who it is and how it feels about the player, and an
@@ -472,9 +637,19 @@ export class NpcVillage {
         if (party) party.started = true;
         a.state = "do";
         this.settlePromise(npc, m, c, "kept");
-        this.said(npc, /birthday/.test(c.occasion) ? `Happy birthday, ${c.from}!` : `Glad you came, ${c.from}!`);
+        this.said(npc, /birthday/.test(c.occasion) ? `Happy birthday, ${c.from}!${this.present(npc, c)}` : `Glad you came, ${c.from}!`);
       }
     }
+  }
+
+  // A birthday guest comes with something from its own stock, if it has anything and the player is on this screen.
+  private present(npc: Npc, c: Commitment): string {
+    const purse = this.purseOf(npc);
+    const good = (Object.keys(purse.goods) as Good[])[0];
+    if (!good || !this.pocket || (c.fromId !== "me" && c.fromId !== this.myId)) return "";
+    addGood(purse, good, -1);
+    this.pocket.change(0, good, 1);
+    return ` I brought you ${good}.`;
   }
 
   // The first meeting after a broken promise: the NPC says so to their face, once for each grudge.
@@ -502,12 +677,18 @@ export class NpcVillage {
     this.keepPromises();
     this.social();
     for (const e of ev) if (e.kind === "start" && this.hosting(e.who as Npc)) this.out.line({ who: e.who, act: e.act });
+    for (const e of ev) if (e.kind === "start" || e.kind === "done") this.earn(e);
     // New memories of the NPCs I host go to the room, so the next host remembers them.
     for (const [id, m] of this.hub.minds) {
       const last = this.sent.get(id) ?? null;
       const from = last ? m.mem.log.indexOf(last) + 1 : 0;
       for (const e of m.mem.log.slice(from)) this.out.line({ who: id, mem: `${e.time || clockLabel(gameTime(this.v.t).hour)} ${e.text}` });
       this.sent.set(id, m.mem.log.at(-1) ?? null);
+      const held = m.mem.purse && purseLine(m.mem.purse);
+      if (held && this.purses.get(id) !== held) {
+        this.purses.set(id, held);
+        this.out.line({ who: id, mem: held });
+      }
       const wired = this.wired.get(id) ?? new Set<string>();
       this.wired.set(id, wired);
       for (const l of [...Object.entries(m.mem.bonds).map(([who, b]) => bondLine(who, b)), ...m.mem.beliefs.map(beliefLine)]) {

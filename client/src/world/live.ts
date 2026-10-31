@@ -48,6 +48,7 @@ export interface MindLine {
   z?: number;
   emote?: Emote;
   invite?: { act: string; to?: string };
+  trade?: string; // a town board line (economy.ts)
 }
 export const MIND_SAY_MAX = 80;
 const MIND_GAP_MS = 3100; // the room's spoken-line gap per mind (3 s) plus a little slack
@@ -142,7 +143,9 @@ export function parseMind(o: Record<string, unknown>): MindLine | null {
   const inv = o.invite && typeof o.invite === "object" ? (o.invite as Record<string, unknown>) : null;
   const ia = inv && str(inv.act, 16);
   if (ia) line.invite = str(inv!.to, 16) ? { act: ia, to: str(inv!.to, 16)! } : { act: ia };
-  return line.act || line.say || line.emote || line.invite ? line : null;
+  const trade = str(o.trade, 80);
+  if (trade) line.trade = trade;
+  return line.act || line.say || line.emote || line.invite || line.trade ? line : null;
 }
 
 // Validates a server message and calls the matching handler. Unknown or malformed messages are ignored.

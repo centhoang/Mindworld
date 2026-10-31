@@ -4,6 +4,7 @@
 
 import type { Phase } from "../life/clock";
 import type { Belief, Bond } from "./bonds";
+import type { Purse } from "./economy";
 import type { Commitment } from "./promises";
 
 export const LOG_MAX = 30;
@@ -27,6 +28,7 @@ export interface MindMemory {
   bonds: Record<string, Bond>; // how it feels about each person, and why (bonds.ts)
   beliefs: Belief[]; // what it holds true about people
   why: string; // its last decision: memory > feeling > choice, shown in the inspector
+  purse?: Purse; // what it owns (economy.ts); villagers only
 }
 
 export function emptyMemory(): MindMemory {
@@ -83,5 +85,6 @@ export function parseMemory(raw: unknown): MindMemory {
   if (r.bonds && typeof r.bonds === "object") m.bonds = r.bonds;
   if (Array.isArray(r.beliefs)) m.beliefs = r.beliefs.filter((b) => b && typeof b.about === "string" && typeof b.text === "string");
   if (typeof r.why === "string") m.why = r.why;
+  if (r.purse && typeof r.purse.coins === "number") m.purse = r.purse;
   return m;
 }

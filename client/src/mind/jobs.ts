@@ -35,6 +35,9 @@ export const dealLimit = (p: Persona): number => has(p, "gentle", "patient") ? -
 
 export const refusesDeal = (p: Persona, b: Bond | undefined): boolean => !!b && (b.fondness <= dealLimit(p) || b.trust <= GRUDGE_TRUST);
 
+// Past even that, the villager will not talk at all, unless it is to say sorry or to ask why.
+export const refusesChat = (p: Persona, b: Bond | undefined): boolean => !!b && b.fondness <= dealLimit(p) - 15;
+
 export function refuseLine(b: Bond | undefined, who: string): string {
   const r = b && hurt(b);
   return `Not today, ${who}.${r ? ` Last time, ${toYou(r.text, who)}.` : ""}`;

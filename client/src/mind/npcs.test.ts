@@ -76,7 +76,7 @@ describe("NpcVillage", () => {
     nv.setHost("ama", "me");
     expect(nv.hub.minds.get("ama")!.mem.log[0]!.text).toBe("cooked soup for Pip");
     run(nv, 400);
-    const mems = lines.filter((l) => l.who === "ama" && l.mem);
+    const mems = lines.filter((l) => l.who === "ama" && l.mem && !/^(purse|trade)\|/.test(l.mem));
     expect(mems.length).toBeGreaterThan(0);
     expect(mems.every((l) => /^\d\d:\d\d /.test(l.mem!) && !l.mem!.includes("cooked soup"))).toBe(true);
     nv.setHost("ama", "other"); // moved away: the mind stops here

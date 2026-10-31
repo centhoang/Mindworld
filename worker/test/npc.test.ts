@@ -97,6 +97,19 @@ describe("room minds", () => {
     expect(NPCS.filter((n) => r.board.hostOf(n) === "d")).toHaveLength(2);
   });
 
+  it("town board trades reach everyone and stay out of the NPC's log; only the latest purse is kept", () => {
+    const r = new Room();
+    r.join("a", {}, 0);
+    r.join("b", {}, 0);
+    const out = send(r, "a", { t: "mind", who: "pip", mem: "trade|Pip|wood|2|5" })!;
+    expect(out.out.map((o) => (o.msg as { trade?: string }).trade)).toEqual(["trade|Pip|wood|2|5"]);
+    send(r, "a", { t: "mind", who: "pip", mem: "purse|15|||" });
+    send(r, "a", { t: "mind", who: "pip", mem: "08:00 woke up" });
+    send(r, "a", { t: "mind", who: "pip", mem: "purse|20|||" });
+    const log = r.board.log("pip");
+    expect(log).toEqual(["08:00 woke up", "purse|20|||"]);
+  });
+
   it("tells a newcomer who hosts which NPC and hands the new host the NPC's memory", () => {
     const r = new Room();
     const ja = r.join("a", {}, 0)!;

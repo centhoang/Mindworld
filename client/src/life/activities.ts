@@ -42,6 +42,7 @@ export const ACTIVITIES: readonly ActivityDef[] = [
   { id: "sell", label: "runs the market stall", who: "human", place: "stall", minutes: 120, min: 1, max: 1, fx: { social: 25, fun: 5 }, pose: "stand", jobOnly: true },
   { id: "chop", label: "chops wood", who: "human", place: "woods", minutes: 90, min: 1, max: 1, fx: { fun: 10, energy: -15 }, pose: "sweep", jobOnly: true },
   { id: "tend", label: "tends herbs", who: "human", place: "home", minutes: 90, min: 1, max: 1, fx: { fun: 15 }, pose: "stand", jobOnly: true },
+  { id: "farm", label: "works the garden", who: "human", place: "home", minutes: 60, min: 1, max: 1, fx: { fun: 12, energy: -5 }, pose: "squat", phases: ["morning", "noon", "evening"] },
   { id: "fish", label: "fishes", who: "human", place: "pond", minutes: 90, min: 1, max: 3, fx: { fun: 35, hunger: 10 }, pose: "fish", phases: ["morning", "noon", "evening"] },
   { id: "picnic", label: "has a picnic", who: "any", place: "picnic", minutes: 60, min: 2, max: 6, fx: { hunger: 40, social: 40, fun: 20 }, pose: "sit", phases: ["noon", "evening"] },
   { id: "soccer", label: "plays soccer", who: "any", place: "playground", minutes: 60, min: 2, max: 6, fx: { fun: 55, social: 30, energy: -25, hygiene: -10 }, pose: "kick", phases: ["morning", "noon", "evening"] },

@@ -109,7 +109,7 @@ export type ServerMsg =
   | { t: "talkNo"; with: string }
   | { t: "npcHost"; npc: Npc; host: string | null }
   | { t: "npcState"; npc: Npc; log: string[] }
-  | { t: "mind"; id: string; who: string; act?: string; say?: string; to?: string; emote?: Emote; invite?: { act: string; to?: string } }
+  | { t: "mind"; id: string; who: string; act?: string; say?: string; to?: string; emote?: Emote; invite?: { act: string; to?: string }; trade?: string }
   | { t: "ask"; npc: Npc; from: string; name: string; text: string; scene?: string }
   | { t: "askNo"; npc: Npc }
   | { t: "away"; away: PublicAway }
@@ -445,11 +445,12 @@ export class Room {
     if (o.mem !== undefined) {
       if (!npc) return this.strike(peer);
       const line = cleanMem(o.mem);
-      if (line) this.board.remember(npc, line);
+      if (line?.startsWith("trade|")) msg.trade = line; // the town board is public
+      else if (line) this.board.remember(npc, line);
     }
     if (npc) this.board.beat(peer.id, now);
     const { say, to, ...rest } = msg;
-    const others = rest.act || rest.emote || rest.invite ? rest : null; // what travels without the spoken line
+    const others = rest.act || rest.emote || rest.invite || rest.trade ? rest : null; // what travels without the spoken line
     if (!say) return { out: others ? [{ to: "others", msg: others }] : [], changed: true };
     return { out: this.hearers(peer, msg, others, o), changed: true };
   }

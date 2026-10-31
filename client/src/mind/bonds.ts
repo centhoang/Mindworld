@@ -5,7 +5,7 @@
 import type { MindMemory } from "./memory";
 import type { Persona } from "./persona";
 
-export type Beat = "kept" | "broken" | "kind" | "rude" | "invited" | "gossip" | "sorry";
+export type Beat = "kept" | "broken" | "kind" | "rude" | "invited" | "gossip" | "sorry" | "gift";
 
 export interface Reason {
   day: number;
@@ -40,6 +40,7 @@ const BEATS: Record<Beat, { fondness: number; trust: number; respect: number }> 
   invited: { fondness: 2, trust: 0, respect: 0 },
   gossip: { fondness: -4, trust: -8, respect: -2 },
   sorry: { fondness: 4, trust: 12, respect: 0 },
+  gift: { fondness: 6, trust: 2, respect: 0 },
 };
 
 const clamp = (n: number): number => Math.max(-100, Math.min(100, Math.round(n)));
@@ -82,7 +83,7 @@ export function feelWord(b: Bond): string {
 
 // The worst thing that stands between us, then the best: what a mind brings up when asked.
 export const hurt = (b: Bond): Reason | undefined => [...b.why].reverse().find((r) => r.beat === "broken" || r.beat === "rude" || r.beat === "gossip");
-const warmth = (b: Bond): Reason | undefined => [...b.why].reverse().find((r) => r.beat === "kept" || r.beat === "kind");
+const warmth = (b: Bond): Reason | undefined => [...b.why].reverse().find((r) => r.beat === "kept" || r.beat === "kind" || r.beat === "gift");
 
 // The prompt line for how this mind feels about someone. Empty until something happened, so old prompts stay as they were.
 export function bondText(m: MindMemory, who: string): string {

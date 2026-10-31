@@ -31,6 +31,7 @@ export interface Save {
   onboard?: OnboardSave; // first-run hatch + hints seen, goals card closed
   party?: PartyMon[]; // v2: befriended pets you own (with their looks)
   active?: number; // v2: who walks and fights: 0 = hatched pet, i = party[i - 1]
+  pack?: Partial<Record<string, number>>; // goods from villagers that are not crops: fish, wood, herbs
   farm?: Farm; // v2: the beds beside your A-frame, seeds and the harvest basket
   room?: Piece[]; // v2: furniture inside your A-frame
   groundSeed?: number; // v3: your ground's shape + theme (world/ground.ts), rolled once
@@ -60,6 +61,7 @@ export function load(): Save {
           const party = parseParty(raw.party);
           return party.length ? { party, active: parseActive(raw.active, party.length) } : {};
         })(),
+        ...(raw.pack && typeof raw.pack === "object" ? { pack: Object.fromEntries(Object.entries(raw.pack).filter(([, n]) => typeof n === "number" && n > 0)) } : {}),
         ...(raw.farm ? { farm: parseFarm(raw.farm) } : {}),
         ...(raw.room ? { room: parseRoom(raw.room) } : {}),
         ...(typeof raw.groundSeed === "number" && Number.isInteger(raw.groundSeed) && raw.groundSeed > 0 && raw.groundSeed < 2 ** 31 ? { groundSeed: raw.groundSeed } : {}),

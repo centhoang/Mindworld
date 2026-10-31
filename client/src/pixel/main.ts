@@ -35,7 +35,9 @@ import { askNpc, chatWhoFor } from "../game/npc-chat";
 import { askPets, traitOf } from "../game/pet-chat";
 import { Interior } from "./interior";
 import { defaultRoom } from "../game/room";
-import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water } from "../game/farm";
+import type { Good } from "../mind/economy";
+import type { Pocket } from "../mind/npcs";
+import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water, type CropId } from "../game/farm";
 import { drawMenu, type MenuRow } from "./menu";
 import { runSetup, storeSetup } from "./setup";
 import { TeachScreen } from "./teach";
@@ -266,6 +268,22 @@ function petChatter(dt: number): void {
   });
 }
 
+// The town board: read only.
+let board: { cursor: number } | null = null;
+
+// What a villager sees of me in a deal: coins, the harvest basket for crops, the pack for the rest.
+const isCrop = (g: Good): g is CropId => (CROP_IDS as readonly string[]).includes(g);
+const pocket: Pocket = {
+  coins: () => state.coins ?? 0,
+  count: (g) => (isCrop(g) ? state.farm?.basket[g] : state.pack?.[g]) ?? 0,
+  change(coins, g, n) {
+    state.coins = addCoins(state.coins ?? 0, coins);
+    if (isCrop(g) && state.farm) state.farm = world.farm = { ...state.farm, basket: { ...state.farm.basket, [g]: Math.max(0, (state.farm.basket[g] ?? 0) + n) } };
+    else if (!isCrop(g)) state.pack = { ...state.pack, [g]: Math.max(0, (state.pack?.[g] ?? 0) + n) };
+    save(state);
+  },
+};
+
 // The shipping crate inside (and the market stall outside): ship the basket for coins, or buy seeds.
 let crate: { cursor: number } | null = null;
 const crateRows = (): MenuRow[] => {
@@ -286,7 +304,9 @@ function crateKey(k: string): void {
   if (k !== "enter" && k !== " " && k !== "z" && k !== "e") return;
   const f = state.farm!;
   if (c.cursor === 0) {
+    const shipped = CROP_IDS.filter((g) => f.basket[g]).map((g) => ({ good: g as Good, qty: f.basket[g]!, price: CROPS[g].sell }));
     const r = sellAll(f, state.coins ?? 0);
+    world.npcs?.shipped(liveName(myGenes()), shipped);
     if (r.earned > 0) state.steps = { ...state.steps, shipped: true };
     state.farm = world.farm = r.farm;
     state.coins = r.coins;
@@ -386,7 +406,9 @@ window.addEventListener("keydown", (e) => {
     if (duelIn) inviteKey(k);
     else if (peerMenu) peerKey(k);
     else if (crate) crateKey(k);
-    else {
+    else if (board) {
+      if (["escape", "x", "e", "enter"].includes(k)) board = null;
+    } else {
       const em = !menu && live.status === "online" ? EMOTES[Number(k) - 1] : undefined;
       if (em) sendEmote(em);
       else menuKey(k);
@@ -431,6 +453,7 @@ function menuKey(k: string): void {
         interior.enter();
       } else if (bed >= 0) useBed(bed);
       else if (world.nearStall()) openStall();
+      else if (world.nearBoard() && world.npcs) board = { cursor: 0 };
       else if (world.npcNear()) openChat(world.npcNear()!);
       else if (world.messNear() !== null) {
         world.cleanMess(world.messNear()!);
@@ -845,7 +868,7 @@ function frame(now: number): void {
 function update(dt: number, t: number): void {
   if (teach.open) teach.draw(g, low.width, low.height, t);
   else if (mode === "world") {
-    const met = world.update(dt, menu || crate || peerMenu || duelIn ? new Set<string>() : keys);
+    const met = world.update(dt, menu || crate || board || peerMenu || duelIn ? new Set<string>() : keys);
     petChatter(dt);
     live.tick(performance.now(), world.me);
     if ((farmTickAt -= dt) <= 0) {
@@ -857,7 +880,8 @@ function update(dt: number, t: number): void {
       }
     }
     world.draw(g, low.width, low.height, t);
-    if (!menu && !crate && !peerMenu && !duelIn) drawGoals();
+    if (world.npcs) world.npcs.pocket = pocket;
+    if (!menu && !crate && !board && !peerMenu && !duelIn) drawGoals();
     if (met) void fight(met);
     if (menu) {
       const a = state.active ?? 0;
@@ -866,6 +890,7 @@ function update(dt: number, t: number): void {
     } else if (duelIn) drawMenu(g, low.width, low.height, `${duelIn.name} wants a duel!`, [{ label: "Accept" }, { label: "Decline" }], duelIn.cursor, t, "Your pet fights with its memo rules");
     else if (peerMenu) drawMenu(g, low.width, low.height, world.peers.get(peerMenu.id)?.name ?? "Player", PEER_ROWS.map((label) => ({ label })), peerMenu.cursor, t, "Enter: pick  Esc: close  1-4: emotes");
     else if (crate) drawMenu(g, low.width, low.height, `Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
+    else if (board) drawMenu(g, low.width, low.height, "Town board", world.npcs?.board() ?? [], -1, t, "Prices move with real trades. Esc: close");
     else if (toast) {
       toast.t -= dt;
       drawDialogue(g, low.width, low.height, toast.text, toast.who);

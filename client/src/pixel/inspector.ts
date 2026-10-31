@@ -2,6 +2,7 @@
 // its friends are, and which model is thinking for it on which machine. This is where players (and
 // judges) see that the village is run by minds, not scripts.
 
+import { purseText } from "../mind/economy";
 import { ACTIVITY } from "../life/activities";
 import { feelWord } from "../mind/bonds";
 import { PLAN_PHASES } from "../mind/brain";
@@ -33,6 +34,7 @@ export function drawInspector(g: Ctx, m: Mind, a: Agent, rel: Map<string, number
   add(`PLAN: ${PLAN_PHASES.map((ph) => `${SHORT[ph]} ${m.mem.plan[ph]?.[0] ?? "-"}`).join("  ")}`);
   const promised = m.mem.promises.filter((c) => c.state === "open").slice(0, 2);
   if (promised.length) add(`PROMISED: ${promised.map((c) => `${c.from}, ${c.occasion || c.act}, day ${c.day + 1} ${c.phase}`).join("; ")}`);
+  if (m.mem.purse) add(`HAS: ${purseText(m.mem.purse)}`);
   const fr = friends(rel, p.id, 1).slice(0, 3);
   add(`FRIENDS: ${fr.length ? fr.map((f) => `${names(f.id)} ${f.affinity}`).join(", ") : "none yet"}`);
   const bond = Object.entries(m.mem.bonds).sort(([, x], [, y]) => Math.abs(y.fondness) + Math.abs(y.trust) - Math.abs(x.fondness) - Math.abs(x.trust))[0];

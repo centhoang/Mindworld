@@ -617,6 +617,11 @@ export class Overworld {
     return best;
   }
 
+  nearBoard(): boolean {
+    const b = this.noticeBoard;
+    return !!b && Math.abs(this.player.x - b.x) < 2 && this.player.z > b.z - 1 && this.player.z < b.z + 2.2;
+  }
+
   nearStall(): boolean {
     const st = this.stall; // anywhere along its 3-tile front
     return !!st && Math.abs(this.player.x - st.x) < 2.2 && this.player.z > st.z - 0.5 && this.player.z < st.z + 2.6;
@@ -1010,7 +1015,7 @@ export class Overworld {
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
-        : this.nearStall() ? "E: MARKET" : this.npcNear() ? "E: TALK" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
+        : this.nearStall() ? "E: MARKET" : this.nearBoard() ? "E: BOARD" : this.npcNear() ? "E: TALK" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
     if (hint) {
       const w = hint.length * GLYPH + 12;
       drawFrame(g, Math.round(px - w / 2), py - 44, w, 16);
