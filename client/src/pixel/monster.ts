@@ -5,6 +5,7 @@
 
 import type { PetLook } from "../game/genes";
 import { PAL } from "./art";
+import { composePet, petRamp, preloadPet } from "./pet-parts";
 
 export type Facing = "front" | "back";
 
@@ -24,26 +25,35 @@ export const BUILDS: Record<string, Build> = {
   bully: { w: 0.7, h: 0.56, head: 0.22 },
 };
 
-// Palette ramps (shadow, base, light) from docs/STYLE.md; the hue gene picks one, so every monster stays on
-// the 28-color palette while hues still read as different bodies.
-const RAMPS: [string, string, string][] = [
-  ["#B88163", "#D8A67A", "#EBC796"], // fur
-  ["#BC756B", "#E69B86", "#F4DEC6"], // coral
-  ["#C69A67", "#EDC76A", "#F7E5BA"], // honey
-  ["#D8A67A", "#EBC796", "#F7E5BA"], // cream fur
-  ["#78A05D", "#9FC66A", "#BFDA82"], // leaf
-  ["#537D59", "#78A05D", "#9FC66A"], // moss
-  ["#43847C", "#519F95", "#6CBAB2"], // teal
-  ["#519F95", "#6CBAB2", "#9ED7CA"], // pool
-  ["#7A8F89", "#9CAC9B", "#BFC7AF"], // stone
-  ["#795849", "#A57954", "#C69A67"], // bark
-];
-
-function ramp(h: number): [string, string, string] {
-  return RAMPS[Math.floor((((h % 1) + 1) % 1) * RAMPS.length) % RAMPS.length]!;
-}
+const buildNames = new Map(Object.entries(BUILDS).map(([name, build]) => [build, name]));
+const sprites = new Map<string, HTMLCanvasElement>();
 
 export function drawMonster(look: PetLook, size: number, facing: Facing, build: Build = BUILDS.pal!): HTMLCanvasElement {
+  const buildName = buildNames.get(build);
+  // Unknown/custom proportions still use the procedural renderer.
+  if (!buildName) return drawProcedural(look, size, facing, build);
+  const key = JSON.stringify([look.hue, look.accentHue, look.ears, look.tail, look.horns, look.pattern, look.size, size, facing, buildName]);
+  const cached = sprites.get(key);
+  if (cached) return cached;
+  const snapshot = { ...look };
+  const composed = composePet(snapshot, size, facing, buildName);
+  const canvas = composed ?? drawProcedural(snapshot, size, facing, build);
+  if (sprites.size >= 256) sprites.delete(sprites.keys().next().value!);
+  sprites.set(key, canvas);
+  if (!composed) void preloadPet(snapshot, size, facing, buildName).then(ready => {
+    if (!ready) return;
+    const art = composePet(snapshot, size, facing, buildName);
+    if (!art) return;
+    // Overworld, party, peers, portraits and battles retain this canvas. Upgrade
+    // it in place, including after cache eviction; no scene can keep stale art.
+    const g = canvas.getContext("2d")!;
+    g.clearRect(0, 0, size, size);
+    g.drawImage(art, 0, 0);
+  });
+  return canvas;
+}
+
+function drawProcedural(look: PetLook, size: number, facing: Facing, build: Build): HTMLCanvasElement {
   const n = size;
   const m = new Uint8Array(n * n);
   const set = (x: number, y: number, v: L) => {
@@ -144,8 +154,8 @@ export function drawMonster(look: PetLook, size: number, facing: Facing, build: 
   }
 
   // Paint.
-  const [d, b, l] = ramp(look.hue);
-  const [ad, ab] = ramp(look.accentHue);
+  const [, d, b, l] = petRamp(look.hue);
+  const [, ad, ab] = petRamp(look.accentHue);
   const c = document.createElement("canvas");
   c.width = n;
   c.height = n;
