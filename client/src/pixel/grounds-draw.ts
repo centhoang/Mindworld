@@ -1,12 +1,13 @@
 // Props on in-between grounds (playground, picnic hill, fishing pond), drawn at an activity spot's foot.
 // Uses the ImageGen sheet `props-grounds` when it is loaded, else small code-drawn stand-ins in the palette.
 
-import { hasArt, img, PAL, themed } from "./art";
+import { hasArt, img, PAL } from "./art";
 import { drawBall } from "./life-draw";
 import { GROUND_PROPS } from "./grounds-props";
 import type { DecorKind } from "./grounds-decor";
 import { AWAY } from "./tiles";
 import { generatedSprites } from "./generated-sprites";
+import { stand, stampSize } from "./sunny";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -23,6 +24,8 @@ export function drawSpotProp(g: Ctx, name: string, x: number, y: number, t: numb
     generatedSprites.draw(g, name === "goal" ? "soccer-goal" : "soccer-ball", x, y - (name === "ball" ? Math.round(Math.abs(Math.sin(t * 3)) * 3) : 0), () => drawOldSpotProp(g, name, x, y, t));
     return;
   }
+  if (name === "bench") return stand(g, "bench", x, y);
+  if (name === "sign") return stand(g, "sign", x, y);
   drawOldSpotProp(g, name, x, y, t);
 }
 
@@ -77,6 +80,8 @@ function drawOldSpotProp(g: Ctx, name: string, x: number, y: number, t: number):
   }
 }
 
+const DECOR_ART: Record<Exclude<DecorKind, "lights" | "fence">, string> = { bush: "bush", "bush-big": "bush-berry", rock: "rock-small", "rock-big": "rock-big", stump: "stump", jar: "jar" };
+
 // Outdoor decor (grounds-decor.ts) at its foot, recoloured with the ground's theme like the trees. Party
 // lights hang on two posts and glow after dark. `tiles` = how many tiles wide, `look` = the tile's look
 // bits (theme | AWAY).
@@ -93,16 +98,9 @@ export function drawDecor(g: Ctx, kind: DecorKind, x: number, y: number, tiles: 
       g.globalAlpha *= 0.25;
       for (let k = -18; k <= 18; k += 9) r(g, x + k - 2, y - 24, 5, 5, PAL.flowerY);
     }
-  } else if (hasArt("props-grounds")) {
-    const s = GROUND_PROPS[kind];
-    const n = kind === "fence" ? tiles : 1; // a fence = the piece repeated across its tiles (16 px each)
-    for (let k = 0; k < n; k++) g.drawImage(themed("props-grounds", look), s.x, s.y, s.w, s.h, Math.round(x - (s.w * n) / 2 + k * s.w), Math.round(y - s.h), s.w, s.h);
-  } else {
-    const big = kind.endsWith("-big") ? 6 : 0;
-    const [c, d] = kind.startsWith("rock") ? [PAL.stone, PAL.stoneD] : kind === "fence" ? [PAL.wood, PAL.woodD] : [PAL.grassS, PAL.grassD];
-    const half = kind === "fence" ? tiles * 8 : 6 + big;
-    r(g, x - half, y - 9, half * 2, 8, c);
-    r(g, x - half, y - 2, half * 2, 2, d);
-  }
+  } else if (kind === "fence") {
+    const w = stampSize("fence-a")[0];
+    for (let k = 0; k < Math.max(1, Math.round((tiles * 16) / w)); k++) stand(g, "fence-a", x + k * w, y);
+  } else stand(g, DECOR_ART[kind], x, y);
   g.globalAlpha = 1;
 }

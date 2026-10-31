@@ -5,7 +5,7 @@ import { parseGenes, petLook, randomGenes } from "../game/genes";
 import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
 import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
 import { EMOTES, isNpc, LiveLink, liveName, NPCS, roomUrl, SAY_MAX, type Emote, type LivePeer, type Npc } from "../world/live";
-import { worldDay, type GroundOwner } from "../world/layout";
+import { SLOT_COUNT, worldDay, type GroundOwner } from "../world/layout";
 import { newGroundSeed } from "../world/ground";
 import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
 import { addCoins, coinsFor } from "../game/shop";
@@ -20,10 +20,12 @@ import { DEFAULT_PET, type Intent, type Outcome } from "../sim/types";
 import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
 import { BUILDS, drawMonster } from "./monster";
-import { Overworld, type Wild } from "./overworld";
+import { NAME_MAX, Overworld, type Wild } from "./overworld";
 import { drawDialogue, drawFrame, drawText } from "./text";
+import { humanLook } from "./humans";
 import { PIXEL_HINTS, pixelGoals } from "../game/onboard";
 import { loadArt } from "./art";
+import { loadSunny } from "./sunny";
 import { Babbler } from "../game/babble";
 import { voiceFor, type Speaker } from "../game/chatter";
 import { Instinct } from "../game/instinct";
@@ -145,8 +147,9 @@ const interior = new Interior({
   },
   petSprite: () => world.petSprite,
   residents: () => world.residentSprites(),
+  look: () => world.myLook,
   useCrate: () => {
-    const no = world.npcs?.shipRefused(liveName(myGenes()));
+    const no = world.npcs?.shipRefused(myName());
     if (no) toast = { text: no, t: 4 };
     else crate = { cursor: 0 };
   },
@@ -161,11 +164,11 @@ const interior = new Interior({
 const chatForm = document.getElementById("chat") as HTMLFormElement;
 const chatInput = chatForm.querySelector("input")!;
 interface PeerChat { peer: string }
-type ChatTarget = Wild | Npc | "room" | PeerChat;
+type ChatTarget = Wild | Npc | "room" | "name" | PeerChat;
 let chatWith: ChatTarget | null = null;
 const isPeerChat = (w: ChatTarget | null): w is PeerChat => typeof w === "object" && w !== null && "peer" in w;
-const chatKey = (w: ChatTarget) => (w === "room" || isPeerChat(w) ? "me" : typeof w === "string" ? `n:${w}` : `w${w.id}`);
-const talkTarget = (w: ChatTarget | null) => (isPeerChat(w) ? w.peer : typeof w === "string" && w !== "room" ? w : null);
+const chatKey = (w: ChatTarget) => (w === "room" || w === "name" || isPeerChat(w) ? "me" : typeof w === "string" ? `n:${w}` : `w${w.id}`);
+const talkTarget = (w: ChatTarget | null) => (isPeerChat(w) ? w.peer : typeof w === "string" && w !== "room" && w !== "name" ? (w as Npc) : null);
 // Private chats: others see a talking status and can't start a chat with those in one (the room enforces it).
 const talks = new Map<string, string>(); // who opened the chat -> who it is with
 const talkKey = (who: string) => (isNpc(who) ? `n:${who}` : `p:${who}`);
@@ -185,8 +188,11 @@ function openChat(w: ChatTarget): void {
   if (typeof w !== "string" && !isPeerChat(w)) w.wait = 999;
   keys.clear();
   chatForm.hidden = false;
-  chatInput.value = "";
+  chatInput.value = w === "name" ? myName() : "";
+  chatInput.maxLength = w === "name" ? NAME_MAX : 140;
+  chatInput.placeholder = w === "name" ? "Your name..." : "Say something...";
   chatInput.focus();
+  if (w === "name") return void chatInput.select();
   if (w !== "room" && !isPeerChat(w)) world.say(chatKey(w), typeof w === "string" ? GREET[w] : "?", 3);
   if (typeof w === "string" && w !== "room") world.npcs?.hold(w);
 }
@@ -201,6 +207,16 @@ chatForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const w = chatWith;
   const line = chatInput.value.trim();
+  if (w === "name") {
+    const name = line.replace(/[^\p{L}\p{N} _'-]+/gu, "").slice(0, NAME_MAX).trim();
+    if (name) state.name = name;
+    else delete state.name;
+    save(state);
+    closeChat();
+    showName();
+    live.rejoin();
+    return;
+  }
   if (w === "room") {
     if (line && live.say(line.slice(0, SAY_MAX))) world.say("me", line.slice(0, SAY_MAX), 5);
     chatInput.value = "";
@@ -211,14 +227,14 @@ chatForm.addEventListener("submit", (e) => {
     chatInput.value = "";
     return;
   }
-  const who = typeof w === "string" ? w : w && chatWhoFor("wild", w.arch);
+  const who = typeof w === "string" ? (w as Npc) : w && chatWhoFor("wild", w.arch);
   if (!w || !who || !line) return;
   chatInput.value = "";
   world.say(chatKey(w), "...", 20);
-  void (typeof w === "string" ? villagerAnswer(w, line) : askNpc(who, line, "", undefined, undefined, world.wildScene(w))).then((r) => {
+  void (typeof w === "string" ? villagerAnswer(w as Npc, line) : askNpc(who, line, "", undefined, undefined, world.wildScene(w))).then((r) => {
     world.say(chatKey(w), r.text, 6);
     if (!state.muted) {
-      const v = voiceFor(typeof w === "string" ? w : w.arch);
+      const v = voiceFor(typeof w === "string" ? (w as Npc) : w.arch);
       babbler.say(r.text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: "triangle" });
     }
   });
@@ -232,7 +248,7 @@ const ASK_WAIT_MS = 15_000;
 const asking = new Map<Npc, (text: string | null) => void>();
 async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string }> {
   const scene = world.sceneWithMe(npc); // what we both see here, so "what's by the pond?" gets a real answer
-  const here = await world.npcs?.reply(npc, liveName(myGenes()), line, undefined, scene);
+  const here = await world.npcs?.reply(npc, myName(), line, undefined, scene);
   if (here) return here;
   const hostedHere = !!world.npcs?.hosting(npc);
   if (!hostedHere && live.status === "online" && npcHosts.get(npc) && !asking.has(npc) && live.ask(npc, line, scene)) {
@@ -306,7 +322,7 @@ function crateKey(k: string): void {
   if (c.cursor === 0) {
     const shipped = CROP_IDS.filter((g) => f.basket[g]).map((g) => ({ good: g as Good, qty: f.basket[g]!, price: CROPS[g].sell }));
     const r = sellAll(f, state.coins ?? 0);
-    world.npcs?.shipped(liveName(myGenes()), shipped);
+    world.npcs?.shipped(myName(), shipped);
     if (r.earned > 0) state.steps = { ...state.steps, shipped: true };
     state.farm = world.farm = r.farm;
     state.coins = r.coins;
@@ -319,7 +335,7 @@ function crateKey(k: string): void {
   } else crate = null;
   save(state);
 }
-let toast: { text: string; who?: string; t: number } | null = { text: "WASD: walk. E: use/talk. T: teach. P: pets. B: brain. G: goals. M: mute. C: CRT.", who: "Hint", t: 7 };
+let toast: { text: string; who?: string; t: number } | null = { text: "WASD: walk. Shift: run. E: use/talk. T: teach. P: pets. B: brain. N: name. M: mute.", who: "Hint", t: 7 };
 // First visit: the hatch line, then the control hints one after another (each 6 s, Esc skips), once.
 const hintQueue: { text: string; who?: string; t: number }[] = [];
 if (!state.onboard?.seen) {
@@ -334,9 +350,29 @@ function nextToast(): void {
   }
 }
 
+// The small buttons (bottom left) open and close every panel but the clock; remembered in the save.
+const hidden = (name: string) => !!state.hide?.[name];
+function applyUi(): void {
+  for (const b of document.querySelectorAll<HTMLButtonElement>("#ui [data-ui]")) b.classList.toggle("off", hidden(b.dataset.ui!));
+  world.ui = { names: !hidden("names"), map: !hidden("map") };
+}
+document.getElementById("ui")!.addEventListener("click", (e) => {
+  const b = (e.target as HTMLElement).closest("button");
+  if (!b) return;
+  b.blur();
+  if (b.dataset.ui === "rename") return void (mode === "world" && !chatWith && openChat("name"));
+  if (b.dataset.dev) return fakeIsle(b.dataset.dev === "add");
+  const name = b.dataset.ui!;
+  state.hide = { ...state.hide, [name]: !hidden(name) };
+  if (name === "goals") state.onboard = { ...state.onboard, goalsHidden: false };
+  save(state);
+  applyUi();
+});
+applyUi();
+
 // The goals card (top left, G hides it): what a first visit should try. Gone once all four are done.
 function drawGoals(): void {
-  if (state.onboard?.goalsHidden || world.inspect) return;
+  if (hidden("goals") || state.onboard?.goalsHidden || world.inspect) return;
   const list = pixelGoals({ taught: !!state.steps?.proved, party: (state.party ?? []).length, shipped: !!state.steps?.shipped, boss: !!state.steps?.boss });
   if (list.every((x) => x.done)) return;
   const w = 150;
@@ -346,13 +382,7 @@ function drawGoals(): void {
 }
 
 const CRT_KEY = "mw.crt";
-let crt = (() => {
-  try {
-    return localStorage.getItem(CRT_KEY) !== "0";
-  } catch {
-    return true;
-  }
-})();
+let crt = false; // off for now: the pack's clean pixels are the look we are judging
 const crtBtn = document.getElementById("crt") as HTMLButtonElement;
 function setCrt(on: boolean): void {
   crt = on;
@@ -387,7 +417,6 @@ window.addEventListener("keydown", (e) => {
     if (k === "escape") closeChat();
     return; // typing in the chat box
   }
-  if (k === "c" && !e.repeat) setCrt(!crt);
   if (k === "b" && !e.repeat && mode === "world" && !menu) void switchBrain();
   if (k === "i" && !e.repeat && mode === "world" && !menu && !crate) world.toggleInspect();
   if (k === "g" && !e.repeat && mode === "world" && !chatWith) {
@@ -395,6 +424,10 @@ window.addEventListener("keydown", (e) => {
     save(state);
   }
   if (k === "escape" && mode === "world" && toast && !menu && !crate) nextToast();
+  if (k === "n" && !e.repeat && mode === "world" && !menu && !crate && !board && !peerMenu && !duelIn) {
+    keys.clear();
+    return void openChat("name");
+  }
   if (k === "m" && !e.repeat) {
     state.muted = !state.muted;
     save(state);
@@ -435,7 +468,7 @@ resize();
 
 // The stall is a person: closed outside the keeper's hours, and the keeper may refuse you (then you can talk it out).
 function openStall(): void {
-  const deal = world.npcs?.dealWith(liveName(myGenes()));
+  const deal = world.npcs?.dealWith(myName());
   if (!deal || deal.ok) crate = { cursor: 0 };
   else if (deal.refused) openChat(deal.npc);
   else world.say("me", deal.text, 4);
@@ -559,6 +592,9 @@ function coolFoe(foe: Wild | "boss" | "ghost"): void {
 // Room chat goes through the same Say box when nobody is near. Others see (and duel) your active pet.
 // Your own other tabs (same save, so the same pet) are left out of the world.
 const myGenes = () => activeMember().genes;
+function myName(): string {
+  return state.name || liveName(myGenes());
+}
 const sameSave = (g: Genes) => JSON.stringify(g) === JSON.stringify(myGenes());
 const addPeer = (p: LivePeer) => {
   if (!sameSave(p.genes)) world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz);
@@ -569,11 +605,24 @@ const addPeer = (p: LivePeer) => {
 const grounds = new Map<string, GroundOwner>(); // live id -> ground
 const aways = new Map<number, { g: GroundOwner; until: number }>(); // slot -> ghost ground
 let mySlot = 0;
+// Testing: pop in a stand-in player's island (the buttons show on localhost or with ?dev).
+const fakes: GroundOwner[] = [];
+function fakeIsle(add: boolean): void {
+  if (!add) fakes.pop();
+  else {
+    const used = new Set([mySlot, ...[...grounds.values()].map((o) => o.slot), ...aways.keys(), ...fakes.map((o) => o.slot)]);
+    const slot = Array.from({ length: SLOT_COUNT }, (_, n) => n).find((n) => !used.has(n));
+    if (slot !== undefined) fakes.push({ id: `fake${slot}`, name: `Test ${slot}`, seed: slot * 7919 + 13, slot });
+  }
+  relayoutGrounds();
+}
+if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || new URLSearchParams(location.search).has("dev"))
+  for (const b of document.querySelectorAll<HTMLButtonElement>("#ui [data-dev]")) b.hidden = false;
 const ROOM_SEED = [...roomUrl(location)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
 const relayoutGrounds = () => {
   const now = Date.now();
   for (const [slot, a] of aways) if (a.until <= now) aways.delete(slot);
-  world.relayout({ me: { seed: state.groundSeed!, slot: mySlot }, others: [...grounds.values(), ...[...aways.values()].map((a) => a.g)], roomSeed: ROOM_SEED, day: worldDay(now) });
+  world.relayout({ me: { seed: state.groundSeed!, slot: mySlot }, others: [...grounds.values(), ...[...aways.values()].map((a) => a.g), ...fakes], roomSeed: ROOM_SEED, day: worldDay(now) });
 };
 const trackGround = (p: LivePeer) => {
   if (p.corner === null || sameSave(p.genes)) return;
@@ -584,13 +633,17 @@ setInterval(() => {
   const due = [...aways.values()].some((a) => a.until <= Date.now());
   if (due || worldDay() !== world.day) relayoutGrounds();
 }, 5000);
-world.myName = liveName(myGenes());
+const showName = () => {
+  world.myName = myName();
+  world.myLook = humanLook(liveName(myGenes()));
+};
+showName();
 const npcHosts = new Map<Npc, string | null>(); // who runs each NPC's mind (me: it runs in this tab)
 function setNpcHost(npc: Npc, host: string | null): void {
   npcHosts.set(npc, host);
   world.npcs?.setHost(npc, host);
 }
-const live = new LiveLink(roomUrl(location), () => ({ name: liveName(myGenes()), genes: myGenes(), groundSeed: state.groundSeed, ...world.me }), {
+const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: state.groundSeed, ...world.me }), {
   welcome: (id, corner, peers, awayList, npcs = {}, open = []) => {
     talks.clear();
     for (const [a, b] of open) talks.set(a, b);
@@ -669,7 +722,7 @@ setInterval(() => {
   if (live.status === "online") live.cap(brain ? mindSched.tps(12) : 0, "gpu" in navigator);
 }, 10_000);
 onPetChange = () => {
-  world.myName = liveName(myGenes());
+  showName();
   live.rejoin();
 };
 
@@ -893,7 +946,7 @@ function update(dt: number, t: number): void {
     else if (board) drawMenu(g, low.width, low.height, "Town board", world.npcs?.board() ?? [], -1, t, "Prices move with real trades. Esc: close");
     else if (toast) {
       toast.t -= dt;
-      drawDialogue(g, low.width, low.height, toast.text, toast.who);
+      if (!hidden("hints")) drawDialogue(g, low.width, low.height, toast.text, toast.who);
       if (toast.t <= 0) nextToast();
     }
   } else if (mode === "home") {
@@ -913,7 +966,7 @@ const setup = runSetup({
   ready: () => (instinct.voice = webBrain),
   background: () => void switchBrain(),
 });
-void Promise.all([loadArt(), setup]).then(() => requestAnimationFrame(frame));
+void Promise.all([loadArt(), loadSunny(), setup]).then(() => requestAnimationFrame(frame));
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
-(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain };
+(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain, fakeIsle };

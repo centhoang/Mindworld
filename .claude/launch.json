@@ -78,6 +78,24 @@
         "API_PROXY": "http://127.0.0.1:8788"
       },
       "port": 5180
+    },
+    {
+      "name": "client-dev-room",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "client",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5181",
+        "--strictPort"
+      ],
+      "env": {
+        "API_PROXY": "http://127.0.0.1:8799"
+      },
+      "port": 5181
     }
   ]
 }

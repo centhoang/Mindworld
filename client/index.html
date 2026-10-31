@@ -13,6 +13,11 @@
       #crt { position: fixed; right: 10px; bottom: 10px; font: 10px "Press Start 2P", monospace; color: #f7dfc8; background: #45301f;
         border: 2px solid #c58757; padding: 6px 8px; cursor: pointer; opacity: 0.8; }
       #crt:hover { opacity: 1; }
+      #crt[hidden] { display: none; }
+      #ui { position: fixed; left: 8px; bottom: 8px; display: flex; gap: 4px; }
+      #ui button { font: 8px "Press Start 2P", monospace; color: #FFF3D8; background: #A57954; border: 2px solid #795849; padding: 4px 5px; cursor: pointer; }
+      #ui button[hidden] { display: none; }
+      #ui button.off { opacity: 0.55; }
       #teach { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 760px); display: flex; gap: 6px; flex-wrap: wrap;
         font: 11px "Press Start 2P", monospace; }
       #teach[hidden], #chat[hidden] { display: none; }
@@ -50,7 +55,16 @@
       <button type="submit">Say</button>
       <button type="button" data-act="close">Bye</button>
     </form>
-    <button id="crt" type="button">CRT on</button>
+    <button id="crt" type="button" hidden>CRT on</button>
+    <nav id="ui">
+      <button type="button" data-ui="goals">Goals</button>
+      <button type="button" data-ui="map">Map</button>
+      <button type="button" data-ui="names">Names</button>
+      <button type="button" data-ui="hints">Hints</button>
+      <button type="button" data-ui="rename">Rename</button>
+      <button type="button" data-dev="add" hidden>+Isle</button>
+      <button type="button" data-dev="drop" hidden>-Isle</button>
+    </nav>
     <div id="setup" hidden>
       <section>
         <h1>Mindworld</h1>

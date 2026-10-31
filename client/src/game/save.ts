@@ -13,7 +13,9 @@ import { EMPTY_MEMO, validateMemo, type Memo } from "../sim/memo";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId, type Replay } from "../sim/types";
 
-export const SAVE_KEY = "petmind.v1";
+// `?p=2` keeps a second player's save apart, so a new tab in the same browser is someone else.
+const player = typeof location === "undefined" ? null : new URLSearchParams(location.search).get("p");
+export const SAVE_KEY = `petmind.v1${player ? `.p${player.slice(0, 4)}` : ""}`;
 export const MAX_TAMED = 6;
 export interface Save {
   memo: Memo;
@@ -25,6 +27,8 @@ export interface Save {
   coins?: number; // earned from wild wins and befriends, spent at the market
   owned?: DecorKind[]; // decor bought at the market (the starter set is always owned)
   muted?: boolean; // in-world voice off
+  name?: string; // the name over your head; empty = the one your pet's genes give you
+  hide?: Record<string, boolean>; // UI panels closed with the small buttons
   steps?: { fought?: boolean; proved?: boolean; boss?: boolean; shipped?: boolean }; // first-steps guide progress
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
   genes: Genes; // the pet's looks, rolled at hatch (older saves get one on first load)
@@ -52,6 +56,8 @@ export function load(): Save {
         coins: parseCoins(raw.coins),
         owned: parseOwned(raw.owned),
         ...(raw.muted === true ? { muted: true } : {}),
+        ...(typeof raw.name === "string" && raw.name ? { name: raw.name.slice(0, 10) } : {}),
+        ...(raw.hide && typeof raw.hide === "object" ? { hide: raw.hide } : {}),
         ...(typeof raw.shared === "string" ? { shared: raw.shared } : {}),
         ...(Array.isArray(raw.mine) ? { mine: raw.mine.filter((x): x is string => typeof x === "string").slice(-20) } : {}),
         ...(Array.isArray(raw.tamed)

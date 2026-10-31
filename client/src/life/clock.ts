@@ -35,6 +35,10 @@ export function phaseOf(hour: number): Phase {
   return "night";
 }
 
+// "Mon" for the on-screen clock: game day 0 is a Monday.
+export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+export const weekday = (day: number): string => WEEKDAYS[((day % 7) + 7) % 7]!;
+
 // "08:30" for logs and the inspector.
 export function clockLabel(hour: number): string {
   const h = Math.floor(hour) % 24;

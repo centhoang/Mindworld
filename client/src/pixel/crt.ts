@@ -100,6 +100,8 @@ export function makePresenter(out: HTMLCanvasElement): Presenter {
       gl.uniform2f(uSrcSize, src.width, src.height);
       gl.uniform2f(uOutSize, out.width, out.height);
       gl.uniform1f(uK, strength);
+      const filter = strength ? gl.LINEAR : gl.NEAREST; // clean: plain nearest-neighbour pixels
+      for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, filter);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
   };

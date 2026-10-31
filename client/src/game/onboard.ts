@@ -46,7 +46,7 @@ export function pixelGoals(g: PixelGoalInput): Goal[] {
 
 // First-run lines for the pixel build, after the hatch line.
 export const PIXEL_HINTS: readonly string[] = [
-  "WASD or arrows to walk. Your pet follows you everywhere.",
+  "WASD or arrows to walk, Shift to run. Your pet follows you everywhere. N: your name.",
   "E talks and uses things: the Elder, wild pets, the farm beds, the market stall, your door.",
   "Bump a wild pet to battle. Your pet fights by its memo: press T to teach it new rules. G: goals.",
 ];

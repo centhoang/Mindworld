@@ -74,6 +74,30 @@ const SWAP: Record<number, Record<string, string>> = {
 const themedCache = new Map<string, HTMLCanvasElement>();
 const hex = (r: number, g: number, b: number) => `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1).toUpperCase()}`;
 
+// A loaded image recoloured for a ground theme (the Sunnyside sheets and strips use this directly).
+const recolourCache = new WeakMap<object, Map<number, HTMLCanvasElement>>();
+export function recoloured(src: HTMLImageElement, theme: number): CanvasImageSource {
+  const swap = SWAP[theme & 3];
+  if (!swap) return src;
+  let byTheme = recolourCache.get(src);
+  if (!byTheme) recolourCache.set(src, (byTheme = new Map()));
+  const hit = byTheme.get(theme & 3);
+  if (hit) return hit;
+  const [c, g] = canvas(src.width, src.height);
+  g.drawImage(src, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height);
+  for (let p = 0; p < d.data.length; p += 4) {
+    const to = swap[hex(d.data[p]!, d.data[p + 1]!, d.data[p + 2]!)];
+    if (!to || !d.data[p + 3]) continue;
+    d.data[p] = parseInt(to.slice(1, 3), 16);
+    d.data[p + 1] = parseInt(to.slice(3, 5), 16);
+    d.data[p + 2] = parseInt(to.slice(5, 7), 16);
+  }
+  g.putImageData(d, 0, 0);
+  byTheme.set(theme & 3, c);
+  return c;
+}
+
 export function themed(name: ArtName, theme: number): CanvasImageSource {
   const swap = SWAP[theme & 3];
   if (!swap) return img(name);

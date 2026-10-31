@@ -1,0 +1,142 @@
+// Sunnyside terrain rules, read off the pack's example room: which tile goes where, from the land shape alone.
+// Land edges are one tile family and roads a matching one; a south edge drops two rows of cliff and ends in foam,
+// and the foam throws a shadow on the sea. Pure, so a shape can be checked without a canvas.
+
+import { hash2, T, type TileMap } from "./tiles";
+
+// A cell = tile index in tiles.png (row * 64 + col) | flags. 0 = nothing.
+export const MIRROR = 1 << 16;
+export const FLIP = 1 << 17;
+export const CELL_ID = 0xffff;
+export const tile = (row: number, col: number, flags = 0) => row * 64 + col + flags;
+
+export interface Terrain {
+  land: Int32Array; // grass, cliffs and foam
+  road: Int32Array;
+  shade: Int32Array; // sea shadow under the cliffs, drawn over the foam
+}
+
+type EdgeName = "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se" | "inNw" | "inNe" | "inSw" | "inSe";
+const GRASS: Record<EdgeName, number> = {
+  nw: tile(3, 8), n: tile(3, 4), ne: tile(4, 4), w: tile(3, 6), e: tile(4, 3), sw: tile(4, 6), s: tile(4, 5), se: tile(4, 7),
+  inNw: tile(3, 2), inNe: tile(3, 3), inSw: tile(3, 5), inSe: tile(4, 1),
+};
+const GRASS_FILL = tile(3, 1);
+const ACCENT = [tile(2, 1), tile(2, 2), tile(2, 3), tile(2, 5), tile(2, 6)];
+const ROAD: Record<EdgeName, number> = {
+  nw: tile(7, 19), n: tile(7, 15), ne: tile(8, 15), w: tile(7, 17), e: tile(8, 14), sw: tile(8, 17), s: tile(8, 16), se: tile(8, 18),
+  inNw: tile(7, 13), inNe: tile(7, 14), inSw: tile(7, 16), inSe: tile(8, 12),
+};
+const ROAD_FILL = [tile(7, 12), tile(7, 12), tile(7, 12), tile(7, 20), tile(7, 21), tile(8, 20), tile(8, 21)];
+// Inland water (a pond) is plain water; its bank is drawn on the land cells around it, named by where the land ends.
+const BANK: Record<EdgeName, number> = {
+  n: tile(8, 26), s: tile(7, 25), w: tile(8, 24), e: tile(7, 27), nw: tile(8, 22), ne: tile(7, 26), sw: tile(7, 24), se: tile(7, 23),
+  inSe: tile(7, 29), inSw: tile(8, 25), inNw: tile(8, 28), inNe: tile(8, 29),
+};
+const POOL_FILL = tile(7, 22);
+const CLIFF = (i: number, j: number) => (((i + j) & 1) ? tile(3, 11) : tile(4, 11));
+
+// Which edge tile a cell of a shape takes, or null for the plain inside.
+export function edgeOf(on: (i: number, j: number) => boolean, i: number, j: number): EdgeName | null {
+  const [n, e, s, w] = [on(i, j - 1), on(i + 1, j), on(i, j + 1), on(i - 1, j)];
+  if (!n && !w) return "nw";
+  if (!n && !e) return "ne";
+  if (!s && !w) return "sw";
+  if (!s && !e) return "se";
+  if (!n) return "n";
+  if (!s) return "s";
+  if (!w) return "w";
+  if (!e) return "e";
+  if (!on(i - 1, j - 1)) return "inNw";
+  if (!on(i + 1, j - 1)) return "inNe";
+  if (!on(i - 1, j + 1)) return "inSw";
+  if (!on(i + 1, j + 1)) return "inSe";
+  return null;
+}
+
+export function buildTerrain(m: TileMap): Terrain {
+  const size = m.w * m.h;
+  const out: Terrain = { land: new Int32Array(size), road: new Int32Array(size), shade: new Int32Array(size) };
+  const at = (i: number, j: number) => (i < 0 || j < 0 || i >= m.w || j >= m.h ? T.water : m.kind[j * m.w + i]!);
+  const dry = (i: number, j: number) => at(i, j) !== T.water && at(i, j) !== T.bridge;
+  const isRoad = (i: number, j: number) => at(i, j) === T.path;
+  const isPool = (i: number, j: number) => at(i, j) === T.pool;
+  const free = (i: number, j: number) => i >= 0 && j >= 0 && i < m.w && j < m.h && !dry(i, j);
+  const put = (a: Int32Array, i: number, j: number, cell: number) => {
+    a[j * m.w + i] = cell;
+  };
+  for (let j = 0; j < m.h; j++)
+    for (let i = 0; i < m.w; i++) {
+      if (!dry(i, j)) continue;
+      const k = j * m.w + i;
+      const edge = edgeOf(dry, i, j);
+      if (edge) out.land[k] = GRASS[edge];
+      else out.land[k] = hash2(i, j, 21) < 0.07 ? ACCENT[Math.floor(hash2(i, j, 22) * ACCENT.length)]! : GRASS_FILL;
+      if (isPool(i, j)) out.land[k] = POOL_FILL;
+      else if (!edge) {
+        const bank = edgeOf((a, b) => !isPool(a, b), i, j);
+        if (bank) out.land[k] = BANK[bank];
+      }
+      if (isRoad(i, j)) {
+        const e = edgeOf(isRoad, i, j);
+        out.road[k] = e ? ROAD[e] : ROAD_FILL[Math.floor(hash2(i, j, 23) * ROAD_FILL.length)]!;
+      }
+      if (dry(i, j + 1)) continue;
+      // The south face of this column, then its foam, then its shadow on the sea.
+      const west = edge === "sw";
+      const east = edge === "se";
+      const face = west ? [tile(4, 10), tile(2, 19, MIRROR), tile(6, 19, MIRROR)] : east ? [tile(4, 10, MIRROR), tile(2, 19), tile(6, 19)] : [CLIFF(i, j + 1), CLIFF(i, j + 2), tile(2, 20)];
+      let last = j;
+      face.forEach((cell, n) => {
+        if (last !== j + n || !free(i, j + n + 1)) return;
+        put(out.land, i, j + n + 1, cell);
+        last = j + n + 1;
+      });
+      if (last === j + 3) for (const d of [0, 1]) if (free(i, last + d)) put(out.shade, i, last + d, tile(1, 12));
+      // A corner standing out on its own gets a lip of foam around it.
+      if ((west || east) && !dry(i + (west ? -1 : 1), j - 1)) {
+        const x = i + (west ? -1 : 1);
+        const lip = west ? [tile(6, 19, MIRROR | FLIP), tile(2, 20), tile(6, 19, MIRROR)] : [tile(6, 19, FLIP), tile(2, 20, FLIP), tile(6, 19)];
+        lip.forEach((cell, n) => {
+          if (free(x, j + n) && !out.land[(j + n) * m.w + x]) put(out.land, x, j + n, cell);
+        });
+      }
+    }
+  return out;
+}
+
+// Bridge planks and rails for the whole map. Ends lie one tile up on the land, as the pack's bridges do.
+export function bridgeLayers(m: TileMap): { deck: Int32Array; rail: Int32Array } {
+  const deck = new Int32Array(m.w * m.h);
+  const rail = new Int32Array(m.w * m.h);
+  const on = (a: number, b: number) => a >= 0 && b >= 0 && a < m.w && b < m.h && m.kind[b * m.w + a] === T.bridge;
+  const put = (i: number, j: number, d: number, r: number) => {
+    if (i < 0 || j < 0 || i >= m.w || j >= m.h) return;
+    deck[j * m.w + i] = d;
+    rail[j * m.w + i] = r;
+  };
+  const run = (i: number, j: number, di: number, dj: number) => {
+    let n = 0;
+    while (n < 9 && on(i + di * (n + 1), j + dj * (n + 1))) n++;
+    return n;
+  };
+  for (let j = 0; j < m.h; j++)
+    for (let i = 0; i < m.w; i++) {
+      if (!on(i, j)) continue;
+      const across = run(i, j, 1, 0) + run(i, j, -1, 0) >= run(i, j, 0, 1) + run(i, j, 0, -1);
+      if (across) {
+        const row = !on(i, j - 1) ? 11 : !on(i, j + 1) ? 13 : 12;
+        put(i, j, tile(row, 40, i & 1 ? MIRROR : 0), row === 11 ? tile(2, 39) : row === 13 ? tile(0, 39) : 0);
+        if (!on(i - 1, j)) put(i - 1, j, tile(row, 39), row === 11 ? tile(2, 42, MIRROR) : row === 13 ? tile(0, 38) : 0);
+        if (!on(i + 1, j)) put(i + 1, j, tile(row, 39, MIRROR), row === 11 ? tile(2, 42) : row === 13 ? tile(0, 38, MIRROR) : 0);
+      } else {
+        const lone = !on(i - 1, j) && !on(i + 1, j);
+        const col = lone ? 40 : !on(i - 1, j) ? 39 : !on(i + 1, j) ? 41 : 40;
+        const side = col !== 40;
+        put(i, j, tile(12, col), side ? tile(3, 40) : 0);
+        if (!on(i, j - 1)) put(i, j - 1, tile(11, col), side ? tile(1, 40) : 0);
+        if (!on(i, j + 1)) put(i, j + 1, tile(11, 80 - col, MIRROR | FLIP), side ? tile(4, 40) : 0);
+      }
+    }
+  return { deck, rail };
+}

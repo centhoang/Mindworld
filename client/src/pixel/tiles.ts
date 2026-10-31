@@ -7,7 +7,7 @@ import { groundOrigin, type Platform, type WorldMap } from "../world/layout";
 
 export const TILE = 16;
 
-export const T = { water: 0, grass: 1, path: 2, bridge: 3, sand: 4, flowers: 5, tall: 6 } as const;
+export const T = { water: 0, grass: 1, path: 2, bridge: 3, sand: 4, flowers: 5, tall: 6, pool: 7 } as const;
 export type TileKind = (typeof T)[keyof typeof T];
 
 export const AWAY = 4; // look bit: the tile belongs to a ghost ground (drawn dimmed)
@@ -71,21 +71,35 @@ export function buildTileMap(w: WorldMap): TileMap {
         look[idx(x, z)] = theme | (p.away ? AWAY : 0);
       }
     // A fishing pond: open water in the middle of the ground, with a short dock out into it.
-    const pond = p.kind === "pond" && p.spots?.pond;
+    const pond = p.spots?.pond;
     if (pond) {
       for (let z = Math.floor(pond.z - 3); z <= pond.z + 3; z++)
         for (let x = Math.floor(pond.x - 4); x <= pond.x + 4; x++)
-          if (((x + 0.5 - pond.x) / 3.4) ** 2 + ((z + 0.5 - pond.z) / 2.2) ** 2 < 1) kind[idx(x, z)] = T.water;
+          if (((x + 0.5 - pond.x) / 3.8) ** 2 + ((z + 0.5 - pond.z) / 2.6) ** 2 < 1) kind[idx(x, z)] = T.pool;
       for (let z = Math.floor(pond.z); z <= Math.floor(pond.z) + 2; z++) kind[idx(Math.floor(pond.x), z)] = T.bridge;
     }
   }
 
-  // Paths from each plaza to its bridges, so the eye follows the way out.
+  // No land one tile wide: the edge tiles need a body behind them.
+  const wet = (k: number) => kind[k] === T.water || kind[k] === T.bridge;
+  for (let pass = 0; pass < 3; pass++)
+    for (let j = 1; j < th - 1; j++)
+      for (let i = 1; i < tw - 1; i++) {
+        const at = j * tw + i;
+        if (!wet(at) && ((wet(at - 1) && wet(at + 1)) || (wet(at - tw) && wet(at + tw)))) kind[at] = T.water;
+      }
+
+  // Paths from each plaza to its bridges, so the eye follows the way out: 3 tiles wide, on land only.
   const pathLine = (x0: number, z0: number, x1: number, z1: number) => {
     const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0));
     for (let s = 0; s <= n; s++) {
-      const at = idx(Math.floor(x0 + ((x1 - x0) * s) / n), Math.floor(z0 + ((z1 - z0) * s) / n));
-      if (kind[at] !== T.water && kind[at] !== T.bridge) kind[at] = T.path;
+      const cx = Math.floor(x0 + ((x1 - x0) * s) / n);
+      const cz = Math.floor(z0 + ((z1 - z0) * s) / n);
+      for (let dz = -1; dz <= 1; dz++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const at = idx(cx + dx, cz + dz);
+          if (!wet(at) && kind[at] !== T.pool) kind[at] = T.path;
+        }
     }
   };
   const byId = new Map(w.platforms.map((p) => [p.id, p]));
@@ -113,15 +127,21 @@ function landKind(p: Platform, x: number, z: number): TileKind | null {
     if (!on(gi, gj)) return null;
     let coast = false;
     for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if (!on(gi + di, gj + dj)) coast = true;
-    if (coast) return T.sand;
+    if (coast) return T.grass;
     if (d < 2.6) return T.path;
     return r < 0.06 ? T.flowers : T.grass;
   }
-  if (d > p.r - 0.6 * hash2(x, z, 1)) return null;
-  if (d > p.r - 1.4) return T.sand;
+  if (d > p.r + bulge(p, cx, cz)) return null;
   if (d < 2.6 && p.kind !== "wild" && p.kind !== "islet" && p.kind !== "picnic") return T.path; // a little plaza in the middle
   if (p.kind === "wild" && r < 0.22) return T.tall;
   return r < (p.kind === "picnic" ? 0.12 : 0.06) ? T.flowers : T.grass;
+}
+
+// Round places get a lumpy outline, as the pack's islands have. It only adds land, so bridges still reach it.
+function bulge(p: Platform, x: number, z: number): number {
+  const a = Math.atan2(z - p.z, x - p.x);
+  const s = hash2(p.cell[0], p.cell[1], 7) * 6.28;
+  return Math.max(0, 1.2 * Math.sin(a * 3 + s) + 0.9 * Math.sin(a * 5 + s * 2) + 0.5);
 }
 
 function nearSegment(ax: number, az: number, bx: number, bz: number, x: number, z: number, half: number): boolean {
@@ -149,5 +169,5 @@ export function lookAt(m: TileMap, i: number, j: number): number {
 // Feet must stand on a non-water tile, with a small margin so sprites don't hang over the coast.
 export function tileWalkable(m: TileMap, x: number, z: number): boolean {
   const e = 0.3;
-  return [[x - e, z], [x + e, z], [x, z - e], [x, z + 0.1]].every(([a, b]) => tileAt(m, a!, b!) !== T.water);
+  return [[x - e, z], [x + e, z], [x, z - e], [x, z + 0.1]].every(([a, b]) => tileAt(m, a!, b!) !== T.water && tileAt(m, a!, b!) !== T.pool);
 }

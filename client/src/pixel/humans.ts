@@ -14,8 +14,9 @@ export const NPC_LOOKS = {
 
 // The human sim uses this same speed. Keep keyboard and remote walkers at its pace.
 export const HUMAN_WALK_SPEED = WALK_SPEED * 0.4;
+export const HUMAN_RUN_SPEED = HUMAN_WALK_SPEED * 1.9;
 const FRAME_SECONDS = 0.075;
-export const HUMAN_ACTIONS = { idle: 9, walk: 8, doing: 8, waiting: 9, jump: 9, axe: 10, watering: 5 } as const;
+export const HUMAN_ACTIONS = { idle: 9, walk: 8, run: 8, doing: 8, waiting: 9, jump: 9, axe: 10, watering: 5 } as const;
 type Action = keyof typeof HUMAN_ACTIONS;
 
 export function humanLook(name: string): HumanLook {
@@ -26,22 +27,23 @@ export function humanLook(name: string): HumanLook {
 }
 
 // No native sit/sweep/dance/cook/sleep strips: retain aligned native action cells instead.
-export function humanLayers(look: HumanLook, pose: Pose | null, walking: boolean): { action: Action; files: string[] } {
+export function humanLayers(look: HumanLook, pose: Pose | null, walking: boolean, running = false): { action: Action; files: string[] } {
   let action: Action = "idle";
-  if (walking) action = "walk";
+  if (walking) action = running ? "run" : "walk";
   else if (pose === "sleep" || pose === "sit" || pose === "fish" || pose === "squat") action = "waiting";
   else if (pose === "dance" || pose === "kick") action = "jump";
   else if (pose === "sweep") action = look.tool === "axe" ? "axe" : look.tool === "watering" ? "watering" : "doing";
   else if (pose === "cook" || pose === "eat" || pose === "wiggle") action = "doing";
   const layers = ["base", look.hair];
   // Waiting contains a rod: use it only for fishing, never for sitting/sleeping. Jump needs no tool.
-  if (action === "idle" || action === "walk" || action === "doing" || action === "axe" || action === "watering" || (!walking && pose === "fish")) layers.push("tools");
+  if (action === "idle" || action === "walk" || action === "run" || action === "doing" || action === "axe" || action === "watering" || (!walking && pose === "fish")) layers.push("tools");
   return { action, files: layers.map(layer => `${layer}_${action}_strip${HUMAN_ACTIONS[action]}.png`) };
 }
 
 export interface HumanMotion {
   pos: Vec;
   walking: boolean;
+  running: boolean;
   dir: 0 | 1 | 2 | 3;
   flip: boolean;
   walkTime: number;
@@ -50,14 +52,15 @@ export interface HumanMotion {
 }
 
 export function newHumanMotion(pos: Vec): HumanMotion {
-  return { pos: { ...pos }, walking: false, dir: 0, flip: false, walkTime: 0, poseTime: 0, pose: null };
+  return { pos: { ...pos }, walking: false, running: false, dir: 0, flip: false, walkTime: 0, poseTime: 0, pose: null };
 }
 
 // Sample actual movement for every human, including collisions and remote interpolation.
 export function stepHumanMotion(m: HumanMotion, pos: Vec, dt: number, pose: Pose | null = null): void {
   const dx = pos.x - m.pos.x, dz = pos.z - m.pos.z;
   const distance = Math.hypot(dx, dz);
-  const walking = dt > 0 && distance > dt * 0.01 && distance <= HUMAN_WALK_SPEED * dt * 2 + 0.01;
+  const walking = dt > 0 && distance > dt * 0.01 && distance <= HUMAN_RUN_SPEED * dt * 2 + 0.01;
+  m.running = walking && distance > HUMAN_WALK_SPEED * dt * 1.4;
   if (walking) {
     m.dir = Math.abs(dx) > Math.abs(dz) ? dx < 0 ? 1 : 2 : dz < 0 ? 3 : 0;
     if (Math.abs(dx) > 0.0001) m.flip = dx < 0;
@@ -73,7 +76,7 @@ export class HumanSprites {
   private readonly images = new SpriteImages();
 
   draw(g: CanvasRenderingContext2D, look: HumanLook, motion: HumanMotion, x: number, y: number, t: number, fallback: () => void): void {
-    const { action, files } = humanLayers(look, motion.pose, motion.walking);
+    const { action, files } = humanLayers(look, motion.pose, motion.walking, motion.running);
     // Request all layers together, and fall back atomically so partial bodies never appear.
     const images = files.map(file => this.images.get(`/art/humans/${file}`));
     if (images.some(image => !image)) return fallback();

@@ -21,17 +21,24 @@ describe("world layout", () => {
 
   it("puts the square in the middle, every shared place around it, and your ground on your slot", () => {
     expect(platformAt(w, 0.5, 0.5)?.kind).toBe("plaza");
-    for (const k of ["wild", "boss", "market", "npc", "event"]) expect(w.platforms.some((p) => p.kind === k)).toBe(true);
+    for (const k of ["wild", "boss", "npc", "event"]) expect(w.platforms.some((p) => p.kind === k)).toBe(true);
     const home = w.platforms.find((p) => p.kind === "home")!;
     expect(home.cell).toEqual(SLOTS[0]);
     expect(platformAt(w, home.x + 0.5, home.z + 0.5)?.id).toBe("home");
     expect(w.platforms.find((p) => p.kind === "ground")).toMatchObject({ owner: "g1", label: "Pip's ground" });
   });
 
+  it("starts small: a lone player gets the square and a few shared places, and more fill in between as players arrive", () => {
+    const count = (n: number) => generateWorld({ me: { seed: 1, slot: 0 }, others: Array.from({ length: n - 1 }, (_, k) => ({ id: `p${k}`, name: "P", seed: k + 2, slot: k + 1 })), roomSeed: 3, day: 0 }).platforms.filter((p) => !p.ground).length;
+    expect(count(1)).toBe(4);
+    expect(count(3)).toBeGreaterThan(count(1));
+    expect(count(6)).toBeGreaterThan(count(3));
+  });
+
   it("has 24 slots on a checkerboard: never two grounds side by side", () => {
     expect(new Set(SLOTS.map((c) => c.join())).size).toBe(SLOT_COUNT);
     for (const [i, j] of SLOTS) {
-      expect(Math.max(Math.abs(i), Math.abs(j))).toBeGreaterThanOrEqual(2);
+      expect(Math.max(Math.abs(i), Math.abs(j))).toBeGreaterThanOrEqual(1);
       for (const [a, b] of SLOTS) expect(Math.abs(i - a) + Math.abs(j - b)).not.toBe(1);
     }
   });

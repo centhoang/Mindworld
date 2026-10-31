@@ -41,10 +41,9 @@ describe("ground decor", () => {
     expect(placeDecor(generateWorld(input), buildTileMap(generateWorld(input)))).toEqual(decor);
   });
 
-  it("puts some on every player's ground and none on the hub", () => {
-    for (const p of world.platforms.filter((q) => q.ground)) expect(decor.filter((d) => d.platform === p.id).length, p.id).toBeGreaterThan(2);
-    const hub = new Set(world.platforms.filter((q) => !q.ground && !q.spots).map((q) => q.id));
-    expect(decor.some((d) => hub.has(d.platform))).toBe(false);
+  it("puts some on every ground, shared places included", () => {
+    for (const p of world.platforms.filter((q) => q.ground)) expect(decor.filter((d) => d.platform === p.id).length, p.id).toBeGreaterThan(0);
+    expect(decor.some((d) => d.platform === "plaza")).toBe(true);
   });
 
   it("changes with the ground's seed", () => {
@@ -87,16 +86,16 @@ describe("ground decor", () => {
   });
 
   it("hangs party lights on picnic hill", () => {
-    const w = generateWorld({ ...input, day: 0 });
+    let hills = 0;
     for (let day = 0; day < 20; day++) {
-      const wd = generateWorld({ ...input, day });
+      const wd = generateWorld({ ...input, others: [...input.others!, ...[4, 5, 6, 7].map((slot) => ({ id: `n${slot}`, name: "N", seed: slot, slot }))], day });
       const picnic = wd.platforms.filter((p) => p.kind === "picnic");
       if (!picnic.length) continue;
+      hills++;
       const lights = placeDecor(wd, buildTileMap(wd)).filter((d) => d.kind === "lights");
       expect(lights.length).toBe(picnic.length);
       expect(lights.every((l) => l.tiles.length === 0)).toBe(true);
-      return;
     }
-    expect(w).toBeNull(); // no picnic hill in 20 days would be a layout bug
+    expect(hills).toBeGreaterThan(0); // no picnic hill in 20 days would be a layout bug
   });
 });

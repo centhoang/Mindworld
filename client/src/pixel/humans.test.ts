@@ -22,7 +22,7 @@ describe("shared human layers", () => {
     const used = new Set<string>();
     const poses = [null, "stand", "sit", "sweep", "fish", "dance", "cook", "sleep", "eat", "kick", "squat", "wiggle"] as const;
     for (const hair of HAIR) for (const tool of ["hands", "rod", "axe", "watering"] as const) for (const pose of poses) for (const walking of [false, true]) {
-      for (const file of humanLayers({ hair, tool }, pose, walking).files) used.add(file);
+      for (const running of [false, true]) for (const file of humanLayers({ hair, tool }, pose, walking, running).files) used.add(file);
     }
     const dir = new URL("../../public/art/humans/", import.meta.url);
     expect(readdirSync(dir).sort()).toEqual([...used].sort());

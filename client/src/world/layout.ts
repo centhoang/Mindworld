@@ -3,16 +3,17 @@
 // on the same map: every client builds it from the same inputs (who holds which slot with which ground
 // seed, the room seed and the shared day) without sending any map data.
 //
-// Grid: cells (i, j) CELL units apart. Ring 0-1 = the hub. Slots = cells on ring >= 2 with i + j odd
-// (a checkerboard), so two players' grounds are never side by side: the even "gap" cell between two
-// neighbours may hold an in-between ground (playground, picnic hill, fishing pond) rolled per day.
-// Any ground cut off from the hub gets the shortest chain of fillers (in-betweens on gaps, small stepping
-// isles on free slots), so every ground is always walkable from the square.
+// Grid: cells (i, j) CELL units apart, the square at (0, 0). Slots = cells with i + j odd (a checkerboard), inner
+// rings first, so two players' grounds are never side by side. Everything that is not a player's ground fills the
+// even "gap" cells between them: a few shared places a lone player needs, more as players arrive, and in-between
+// grounds (playground, picnic hill, fishing pond) rolled per day where two grounds touch one gap.
+// Any place cut off from the square gets the shortest chain of fillers (in-betweens on gaps, small stepping isles
+// on free slots), so everything is always walkable.
 
 import { mulberry32 } from "../sim/rng";
 import { groundFromSeed, GROUND_H, GROUND_W, isLand, type Ground, type Side } from "./ground";
 
-export const PLATFORM_KINDS = ["plaza", "home", "ground", "wild", "boss", "market", "npc", "event", "playground", "picnic", "pond", "islet"] as const;
+export const PLATFORM_KINDS = ["plaza", "home", "ground", "wild", "boss", "npc", "event", "playground", "picnic", "pond", "islet"] as const;
 export type PlatformKind = (typeof PLATFORM_KINDS)[number];
 export const BETWEEN_KINDS = ["playground", "picnic", "pond"] as const;
 export type BetweenKind = (typeof BETWEEN_KINDS)[number];
@@ -72,14 +73,13 @@ export const SLOT_COUNT = 24;
 const MAX_RING = 5;
 
 const RADIUS: Record<PlatformKind, number> = {
-  plaza: 10.5, home: 11, ground: 11, wild: 12.5, boss: 11, market: 10.5, npc: 10.5, event: 11, playground: 9, picnic: 9, pond: 9.5, islet: 4.5,
+  plaza: 10.5, home: 11, ground: 11, wild: 12.5, boss: 11, npc: 10.5, event: 11, playground: 9, picnic: 9, pond: 9.5, islet: 4.5,
 };
 const LABEL: Partial<Record<PlatformKind, string>> = {
   plaza: "Village square",
   home: "Your ground",
   wild: "Wild meadow",
   boss: "Boss room",
-  market: "Market",
   npc: "Elder's house",
   event: "Event ground",
   playground: "Playground",
@@ -88,27 +88,26 @@ const LABEL: Partial<Record<PlatformKind, string>> = {
   islet: "Stepping isle",
 };
 
-// The hub: fixed, so players learn the map.
-const HUB: [number, number, PlatformKind][] = [
-  [0, 0, "plaza"],
-  [0, -1, "event"],
-  [1, 0, "wild"],
-  [0, 1, "market"],
-  [-1, 0, "npc"],
-  [1, -1, "boss"],
-  [-1, -1, "wild"],
-  [-1, 1, "wild"],
-  [1, 1, "wild"],
+// Shared places, fixed so players learn the map: [i, j, kind, players needed before it fills in].
+const SHARED: [number, number, PlatformKind, number][] = [
+  [0, 0, "plaza", 0],
+  [-1, -1, "npc", 0],
+  [1, -1, "wild", 0],
+  [0, -2, "boss", 0],
+  [1, 1, "event", 2],
+  [-1, 1, "wild", 3],
+  [2, 0, "wild", 4],
+  [-2, 0, "wild", 5],
 ];
 
 const ring = (i: number, j: number) => Math.max(Math.abs(i), Math.abs(j));
 const key = (i: number, j: number) => `${i},${j}`;
-const isGap = (i: number, j: number) => ring(i, j) >= 2 && (((i + j) % 2) + 2) % 2 === 0;
+const isGap = (i: number, j: number) => ring(i, j) >= 1 && (((i + j) % 2) + 2) % 2 === 0;
 
 // Slot n -> grid cell: inner rings first, clockwise from north, so early players are neighbours.
 export const SLOTS: [number, number][] = (() => {
   const cells: [number, number][] = [];
-  for (let r = 2; r <= 4; r++)
+  for (let r = 1; r <= 4; r++)
     for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) if (ring(i, j) === r && !isGap(i, j)) cells.push([i, j]);
   const ang = ([i, j]: [number, number]) => (Math.atan2(i, -j) + Math.PI * 2) % (Math.PI * 2);
   cells.sort((a, b) => ring(...a) - ring(...b) || ang(a) - ang(b));
@@ -132,14 +131,18 @@ function betweenSpots(kind: BetweenKind, x: number, z: number): Record<string, V
   return { pond: { x, z: z - 2.5 }, dock: { x, z: z + 0.2 }, rod: { x: x + 1, z: z + 1 } };
 }
 
+// The Elder's island keeps a fishing pond, so Mo has water even with nobody else around.
+const elderPond = (x: number, z: number): Record<string, Vec2> => ({ pond: { x: x - 5.5, z: z + 3.6 }, dock: { x: x - 5.5, z: z + 6.3 } });
+
 export function generateWorld(input: LayoutInput = {}): WorldMap {
   const { me, others = [], roomSeed = 1, day = 0 } = input;
   const cells = new Map<string, Platform>();
   const put = (i: number, j: number, p: Omit<Platform, "x" | "z" | "r" | "cell">) =>
     cells.set(key(i, j), { ...p, x: i * CELL, z: j * CELL, r: RADIUS[p.kind], cell: [i, j] });
 
+  const players = (me ? 1 : 0) + others.length;
   let wilds = 0;
-  for (const [i, j, kind] of HUB) put(i, j, { id: kind === "wild" ? (wilds++ ? `wild-${wilds - 1}` : "wild") : kind, kind, label: LABEL[kind]! });
+  for (const [i, j, kind, need] of SHARED) if (players >= need) put(i, j, { id: kind === "wild" ? (wilds++ ? `wild-${wilds - 1}` : "wild") : kind, kind, label: LABEL[kind]!, ...(kind === "npc" ? { spots: elderPond(i * CELL, j * CELL) } : {}) });
 
   // Players' grounds: home first, so a stale peer claiming my slot never hides it.
   const slotOk = (s: number) => Number.isInteger(s) && s >= 0 && s < SLOTS.length;
@@ -172,7 +175,7 @@ export function generateWorld(input: LayoutInput = {}): WorldMap {
       if (kind) putBetween(i, j, kind);
     }
 
-  // Stepping stones: link every cut-off ground to the hub by the shortest chain of new cells.
+  // Stepping stones: link every cut-off place to the square by the shortest chain of new cells.
   const reach = () => {
     const seen = new Set([key(0, 0)]);
     const stack: [number, number][] = [[0, 0]];
@@ -188,9 +191,9 @@ export function generateWorld(input: LayoutInput = {}): WorldMap {
     }
     return seen;
   };
-  for (const [i0, j0] of SLOTS) {
+  for (const { cell: [i0, j0] } of [...cells.values()]) {
     let seen = reach();
-    if (!cells.has(key(i0, j0)) || seen.has(key(i0, j0))) continue;
+    if (seen.has(key(i0, j0))) continue;
     const prev = new Map<string, string | null>([[key(i0, j0), null]]);
     const queue: [number, number][] = [[i0, j0]];
     let end: string | null = null;

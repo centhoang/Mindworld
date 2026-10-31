@@ -14,10 +14,11 @@ describe("layoutBubbles", () => {
     const p = layoutBubbles([box(150, 120), box(160, 118), box(170, 116)], 320, 240);
     expect(overlap(p[0]!, p[1]!) || overlap(p[0]!, p[2]!) || overlap(p[1]!, p[2]!)).toBe(false);
     expect(p.filter((b) => b!.moved).length).toBe(2);
+    for (const b of p) expect(Math.abs(b!.x + 50 - 160)).toBeLessThan(60); // never far from who speaks
   });
 
   it("keeps every bubble on screen", () => {
-    for (const b of layoutBubbles([box(4, 30), box(6, 30), box(316, 30), box(318, 30)], 320, 240)) {
+    for (const b of layoutBubbles([box(4, 30), box(6, 30), box(316, 30), box(318, 30)], 320, 240).filter((p) => p)) {
       expect(b!.x).toBeGreaterThanOrEqual(2);
       expect(b!.x + 100).toBeLessThanOrEqual(318);
       expect(b!.y).toBeGreaterThanOrEqual(2);
@@ -32,6 +33,16 @@ describe("layoutBubbles", () => {
     expect(p[0]).not.toBeNull();
     expect(shown.length).toBeLessThan(crowd.length);
     for (const a of shown) for (const b of shown) if (a !== b) expect(Math.abs(a.x - b.x) < 200 && Math.abs(a.y - b.y) < 60).toBe(false);
+  });
+});
+
+describe("layoutBubbles limits", () => {
+  it("shows at most three, and whoever speaks to me comes first", () => {
+    const crowd = Array.from({ length: 8 }, (_, i) => box(60 + i * 30, 150));
+    crowd[7] = { ...crowd[7]!, first: true };
+    const p = layoutBubbles(crowd, 320, 240);
+    expect(p.filter((b) => b).length).toBeLessThanOrEqual(3);
+    expect(p[7]).not.toBeNull();
   });
 });
 

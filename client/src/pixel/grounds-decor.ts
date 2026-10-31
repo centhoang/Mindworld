@@ -10,7 +10,7 @@ import { mulberry32 } from "../sim/rng";
 import { groundOrigin, type Platform, type WorldMap } from "../world/layout";
 import { T, type TileMap } from "./tiles";
 
-export const DECOR_KINDS = ["bush", "bush-big", "rock", "rock-big", "fence", "lights"] as const;
+export const DECOR_KINDS = ["bush", "bush-big", "rock", "rock-big", "fence", "stump", "jar", "lights"] as const;
 export type DecorKind = (typeof DECOR_KINDS)[number];
 
 export interface DecorPiece {
@@ -22,8 +22,8 @@ export interface DecorPiece {
 }
 
 // Width in tiles of each solid piece (fences come in runs of 2-3 posts).
-const WIDTH: Record<Exclude<DecorKind, "lights">, number> = { bush: 1, "bush-big": 2, rock: 1, "rock-big": 2, fence: 1 };
-const PICK: Exclude<DecorKind, "lights">[] = ["bush", "bush", "bush-big", "rock", "rock", "rock-big", "fence"];
+const WIDTH: Record<Exclude<DecorKind, "lights">, number> = { bush: 1, "bush-big": 2, rock: 1, "rock-big": 2, fence: 1, stump: 1, jar: 1 };
+const PICK: Exclude<DecorKind, "lights">[] = ["bush", "bush", "bush-big", "bush-big", "rock", "rock-big", "fence", "stump", "jar"];
 
 const seedOf = (p: Platform): number =>
   p.ground ? (p.ground.seed ^ 0x2c1b3c6d) >>> 0 : (Math.imul(p.cell[0] + 41, 73856093) ^ Math.imul(p.cell[1] + 37, 19349663) ^ p.kind.length * 2654435761) >>> 0;
@@ -41,18 +41,17 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
   };
   for (const p of world.platforms) {
     const between = !!p.spots;
-    if (!p.ground && !between) continue; // the hub keeps its own look
     const rng = mulberry32(seedOf(p));
     const spots = Object.values(p.spots ?? {});
     const free = (x: number, z: number) => {
       if (spots.some((s) => Math.abs(s.x - x) < 3.5 && Math.abs(s.z - z) < 3.5)) return false;
-      return !(p.ground && Math.hypot((x - p.x) / 6, (z - p.z + 1) / 4.5) < 1); // the yard: house, beds, plaza
+      return Math.hypot((x - p.x) / (p.ground ? 7.5 : 6), (z - p.z + 1) / 5) >= 1; // the yard: house, beds, plaza
     };
     if (p.kind === "picnic" && p.spots?.blanket) {
       const b = p.spots.blanket; // a string of lights on two posts behind the blanket (walk-through)
       out.push({ kind: "lights", x: b.x + 0.5, z: b.z - 1.6, tiles: [], platform: p.id });
     }
-    const want = p.ground ? 7 + Math.floor(rng() * 4) : 3 + Math.floor(rng() * 2);
+    const want = p.ground ? 9 + Math.floor(rng() * 4) : between ? 3 + Math.floor(rng() * 2) : 8 + Math.floor(rng() * 4);
     const [x0, z0, w, h] = p.ground ? [...groundOrigin(p), p.ground.w, p.ground.h] : [p.x - p.r, p.z - p.r, p.r * 2, p.r * 2];
     for (let tries = 0, placed = 0; tries < 200 && placed < want; tries++) {
       const kind = PICK[Math.floor(rng() * PICK.length)]!;
