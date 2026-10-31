@@ -96,6 +96,31 @@ the complete view by a whole integer and letterbox the remainder. Judge new art
 at 1x and 4x. Pet resolutions are separately drawn, never scaled versions of one
 master with thicker outlines.
 
+## Pixel size rules by asset type
+
+Native evidence: `.scratch/art/gen/pack-metrics.json` (59 samples; frames count separately; panels are nine 3x3 slices). Width x height, padding L/T/R/B, root coordinates from top-left; body excludes identified ground shadows. Outline percentages estimate boundary-connected dark ramps; 1px is the measured typical contour, not every dark mass.
+
+| Type (manifest key) | Canvas px | Allowed visible W x H px | Padding px | Outline px; native share | Smallest detail px | Colours/sprite | Scale beside 11x16 human; root guide |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Human (`human`) | 96x64 | 11-14 x 15-16, bald standing/carry | 43/23-24/39-42/25 | 1; 27-29% | 1, e.g. eye | 3-20 (native 18-20) | 1 human; (48,39), preserve action alignment |
+| Small animal (`small-animal`) | 16x16 | 14-15 x 10-14 | 0-2/0-3/0-2/2-3 | 1 coloured; 26-35% | 1 | 3-10 (native 9-10) | bird/duck about 0.6-0.9 human tall; (8,14) |
+| Large animal (`large-animal`) | 32x32 | 16-23 x 16-20 | 4-7/3-7/5-9/8-10 | 1 coloured; 17-32% | 1 | 3-9 (native 7-9) | cow/pig/sheep 1-1.25 humans tall; (16,24) |
+| Tree (`tree`) | 32x34 or 28x43 | 18-26 x 30-33 | 3-5/0-5/3-5/3-5 | 1 coloured; 13-21% | 1; broad leaf clusters | 3-12 (native 9-57) | about 2 humans tall; (16,31)/(14,38) |
+| Crop (`crop`) | native 12x14,16x13,10x13,13x19; new 16x16/24 | 10-16 x 13-19 | 0-5 (native 0) | 1 coloured; 2-18% | 1 seeds, 2+ leaves | 3-11 (native 8-11) | mature plants 0.8-1.2 humans tall; stem base |
+| Building prop (`building-prop`) | 16x16/24/32,32x16/32,48x32 | 10-48 x 8-32 | 0-11; retain footprint | 1 coloured/ink; 9-34% | 1 grain, 2+ trim | 3-12 (native 5-6) | table top 10-16px above ground; door opening 13-16x18-24; goal opening 32-38x18-24; bottom of supports |
+| Floor/terrain tile (`floor-or-terrain-tile`) | 16x16 | 16 x 16 | 0 all sides | 0 ink; 1px material seams; 0% | 1 fleck, 2+ textile strokes | 1-12 (native 1-5) | 1 tile spans about 1.5 body widths; (0,0), repeat seamless at 1x |
+| Carried item/food (`carried-item-or-food`) | native 10x11/12,11x11,12x11; new 16x16 | 8-12 x 8-15 | 0-7 (native 0) | 1 coloured; 0-40% | 1 accent, 2+ main patch | 3-11 (native 4-6) | ball 8x8, about half human height; cake incl. candle <=15 high; bottom centre |
+| UI icon (`UI-icon`) | native 11x12,15x13,12x12,12x11,13x13; new 16x16 | 11-15 x 11-14 | 0-3 (native 0) | 1; 30-37% | 1 mark | 3-9 (native 4-9) | screen space; centre |
+| UI panel (`UI-panel`) | 3x3 native slices; assembled 9-384 x 9-216 | assembled full canvas | 0 outer; 4 inner content | 1 ink + 1 bevel; slices 0-50% | 1; fixed 3x3 corners | 2-4 (native slices 1-3) | screen space; top-left |
+| Speech/emotion icon (`speech-or-emotion-icon`) | native 9x9,4x9,7x10,9x8,7x7; new 16x16 | 4-9 x 7-10 | 0-9 (native 0) | 1; 38-73% | 1 mark | 3-4 | screen space, 9px chat; lower pointer |
+| Pet at 16 (`pet-16`) | 16x16 | 10-14 x 9-13 | 1-3/1-5/1-3/2 | 1, coloured seams | 1 eyes, 2+ fur | 3-8 | 0.6-0.8 humans tall; (8,14) |
+| Pet at 32 (`pet-32`) | 32x32 | 16-26 x 16-26 | 1-8/4-14/1-8/2 | 1, not doubled | 1 eyes, 2+ fur | 3-10 | 1-1.6 humans tall; (16,30) |
+| Pet at 48 (`pet-48`) | 48x48 | 26-40 x 26-40 | 1-11/5-19/1-11/3 | 1, not tripled | 1 eyes, 2+ fur | 3-12 | 1.6-2.5 humans tall; (24,45) |
+| Wild pet (`wild-pet`) | 16x16/32x32/48x48 | same respective pet envelope | same respective pet | 1 | same respective pet | 3-8/10/12 | same size tier; same root; redraw at each size |
+| Market stall (`market-stall`) | 48x48 or 64x48 | 40-60 x 32-44 | 1-8 | 1 coloured; no thick ink frame | 1 grain, 2+ cloth | 3-12 | 3.6-5.5 body widths; counter 10-16px high, canopy clears 18-24px doorway; bottom support centre |
+| Bubble container (`bubble-container`) | 24x16 or 32x24 | 24-32 x 16-21 | 0/0/0/0-3; 4 inner content | 1 ink + 1 bevel | 1 mark; 3x3 corners | 3-4 | screen space; thought (2,16), plan (9,21) pointer |
+Chosen, not measured: new canvas/padding envelopes, commissioned pet/stall/bubble dimensions and roots, door/goal/table/ball scales, extended colour budgets and reduced new-tree palette, noise limits in `scripts/check-art.mjs`; source-only ranges and outline/detail metrics above are measured. Checker gates dimensions/padding/palette/alpha/colour/noise; assess contour weight, main detail clusters and world scale by eye at 1x beside native art.
+
 ## Outlines and pixel clusters
 
 **Observed:** human silhouettes primarily use near-black purple **#171424**;
