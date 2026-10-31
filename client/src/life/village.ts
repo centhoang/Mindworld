@@ -18,6 +18,7 @@ export interface Agent {
   pos: Vec;
   needs: Needs;
   state: State;
+  pause?: number; // seconds left standing still on the way
   act: string | null;
   target: Vec;
   left: number; // game minutes left in the current activity
@@ -214,6 +215,10 @@ export function stepVillage(v: Village, dt: number, env: Env): LifeEvent[] {
       continue;
     }
     if (a.state === "walk") {
+      if ((a.pause ?? 0) > 0) {
+        a.pause! -= dt; // stopped for a chat
+        continue;
+      }
       const way = a.path?.[0];
       if (way && way !== a.path![a.path!.length - 1]) {
         const s = stepToward(a.pos, way, SPEED[a.kind] * dt);

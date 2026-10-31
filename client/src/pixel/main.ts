@@ -177,7 +177,11 @@ const talks = new Map<string, string>(); // who opened the chat -> who it is wit
 const talkKey = (who: string) => (isNpc(who) ? `n:${who}` : `p:${who}`);
 const inMyTalk = (a: string, b: string) => !!world.npcs?.me && (a === world.npcs.me || b === world.npcs.me);
 setInterval(() => {
-  for (const [a, b] of talks) if (!inMyTalk(a, b)) for (const who of [a, b]) world.say(talkKey(who), "talking...", 3);
+  for (const [a, b] of talks) {
+    if (!inMyTalk(a, b)) for (const who of [a, b]) world.say(talkKey(who), "talking...", 3);
+    if (isNpc(b) && world.npcs?.hosting(b)) world.npcs.hold(b); // a villager in a chat stays, whoever hosts it
+  }
+  if (typeof chatWith === "string" && isNpc(chatWith)) world.npcs?.hold(chatWith);
 }, 2000);
 setInterval(() => {
   const to = talkTarget(chatWith);
@@ -658,6 +662,7 @@ function setNpcHost(npc: Npc, host: string | null): void {
   npcHosts.set(npc, host);
   world.npcs?.setHost(npc, host);
 }
+const DROP_GRACE_MS = 20_000;
 const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: state.groundSeed, ...world.me }), {
   welcome: (id, corner, peers, awayList, npcs = {}, open = []) => {
     talks.clear();
@@ -680,7 +685,7 @@ const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myG
   },
   leave: (id) => {
     world.peers.delete(id);
-    if (grounds.delete(id)) relayoutGrounds();
+    if (grounds.delete(id)) setTimeout(relayoutGrounds, 500); // an `away` usually follows and keeps the ground
   },
   mind: (from, l) => {
     world.hearMind(from, l);
@@ -717,11 +722,13 @@ const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myG
     for (const n of NPCS) setNpcHost(n, null);
     if (world.npcs) world.npcs.me = null; // offline: the NPCs' minds run here
     world.peers.clear();
-    if (grounds.size || aways.size) {
+    // A short drop must not pull the islands from under a visitor's feet.
+    setTimeout(() => {
+      if (live.status === "online" || (!grounds.size && !aways.size)) return;
       grounds.clear();
       aways.clear();
       relayoutGrounds();
-    }
+    }, DROP_GRACE_MS);
   },
   say: (id, text) => world.say(`p:${id}`, text, 5),
   duel: (duel, from, name) => duelInvited(duel, from, name),
@@ -932,6 +939,16 @@ function frame(now: number): void {
   update(dt, now / 1000);
   requestAnimationFrame(frame);
 }
+// A hidden tab gets no frames, but other players still see my villagers and me: the world runs on without drawing.
+setInterval(() => {
+  if (!document.hidden || mode !== "world") return;
+  const now = performance.now();
+  const steps = Math.min(40, Math.floor((now - last) / 50));
+  if (!steps) return;
+  last = now;
+  for (let i = 0; i < steps; i++) world.update(0.05, new Set<string>());
+  live.tick(now, world.me);
+}, 500);
 
 function update(dt: number, t: number): void {
   if (teach.open) teach.draw(g, low.width, low.height, t);

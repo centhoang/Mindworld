@@ -337,10 +337,11 @@ export class NpcVillage {
     return null;
   }
 
-  // A player is talking to this NPC: if it is between activities, it waits a moment instead of leaving.
+  // A player is talking to this NPC: between activities it waits instead of leaving, on the way it stops.
   hold(npc: Npc): void {
     const a = this.v.agents.find((x) => x.id === npc);
     if (a?.state === "idle") a.idle = Math.max(a.idle, 15);
+    if (a?.state === "walk") a.pause = 4;
   }
 
   // The player talks to an NPC. Hosted here with a model: its own mind answers (persona + memories) and
