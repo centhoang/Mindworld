@@ -1,10 +1,10 @@
-# HANDOFF: Mindworld v3, NPCs are the star; promises, bonds, jobs, economy live; N4 model swapped in; Sunnyside art (2026-10-31)
+# HANDOFF: Mindworld v3, NPCs are the star; promises, bonds, jobs, economy live; N4 model swapped in; world rebuilt from the Sunnyside example room (2026-10-31)
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/NPC-PLAN.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **59290524**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 527, worker 191, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **7d3b8574**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client 529, worker 191, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
 - **Done 2026-10-31:** power mode removed (`finetune/native-voice.ts` keeps the bench client, GGUFs stay). Limits lifted: CloudMind gap 0, MAX_DAILY_USD 30, CLIENT_DAILY_USD 10, CLIENT_PER_MINUTE 120; MAX_TOTAL_USD_* stay the hard stop. Caps come back down after the event.
 - **Setup gate** (pixel/setup.ts, #setup in index.html): checks the adapter first. capable = download + warm-up, then the game; weak Intel on Windows = steps + re-check; none/mobile = straight in. Remembered per GPU in `mindworld.setup.v1`; a return visit opens at once and loads in the background. Dev: `?gpu=switch|capable|none|skip`. Checked in the pane on a real Intel Gen 9 (guide, exit, remembered). The capable path with a real download has NOT been run: user's GTX 1050 is the first test.
 - **Private chats** (worker/src/room.ts): lines to a player reach that player only; other mind lines reach players within HEAR_DIST 14 tiles plus the host of the NPC spoken to; room chat stays public. `talk` = busy state, "talking..." bubble, new chats refused, ends on close, disconnect or 45 s silence (clients renew every 15 s). Checked on the real Durable Object with 3 sockets (worker-mock on port 8799).
@@ -22,16 +22,24 @@
 - Credits: Meta ~$149.9, Modal ~$102 left (approx).
 - Claude weekly quota 74% (resets Nov 1 17:00 UTC): push isolated work to Codex.
 
+- **World rebuilt to match VisualAssetPack/BuiltDemo (e89f9db):** `scripts/art-sunny.py` decodes the pack's GameMaker room and exports client/public/art/sunny (tiles, house/prop/furniture stamps, clouds, strips, interior.png). `pixel/sunny-terrain.ts` = pure tile rules read off the room (edges, 2-row cliffs + foam, sea shade, road, pond bank, bridge decks and rails); `pixel/sunny.ts` draws them plus drifting clouds and a cloud bank at the map edge. Interior uses pack tiles and furniture. Seasonal recolour is no longer applied (grounds all green, `recoloured` kept). Old art under client/public/art is partly unused now: prune later.
+- **Islands (world/layout.ts):** slots = odd cells from ring 1; shared places fill even gaps. Alone: square, your ground, Elder (with a pond for Mo), one meadow, boss. Event from 2 players, more meadows from 3, 4, 5. The market island is gone: the stall stands on the square. In-betweens need a gap touching 2 grounds, so they appear from about 5-6 players.
+- **Also new:** Shift runs (humans `run` strip, also indoors), tiny name tags on everyone, N or Rename sets a name (10 chars, `state.name`; hair stays from genes), bottom-left buttons toggle Goals/Map/Names/Hints (`state.hide`), clock shows `Sat 12:28`, bubbles: max 3 stacked over the speaker, others get a chat mark, off-screen speakers never show. CRT is forced off, code kept (`let crt = false` in main.ts). Test tools: +Isle/-Isle buttons on localhost or `?dev`; `?p=2` = a separate player in a new tab; launch config `client-dev-room` (5181) + `worker-mock` (8799). Two tabs checked: both online, each sees the other's island. `__px.world.alwaysDay = true` for daytime shots.
+- Chrome real-browser test of the deployed build not done this session; checked in the app pane on localhost.
+
 ## Decisions made
+- 2026-10-31 user: the game must look as close and natural as BuiltDemo, use the pack as much as possible. Non-player islands fill in between players' islands; no 3x3 hub for a lone player. Real-browser tests and home-network Access are standing-approved (CLAUDE.md).
 - 2026-10-31 user: **NPCs are the star for judges; a player can't tell them from a human.** Plan and backlog: docs/NPC-PLAN.md. Pets go deep only after the star work.
 - 2026-10-31 user: must fit a local model so the game runs free after the event. Approach: the sim reasons, the model decides among valid options and speaks.
 - 2026-10-31 user: Sunnyside pack = the art direction (free + commercial, credit optional). Use only what we need; Codex makes the gaps (modular pets etc.) after learning the style once; Claude reviews.
 - 2026-10-30 user: nothing goes public before submission day; HF private repos standing-approved; no Muse Spark limits until judging; game must outlive the event on local; setup gate; chat privacy. Earlier: shared clock, NPCs move to model holders, lines queue.
 
 ## Pending decisions (user)
+- Approve the new look (user rule: approval only if it matches BuiltDemo). CRT stays off until the user says.
 - Submission day: make the GitHub repo + the 4 Mindworld HF repos public, then remove Access. The proxy keeps working either way.
 
 ## User-only actions
+- Play-test the look on https://pets.uryto.dev/ (or Chrome TEMP profile): walk, Shift, enter the house, N to rename, bottom-left buttons, cross a bridge.
 - Play-test N3 + N5: stand near Pip in the morning (Pip may ask for a good or invite you); press E at the board in the village square; say "here is a carrot for you" to Pip; "sell you a carrot for 20 coins" to Pip, then "ok"; "how much is fish?"; look at I (HAS, WHY).
 - Play-test N2: promise Pip a party, stay away, then talk: grudge, "why are you mad", refusal, "sorry", accept; I shows FEELS/WHY.
 - Play-test look: all people now use pack sprites; check walking, facing, tools (fishing line, axe) and NPC poses.
@@ -40,6 +48,7 @@
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
+0. **Look polish after the user's review:** denser tree clusters and rivers/height steps like BuiltDemo, sand islets, ducks and boats, windows and dark floors indoors, roof-fade house entry (Interior.gif) if wanted; bubbles draw under the Goals card; prune unused art; docs/STYLE.md still describes the old art; deck rails do not block walking.
 1. **N4 browser audit (weights live but unaudited in WebLLM):** run client/mlc-bench.html (`?gpu`, bridge=1, chunk=128, see Gotchas) on the GTX 1050 with seed 4 prompts (bench-prompts come from .scratch/mlc/dump_prompts.ts), and check the model path in the game: extract, decide and deal have only run on llama.cpp so far. Quote browser numbers after this; update the HF cards (publish_coach.py still has stage 5 numbers) and docs/NPC-PLAN.md.
 2. **N5 rest:** gossip travels through talk with its source (today only between minds on one host), long goals (save for a pet, rematch), NPC duel and pets, indistinguishable pass (typing delay, small errors, NPC tag). Deals with NPCs hosted on another machine. Wild pets art (client/public/art/gen/wild) still unused. Prompts are frozen: sim-only changes, or plan a small retrain.
 3. Demo captures, README numbers (credit the Sunnyside pack), docs/DEMO.md script, submission prep. Caps come back down after the event.
@@ -62,4 +71,4 @@
 - Aseprite headless: see VisualAssetPack/HowToUseAsepriteFile.txt. Contact-sheet tool: `.scratch/art/pack_sheet.py` (sheets in .scratch/art/pack/).
 
 ## File map
-docs/{NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/{mlc_q4,convert_mlc,verify_mlc,publish_coach,finetune_llama}.py · worker/src/{mlc,app,room,room-do,npc,chat}.ts · worker/wrangler.toml · client/src/game/voices.ts · client/src/pixel/{main,setup,overworld,bubbles,teach,life-draw}.ts · client/src/mind/{brain,hub,npcs,memory,persona,scheduler}.ts · client/src/life/ · client/src/finetune/{gen-village,village-bench,mlc-bench,native-voice}.ts · scripts/codex.ps1
+docs/{NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/{mlc_q4,convert_mlc,verify_mlc,publish_coach,finetune_llama}.py · worker/src/{mlc,app,room,room-do,npc,chat}.ts · worker/wrangler.toml · client/src/game/voices.ts · client/src/pixel/{main,setup,overworld,sunny,sunny-terrain,bubbles,teach,life-draw}.ts · scripts/art-sunny.py · client/src/mind/{brain,hub,npcs,memory,persona,scheduler}.ts · client/src/life/ · client/src/finetune/{gen-village,village-bench,mlc-bench,native-voice}.ts · scripts/codex.ps1
