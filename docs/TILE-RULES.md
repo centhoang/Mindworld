@@ -28,7 +28,8 @@ Decide each tile from the land shape alone, with 4 neighbours and then diagonals
 - The light road family is the grass table moved down 4 rows (3.k becomes 7.k, 4.k becomes 8.k). Not used yet.
 - Roads are 3 tiles wide and stay on land.
 - Island outlines are straight edges with stepped corners, never slants or circles: coast, cliff and foam tiles only join on those. Grounds are stepped rectangles (world/ground.ts), other places squares with corner notches (`inBlock` in world/layout.ts). Roads run along one axis, then the other.
-- Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in clumps.
+- Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in 2-3 tight clumps per platform, about 2 tiles apart.
+- Fence rows run on the grass row just north of a straight road of 6+ tiles: segments 3-6 tiles, gaps 2+, kept 2 tiles clear of junctions, gates and bridges (grounds-decor.ts).
 
 ## Cliffs, foam, sea shadow
 Only south edges have a face, worked out per column. Cells below the land, from the top:
