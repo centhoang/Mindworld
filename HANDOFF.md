@@ -29,7 +29,7 @@
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
-1. **Art:** review .scratch/art/gen/batch1-sheet.png (Codex art batch 1; note in .scratch/codex-art1.md), accept or send back. Commit client/public/art/gen once accepted (already `git status` untracked until then). Next batches: market stall, modular pets, wild pets. Then the art swap: Sunnyside tiles + layered humans so NPCs share the player's sprites.
+1. **Art:** batch 1 accepted and committed (14 PNGs in client/public/art/gen, not used in-game yet; generator .scratch/art/gen/batch1.mjs). Next batches through Codex: market stall, modular pets, wild pets (same brief shape: .scratch/brief-art1.md). Then the art swap: Sunnyside tiles + layered humans so NPCs share the player's sprites.
 2. **N2 memory + relationships with reasons;** inspector "why" trail; thought bubbles; NPC tells the place when accepting; gossip of broken promises.
 3. **N3 verbs** (NPC farm, wallet, market, town board, trade). **N4 retrain by Nov 2 night:** add extract + decide (and N2/N3 prompts) to gen-village, freeze prompts first. N5, then demo captures and README numbers (credit the Sunnyside pack in README).
 
