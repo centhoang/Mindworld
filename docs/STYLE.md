@@ -1,328 +1,402 @@
-# Mindworld pixel art profile
+# Mindworld pixel art bible
 
-Version 1.0 · 2026-10-29 · review baseline, not a renderer migration.
-Approved profile: `docs/STYLE.md`. Proof assets and reproducible local tools:
-`.scratch/art/`. The task brief's dimensions take precedence over earlier proposals.
+Version **2.0** · 2026-10-31 · approved output: `docs/STYLE.md`.
+Replaces v1's palette and proposed pack conventions. This is an art specification;
+the current renderer and its v1 colors have not been migrated.
 
 ## Identity and provenance
 
-Four pillars: **sunlit meadows; soft teal water; honey-colored timber; friendly,
-readable creatures**. Use generous empty ground and rounded clusters. Warm, bright,
-low-contrast scenery carries the mood; a few dark marks carry interaction and text.
+Five pillars: **bright green ground; clear blue water; warm timber; oversized
+heads and compact bodies; crisp colored outlines and clustered shading**. The
+author's scenes use strong color separation, rounded foliage, little working
+villages and open paths. Keep this cheerful contrast rather than v1's muted wash.
 
-Inspected the 19-image `.scratch/visuals/ref-sheet.jpg`, then
-`visual-ref/house-inside.webp` separately. Inventory: 20 reference images, matching
-the 20 sources in `.scratch/moodboard/palette.json`; no later additions at review.
+The sole asset source is `PACK/`, shorthand throughout this document for:
 
-| Evidence | Role and observed trait | Production translation |
-| --- | --- | --- |
-| `visual-ref/1732880538_1791102160_9254.webp` and `visual-ref/5424886402_1791102156_7105.webp` (sheet 3, 10) | Rounded buildings, warm greens, quiet teal shoreline | Broad foliage clusters, light banks, clear doorways |
-| `visual-ref/6962038659_1791102139_4708.webp` and `visual-ref/9950256894_1791102141_2789.webp` (5, 19) | Sunny meadow / warm wood room | Light grass base; wood, cream and green interior furnishings |
-| `visual-ref/3984968671_1791102158_8522.webp` (6) | Organized garden and walking space | Grid-aligned beds and one-tile clear routes |
-| `visual-ref/101540361_1791102145_9052.webp` and `visual-ref/8567817249_ss_a20bd28a0114621e2f3a82b8b0d4c373778de.webp` (1, 16) | Cream UI, restrained framing | Cream panels with a narrow warm border; original layout and glyphs |
-| `visual-ref/9197520526_1791102154_7549.webp` and `visual-ref/house-inside.webp` (18, separate) | Cream walls, timber beams, green fabrics, plants and window light | Same wood/grass/cream ramps indoors; readable furniture footprints |
-| Sheet 7, 12, 13, 14, 17 | Dusk, night, orange autumn or unusually yellow grading conflict with the daytime majority | Do not average these into the default palette; seasonal variants need a separate reviewed profile |
+`VisualAssetPack/Sunnyside_World_ASSET_PACK_V2.1/Sunnyside_World_ASSET_PACK_V2.1/Sunnyside_World_Assets/`
 
-**Observed:** mostly smooth 3D surfaces, soft light and perspective cameras. None
-establishes a tile grid, pixel density or animation count. **Chosen below:** all
-pixel sizes, projection, silhouettes, ramps, timings and screen layouts. Do not copy
-reference characters, room arrangements, logos or recognizable building outlines.
-References are aesthetic evidence only; no source pixels are redistributed.
+The Gamemaker folder is outside this profile. License basis supplied in the brief:
+free and commercial use, modification and style study are allowed.
 
-All v1 samples are original programmatic pixel drawings, including the modular
-creatures and bitmap glyphs. No ImageGen, external packs, paid calls or downloads
-were used. For later tiles/props, an approved CC0 16x16 pack may supply a starting
-asset: retain its local license/source record, adapt its shape and palette, then
-apply this checklist. No pack license is asserted for assets not actually imported.
+References inspected in the requested order:
 
-Change record: v1.0 establishes 384x216, 16x24 player, 32x32 portraits and the
-28-color palette; these override the skill's starting proposals and the older
-16x16 player note. New colors or exceptions require a versioned entry here.
+| Evidence | What it establishes |
+| --- | --- |
+| `VisualAssetPack/BuiltDemo/Screenshot 2026-10-31 111131.jpg`, then `hBwJz2.jpg` | Scene density, proportions in context, layered cliffs, bridges, farms, timber buildings and water. JPEG colors are not palette evidence. |
+| `.scratch/art/pack/tileset.png` | Overview of the 16 px atlas: terrain joins, architecture, furniture, goods, foliage and icons. |
+| `.scratch/art/pack/people.png` | First-frame comparison of human actions, base, six hair choices and tool layers. This is a preview, not the animation layout. |
+| `.scratch/art/pack/ui_elements.png` | UI, animal, plant and crop overview; labels and preview background are not source pixels. |
+| Original PNGs in `PACK/Tileset`, `Characters`, `Elements`, `UI` | Exact dimensions, opaque colors, alpha, outlines, complete strips and the gap audit. Both tilesets were inspected. |
+| `PACK/Characters/_Source/**/*.aseprite` and supplied GIFs | Frame tags, durations and discrepancies in exports. |
+| `client/src/pixel/monster.ts` | Existing pet slots, build ratios, layer order and front/back behavior to preserve when drawing replacements. |
+
+**Observed** means inspected pixels or file metadata. **Chosen** means a
+production rule where the pack supplies no game-specific contract. No directional
+sprite set, battle layout, font or animation speed is inferred from a still.
+Measurements use original resolution and zero-based pixels.
 
 ## Palette
 
-Exactly **28 unique opaque RGB colors**; transparency uses no additional slot.
-The candidate extraction is a histogram, not an authoritative source palette.
-Retain its cream `#F4DEC6` and muted teal `#43847C`; replace near-black `#14181C`
-with softer green ink, merge duplicate greens into one light ramp, soften strong
-blue/cyan into teal, and turn lemon yellows/oranges into honey and coral accents.
-The following marked block is the only canonical quantization palette.
+The canonical block contains **32 unique opaque RGB colors**, all sampled exactly
+from original pack PNGs at alpha 255, without quantization, averaging or JPEG
+sampling. This is a curated working subset, not the author's complete palette:
+the 16 px atlas alone has **338 visible RGB values** at alpha > 0. Native assets
+retain their original colors. Do not quantize the whole pack to this subset; use
+it to author new assets for the daytime village direction.
+
+Rows run dark to light. Outline, rim and specular entries are available roles,
+not instructions to use every entry on every material patch.
 
 <!-- moodboard:palette:start -->
 | Material | Shadow -> base -> light | Usage |
 | --- | --- | --- |
-| Grass | #537D59 -> #78A05D -> #9FC66A -> #BFDA82 -> #DDE8A3 | Shadow under foliage -> lower foliage -> meadow/base leaves -> upper-left leaves -> small sunlit tips. Terrain uses the middle three most often. |
-| Water | #43847C -> #519F95 -> #6CBAB2 -> #9ED7CA -> #D4EADD | Recess/leaf stem -> deep channel -> surface base -> short ripple -> rare glint/window reflection. Never fill a whole river with the darkest tone. |
-| Wood | #795849 -> #A57954 -> #C69A67 -> #E0BC85 -> #F4DEC6 | Recess/structural line -> endgrain -> plank/furniture base -> lit plank/path -> cream trim and wall. Wood stays warm indoors and outdoors. |
-| Stone | #7A8F89 -> #9CAC9B -> #BFC7AF -> #DDE1C6 | Cool crevice/disabled text -> shaded rock -> rock base -> lit top. Reuse for quiet UI borders and pale banks. |
-| Skin/fur | #B88163 -> #D8A67A -> #EBC796 -> #F7E5BA | Fur underside/skin shadow -> cheek or fur base -> lit fur -> muzzle/belly/tiny highlight. Grass or water ramps may color alternate creature bodies. |
-| UI | #39463F -> #7A8F89 -> #BFC7AF -> #F4DEC6 -> #FFF3D8 | Shared ink/normal text/silhouette -> disabled text -> inner keyline -> border -> opaque panel background. No dark panel fill. |
-| Accents | #BC756B -> #E69B86 -> #EDC76A | Muted coral shadow/error marker -> blush/coral flower -> honey flower, selection badge or lamp core. A role list, not a shading ramp. |
+| Grass | #193C3E -> #265C42 -> #3E8948 -> #53A641 -> #63C74D | Deep foliage edge -> underside -> main canopy -> lit leaf clusters -> bright tips and meadow base. |
+| Grass detail | #3E8948 -> #63C74D -> #7BCF5C | Dark tufts -> meadow -> small lighter ground flecks; keep most ground flat. |
+| Water | #124E89 -> #1E6DD5 -> #0099DB -> #2CE8F5 -> #FFFFFF | Deep shore band -> blue shore rim -> open-water base -> cyan pool/glint -> narrow foam or sparkle. |
+| Wood | #733E39 -> #B86F50 -> #C58A63 -> #E4A672 | Seams/underside -> shaded furniture -> structural timber -> lit boards, rails and trim. |
+| Stone | #262B44 -> #5A6988 -> #8B9BB4 -> #C0CBDC | Dark crevice/edge -> shadow -> stone/metal midtone -> upper face or bevel. |
+| Skin/fur | #BB6D53 -> #C87F5B -> #E8AD7D | Tiny skin/fur shadow -> warm edge -> broad human skin/light tan fur. |
+| UI | #171424 -> #181425 -> #262B44 -> #C0CBDC -> #FFFFFF | Human ink -> general panel ink -> blue-black icon edge -> default panel fill -> bevel/icon white. The two inks are actual distinct source colors, not a useful shading transition. |
+| Pink fur | #B74851 -> #E17276 -> #FF979B | Pig-like underside -> warm pink midtone -> broad light pink; also creature cheeks. |
+| Red/coral | #BE4A2F -> #E43B44 -> #FF979B | Warm red shadow -> cloth/heart/error accent -> small pink highlight. |
+| Gold | #BE4A2F -> #FEAE34 -> #FEE761 | Deep orange edge -> orange crop/lamp/accent -> tiny yellow highlight. |
+| Sand | #C58A63 -> #E4A672 -> #E4D572 | Bank detail/shadow -> warm path -> sand base; reuse existing wood colors. |
 <!-- moodboard:palette:end -->
 
-Six material ramps contain 3-5 ordered tones each; the accent row is a three-color
-budget. Reuse entries rather than adding colors per asset. Use at most 4 tones in
-one small material region (5 permitted for large foliage/water). Keep ink below 3%
-of non-UI scenery when practical; avoid continuous ink terrain borders. Accents
-should occupy at most 5% of the scene outside UI. A sprite may use more of its own
-coral/gold marks when these identify its anatomy.
-
-Normal text is ink on the UI cream, with a measured contrast ratio recorded in
-`verification.json` (target >=7:1). Disabled text remains secondary, never the only
-way to communicate state. HP/focus/error states include a number, pointer or label
-as well as color. Warm interiors reuse wood/cream, grass upholstery, teal glass,
-and gold lamp cores; they introduce zero new colors.
+Palette provenance: grass/shore/sand and structural wood occur in
+`Tileset/spr_tileset_sunnysideworld_16px.png`; skin occurs in human base strips;
+pink occurs in `Elements/Animals/spr_deco_pig_01_strip4.png`; gray, ink, white and
+accents also occur in UI and character exports. A scan of all **396 source PNGs**
+verified every canonical RGB at full opacity. Transparency consumes no color
+slot; shadow opacity is specified separately below. Warm interiors reuse wood,
+stone, red cloth and gold rather than introducing a separate grade.
 
 ## Pixel grid and camera
 
-Plain Canvas2D composition, **16x16 tiles**, **384x216 logical pixels** at 16:9:
-24 columns by 13.5 rows. Draw 14 tile rows, clip the last 8 px; do not stretch the
-tile grid to fit. Camera is top-down with visible front faces on trees, walls and
-furniture. Parallel verticals, no vanishing point or isometric diamonds. Scroll
-and place sprites at integer logical coordinates, including camera subtraction.
+**Observed:** the main atlas is **1024x1024**, a **64x64 grid of 16x16 cells**, with
+unused transparent space and no intervening gutters. The additional
+`spr_tileset_sunnysideworld_forest_32px.png` is **320x576**, a 10x18 grid of 32 px
+cells for larger forest pieces; this does not change the world's 16 px base grid.
+The view looks down onto tops while showing vertical front faces, with parallel
+verticals and no isometric diamonds or perspective convergence.
 
-| Role | Cell size | Anchor / padding / facing |
+| Role | Measured source dimensions / proportions | Production anchor or use |
 | --- | --- | --- |
-| Player | 16x24 | (8,23); bottom-center contact, one clear pixel at top/sides. Directions down/left/right/up. Height includes headwear. |
-| Overworld pet | 16x16 | (8,15); one clear pixel top/sides, feet may touch anchor row. Larger species use a fixed 24x24 cell and (12,23), never per-frame resizing. |
-| Battle front | 64x64 | (32,59); one clear pixel sides/top, four transparent rows below ground row. Faces down-left toward opposing platform. |
-| Battle back | 48x48 | (24,43); four transparent rows below ground row. Faces up-right; show ears/tail/pattern rather than a second face. |
-| Portrait | 32x32 | (16,31); head/upper-body crop, 1 px side/top margin; no implied ground contact. |
-| Tree | 32x48 | (16,47); canopy within x=1..30, y=1..32; trunk/root reaches contact row. Ground collision 16x16. |
-| A-frame exterior | 48x48 | (24,47); 3x3 visual tiles; 48x32 blocked footprint in bottom two tile rows, with center 16x16 doorway override. Ground row is the bottom stair. |
-| Text frame source | 12x12 | 4x4 corner cells; cut coordinates 0,4,8,12 on both axes. |
+| Human animation | **96x64 per frame**, one horizontal action strip. First bald idle occupies x=43..53, y=23..38: **11x16 visible pixels**. With bowl hair: x=42..54, y=21..38, **13x18**. | Preserve the full action canvas and layer alignment. Chosen ground guide **(48,39)**, immediately below the first idle's feet. Do not center each trimmed frame independently. |
+| Human anatomy | The bald head occupies roughly the upper 11 rows of a 16 px silhouette; torso and legs occupy about the lower 5. Hair adds height/width, not a larger body. | Large rounded rectangular head, tiny torso, short legs; 1x2 px eyes, sparse face marks. A 96 px canvas does not mean a 96 px person. |
+| Small animals | Bird and duck: **16x16 cells**, 4 frames. | Keep native padding and ground point. |
+| Larger animals | Chicken, cow, pig and sheep: **32x32 cells**, 4 frames. A pig's first cell including shadow occupies **18x21**, not the entire cell. | Keep the native cell, not a 32 px solid silhouette. |
+| Trees | Animated broadleaf **32x34** and conifer **28x43** cells, 4 frames each; static canopy groups also exist. | Bottom trunk/root is the sorting point. Do not cut a 34/43 px sprite into a 32 px height. |
+| New modular pets | **16x16, 32x32, 48x48**, each in **front and back** views. Brief/code requirements, not supplied pack assets. | Chosen guides **(8,14), (16,30), (24,45)**. Keep at least 1 clear pixel at top/sides after outlining, and a fixed guide across layers/frames. |
 
-Scale the final framebuffer by the largest fitting **integer** (e.g. 5x on a
-1920x1080 area, 3x on 1366x768); center and letterbox remaining pixels. Review
-exports are exactly 4x = **1536x864**. If a portrait viewport is supported, crop
-the world width in whole tiles and reflow UI; do not squeeze the 384-wide UI.
-The supplied mockups prove only the 384-wide layout.
+**Chosen:** retain the established **384x216 logical viewport**. Draw 14 terrain
+rows and clip the final 8 px; do not stretch tiles to fit. Keep source pixels and
+camera subtraction on integer coordinates, use nearest-neighbor sampling, scale
+the complete view by a whole integer and letterbox the remainder. Judge new art
+at 1x and 4x. Pet resolutions are separately drawn, never scaled versions of one
+master with thicker outlines.
 
 ## Outlines and pixel clusters
 
-Use a 1 px ink silhouette on small characters and key interactive prop bases;
-use wood shadow on warm structural edges and grass shadow on leaf silhouettes.
-Break the dark edge on upper-left foliage and long sunlit roof edges in favor of
-the material's midtone. Never add a second outline at joins. Interior separators
-use the material shadow rather than universal ink.
+**Observed:** human silhouettes primarily use near-black purple **#171424**;
+general UI and many small objects use **#181425**. Animals, pale icons and stone
+often use blue-black **#262B44**. Main silhouettes are generally **1 logical px**,
+with locally thicker corners, hair masses or contact edges. Do not turn those
+filled masses into a uniform 2 px contour.
 
-Build curves with stair steps of 1-3 px; use 2x2 or larger highlight clusters.
-One-pixel exceptions: eyes, mouth, glyph strokes, flower centers, roof seams and
-leaf veins. Creature eyes are 2x2 at battle scale and 1 px at overworld scale.
-Avoid checker texture, isolated random noise and hair-thin diagonals. Terrain has
-no ink silhouette. Use 1-3 small grass/stone clusters per 16x16 tile with at least
-the outer 2 px free of random detail; combined detail coverage <=12% of a flat tile.
-No antialiasing, smoothed brushes, fractional placement or outline filters.
+Foliage uses its dark green/teal ramp at the lower perimeter; beams, fences and
+furniture use brown seams. Terrain has colored lips and banks rather than a
+universal black border. Lit upper foliage and timber edges can meet neighboring
+colors without an ink line. Internal marks are material shadows except facial
+features, icon marks and the darkest recesses.
+
+**Chosen:** use one silhouette outline on the assembled pet, with colored
+internal seams. Merge attachment masks before outlining so there is no black
+join across an ear/head attachment. Curves use deliberate 1-3 px steps;
+highlights form connected blocks. Reserve isolated pixels for eyes, seeds,
+sparkles and tiny surface details. Never smooth or antialias an outline.
 
 ## Lighting and ramps
 
-World light comes from upper-left (screen NW). Cluster highlights on upper/left
-surfaces and shadows on lower/right. Cast contact shadows separately in the scene,
-offset (+3,+2) logical px; use a solid material shadow, never translucent black.
-Tree shadows are flattened green shapes, creature shadows are small green/teal
-ellipses. Shadows do not belong in sprite images.
+**Observed:** top and upper-left surfaces carry the brightest clusters; lower
+and right faces are darker. Leaves have lobed patches, rocks have broad planes,
+wood has short horizontal grain/seam marks, and roofs have repeated little tile
+clusters. Shade a form, not every individual pixel.
 
-Use discrete ramp steps: shadow, base and light, plus a small optional brightest
-cluster. Cool green/teal shadows sit beside warm yellow-green or cream highlights;
-keep timber shadows warm to preserve its material. No gradients, baked AO/glow,
-specular noise, fog overlays or per-asset color grading. Interior lamps may light
-the nearest 16 px with wood light and gold; maximum two sources per room, with no
-new hue and no softened sprite edges. This is a local exception to NW lighting.
+| Material | Observed tones, excluding tiny near-duplicate RGB variations | Rule for new assets |
+| --- | --- | --- |
+| Meadow | One broad base plus 1-2 lighter fleck colors; darker edge/tuft patches. | Flat base with sparse clustered details; avoid filling empty ground with texture. |
+| Foliage | About 4-5 main green shading levels, a deep colored edge and occasional extra bright tips. | Use the grass ramp; place light clusters high/left and dark clusters below. |
+| Water | One broad blue surface with 2 subtle ripple tints in the atlas; banks have distinct dark-blue, blue and white bands. | Keep ripples low contrast; reserve white for narrow foam and isolated glints. The working palette deliberately consolidates the subtle source tints. |
+| Wood | Usually 3-4 broad brown tones, with optional extra light trim on larger furniture. | Shadow/seam, base and lit face; use a fourth tone only for a distinct plane or grain. |
+| Stone / metal | About 3 face tones plus a dark edge; occasional white speculars. | Broad cool planes, one small top/left highlight, dark underside; no smooth shine gradient. |
+| Human skin / fur | Human skin is mostly one broad light fill plus tiny edge shades. Pink animals use about 3-5 fill shades plus outline. | New pets start with 3 material tones; add a shared tone only for a distinct feature or plane. Keep faces simple. |
+| Cloth / UI | Cloth commonly has 2-3 fills plus an edge; UI has flat centers with stepped bevel/outline bands. | Separate flat clusters and an explicit focus mark, never a soft bevel filter. |
+
+**Chosen:** keep a single upper-left daylight convention for new assets,
+consistent between independently drawn front and back views. Interior lamp/fire
+animation may use gold locally; it does not recolor every neighboring sprite or
+introduce a new material palette.
+
+### Shadows
+
+The pack **does bake contact shadows into some sprites**. Pig, cow and chicken
+strips contain hard-edged, flattened **#262B44 at alpha 74/255** ellipses beneath
+the feet, spreading a little down/right. The broadleaf animation has a native
+dark-teal shadow at alpha 49/255. These are translucent pixel shapes, not blurred
+drop shadows. Cliff faces use opaque warm bands, with dark shore bands below.
+
+The windmill has separate `spr_deco_windmill_strip9.png`,
+`spr_deco_windmillshadow_strip9.png` and
+`spr_deco_windmill_withshadow_strip9.png`; its shadow uses **#181425 at alpha
+79/255**. Use either the combined strip or the sprite plus its shadow, once.
+
+**Chosen:** deliver new pet contact shadows separately using the animal shadow
+color/opacity, so modular parts do not stack shadows. Use a crisp stepped ellipse
+beneath the feet, without an outline; keep its anchor stable while the body bobs.
+Do not add a second ellipse beneath a native asset with a baked shadow.
 
 ## Dithering and alpha
 
-**No dithering in v1**, including terrain, characters, UI and effects. Shade with
-connected flat clusters instead. All PNGs are RGBA with **binary alpha 0/255**;
-opaque backgrounds for mockups, transparent backgrounds for sprites/frame/glyphs.
-No partially transparent edge or effect exception in this profile. Transparent
-pixels use ink RGB for strict palette checks (the quantizer's zeroed invisible
-RGB is normalized to ink afterward). All visible RGB is canonical without exception.
+**No regular checkerboard dithering** for new assets. The references use flat
+connected shading clusters, ground flecks, grain and roof patterns; these are
+intentional shapes rather than gradient dithering. Avoid random pixel noise.
+
+Use alpha **0/255 on new sprite silhouettes and UI edges**. Explicit exceptions:
+the shadow layers above and supplied VFX with native opacity. Preserve original
+PNGs, including occasional translucent foliage pixels; the pack is not uniformly
+binary-alpha. Translucent source pixels do not permit antialiasing a new sprite's
+perimeter. Ignore RGB under alpha 0 when checking palette membership.
 
 ## Tiles and seams
 
-Use **16 N/E/S/W edge masks plus 4 inner-corner patches**, not a 47-blob mixture.
-Mask bits N=1, E=2, S=4, W=8. In a shore mask a bit means neighboring **water**;
-in a path mask it means a **connected path**. Atlas cell index equals the mask,
-left-to-right then top-to-bottom in a 4x4 sheet. Inner-corner patch order is
-NW/NE/SE/SW in one row, alpha over a grass tile; apply when the two cardinal
-neighbors are land but the diagonal is water. Compute these from the map, not
-from hand-selected scene-specific tile IDs.
+**Observed:** the atlas supplies grass/path transitions, beach and cliff shore
+edges, outer and inner corners, repeated cliff faces, bridge/fence parts, soil,
+roof modules and furniture. Grass has irregular stepped lips; water banks use
+crisp colored bands. Bridges have separate planked decks, posts and rails.
+Buildings use timber fronts and blue, green, orange, red or purple tiled roofs.
 
-Bank cross section, measured inward from an open edge: 3 px water, 1 px honey
-bank, 1 px grass lip, then grass base. N/W lips use grass light; S/E lips use grass
-shadow. Orthogonal joins use the union of exposed edge strips; the four concave
-5x5 corner patches (a 3x3 water cut plus bank/lip) close diagonal holes. Straight water borders use surface base,
-with no edge decoration, so neighbors meet. Only interior ripples move.
+**Chosen:** map supplied pieces by explicit atlas rectangles. Their arrangement
+is not v1's numeric 16-mask order, and no machine-readable autotile map was found.
+Keep each source corner/endcap with its matching edge family. For a new terrain
+family, deliver straight N/E/S/W edges, four convex corners, four concave corner
+patches, an interior, an isolated patch and required endcaps; document the lookup
+rather than inventing an atlas index convention.
 
-Paths have a 12 px dirt center on a single tile, 2 px grass margins on
-disconnected sides, and a 12 px connection to the border on connected sides.
-The four 2x2 corner pixels remain grass under this 16-mask grammar. A 1 px inner dirt
-line separates open margins. For every side join, the touching edge pixels must
-match. Bridges are 16 px modules, 12 px walking deck with 2 px rail bands, wood
-planks every 4 px, plus explicit land endcaps. No diagonal bridge. Future cliffs:
-one 16 px rise; 8 px visible front face below a top rim; no walk across a face.
+Repeat 16 px cliff-face modules to make height; never stretch the texture. Keep
+the top lip, face and water rim on separate map layers. Preserve bridge deck
+width and rail endcaps when extending a bridge. Preview every new tile in a 3x3
+repeat, a straight join, an inside corner and an outside corner, including
+against the supplied tiles.
 
-Maintain 3 base variants and 2 optional detail overlays per grass/path terrain;
-detail overlays cover <=12% and avoid the outer 2 px. Water: 4 animation cells,
-same edge pixels and bank geometry. Samples include 3 grass variants, path/shore
-mask atlases, four inner corners, two detail overlays and four water frames.
-`tile-patch-3x3.png` is 48x48: each row is vertical path / east shoreline / water.
-It proves one straight bank orientation, not the complete runtime tile system.
-The verifier checks connected borders in all 16 masks and water animation borders.
-
-Farms use 16x16 cells with a 12x12 inset bed, one-tile walking aisles between groups
-of at most 3x2 beds. Dry soil uses wood shadow/base; wet soil uses wood shadow plus
-teal corner marker; 4 static crop stages: seed mark, two leaves, leafy plant, ripe
-root with gold tip. Shape changes as well as color. No automatic growth animation.
+Crop files are **static states**, not an animation: `_00` is the seed item,
+`_01.._04` are plant stages, and `_05` is the harvested item. Keep a 16 px planting
+grid but allow plants to overhang it: `sunflower_04.png` is **13x19**. Soil images
+are **16x12**; their footprint and native offsets must not grow with the crop.
 
 ## UI and text
 
-`ui-frame-12.png` is a **12x12 9-slice**, cuts at 4 and 8. Corners stay exactly 4x4;
-tile the 4 px edge spans/center and clip the final repeat as needed. Minimum box
-12x12. Border uses stone/wood/cream, background opaque UI cream, 1 px stepped
-outside corners with alpha. Do not stretch corners or apply a fuzzy shadow.
+**Observed:** `UI/9slice_box_white/` has **three sets of nine 3x3 pieces**, prefixed
+`w_`, `lt_`, `dt_`. A set assembles into a **9x9 minimum source**, with **3 px
+corner and edge-slice spans**, replacing v1's 12x12 source and 4 px corners.
+The white set's straight edge is **1 px #181425 ink + 1 px white bevel**, then
+**#C0CBDC fill**; the third pixel in an edge slice already belongs to the fill.
+The other sets are warm light/dark variants. Corners are sharp and stepped.
 
-Use original uppercase **5x7 marks in 6x8 cells**, 8 px nominal height, **10 px
-line height**, 4 px panel padding. `font-6x8.png`: ASCII 32-95, 16 columns x 4 rows,
-96x32; index = codepoint-32. Unsupported lowercase is uppercased; unsupported
-symbols become `?`. Atlas glyph RGB is ink; selection adds a pointer and pale
-grass fill, disabled text uses stone shadow plus a state label.
+The pack supplies **15x7** state bars, **4x13 / 16x13 / 4x13** label
+left/middle/right pieces, hands, arrows, selection corners, emotion icons and
+tools. Preserve native icon proportions and bar borders. Use supplied fill
+states or redraw only the interior; do not stretch an entire icon or bar.
 
-Dialogue box: **(8,160), 368x48**. Portrait at **(16,168), 32x32**, text at
-**(56,168)**, content width 312 px = **52 cells**, max 3 lines at y=168,178,188.
-Word-wrap before overflow; hard-break a token longer than 52 cells; paginate
-beyond 3 lines, with a 3 px advance marker at (366,198). Never shrink the font or
-let text enter the border. Without a portrait, text starts x=16 and gains 6 cells.
-World controls and important targets stay above y=152 while dialogue is open.
+**Chosen:** use the white set for new dialogue/menu panels. Fix 3x3 corners;
+repeat edge spans and the center, clipping the final repeat. Keep 4 px clear
+padding inside the border. Use ink on gray for text; focus gets a pointer or
+corner bracket plus a color change. Disabled/error/health states need a symbol,
+label or number as well as color. The canonical ink on the default fill measures
+**11:1 contrast** before display effects; keep normal text at least 7:1.
 
-Battle scene: top-left enemy panel **(16,20), 132x36**, lower-right own panel
-**(230,114), 146x38**. HP is numeric and a 3 px filled bar; character name and level
-share a row. Bottom prompt **(8,160), 216x48** with 32x32 portrait; text width
-160 px (26 cells), max 3 lines. Menu **(228,160), 148x48** holds 2x2 choices:
-Fight / Teach / Swap / Run, 70x18 hit regions. Keep names <=12 glyphs in HP panels;
-truncate long display names with `...`, never silently overflow. UI readable at 1x
-and with CRT disabled is an acceptance requirement.
+No font was found in the allowed pack. Retain the project's original **5x7
+glyphs in 6x8 cells**, **10 px line spacing**, as a chosen UI convention. At
+384x216, the existing dialogue rectangle **(8,160), 368x48** remains the baseline:
+**32x32** portrait at **(16,168)**, text at **(56,168)**, at most **52 cells per
+line / 3 lines**. Wrap before overflow, hard-break oversized words and paginate
+longer text; never shrink the font. Keep important world targets above y=152
+while this box is open. These are project choices, not pack measurements.
+
+`UI/expression_chat.png` is an existing **9x9 ellipsis speech icon** for generic
+chatter. A larger thought/plan bubble must reuse the panel vocabulary and add an
+intentional tail/state symbol; the tiny icon is not a full text box.
 
 ## Scene grammar
 
-Overworld: grass/path/water layers, then beds/low props, depth-sorted actors and
-tall props by ground-anchor y, then dialogue. One-tile routes are minimum; use
-two tiles near houses and junctions. Bridge decks override water collision only
-on their center 12 px. Keep about two-thirds of walkable ground free of decor.
-Trees occupy a 1x1 collision tile while their 2x3 canopy can occlude; draw actors
-in front once their feet pass the trunk contact. No overlay card over the player.
+Draw ground, low decor, feet-sorted actors/tall props, then UI. Sort trees by
+trunk contact and buildings by ground footprint, not canopy or roof top. Choose
+at least one 16 px tile clear for routes, widening to 32 px at doors, markets and
+junctions. Group detail around farms and buildings, with quiet ground between.
+Preserve front-facing doors, timber bands and steep tiled roofs rather than
+forcing every building into v1's small A-frame.
 
-A-frame: 3x3 visual footprint, triangular front and two narrow roof slopes,
-12 px door centered on the bottom tile, 2 px stair treads at the front. Transition
-through the central 16x16 entry tile. Interior is a separate **12x9 tile room**,
-192x144 at (96,8), with a bottom-center two-tile entrance; NW warm ambient light.
-Furniture footprints: stool/plant 1x1, table/bed 2x1, sofa 2x1. Hide the roof and
-front wall entirely inside; decor above the player's feet occludes consistently,
-never place a front wall across the exit. Leave a full one-tile loop from entry
-to bed/table; dialogue uses the same bottom 48 px. No interior proof is supplied.
+Interiors reuse timber, red rugs/cloth, gray stone and existing small furniture.
+Choose 16 px collision footprints independently from overhanging art. Hide an
+obstructing roof/front wall when inside and keep the exit readable. These are
+layout choices; no complete interior map was supplied in the brief.
 
-Battle: two opposing shallow platforms. Enemy front cell at **(240,38)** with
-ground anchor **(272,97)**; own back cell at **(80,98)**, ground **(104,141)**.
-Platform extents roughly (224,92)-(320,116) and (48,132)-(160,154). Enemy panel
-stays left of the enemy; own panel right of the player. Background is quiet pale
-teal/green flat layers, not a perspective stage. Reserve y=160..207 for decisions;
-no sprite/effect enters it. Portraits retain the same creature's ears/pattern.
-
-Farm states retain their bed footprint. Other owned pets may rest in open home
-ground; use a static pose until activity frames are authored, not size changes.
-Sample layouts are original compositions for checking style and legibility.
+For battle, place the opponent's front view above/right and the player's back
+view below/left, each on a quiet shallow ground patch. Use the chosen 32/48 px
+pet cells and fixed ground guides. Reserve the bottom 48 px for decisions and
+keep effects out of text. This is a project convention, not a second camera
+style demonstrated by the pack.
 
 ## Animation
 
-Cells never change size or anchors. Sheets contain no gutters/extruded pixels.
-Frame numbers below begin at 0; all times are chosen production rules, not facts
-inferred from the refs. Samples contain **static poses only** except water cells.
+**Measured character timing:** all **211 frames** in each supplied human source
+file and the goblin source have **75 ms** durations (**13⅓ fps**), with forward
+tags. Human base/hair/tool PNGs share **96x64** cells, frame 0 at the left, with no
+direction rows or gutters. Keep layers on the same frame index. Six hair exports
+are bowl, curly, long, mop, short and spikey. Actions can pose the character
+differently; they do not supply four complete travel views.
 
-| Sheet / row order | Columns and exact timing | Loop / behavior |
+| Human source tag / exported action | Frames | One cycle at the measured 75 ms |
 | --- | --- | --- |
-| Player/pet idle; rows down, left, right, up | 2 columns; 500 ms each (2 fps) | Loop; only upper body moves 1 px, feet fixed |
-| Player/pet walk; same direction rows | 4 columns; 125 ms each (8 fps) | Loop 0,1,2,3; stop on idle cell 0 |
-| Battle front/back idle, separate files | 2 columns; 400 ms each (2.5 fps) | Loop; squash at most 1 px, contact fixed |
-| Battle attack | 4 columns; 100 ms each (10 fps) | Once; anticipation, lunge, contact, recover; runtime translation <=4 px |
-| Battle hit | 2 columns; 80 ms each (12.5 fps) | Once; normal / material-light flash, no alpha fade |
-| Battle faint | 4 columns; 140 ms each | Once, hold last until removal; shrink upper body downward, anchor remains fixed |
-| Water | 4 columns; 250 ms each (4 fps) | Loop 0..3; move interior ripple clusters only |
-| Crop growth | 4 columns; static state IDs 0..3 | Switch by simulation state; never time-loop |
+| walk, run, carry, doing, hurt | 8 each | 600 ms |
+| idle, jump, waiting | 9 each | 675 ms |
+| watering | 5 | 375 ms |
+| axe, mining, attack, caught, roll | 10 each | 750 ms |
+| death, dig, reeling | 13 each | 975 ms |
+| swimming | 12 | 900 ms |
+| casting | 15 | 1125 ms |
+| hamering (source spelling; folder `HAMMERING`) | 23 | 1725 ms |
 
-Atlas layout is `[frame x direction]` for walkers, `[frame x 1]` for battle/water
-and crops. Independently mirror neither lighting nor asymmetric creature marks;
-author opposite-facing cells with consistent NW highlights.
+Goblin GIFs confirm these counts but store **70 ms** delays. Some goblin PNGs
+have inconsistent names/dimensions: `spr_attack_strip10.png` is **864x64**, only
+nine 96 px cells, while its GIF/source has ten frames; some longer exports wrap
+onto extra rows. Resolve from Aseprite/GIF before use, rather than trusting the
+suffix. Skeleton GIFs have idle **6**, walk **8**, attack/hurt **7**,
+jump/death **10**, all at **70 ms**, with 96x64 frames. Do not conflate these
+with the human counts.
+
+| Environment strip / state family | Measured frame/cell count | Playback rule |
+| --- | --- | --- |
+| Bird, duck; chicken, cow, pig, sheep | 4; 16x16 or 32x32 as above | **Chosen:** 150 ms/frame, loop (600 ms cycle). |
+| `spr_deco_blinking_strip12` | 12, 16x16 | **Chosen:** 75 ms/frame once, then wait 2-4 seconds before the next blink. |
+| Mushrooms | 4, 16x16 | **Chosen:** 200 ms/frame, loop. |
+| Broadleaf / conifer | 4, 32x34 / 28x43 | **Chosen:** 250 ms/frame, loop, unchanged trunk anchor. |
+| Coracle | 4, 48x37; separate land sprite 32x30 | **Chosen:** 150 ms/frame, loop; the land sprite is not a water frame. |
+| Windmill and matching shadow | 9, 112x112 | **Chosen:** 100 ms/frame, loop in lockstep. |
+| Chimney smoke 01..05 | 30 each; cells 15x37, 10x30, 18x21, 20x32, 24x19 | **Measured GIF:** 100 ms/frame, 3 second loop. |
+| Fire 01 / 02 | 4; 5x10 / 8x12 | **Chosen:** 100 ms/frame, loop. |
+| Glint 01 / 02 | 6 / 4; 7x7 | **Chosen:** 100 ms/frame once, then hide until retriggered. |
+| Water tiles | Static atlas artwork; no water animation strip found | Keep static. If ripple animation is later commissioned, choose 4 frames at 250 ms with unchanged bank edges. |
+| Crops `_00.._05` | 6 static states, not 6 growth-animation frames | Select by seed/growth/harvest state; never time-loop. |
+
+PNG-only environment strips do not encode timing. The chosen rates are not
+claims about the demo executable. For gameplay, loop locomotion, idle and
+repeated work; play hurt, death, jump, roll and individual actions once when
+triggered. This behavior is chosen even though preview GIFs loop.
+
+**Chosen new-pet baseline:** idle **4 x 150 ms**, walk **8 x 75 ms**, attack
+**6 x 75 ms**, hit **2 x 75 ms**, faint **6 x 100 ms**; idle/walk loop, the rest
+play once. Author matching front/back cells and every layer needed by that action.
+Keep the root guide fixed; allow a 1 px body bob without moving detached parts.
+These are new deliverables, not animations already present in the pack or code.
+
+## Modular pet contract
+
+Preserve the anatomy and gene vocabulary in `monster.ts` while repainting in
+pack style. Its old ramps and header's old size examples are not the v2 palette
+or the brief's 16/32/48 size contract.
+
+| Slot / control | Required variants and behavior |
+| --- | --- |
+| Body/build | `pal`, `brute`, `skitter`, `turtle`, `bully`; shared feet, body and head. Gene `size` scales within the fixed cell. |
+| Main / accent hue | `hue` selects a body ramp; `accentHue` selects a coordinated accent ramp. Use canonical material colors, not arbitrary HSL colors. |
+| Ears | `pointy`, `round`, `floppy`, `bunny`, `tuft`, attached at common head landmarks. |
+| Tail | `puff`, `nub`, `curl`, `fox`; root behind the body. The absent state adds no pixels. |
+| Horns | `nubs`, `unicorn`, `antlers`; absent state does not alter head placement. |
+| Pattern | Unpatterned state, `belly`, `stripes`, `spots`; belly only in front, stripes/spots on the back too. |
+| Face | Front only: eyes, optional cheeks and a catchlight only if the eye has space. Back has no second face. Simplify at 16 px. |
+
+Code proportions are relative to `k = cell size * look.size`: full body
+width/height and head radius respectively: `pal` **0.62/0.50/0.24**, `brute`
+**0.78/0.60/0.20**, `skitter` **0.50/0.36/0.22**, `turtle` **0.80/0.44/0.17**,
+`bully` **0.70/0.56/0.22**. Use these attachment guides, then hand-clean clusters
+rather than reproducing smooth ellipses at larger resolution.
+
+Composition follows the existing model: **tail -> feet/body/head -> ears and
+horns -> body pattern -> front face -> shared exterior outline**. Keep the
+contact shadow separate. Render the same gene identity at all three sizes and
+both views, retaining ear, horn, tail and pattern landmarks; never horizontally
+flip a front view to manufacture a back view.
 
 ## Rendering and delivery
 
-PNG RGBA, exact logical sizes, sRGB entries, binary alpha. Sample naming is
-`tile-*`, `prop-*`, `monster-mallow-{front,back,overworld,portrait}.png`,
-`ui-*`, `mock-*`; atlases and cut/anchor metadata are in `manifest.json`.
-Future animated names: `<subject>-<view>-<action>.png` with the row convention
-above. Keep gene slots body / ears / tail / pattern independent; render the same
-gene record separately at each resolution, not a blurred/downscaled battle sprite.
-The sample generator includes two choices per slot and two example gene records;
-it is an art proof, not integration with the existing runtime genetics or a
-guarantee that future hatches can never share a visual combination.
+Deliver sRGB **PNG RGBA at logical resolution**, with source-sized pixels, no
+gutters unless an explicit manifest requests them, and one constant cell/anchor
+per strip. Suggested naming:
+`pet-<build>-<slot>-<variant>-<16|32|48>-<front|back>-<action>.png`.
+Record frame size/count/duration, layer order, pivot, collision footprint and
+shadow inclusion in the manifest when assets are commissioned. Keep native
+file names and source copies unchanged.
 
-Canvas image smoothing off, integer source/destination rectangles. Apply CRT
-scanlines, curvature, bloom and optional RGB offset **once after scene + UI
-composition**, never in an asset or these mockups. Start renderer review at
-scanline darkening <=8%, bloom contribution <=5%, barrel edge displacement <=2
-logical px and RGB shift <=0.25 logical px. CRT off is required. Inspect both
-states with all UI visible, preserving >=7:1 effective normal-text contrast and
-no cropped edge text; reduce effects if this fails. These are review limits,
-not implemented shader settings.
+No baked scanlines, glow, vignette, chromatic fringes or smoothing. Any CRT effect
+belongs to final scene composition and must be removable. Review text/edges with
+effects off first; reduce effects that erase 1 px details. Do not run the v1
+`.scratch/art/build.mjs` and treat its procedural samples as v2 proofs: they were
+authored against the replaced profile.
 
-Sprites contain no scanlines, glow, vignette, chromatic fringes or baked words.
-Mockups may contain the sample bitmap text; 4x previews use nearest neighbor only.
+## Creating new assets
 
-Local reproduction (from project root, no install/network):
+The acceptance test is a side-by-side comparison with native pack art on native
+ground, without a visible change in drawing technique.
 
-```powershell
-node .scratch/art/build.mjs
-node .scratch/art/verify.mjs
-```
+- [ ] Pick a real pack reference: human base/hair for people, pig/cow for rounded pets, tileset foliage for leaves, white UI set for panels. Inspect at 1x and integer zoom before drawing.
+- [ ] Specify logical cell, world footprint, root guide, view, action and shadow inclusion. Use 16 px terrain modules; preserve supplied action canvases/padding.
+- [ ] Block the silhouette with the same large-head/short-body proportions or required pet build. Reserve outline space, including the longest ear, horn and tail combination.
+- [ ] Select a small subset of the canonical 32 colors. Match the material ramp and colored outline; introduce no averaged or invented RGB values.
+- [ ] Paint broad flat bases, upper-left highlight clusters and lower/right shadows with the stated tone count. Use short wood grain, lobed leaves or planar stone marks rather than generic noise.
+- [ ] Use a 1 px silhouette where the reference uses ink, material edges for foliage/timber, and no black contour around ground tiles. Merge modular masks before outlining.
+- [ ] Keep edges binary-alpha, omit checkerboard dithering/gradients and put the permitted translucent contact shadow on its own layer. Never duplicate a supplied shadow.
+- [ ] For pets, verify every slot, gene size extremes, patterns, both views and 16/32/48 cells. Check body/ear/horn/tail joins and the 16 px face by eye; palette checks cannot detect a bad attachment.
+- [ ] Animate on fixed cells/root guides at the stated counts/holds. Preview the composite so hair, tools and pet parts never lag or jitter. Author the back; do not mirror the front.
+- [ ] Test tiles in 3x3 repeats and all required joins against native neighbors. For UI, preserve 3 px corners, text padding, wrapping and a visible focus shape.
+- [ ] Compare beside two native assets on grass, a path and the default panel background, at 1x and 4x. Reject art that looks more blurred, noisy, outlined or finely modeled than its neighbors.
+- [ ] Verify dimensions, frame layout, visible RGB membership and permitted alpha. Record necessary profile exceptions before accepting; preserve an editable layered source and export without resampling.
 
-The build draws raw RGBA in memory, saves a temporary input inside `.scratch/art/`,
-runs `.claude/skills/moodboard/scripts/palette.mjs quantize` against this profile
-for every PNG, normalizes invisible RGB, then removes its temporary inputs. The
-verifier scans every PNG recursively, checks exact palette membership including
-invisible RGB, binary alpha, dimensions, mask joins, corner composition, 9-slice
-reuse and byte-exact 4x pixel replication. It writes `verification.json` locally.
-No existing files outside the brief's write scope are modified.
+Do keep broad cheerful shapes, warm wood, blue water, purposeful clusters and
+consistent roots. Do not copy a whole demo layout, add a palette per sprite,
+blur edges, thicken every contour or disguise incompatible art with grading.
 
-## Asset review checklist
+## Asset gap list
 
-- [ ] Original anatomy/layout; no borrowed recognizable creature, name or logo.
-- [ ] Correct logical size, view, padding, ground anchor, footprint and crop.
-- [ ] Canonical RGB only; binary alpha; shared ramps and NW lighting.
-- [ ] 1 px/selective silhouettes, connected clusters, sparse texture; no blur.
-- [ ] Compare beside the approved tree, house and Mallow on actual scene ground.
-- [ ] Every required edge/corner joins, water borders stay stable and 3x3 repeat reads.
-- [ ] Animation cells/contact do not jitter; review timing at the stated rates.
-- [ ] Frame corners stay 4 px, text wraps/paginates, focus and HP have shape/number cues.
-- [ ] Review at 1x and integer upscale; CRT on/off with UI before runtime approval.
-- [ ] Record any exception here before using it as a new rule.
+Audit scope: **396 PNGs, 31 GIFs and 3 Aseprite sources** under `PACK`, both
+tileset atlases, the overview sheets and both demo images. The table keeps only
+missing complete assets or missing variants. Sizes are **chosen commissions**,
+not dimensions claimed for nonexistent pack files.
 
-## Do / don't
+| Remaining gap | Check result / reusable assets | Minimum new work |
+| --- | --- | --- |
+| Modular pet body and parts | Human base/hair/tools are modular, but animals are flattened strips; no gene-compatible pet kit or paired front/back parts exist. | Full slot contract at **16/32/48**, both views, common guides and separate shadows. |
+| Distinctive wild pet species | Bird, duck, chicken, cow, pig and sheep exist; so do goblin/skeleton characters. They do not supply fictional pet families or their gene/back-view variants. | Only missing fictional species and required views/parts; reuse native fauna for ordinary animals. |
+| Soccer ball and goal | Neither found in atlases, elements or UI. UI discs/selectors are not soccer balls; fences are not netted goals. | **8x8 ball in a 16x16 cell**; **48x32 goal**, readable net and separate ground footprint. |
+| Dance floor | Red patterned rugs and ordinary floor/deck pieces exist; no dedicated dance tiles or lit states found. | Repeatable **16x16** floor family with inactive/active states using existing ramps. |
+| Birthday bunting, cake and balloons | Flowers, tables, rugs and food crops are reusable. None of the three birthday assets was found; the round white-faced furniture object is a clock. | **32x16 bunting**, **16x16 cake**, **16x24 balloon** variants, without baked words. |
+| Public notice board | Crates, timber, furniture, framed interior pictures and roofed well/architecture pieces exist; no complete posting board found. | **32x32 board** with posts and a distinct posting surface; reuse timber for its frame. |
+| Complete market stall | Goods exist: crops, fish, milk, egg, crates, tables and baskets. Roof/counter ingredients exist, but no complete merchandise stall/canopy was found. | Assemble a **48x48** stall from native pieces; author missing canopy/support joins and arrange existing goods. No new goods drawing needed. |
+| Trade icon | Individual arrows and a basket exist, but no two-way exchange glyph was found. | **16x16** exchange icon using the supplied arrow vocabulary, with two opposing directions. |
+| Thought and plan bubble variants | **9x9 ellipsis speech icon** and panel slices exist. `expression_confused-1.png` is a purple confusion swirl; `UI/plan alt.png` is a **plant sprout**, not a planning icon. No thought-tail/plan-state container was found. | **24x16 or 32x24** container using native panel parts, a thought trail and explicit plan/state mark. Reuse chat/emotion symbols as appropriate. |
 
-- **Do:** favor large friendly silhouettes, cream negative space, sparse leaf
-  clusters, shared material ramps, consistent anchors and original modular anatomy.
-- **Do:** keep sunny meadow and teal water dominant; use gold/coral in small marks.
-- **Do:** redraw tiny creature faces for their size; retain ear/tail/pattern identity.
-- **Don't:** add a custom palette per asset, photographic detail, dither, blurred
-  edges, two-pixel outlines or smooth gradients.
-- **Don't:** import 3D perspective, dark night grading, copied character shapes,
-  baked text/CRT effects, moving tile seams or crowded walking routes.
+Removed from drawing gaps after checking:
 
-## Scope and remaining review
+- **Fishing spot:** water/shore and wooden deck/bridge pieces, `UI/rod.png` and
+  `rod alt.png`, the fish item, and human `waiting`, `reeling`, `caught` animations
+  already supply the art for a marked fishing location. Scene assembly and an
+  interaction hotspot remain implementation work; no new fishing art is required.
+- **Duel icon:** reuse the existing **14x14 `UI/sword.png`** in a 16x16 slot.
+- **Ordinary fauna, market goods and generic chat icon:** reuse the files above;
+  only distinct species, stall structure and thought/plan variants remain.
 
-This baseline proves palette, logical sizing and two still compositions. The
-32x32 portrait, 48x48 back, original font and tile masks are supporting samples.
-It does not prove a full walk/battle animation set, interior/decor art, all bridge
-orientations, runtime collision, live CRT behavior, touch UI or hatch diversity.
-The straight bridge and four water cells are visual samples. Validate corner
-combinations on runtime maps and compare more independent monster families before
-approving the full procedural catalog. The small house/window and 16 px face are
-the first details to revisit after 1x play-testing. Keep these limits explicit.
+Audit limit: unnamed atlas objects were judged visually. A dedicated market
+canopy or notice-board export was not found; generic furniture can be adapted,
+but that is an assembly commission rather than a verified ready-made asset.
+Environment PNG playback rates, new-pet animation, layout and gap dimensions are
+chosen rules. This document creates no sprites or code changes.
