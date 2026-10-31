@@ -67,7 +67,7 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
         // A clear ring provides a detour around either end, even when the road borders the coast.
         for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
           const k = kindAt(i + di, j + dj);
-          if (k === T.water || k === T.pool || k === T.bridge || taken.has((j + dj) * m.w + i + di) || reserved(m.ox + i + di + 0.5, m.oz + j + dj + 0.5)) return false;
+          if (k === T.water || k === T.pool || k === T.bridge || k === T.ledge || taken.has((j + dj) * m.w + i + di) || reserved(m.ox + i + di + 0.5, m.oz + j + dj + 0.5)) return false;
         }
         return true;
       };
@@ -103,7 +103,7 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
         for (let di = -1; di <= len && ok; di++) {
           const [i, jj] = [i0 + di, j + dj];
           const k = kindAt(i, jj);
-          if ((di >= 0 && di < len && dj === 0 ? !GRASSY.has(k) : k === T.water || k === T.pool || k === T.bridge) || taken.has(jj * m.w + i) || reserved(m.ox + i + 0.5, m.oz + jj + 0.5)) ok = false;
+          if ((di >= 0 && di < len && dj === 0 ? !GRASSY.has(k) : k === T.water || k === T.pool || k === T.bridge || k === T.ledge) || taken.has(jj * m.w + i) || reserved(m.ox + i + 0.5, m.oz + jj + 0.5)) ok = false;
         }
       for (let di = 0; di < len && ok; di++) {
         const x = m.ox + i0 + di + 0.5;

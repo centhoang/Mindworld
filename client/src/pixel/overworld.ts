@@ -403,7 +403,7 @@ export class Overworld {
         const z = m.oz + j + 0.5;
         if (platformAt(this.world, x, z)?.id !== p.id) continue;
         // Trees stand well inland (canopies must not hang over a cliff) and grow in clumps, as in the pack's scenes.
-        if (SHORE.some(([di, dj]) => { const c = kindAt(i + di, j + dj); return c === T.water || c === T.pool || c === T.bridge; })) continue;
+        if (SHORE.some(([di, dj]) => { const c = kindAt(i + di, j + dj); return c === T.water || c === T.pool || c === T.bridge || c === T.ledge; })) continue;
         if (p.ground && Math.hypot((x - p.x) / 7.5, (z - p.z + 1) / 5) < 1) continue;
         if (p.spots && Object.values(p.spots).some((s) => Math.abs(s.x - x) < 3.5 && Math.abs(s.z - z) < 3.5)) continue;
         if (p.kind === "plaza" && Math.abs(x - p.x) < 4 && Math.abs(z - p.z) < 3) continue;

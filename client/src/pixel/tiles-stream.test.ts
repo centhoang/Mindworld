@@ -110,6 +110,26 @@ describe("ground streams", () => {
     expect(streams).toBeGreaterThanOrEqual(20);
   });
 
+  it("raises a terrace on most grounds, its top reached only by the ramp", () => {
+    let terraces = 0;
+    for (let seed = 0; seed < 30; seed++) {
+      const world = production(seed);
+      const m = buildTileMap(world);
+      const home = world.platforms.find((p) => p.kind === "home")!;
+      const seen = flood(m, home.x + 0.5, home.z + 0.5);
+      for (let k = 0; k < m.kind.length; k++) if (m.high![k] && m.kind[k] !== T.ledge) {
+        terraces++;
+        const [x, z] = [m.ox + k % m.w + 0.5, m.oz + Math.floor(k / m.w) + 0.5];
+        if (world.platforms.filter((p) => p.ground).length) expect(tileWalkable(m, x, z)).toBe(true);
+      }
+      // Everything walkable on the map is one connected piece, terrace tops included.
+      const interior = (k: number) => k >= m.w && k % m.w > 0 && k % m.w < m.w - 1;
+      for (let k = 0; k < m.kind.length; k++)
+        if (m.high![k] && m.kind[k] !== T.ledge && interior(k) && seen.size) expect(seen.has(k), `seed ${seed}`).toBe(true);
+    }
+    expect(terraces).toBeGreaterThan(30 * 12);
+  }, 30_000);
+
   it("existing tree and decor placement avoid carved water", () => {
     let checked = 0;
     for (let seed = 0; seed < 30; seed++) {

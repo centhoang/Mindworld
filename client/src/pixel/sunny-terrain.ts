@@ -60,6 +60,7 @@ export function buildTerrain(m: TileMap): Terrain {
   const at = (i: number, j: number) => (i < 0 || j < 0 || i >= m.w || j >= m.h ? T.water : m.kind[j * m.w + i]!);
   const dry = (i: number, j: number) => at(i, j) !== T.water && at(i, j) !== T.bridge;
   const isRoad = (i: number, j: number) => at(i, j) === T.path;
+  const high = (i: number, j: number) => m.high?.[j * m.w + i] === 1;
   const isPool = (i: number, j: number) => at(i, j) === T.pool;
   const free = (i: number, j: number) => i >= 0 && j >= 0 && i < m.w && j < m.h && !dry(i, j);
   const put = (a: Int32Array, i: number, j: number, cell: number) => {
@@ -80,6 +81,12 @@ export function buildTerrain(m: TileMap): Terrain {
       if (isRoad(i, j)) {
         const e = edgeOf(isRoad, i, j);
         out.road[k] = e ? ROAD[e] : ROAD_FILL[Math.floor(hash2(i, j, 23) * ROAD_FILL.length)]!;
+      }
+      if (at(i, j) === T.ledge) {
+        // Terrace walls sit on the road layer, over plain grass: the lip of the top, or the cliff below it.
+        out.land[k] = GRASS_FILL;
+        // Corner cliff tiles carry sea and foam, so a terrace face is plain cliff from end to end.
+        out.road[k] = high(i, j) ? GRASS[edgeOf(high, i, j) ?? "n"] : CLIFF(i, j);
       }
       if (dry(i, j + 1)) continue;
       // The south face of this column, then its foam.

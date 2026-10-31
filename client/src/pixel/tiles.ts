@@ -8,7 +8,7 @@ import { mulberry32 } from "../sim/rng";
 
 export const TILE = 16;
 
-export const T = { water: 0, grass: 1, path: 2, bridge: 3, sand: 4, flowers: 5, tall: 6, pool: 7 } as const;
+export const T = { water: 0, grass: 1, path: 2, bridge: 3, sand: 4, flowers: 5, tall: 6, pool: 7, ledge: 8 } as const;
 export type TileKind = (typeof T)[keyof typeof T];
 
 export const AWAY = 4; // look bit: the tile belongs to a ghost ground (drawn dimmed)
@@ -20,6 +20,7 @@ export interface TileMap {
   oz: number; // world z of tile row 0
   kind: Uint8Array;
   look: Uint8Array; // theme index (THEMES) | AWAY
+  high?: Uint8Array; // 1 = on a raised terrace
 }
 
 // Small deterministic hash so the coast and the meadow detail look the same on every load.
@@ -111,10 +112,59 @@ export function buildTileMap(w: WorldMap): TileMap {
     if (pa.kind !== "islet") pathLine(pa.x + 0.5, pa.z + 0.5, b.ax, b.az);
     if (pb.kind !== "islet") pathLine(pb.x + 0.5, pb.z + 0.5, b.bx, b.bz);
   }
-  const map = { w: tw, h: th, ox, oz, kind, look };
+  const map: TileMap = { w: tw, h: th, ox, oz, kind, look, high: new Uint8Array(tw * th) };
   // Roads must be final before choosing water: never carve a route that would need a bridge.
-  for (const p of w.platforms) if (p.ground) carveStream(map, p);
+  for (const p of w.platforms) if (p.ground) {
+    carveStream(map, p);
+    raiseTerrace(map, p);
+  }
   return map;
+}
+
+// The shape generator's guaranteed yard, the scene's working yard, the house and the gates (ground tiles).
+function inYard(p: Platform, i: number, j: number, shape = true): boolean {
+  const g = p.ground!;
+  const [ox, oz] = groundOrigin(p);
+  const [x, z] = [ox + i + 0.5 - p.x, oz + j + 0.5 - p.z];
+  return (shape && Math.hypot((i - (g.w - 1) / 2) / 8.5, (j - (g.h - 1) / 2) / 6.2) <= 1) ||
+    Math.hypot(x / 7.5, (z + 1) / 5) <= 1 ||
+    // Largest house stamp (103 x 97 px), at z - 2.5; protect its whole visible rectangle.
+    (Math.abs(x) <= 103 / 32 && z >= -2.5 - 97 / 16 && z <= -2.5) ||
+    Object.values(g.gates).some((gate) => gate.i === i && gate.j === j);
+}
+
+// One raised block per ground: a walled grass top, a two-row cliff on its south side, a dirt ramp through the
+// middle of the cliff. Chosen after roads and water, on plain grass only, so it can never cut a route.
+function raiseTerrace(m: TileMap, p: Platform): void {
+  const g = p.ground!;
+  const rng = mulberry32(g.seed ^ 0x74657272);
+  const [ox, oz] = groundOrigin(p);
+  const index = (i: number, j: number) => (oz + j - m.oz) * m.w + ox + i - m.ox;
+  const plain = (i: number, j: number) => {
+    if (i < 0 || j < 0 || i >= g.w || j >= g.h || !g.land[j * g.w + i] || inYard(p, i, j, false)) return false;
+    const k = m.kind[index(i, j)]!;
+    return k === T.grass || k === T.flowers || k === T.tall;
+  };
+  for (let tries = 0; tries < 800; tries++) {
+    const [rw, rh] = [8 + Math.floor(rng() * 3), 4 + Math.floor(rng() * 2)];
+    const [i0, j0] = [Math.floor(rng() * g.w), Math.floor(rng() * g.h)];
+    let ok = true;
+    for (let j = j0 - 2; j < j0 + rh + 3 && ok; j++) for (let i = i0 - 1; i < i0 + rw + 1 && ok; i++) ok = plain(i, j);
+    if (!ok) continue;
+    const ramp = i0 + Math.floor((rw - 3) / 2);
+    // The ramp is road, so it keeps the two dry rows every road keeps from water.
+    for (let j = j0 + rh - 2; j <= j0 + rh + 4 && ok; j++) for (let i = ramp - 2; i < ramp + 5 && ok; i++)
+      ok = m.kind[index(i, j)] !== T.pool;
+    if (!ok) continue;
+    for (let j = j0; j < j0 + rh + 2; j++) for (let i = i0; i < i0 + rw; i++) {
+      const k = index(i, j);
+      const top = j < j0 + rh;
+      if (top) m.high![k] = 1;
+      if (!top || i === i0 || i === i0 + rw - 1 || j === j0 || j === j0 + rh - 1) m.kind[k] = T.ledge;
+    }
+    for (let j = j0 + rh - 2; j <= j0 + rh + 2; j++) for (let i = ramp; i < ramp + 3; i++) m.kind[index(i, j)] = T.path;
+    return;
+  }
 }
 
 // Coast and pond banks have no shared mouth tile. Keep two complete land rows at the mouth,
@@ -127,15 +177,7 @@ function carveStream(m: TileMap, p: Platform): void {
   const on = (i: number, j: number) => i >= 0 && j >= 0 && i < g.w && j < g.h && g.land[j * g.w + i] === 1;
   const kind = (i: number, j: number) => on(i, j) ? m.kind[index(i, j)]! : T.water;
   const wet = (k: number) => k === T.water || k === T.pool || k === T.bridge;
-  const reserved = (i: number, j: number) => {
-    const [x, z] = [ox + i + 0.5 - p.x, oz + j + 0.5 - p.z];
-    // Preserve both the shape generator's guaranteed yard and the scene's working yard.
-    return Math.hypot((i - (g.w - 1) / 2) / 8.5, (j - (g.h - 1) / 2) / 6.2) <= 1 ||
-      Math.hypot(x / 7.5, (z + 1) / 5) <= 1 ||
-      // Largest house stamp (103 x 97 px), at z - 2.5; protect its whole visible rectangle.
-      (Math.abs(x) <= 103 / 32 && z >= -2.5 - 97 / 16 && z <= -2.5) ||
-      Object.values(g.gates).some((gate) => gate.i === i && gate.j === j);
-  };
+  const reserved = (i: number, j: number) => inYard(p, i, j);
   const safe = new Uint8Array(g.w * g.h);
   for (let j = 0; j < g.h; j++) for (let i = 0; i < g.w; i++) {
     let ok = true;
@@ -264,5 +306,5 @@ export function lookAt(m: TileMap, i: number, j: number): number {
 // Feet must stand on a non-water tile, with a small margin so sprites don't hang over the coast.
 export function tileWalkable(m: TileMap, x: number, z: number): boolean {
   const e = 0.3;
-  return [[x - e, z], [x + e, z], [x, z - e], [x, z + 0.1]].every(([a, b]) => tileAt(m, a!, b!) !== T.water && tileAt(m, a!, b!) !== T.pool);
+  return [[x - e, z], [x + e, z], [x, z - e], [x, z + 0.1]].every(([a, b]) => tileAt(m, a!, b!) !== T.water && tileAt(m, a!, b!) !== T.pool && tileAt(m, a!, b!) !== T.ledge);
 }

@@ -40,6 +40,9 @@ Only south edges have a face, worked out per column. Cells below the land, from 
 - No sea shadow under cliffs: 1.12 and its end pieces 1.13/1.14 only read right on the room's own coast; on ours they showed as hard blocks.
 - Foam animates: tileset animation pairs such as 147/150 and 148/151, about 2 flips per second (`anims` in sunny.json).
 
+## Terraces
+One raised block per player ground where it fits (about 4 grounds in 5), chosen after roads and streams on plain grass (`raiseTerrace` in tiles.ts): 8-10 wide, 4-5 deep. The top's border is `T.ledge` (not walkable) with grass edge tiles on the road layer over grass fill; two rows of plain cliff below it (`m.high` marks the top). A 3-wide dirt ramp through the middle of the south side is the only way up. Never use the corner cliff tiles (4.10, 2.19) here: they carry sea and foam. The ramp counts as road, so it keeps two dry rows from water. Trees and decor keep off ledges.
+
 ## Water
 - Sea: a 4 x 4 repeat of rows 18-21, cols 11-14. The tiles do not animate; life comes from foam and glint sprites.
 - Pond and river: fill 7.22. The bank is drawn on the land cells around the water, not on water cells. Names are by where the land ends: N 8.26, S 7.25, W 8.24, E 7.27, NW 8.22, NE 7.26, SW 7.24, SE 7.23, inner SE 7.29, inner SW 8.25, inner NW 8.28. Inner NE 8.29 is a guess, not read from the room.
