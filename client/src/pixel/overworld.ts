@@ -28,6 +28,7 @@ import { drawInspector } from "./inspector";
 import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
 import { petScene, sharedScene, type Seen } from "../mind/scene";
+import { generatedSprites } from "./generated-sprites";
 
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
 const DECOR_NAME: Record<DecorPiece["kind"], string> = { bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
@@ -107,6 +108,7 @@ export class Overworld {
   elder: { pos: Vec; sprite: HTMLCanvasElement } | null = null;
   // The market stall on the market island: E there opens the same buy/sell menu as the crate at home.
   stall: Vec | null = null;
+  private noticeBoard: Vec | null = null;
   // The ghost stone on the event island: touch it to fight a random shared ghost.
   ghostStone: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
   // Other players online (live room): their walker and pet, eased toward the last position received.
@@ -151,6 +153,8 @@ export class Overworld {
     this.layoutIn = { ...this.layoutIn, ...next };
     this.world = generateWorld(this.layoutIn);
     this.map = buildTileMap(this.world);
+    const plaza = this.world.platforms.find((p) => p.kind === "plaza");
+    this.noticeBoard = plaza ? { x: plaza.x + 5, z: plaza.z - 3 } : null;
     this.mini = null;
     const home = this.home;
     const dx = old ? home.x - old.x : 0;
@@ -235,7 +239,8 @@ export class Overworld {
     const ring = (c: Platform | undefined, r: number, n: number, dz = 0) =>
       c ? Array.from({ length: n }, (_, i) => ({ x: c.x + Math.cos((i / n) * Math.PI * 2) * r, z: c.z + dz + Math.sin((i / n) * Math.PI * 2) * r * 0.8 })).filter((q) => this.canWalk(q.x, q.z)) : [];
     const away = this.betweenSpots(hub.map((p) => p.cell), plaza ? { x: plaza.x, z: plaza.z + 2 } : undefined);
-    const out: Spots = { ...away, home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 3.5, 10), picnic: [...ring(plaza, 2, 6, 2), ...(away.picnic ?? [])], woods: ring(plaza, 5.5, 10) };
+    // Keep dance feet within the 6x4 logical-tile floor centred on the plaza.
+    const out: Spots = { ...away, home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 2.4, 10), picnic: [...ring(plaza, 2, 6, 2), ...(away.picnic ?? [])], woods: ring(plaza, 5.5, 10) };
     if (this.stall) out.stall = [{ x: this.stall.x, z: this.stall.z + 1.2 }];
     for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
     return out;
@@ -321,6 +326,8 @@ export class Overworld {
         const h = hash2(i + m.ox, j + m.oz, 9);
         if (!(ring ? h < 0.22 : h < 0.012)) continue;
         if (p.spots && Object.values(p.spots).some((s) => Math.abs(s.x - x) < 3.5 && Math.abs(s.z - z) < 3.5)) continue;
+        if (p.kind === "plaza" && Math.abs(x - p.x) < 4 && Math.abs(z - p.z) < 3) continue;
+        if (this.noticeBoard && Math.abs(x - this.noticeBoard.x) < 2 && Math.abs(z - this.noticeBoard.z) < 2) continue;
         if (this.houses.some((hs) => Math.abs(x - hs.x) < 3.5 && Math.abs(z - hs.z + 1) < 3.5)) continue;
         if (this.nearPath(i, j)) continue;
         if (this.trees.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5)) continue;
@@ -672,6 +679,8 @@ export class Overworld {
     if (Math.abs(x - this.house.x) < 1.6 && z < this.house.z + 0.2 && z > this.house.z - 2.2) return false;
     if (this.houses.some((h) => Math.abs(x - h.x) < 1.6 && z < h.z + 0.2 && z > h.z - 2.2)) return false;
     if (this.stall && Math.abs(x - this.stall.x) < 1.4 && z < this.stall.z + 0.2 && z > this.stall.z - 1.4) return false;
+    // A tile-deep support footprint also blocks tile-centre routes; the panel can overhang it.
+    if (this.noticeBoard && Math.abs(x - this.noticeBoard.x) < 0.8 && z > this.noticeBoard.z - 0.8 && z < this.noticeBoard.z + 0.2) return false;
     if (this.beds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
     const i = Math.floor(x - this.map.ox);
     const j = Math.floor(z - this.map.oz);
@@ -787,8 +796,45 @@ export class Overworld {
       }
     }
     this.drawBeds(g, toScreen, t);
+    const plaza = this.world.platforms.find((p) => p.kind === "plaza");
+    if (plaza) {
+      const dancing = this.npcs?.v.agents.some((a) => a.act === "dance") ?? false;
+      for (let j = 0; j < 4; j++) for (let i = 0; i < 6; i++) {
+        const [sx, sy] = toScreen(plaza.x - 3 + i, plaza.z - 2 + j);
+        generatedSprites.draw(g, dancing ? "dance-floor-active" : "dance-floor-inactive", sx, sy);
+      }
+    }
     // Sprites sorted by their feet, so things lower on screen stand in front.
     const items: { z: number; draw: () => void }[] = [];
+    if (this.noticeBoard) {
+      const board = this.noticeBoard;
+      const [sx, sy] = toScreen(board.x, board.z);
+      items.push({ z: board.z, draw: () => generatedSprites.draw(g, "notice-board-notes", sx, sy, () => {
+        g.fillStyle = PAL.woodD;
+        g.fillRect(sx - 10, sy - 18, 2, 18);
+        g.fillRect(sx + 8, sy - 18, 2, 18);
+        g.fillStyle = PAL.wood;
+        g.fillRect(sx - 13, sy - 29, 26, 23);
+        g.fillStyle = PAL.cream;
+        g.fillRect(sx - 9, sy - 25, 7, 10);
+        g.fillRect(sx + 2, sy - 23, 7, 11);
+      }) });
+    }
+    const today = gameTime(this.life.t).day;
+    // Due promises remain open. The room shares promise memory only with that NPC's host.
+    const birthday = NPCS.some((id) => (this.npcs?.hub.minds.get(id)?.mem.promises ?? [])
+      .some((p) => p.state === "open" && p.day === today && /birthday/i.test(p.occasion)));
+    if (plaza && birthday) {
+      // Decorations sit just outside the dance floor; they do not obstruct the plaza routes.
+      const [bx, by] = toScreen(plaza.x, plaza.z - 2.5);
+      items.push({ z: plaza.z - 2.5, draw: () => generatedSprites.draw(g, "birthday-bunting", bx, by - 18) });
+      const balloons = ["birthday-balloon-red", "birthday-balloon-blue", "birthday-balloon-gold"] as const;
+      balloons.forEach((name, i) => {
+        const z = plaza.z + (i === 2 ? 1.5 : -1.5);
+        const [sx, sy] = toScreen(plaza.x + (i === 0 ? -3.5 : 3.5), z);
+        items.push({ z, draw: () => generatedSprites.draw(g, name, sx, sy) });
+      });
+    }
     for (const tr of this.trees) {
       const [sx, sy] = toScreen(tr.x, tr.z);
       if (sx < -32 || sy < -48 || sx > sw + 32 || sy > sh + 48) continue;
@@ -837,7 +883,7 @@ export class Overworld {
     }
     if (this.stall) {
       const [mx, my] = toScreen(this.stall.x, this.stall.z);
-      items.push({ z: this.stall.z, draw: () => drawProp(g, MARKET_STALL, mx, my + 4) });
+      items.push({ z: this.stall.z, draw: () => generatedSprites.draw(g, "market-stall", mx, my + 4, () => drawProp(g, MARKET_STALL, mx, my + 4)) });
     }
     if (this.elder && hasArt("elder-npc")) {
       // ImageGen Elder: two 16x24 idle frames, 500 ms each.

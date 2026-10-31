@@ -6,6 +6,7 @@ import { drawBall } from "./life-draw";
 import { GROUND_PROPS } from "./grounds-props";
 import type { DecorKind } from "./grounds-decor";
 import { AWAY } from "./tiles";
+import { generatedSprites } from "./generated-sprites";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -18,6 +19,14 @@ const r = (g: Ctx, x: number, y: number, w: number, h: number, c: string) => {
 const SHEET: Record<string, keyof typeof GROUND_PROPS> = { goal: "goal", ball: "ball", slide: "slide", blanket: "blanket", basket: "basket", bench: "bench", rod: "rod", sign: "sign" };
 
 export function drawSpotProp(g: Ctx, name: string, x: number, y: number, t: number): void {
+  if (name === "goal" || name === "ball") {
+    generatedSprites.draw(g, name === "goal" ? "soccer-goal" : "soccer-ball", x, y - (name === "ball" ? Math.round(Math.abs(Math.sin(t * 3)) * 3) : 0), () => drawOldSpotProp(g, name, x, y, t));
+    return;
+  }
+  drawOldSpotProp(g, name, x, y, t);
+}
+
+function drawOldSpotProp(g: Ctx, name: string, x: number, y: number, t: number): void {
   const item = SHEET[name];
   if (item && hasArt("props-grounds")) {
     const s = GROUND_PROPS[item];
