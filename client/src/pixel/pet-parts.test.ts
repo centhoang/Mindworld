@@ -48,8 +48,10 @@ describe("integer pet sizes and the existing foot baseline", () => {
     pixels.set([10, 20, 30, 255], (13 * 16 + 8) * 4);
     const out = placePetPixels(pixels, 24);
     expect([...out.slice((21 * 24 + 12) * 4, (21 * 24 + 12) * 4 + 4)]).toEqual([10, 20, 30, 255]);
-    const big = placePetPixels(pixels, 80);
-    expect(Array.from(big).filter((_, i) => i % 4 === 3 && big[i] === 255)).toHaveLength(25);
+    const dot = new Uint8ClampedArray(32 * 32 * 4);
+    dot.set([10, 20, 30, 255], (13 * 32 + 8) * 4);
+    const big = placePetPixels(dot, 64);
+    expect(Array.from(big).filter((_, i) => i % 4 === 3 && big[i] === 255)).toHaveLength(4);
   });
 });
 
