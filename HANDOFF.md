@@ -1,14 +1,16 @@
-# HANDOFF: Mindworld v3, NPCs are now the star; power mode gone, setup gate + private chats live (2026-10-31)
+# HANDOFF: Mindworld v3, NPCs are the star; promises + bonds live, pixel rules in force (2026-10-31)
 
 **Fresh-session starting prompt (user pastes it):** "Read HANDOFF.md and docs/NPC-PLAN.md. Continue from Next actions. Follow CLAUDE.md (Normal mode, 35% context limit; nothing goes public before submission day)."
 
 ## State
-- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **e02624d8**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
-- **Tests:** client 449 (164 are promises.test.ts), worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
+- **Deployed behind Access** (only the user's email): https://pets.uryto.dev/ = Worker `pet-mind` **86045335**. Redeploys standing-approved: `npm --prefix client run build`, then `npx wrangler deploy` **inside worker/** (two plain commands). Check the output names `pet-mind` + `pets.uryto.dev`.
+- **Tests:** client 469, worker 189, tsc clean. `info-ref/` stays untracked (user's); `VisualAssetPack/` gitignored (only used sprites get copied to client/public/art).
 - **Done 2026-10-31:** power mode removed (`finetune/native-voice.ts` keeps the bench client, GGUFs stay). Limits lifted: CloudMind gap 0, MAX_DAILY_USD 30, CLIENT_DAILY_USD 10, CLIENT_PER_MINUTE 120; MAX_TOTAL_USD_* stay the hard stop. Caps come back down after the event.
 - **Setup gate** (pixel/setup.ts, #setup in index.html): checks the adapter first. capable = download + warm-up, then the game; weak Intel on Windows = steps + re-check; none/mobile = straight in. Remembered per GPU in `mindworld.setup.v1`; a return visit opens at once and loads in the background. Dev: `?gpu=switch|capable|none|skip`. Checked in the pane on a real Intel Gen 9 (guide, exit, remembered). The capable path with a real download has NOT been run: user's GTX 1050 is the first test.
 - **Private chats** (worker/src/room.ts): lines to a player reach that player only; other mind lines reach players within HEAR_DIST 14 tiles plus the host of the NPC spoken to; room chat stays public. `talk` = busy state, "talking..." bubble, new chats refused, ends on close, disconnect or 45 s silence (clients renew every 15 s). Checked on the real Durable Object with 3 sockets (worker-mock on port 8799).
 - **N1 Promises live** (mind/promises.ts, wired in mind/npcs.ts `invited` + `keepPromises`): chat line -> extract (model, keyword fallback) -> decide from persona + relationship -> Commitment in `mem.promises` -> at the time the NPC announces and goes -> player within 7 tiles = kept (+affinity, fact, "Happy birthday"); NPC there and player absent = broken (-affinity by personality, fact "stood me up", shows in later replies through memory); NPC never got there = cancelled, no blame. No spot on the map = says so, no promise. Inspector shows PROMISED. Open promises travel to the next host as `promise|...` lines in the room log. Tested by unit tests + the real game objects; not yet played by hand, and the model path (extract/decide) has not run on the tuned 1B or Muse Spark in the browser.
+- **N2 live** (mind/bonds.ts): per-person fondness/trust/respect, each change with a reason; beliefs with source; important memories outlive the log; `relevant` finds short names. Grudge (trust <= -20) turns accept into a refusal until "sorry" or a kept promise; `whyAnswer` gives the real reason; grudge raised to your face once; Pip/Ama gossip broken promises (Mo/Elder don't). Bonds and beliefs travel as `bond|`/`belief|` room lines. Invite and why answers come straight from the sim, never the free model line (it could contradict the decision). Inspector: FEELS, THINKS, WHY. Thought bubbles via `out.think`. Checked in the pane (offline, rules). Gossip works only between minds on one host. Model path not run.
+- **Art rules:** docs/STYLE.md "Pixel size rules by asset type" (59 native samples), `node scripts/check-art.mjs <manifest>`; AGENTS.md makes Codex follow them. Batch 1: 14 pass, ball, goal and floors remade.
 - Known gaps in N1: an invite to an NPC hosted by another player with no model goes to the cloud chat and makes no promise; the place named by the player is ignored (each activity uses its own spot, so tell the player where); other machines replay `do` only when a start event arrives.
 - Tuned 1B: `Llama-3.2-1B-Mindworld-q4f32_1-MLC` via `/mlc`, chunk 128. **Quote the browser's numbers:** 98.5% village, Teach +19.1 (6 harmful), voice 100%. GGUF: 99.5%, +22.6, 1 harmful.
 - Runtime chains: mind and chat = local -> Muse Spark (`CloudMind`) -> rules. Combat: memo decides, local voice -> scripted. Teach = Muse Spark -> local -> scripted.
@@ -25,13 +27,14 @@
 - Submission day: make the GitHub repo + the 4 Mindworld HF repos public, then remove Access. The proxy keeps working either way.
 
 ## User-only actions
+- Play-test N2: promise Pip a party, stay away, then talk: grudge, "why are you mad", refusal, "sorry", accept; I shows FEELS/WHY.
 - Play-test: setup gate on the GTX 1050; two windows for private chat (E on a player > Say something; a third party sees "talking..." only).
 - Try a modern GPU and a Mac if reachable: the tuned f16 build has never finished a bench.
 
 ## Next actions
-1. **Art:** batch 1 accepted and committed (14 PNGs in client/public/art/gen, not used in-game yet; generator .scratch/art/gen/batch1.mjs). Next batches through Codex: market stall, modular pets, wild pets (same brief shape: .scratch/brief-art1.md). Then the art swap: Sunnyside tiles + layered humans so NPCs share the player's sprites.
-2. **N2 memory + relationships with reasons;** inspector "why" trail; thought bubbles; NPC tells the place when accepting; gossip of broken promises.
-3. **N3 verbs** (NPC farm, wallet, market, town board, trade). **N4 retrain by Nov 2 night:** add extract + decide (and N2/N3 prompts) to gen-village, freeze prompts first. N5, then demo captures and README numbers (credit the Sunnyside pack in README).
+1. **Art:** Codex batch 2 running/under review (brief .scratch/brief-art2.md, report .scratch/art2-report.md, sheet .scratch/art/gen/batch2-sheet.png). Then the art swap: Sunnyside tiles + layered humans so NPCs share the player's sprites, and use the gen art in-game.
+2. **N3 verbs** (NPC farm, wallet, market, town board, trade).
+3. **N4 retrain by Nov 2 night:** add extract + decide + N2/N3 prompts to gen-village, freeze prompts first (reply/line prompts now carry a feeling line). N5, then demo captures and README numbers (credit the Sunnyside pack in README).
 
 ## Gotchas
 - Codex: `scripts/codex.ps1` by absolute path (the shell cwd drifts), from the PowerShell tool only (bash has no `powershell`), and a brief with double quotes breaks argument passing: put the brief in `.scratch/brief-*.md` and pass "Read .scratch/brief-x.md and carry it out exactly."
