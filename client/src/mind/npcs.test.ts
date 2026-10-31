@@ -356,5 +356,49 @@ describe("NpcVillage talks to pets", () => {
       expect(mo.mem.why).toContain("Pip told me");
       expect(pip.mem.bonds.Mo).toBeUndefined();
     }, 20000);
+
+    it("news passes on with every teller in the chain, and the next villager raises it", async () => {
+      const { nv, pip } = await stoodUp();
+      const [ama, elder] = [nv.hub.minds.get("ama")!, nv.hub.minds.get("elder")!];
+      nv.hub.hearNews(ama, "Pip", "Kai", pip.mem.bonds.Kai!.why.at(-1)!.text);
+      expect(ama.mem.bonds.Kai!.why.at(-1)!.text).toBe("Pip told me: Kai stood Pip up at the birthday party");
+      await nv.hub.talk(nv.v.agents.find((x) => x.id === "ama")!, nv.v.agents.find((x) => x.id === "elder")!);
+      expect(elder.mem.beliefs[0]).toMatchObject({ about: "Kai", source: "Ama", conf: 0.4 });
+      expect(elder.mem.bonds.Kai!.why.at(-1)!.text).toContain("Ama told me: Pip told Ama: Kai stood Pip up");
+    }, 20000);
+
+    it("news reaches a mind hosted on another machine through a spoken line", () => {
+      const { nv } = make();
+      nv.me = "me";
+      nv.setHost("mo", "me");
+      nv.setHost("pip", "other");
+      nv.hear({ who: "pip", say: "Kai broke a promise to me, you know.", to: "mo" });
+      const mo = nv.hub.minds.get("mo")!;
+      expect(mo.mem.beliefs[0]).toMatchObject({ about: "Kai", text: "broke a promise", source: "Pip" });
+      expect(mo.mem.bonds.Kai!.trust).toBeLessThan(0);
+    });
+  });
+
+  describe("long goals", () => {
+    it("saves, buys, says so, and moves on; the count travels with the purse", () => {
+      const { nv, bubbles, lines } = make();
+      const pip = nv.hub.minds.get("pip")!;
+      nv.purseOf("pip").coins = 50;
+      run(nv, 0.5);
+      expect(nv.purseOf("pip")).toMatchObject({ coins: 5, goals: 1 });
+      expect(bubbles.some(([id, t]) => id === "pip" && t.includes("a pet of my own"))).toBe(true);
+      expect(pip.mem.facts).toContain("saved up and bought a pet of my own");
+      const held = lines.filter((l) => l.who === "pip" && l.mem?.startsWith("purse|")).at(-1)!.mem!;
+      nv.setMemory("pip", [held]);
+      expect(pip.mem.purse!.goals).toBe(1);
+    });
+
+    it("answers from the books and keeps its coins back in a deal", async () => {
+      const { nv } = make();
+      nv.pocket = { coins: () => 100, count: () => 5, change: () => {} };
+      nv.purseOf("pip").coins = 30;
+      expect((await nv.reply("pip", "Kai", "what are you saving for?"))?.text).toBe("I am saving for a pet of my own. 30 of 45 coins so far.");
+      expect((await nv.reply("pip", "Kai", "sell you a tomato for 12 coins"))?.text).toContain("I am saving for a pet of my own");
+    });
   });
 });

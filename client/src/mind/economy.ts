@@ -27,6 +27,7 @@ export interface Purse {
   goods: Partial<Record<Good, number>>;
   crop: Good | null;
   grown: number; // garden sessions on this crop
+  goals?: number; // long goals reached so far (goals.ts)
 }
 
 export const newPurse = (): Purse => ({ coins: 15, goods: {}, crop: null, grown: 0 });
@@ -133,14 +134,15 @@ export function sellStock(m: Market, p: Purse, person: Persona): Trade[] {
   return out;
 }
 
-export const purseLine = (who: Purse): string => `purse|${who.coins}|${who.crop ?? ""}|${who.grown}|${GOOD_IDS.filter((g) => who.goods[g]).map((g) => `${g}:${who.goods[g]}`).join(",")}`;
+export const purseLine = (who: Purse): string => `purse|${who.coins}|${who.crop ?? ""}|${who.grown}|${GOOD_IDS.filter((g) => who.goods[g]).map((g) => `${g}:${who.goods[g]}`).join(",")}|${who.goals ?? 0}`;
 export function parsePurseLine(l: string): Purse | null {
-  const [tag, coins, crop, grown, goods] = l.split("|");
+  const [tag, coins, crop, grown, goods, goals] = l.split("|");
   if (tag !== "purse") return null;
   const p = newPurse();
   p.coins = Number(coins) || 0;
   p.crop = crop && isGood(crop) ? crop : null;
   p.grown = Number(grown) || 0;
+  if (Number(goals) > 0) p.goals = Number(goals);
   for (const part of (goods ?? "").split(",")) {
     const [g, n] = part.split(":");
     if (g && isGood(g) && Number(n) > 0) p.goods[g] = Number(n);
@@ -193,8 +195,9 @@ export interface Verdict {
 
 const no = (why: string): Verdict => ({ answer: "refuse", fixed: true, price: 0, why });
 
-// `pay` is what the player can spend and `stock` what they hold of the good.
-export function judge(p: Persona, b: Bond | undefined, purse: Purse, m: Market, o: Offer, who: string, pay: number, stock: number): Verdict {
+// `pay` is what the player can spend and `stock` what they hold of the good. `saving`: what the NPC keeps its coins
+// for, and how many it can spare.
+export function judge(p: Persona, b: Bond | undefined, purse: Purse, m: Market, o: Offer, who: string, pay: number, stock: number, saving?: { what: string; spare: number }): Verdict {
   const sore = b && hurt(b);
   const fond = (b?.fondness ?? 0) / 200; // up to half the price either way
   if (o.kind !== "buy" && stock < o.qty) return no(`You don't have ${o.qty} ${o.good}, ${who}.`);
@@ -211,6 +214,7 @@ export function judge(p: Persona, b: Bond | undefined, purse: Purse, m: Market, 
     const ask = o.price ?? fair;
     const each = Math.min(ask, top);
     if (each * o.qty > purse.coins) return no(`I only have ${purse.coins} coins, ${who}.`);
+    if (saving && each * o.qty > saving.spare) return no(`I am saving for ${saving.what}, ${who}. I can spare ${saving.spare} coins.`);
     if (ask <= top) return { answer: "accept", fixed: false, price: each, why: `${o.good} is ${fair}c on the board` };
     return ask <= top * 1.5 ? { answer: "counter", fixed: false, price: top, why: `${ask}c is over the board's ${fair}c` } : no(`${ask} coins? Not for ${o.good}, ${who}. The board says ${fair}.`);
   }

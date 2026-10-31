@@ -147,14 +147,25 @@ const SORRY = /\b(?:sorry|apologi[sz]e|my bad|forgive me)\b/i;
 export const toneOf = (line: string): "kind" | "rude" | "sorry" | null => RUDE.test(line) ? "rude" : SORRY.test(line) ? "sorry" : KIND.test(line) ? "kind" : null;
 
 // Something worth passing on: a promise someone broke to me. The gentle and the patient keep it to themselves.
-export function gossipFrom(speaker: MindMemory, p: Persona, listener: string): { about: string; text: string } | null {
+// What was heard travels too, and each teller stays in the chain.
+export function gossipFrom(speaker: MindMemory, p: Persona, listener: string): { about: string; text: string; hop?: true } | null {
   if (hasTrait(p, "gentle", "patient")) return null;
   for (const [about, b] of Object.entries(speaker.bonds)) {
     if (about === listener) continue;
-    const r = [...b.why].reverse().find((x) => x.beat === "broken");
-    if (r) return { about, text: r.text };
+    const r = [...b.why].reverse().find((x) => x.beat === "broken" || x.beat === "gossip");
+    if (r) return r.beat === "gossip" ? { about, text: r.text, hop: true } : { about, text: r.text };
   }
   return null;
+}
+
+// How the news sounds in a mouth, and in the listener's memory ("Pip told me: Kai stood Pip up").
+export const gossipLine = (about: string, hop?: boolean): string => `${about} broke a promise${hop ? "" : " to me"}, you know.`;
+export const heardFrom = (teller: string, text: string): string => `${teller} told me: ${text.replace(/\bme\b/g, teller)}`;
+
+// News spoken by an NPC another machine hosts reaches mine as that same plain line.
+export function parseGossip(say: string, teller: string): { about: string; text: string } | null {
+  const m = /^(\S+) broke a promise( to me)?, you know\.$/.exec(say);
+  return m ? { about: m[1]!, text: `${m[1]} broke a promise${m[2] ? ` to ${teller}` : ""}` } : null;
 }
 
 // Bonds and beliefs travel to the next host as lines in the room log (it keeps lines of up to 120 characters).

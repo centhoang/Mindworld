@@ -11,10 +11,11 @@ import type { Vec } from "../world/movement";
 import { NPCS, type MindLine, type Npc } from "../world/live";
 import { MindHub, type Mind } from "./hub";
 import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
-import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, holdsGrudge, hurt, parseBeliefLine, parseBondLine, toneOf, toYou, wariness, whyAnswer } from "./bonds";
+import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, gossipFrom, gossipLine, holdsGrudge, hurt, parseBeliefLine, parseBondLine, parseGossip, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
 import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
+import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
 import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
 import { addCommitment, answerLine, type Invite, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
@@ -42,6 +43,7 @@ const SCRIPT_GAP_MS = 3200; // without a model, wait a little before answering (
 const PROMISE_PULL = 3; // score added to a promised activity while it is due: it beats any need
 const PROMISE_DIST = 7; // the one who invited is here if they are this close
 const PITCH_SKIP = 0.4; // most meetings are just a hello or a chat
+const PITCH_SELL = 0.5; // how often a saver offers its stock instead of an invitation
 const PITCH_ACTS = ["soccer", "dance", "picnic", "fish"];
 const FARM_PULL = 0.5; // a villager short of coins or with a crop in the ground goes to its garden
 const FARM_COINS = 30;
@@ -94,6 +96,7 @@ export class NpcVillage {
   private readonly arrived = new Set<string>(); // promises the NPC turned up for
   private readonly wired = new Map<string, Set<string>>(); // npc -> bond and belief lines the room has
   private readonly raised = new Set<string>(); // grudges the NPC already brought up to the person's face
+  private readonly told = new Set<string>(); // news already passed to a neighbour on another machine
   private readonly duties = new Map<string, Duty>(); // "npc:day:phase" -> what it chose for that shift
   readonly market: Market = newMarket();
   pocket: Pocket | null = null;
@@ -203,6 +206,9 @@ export class NpcVillage {
     // Another machine's NPC spoke to an NPC I host: mine answers (a few turns at most).
     const to = l.to as Npc | undefined;
     if (l.say && to && NPCS.includes(to) && this.hosting(to)) {
+      const teller = personaOf(npc)!.name;
+      const news = parseGossip(l.say, teller);
+      if (news) this.hub.hearNews(this.hub.minds.get(to)!, teller, news.about, news.text);
       const c = this.chats.get(to)?.with === npc ? this.chats.get(to)! : { with: npc, said: [], turns: 0 };
       c.said.push(`${VILLAGERS.find((p) => p.id === npc)!.name}: ${l.say}`);
       this.chats.set(to, c);
@@ -262,11 +268,26 @@ export class NpcVillage {
       if (a.needs.social > 70 || this.v.t - (this.lastChat.get(npc) ?? -1e9) < CHAT_GAP) continue;
       const mate = this.v.agents.find((o) => o !== a && !this.hosting(o.id as Npc) && this.hosts.get(o.id as Npc) && near(o.pos, CHAT_DIST));
       if (!mate) continue;
+      this.lastChat.set(npc, this.v.t);
+      if (this.passOn(npc, mate.id as Npc)) continue;
       const c = { with: mate.id as Npc, said: [] as string[], turns: 0 };
       this.chats.set(npc, c);
-      this.lastChat.set(npc, this.v.t);
       void this.speak(npc, VILLAGERS.find((p) => p.id === mate.id)!, mate.id, c);
     }
+  }
+
+  // News for a neighbour whose mind runs on another machine: it goes out as a spoken line, once per piece of news.
+  private passOn(npc: Npc, mate: Npc): boolean {
+    const m = this.hub.minds.get(npc);
+    const name = personaOf(mate)!.name;
+    const news = m && gossipFrom(m.mem, m.persona, name);
+    const key = `${npc}:${mate}:${news?.about}`;
+    if (!news || this.told.has(key)) return false;
+    this.told.add(key);
+    const say = gossipLine(news.about, news.hop);
+    this.out.say(npc, say, name);
+    this.out.line({ who: npc, say, to: mate });
+    return true;
   }
 
   // One line to a pet nearby: from the NPC's mind with a model here, else scripted. It goes to the room as a
@@ -328,7 +349,7 @@ export class NpcVillage {
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
     if (!m || !this.hosting(npc)) return null;
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
-    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? this.quote(npc, line) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? this.quote(npc, line) ?? goalAnswer(line, goalOf(npc, this.purseOf(npc)), this.purseOf(npc)) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     if (!this.hasModel() && !answer) return null;
     const ans = answer ? { value: answer, source: "rules" }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
@@ -348,7 +369,9 @@ export class NpcVillage {
     if (known || !p) return known ?? { work: false, why: "" };
     const m = this.hub.minds.get(a.id);
     const promised = m ? dueNow(m.mem.promises, g.day, g.phase)[0]?.from ?? "" : "";
-    const d = shiftChoice(p, a.needs, g.phase, g.day, promised);
+    const purse = m?.mem.purse;
+    const goal = purse ? goalOf(a.id, purse) : null;
+    const d = shiftChoice(p, a.needs, g.phase, g.day, promised, purse && closeTo(goal, purse) ? goal!.what : "");
     this.duties.set(key, d);
     if (m && d.why) {
       m.mem.why = d.why;
@@ -452,7 +475,8 @@ export class NpcVillage {
     openDay(this.market, g.day, VILLAGERS);
     const purse = this.purseOf(npc);
     const bond = bondOf(m.mem, player);
-    const v = judge(m.persona, bond, purse, this.market, o, player, pocket.coins(), pocket.count(o.good));
+    const goal = goalOf(npc, purse);
+    const v = judge(m.persona, bond, purse, this.market, o, player, pocket.coins(), pocket.count(o.good), goal && closeTo(goal, purse) ? { what: goal.what, spare: spare(purse) } : undefined);
     if (v.answer === "refuse") {
       m.mem.why = `${player} offered ${o.good} > ${v.why}`;
       remember(m.mem, g.day, clockLabel(g.hour), `turned down ${player}'s ${o.kind} of ${o.good}`, 4);
@@ -678,6 +702,15 @@ export class NpcVillage {
       this.said(npc, `${guest.name}, I am after ${want} today. ${price} coins for one?`, guest.name);
       return true;
     }
+    const goal = goalOf(npc, purse);
+    const stock = (Object.keys(purse.goods) as Good[]).find((s) => priceOf(this.market, s) <= (this.pocket?.coins() ?? 0));
+    if (goal && stock && this.env.rng() < PITCH_SELL) {
+      const price = priceOf(this.market, stock);
+      this.offers.set(`${npc}:${guest.name}`, { o: { kind: "buy", good: stock, qty: 1, price }, price });
+      m.mem.why = `saving for ${goal.what} > have ${stock} to sell > offered it to ${guest.name}`;
+      this.said(npc, `${guest.name}, I am saving for ${goal.what}. ${price} coins for my ${stock}?`, guest.name);
+      return true;
+    }
     const act = PITCH_ACTS.find((a) => traitBias(m.persona, a) > 0 && this.env.spots[ACTIVITY.get(a)!.place]?.length);
     if (!act || g.phase === "evening" || g.phase === "night" || dueNow(m.mem.promises, g.day, "evening").length) return false;
     this.asked.set(`${npc}:${guest.name}`, { act, occasion: "", day: g.day, phase: "evening" });
@@ -703,12 +736,33 @@ export class NpcVillage {
   // The first meeting after a broken promise: the NPC says so to their face, once for each grudge.
   private bringUp(npc: Npc, guest: Person): boolean {
     const m = this.hub.minds.get(npc);
-    const r = m && bondOf(m.mem, guest.name)?.why.filter((x) => x.beat === "broken").at(-1);
+    const r = m && bondOf(m.mem, guest.name)?.why.filter((x) => x.beat === "broken" || x.beat === "gossip").at(-1);
     const key = `${npc}:${r?.text}`;
     if (!r || this.raised.has(key)) return false;
     this.raised.add(key);
-    this.said(npc, `${guest.name}, ${toYou(r.text, guest.name)}.`, guest.name);
+    this.said(npc, `${guest.name}, ${toYou(r.text, guest.name)}.${r.beat === "gossip" ? " Is that true?" : ""}`, guest.name);
     return true;
+  }
+
+  // Saved enough: it buys the thing, and the next goal starts. The goal also sits in its facts, so its talk knows it.
+  private pursueGoals(): void {
+    const g = gameTime(this.v.t);
+    for (const [id, m] of this.hub.minds) {
+      const purse = m.mem.purse;
+      if (!purse || !this.hosting(id as Npc)) continue;
+      const goal = goalOf(id, purse);
+      if (reached(goal, purse)) {
+        purse.coins -= goal!.cost;
+        purse.goals = (purse.goals ?? 0) + 1;
+        const text = `saved up and bought ${goal!.what}`;
+        remember(m.mem, g.day, clockLabel(g.hour), text, 8);
+        addFact(m.mem, text);
+        m.mem.why = `${goal!.cost} coins saved > ${text}`;
+        this.said(id as Npc, `At last! I bought ${goal!.what}!`);
+        continue;
+      }
+      if (goal) addFact(m.mem, `saving up for ${goal.what}`);
+    }
   }
 
   private said(npc: Npc, text: string, to?: string): void {
@@ -723,6 +777,7 @@ export class NpcVillage {
     this.hub.onEvents(ev);
     this.hub.tick();
     this.keepPromises();
+    this.pursueGoals();
     this.social();
     for (const e of ev) if (e.kind === "start" && this.hosting(e.who as Npc)) this.out.line({ who: e.who, act: e.act });
     for (const e of ev) if (e.kind === "start" || e.kind === "done") this.earn(e);

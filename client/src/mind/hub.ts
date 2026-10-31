@@ -10,7 +10,7 @@ import { bump, pairKey } from "../life/relations";
 import type { Agent, Choice, LifeEvent, Village } from "../life/village";
 import type { Emote } from "../world/live";
 import { choosePrompt, emotePrompt, eventText, linePrompt, parseChoice, parseEmote, parseLine, parsePlan, planPrompt, PLAN_PHASES, reflectPrompt, scriptedLine } from "./brain";
-import { addBelief, feel, gossipFrom } from "./bonds";
+import { addBelief, feel, gossipFrom, gossipLine, heardFrom } from "./bonds";
 import { addFact, emptyMemory, parseMemory, remember, type MindMemory } from "./memory";
 import { traitBias, type Persona } from "./persona";
 import { PRIO, type MindScheduler } from "./scheduler";
@@ -246,15 +246,19 @@ export class MindHub {
   // A broken promise travels: the listener now believes it, with its source, and cools toward that person.
   private gossip(from: Mind, to: Mind): void {
     const news = gossipFrom(from.mem, from.persona, to.persona.name);
-    if (!news) return;
+    if (news && this.hearNews(to, from.persona.name, news.about, news.text, news.hop)) this.out.say(from.persona.id, gossipLine(news.about, news.hop), to.persona.name);
+  }
+
+  // Each telling is worth less than the last. False = this mind knew already.
+  hearNews(to: Mind, teller: string, about: string, text: string, hop?: boolean): boolean {
+    if (about === to.persona.name) return false;
     const now = this.now();
-    const text = "broke a promise";
-    if (!addBelief(to.mem, { about: news.about, text, source: from.persona.name, conf: 0.6, day: now.day })) return;
-    const heard = `${from.persona.name} told me: ${news.text}`;
+    if (!addBelief(to.mem, { about, text: "broke a promise", source: teller, conf: hop ? 0.4 : 0.6, day: now.day })) return false;
+    const heard = heardFrom(teller, text);
     remember(to.mem, now.day, now.time, heard, 6);
-    bump(this.v.rel, to.persona.id, news.about, feel(to.mem, to.persona, news.about, "gossip", now.day, heard));
-    this.out.say(from.persona.id, `${news.about} broke a promise to me, you know.`, to.persona.name);
-    to.mem.why = `${from.persona.name} told me > ${news.about} ${text} > trust ${news.about} less`;
+    bump(this.v.rel, to.persona.id, about, feel(to.mem, to.persona, about, "gossip", now.day, heard));
+    to.mem.why = `${teller} told me > ${about} broke a promise > trust ${about} less`;
+    return true;
   }
 
   // What the opener talks about: a group plan coming up (an invitation), else the latest memory.

@@ -18,13 +18,15 @@ export interface Duty {
 const roll = (id: string, day: number): number => [...id].reduce((s, c) => s + c.charCodeAt(0), day * 7);
 const has = (p: Persona, ...ts: string[]): boolean => p.traits.some((t) => ts.includes(t.toLowerCase()));
 
-export function shiftChoice(p: Persona, needs: Needs, phase: Phase, day: number, promised: string): Duty {
+// `saving` = the goal it is close to, if any: that beats a day off, not its body or its word.
+export function shiftChoice(p: Persona, needs: Needs, phase: Phase, day: number, promised: string, saving = ""): Duty {
   const job = p.job;
   if (!job || !job.phases.includes(phase)) return { work: false, why: "" };
   const shift = `${job.title} shift`;
   if (promised) return { work: false, why: `${shift} > promised ${promised} > skip work` };
   if (needs.energy < 20) return { work: false, why: `${shift} > too tired > rest first` };
   if (needs.hunger < 15) return { work: false, why: `${shift} > too hungry > eat first` };
+  if (saving) return { work: true, why: `${shift} > saving for ${saving} > go to work` };
   if (has(p, "playful") && roll(p.id, day) % 3 === 0) return { work: false, why: `${shift} > feel like playing > skip work today` };
   if (has(p, "curious") && !has(p, "patient") && roll(p.id, day) % 5 === 0) return { work: false, why: `${shift} > want to wander > skip work today` };
   return { work: true, why: `${shift} > feel fine > go to work` };
