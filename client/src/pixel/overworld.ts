@@ -925,9 +925,9 @@ export class Overworld {
     const camY = Math.round(this.cam.z * TILE - sh / 2);
     const toScreen = (x: number, z: number): [number, number] => [Math.round(x * TILE) - camX, Math.round(z * TILE) - camY];
     drawSea(g, m, camX, camY, sw, sh, t);
-    drawSeaLife(g, this.sunny.seaLife, camX, camY, sw, sh, t);
     drawLowClouds(g, m, camX, camY, sw, sh, t);
     drawLand(g, m, this.sunny, camX, camY, sw, sh, t);
+    drawSeaLife(g, this.sunny.seaLife, camX, camY, sw, sh, t);
     this.drawBeds(g, toScreen, t);
     const plaza = this.world.platforms.find((p) => p.kind === "plaza");
     if (plaza) {

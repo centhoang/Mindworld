@@ -43,6 +43,8 @@ Only south edges have a face, worked out per column. Cells below the land, from 
 ## Water
 - Sea: a 4 x 4 repeat of rows 18-21, cols 11-14. The tiles do not animate; life comes from foam and glint sprites.
 - Pond and river: fill 7.22. The bank is drawn on the land cells around the water, not on water cells. Names are by where the land ends: N 8.26, S 7.25, W 8.24, E 7.27, NW 8.22, NE 7.26, SW 7.24, SE 7.23, inner SE 7.29, inner SW 8.25, inner NW 8.28. Inner NE 8.29 is a guess, not read from the room.
+- Player-ground streams are chosen after roads, by a separate RNG seeded from `ground.seed`: two grounds in three are eligible, with at most one course. Channels are two tiles wide, take 6-10 axis steps with square stepped turns, and end in a 4 x 3 pool. All water stays outside a two-tile buffer around roads, bridges, gates, both yard ovals and the largest house stamp; reject courses that narrow land to one tile or disconnect a gate from the centre. Pools remain unwalkable, and existing trees/decor reject them.
+- Closed-stream fallback: the existing tiles have no combined pond-bank/sea-coast mouth, and the renderer gives coast edges priority over banks. Leave two full land tiles between the channel and sea (also around the other banks), rather than draw a broken mouth. If the whole course cannot fit, carve nothing. The current 26 x 20 player grounds have no fitting course in the 30-seed regression sample; larger test grounds exercise successful streams. Increasing production ground size or reducing the requested clearances is a separate change.
 
 ## Bridges
 The ends lie one tile up on the land.

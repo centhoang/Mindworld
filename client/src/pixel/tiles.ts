@@ -4,6 +4,7 @@
 
 import { THEMES } from "../world/ground";
 import { inBlock, groundOrigin, type Platform, type WorldMap } from "../world/layout";
+import { mulberry32 } from "../sim/rng";
 
 export const TILE = 16;
 
@@ -110,7 +111,108 @@ export function buildTileMap(w: WorldMap): TileMap {
     if (pa.kind !== "islet") pathLine(pa.x + 0.5, pa.z + 0.5, b.ax, b.az);
     if (pb.kind !== "islet") pathLine(pb.x + 0.5, pb.z + 0.5, b.bx, b.bz);
   }
-  return { w: tw, h: th, ox, oz, kind, look };
+  const map = { w: tw, h: th, ox, oz, kind, look };
+  // Roads must be final before choosing water: never carve a route that would need a bridge.
+  for (const p of w.platforms) if (p.ground) carveStream(map, p);
+  return map;
+}
+
+// Coast and pond banks have no shared mouth tile. Keep two complete land rows at the mouth,
+// using the closed-stream fallback rather than covering a coast edge with an incomplete bank.
+function carveStream(m: TileMap, p: Platform): void {
+  const g = p.ground!;
+  const rng = mulberry32(g.seed ^ 0x7374726d);
+  if (rng() >= 2 / 3) return;
+  const [ox, oz] = groundOrigin(p);
+  const index = (i: number, j: number) => (oz + j - m.oz) * m.w + ox + i - m.ox;
+  const on = (i: number, j: number) => i >= 0 && j >= 0 && i < g.w && j < g.h && g.land[j * g.w + i] === 1;
+  const kind = (i: number, j: number) => on(i, j) ? m.kind[index(i, j)]! : T.water;
+  const wet = (k: number) => k === T.water || k === T.pool || k === T.bridge;
+  const reserved = (i: number, j: number) => {
+    const [x, z] = [ox + i + 0.5 - p.x, oz + j + 0.5 - p.z];
+    // Preserve both the shape generator's guaranteed yard and the scene's working yard.
+    return Math.hypot((i - (g.w - 1) / 2) / 8.5, (j - (g.h - 1) / 2) / 6.2) <= 1 ||
+      Math.hypot(x / 7.5, (z + 1) / 5) <= 1 ||
+      // Largest house stamp (103 x 97 px), at z - 2.5; protect its whole visible rectangle.
+      (Math.abs(x) <= 103 / 32 && z >= -2.5 - 97 / 16 && z <= -2.5) ||
+      Object.values(g.gates).some((gate) => gate.i === i && gate.j === j);
+  };
+  const safe = new Uint8Array(g.w * g.h);
+  for (let j = 0; j < g.h; j++) for (let i = 0; i < g.w; i++) {
+    let ok = true;
+    for (let dj = -2; dj <= 2 && ok; dj++) for (let di = -2; di <= 2 && ok; di++) {
+      const k = kind(i + di, j + dj);
+      if (wet(k) || k === T.path || reserved(i + di, j + dj)) ok = false;
+    }
+    safe[j * g.w + i] = +ok;
+  }
+  const shuffle = <A,>(a: A[]): A[] => {
+    for (let n = a.length - 1; n > 0; n--) {
+      const q = Math.floor(rng() * (n + 1));
+      [a[n], a[q]] = [a[q]!, a[n]!];
+    }
+    return a;
+  };
+  // Each anchor is the coast end of a two-wide channel, with an inward axis and a side axis.
+  const mouths: { i: number; j: number; di: number; dj: number }[] = [];
+  for (const [di, dj] of [[0, 1], [1, 0], [0, -1], [-1, 0]])
+    for (let j = 0; j < g.h; j++) for (let i = 0; i < g.w; i++) {
+      if (on(i, j) && on(i - dj!, j + di!) && !on(i - di!, j - dj!) && !on(i - dj! - di!, j + di! - dj!)) mouths.push({ i, j, di: di!, dj: dj! });
+    }
+  const lengths = shuffle([6, 7, 8, 9, 10]);
+  const offsets = shuffle([-3, -2, 2, 3]);
+  for (const { i, j, di, dj } of shuffle(mouths)) {
+    if (![0, 1].every((du) => [0, 1].every((dv) => {
+      const [a, b] = [i + di * (2 + du) - dj * dv, j + dj * (2 + du) + di * dv];
+      return on(a, b) && safe[b * g.w + a];
+    }))) continue;
+    for (const length of lengths) for (const offset of offsets) for (let bend = 2; bend <= length - Math.abs(offset) - 2; bend++) {
+      const cells = new Set<number>();
+      let ok = true;
+      const add = (a: number, b: number) => {
+        if (!on(a, b) || !safe[b * g.w + a]) ok = false;
+        else cells.add(b * g.w + a);
+      };
+      const point = (u: number, v: number): [number, number] => [i + di * u - dj * v, j + dj * u + di * v];
+      // Sweep a 2 x 2 square along axis steps: two-wide legs and square, stepped elbows.
+      const block = (u: number, v: number) => {
+        for (let du = 0; du < 2; du++) for (let dv = 0; dv < 2; dv++) add(...point(u + du, v + dv));
+      };
+      const end = length - Math.abs(offset);
+      for (let u = 2; u <= 2 + bend; u++) block(u, 0);
+      for (let v = Math.min(0, offset); v <= Math.max(0, offset); v++) block(2 + bend, v);
+      for (let u = 2 + bend; u < 2 + end; u++) block(u, offset);
+      const [ex, ez] = point(2 + end, offset);
+      // The terminal pool is always 4 columns by 3 rows, even for an east/west course.
+      const px = ex - (di < 0 ? 3 : di === 0 ? 1 : 0);
+      const pz = ez - (dj < 0 ? 2 : di < 0 ? 1 : 0);
+      for (let b = 0; b < 3; b++) for (let a = 0; a < 4; a++) add(px + a, pz + b);
+      if (!ok) continue;
+      const water = (a: number, b: number) => cells.has(b * g.w + a) || wet(kind(a, b));
+      // Reject narrow land between any two banks, including the original coast.
+      for (const k of cells) {
+        const [a, b] = [k % g.w, Math.floor(k / g.w)];
+        for (let db = -1; db <= 1; db++) for (let da = -1; da <= 1; da++) {
+          const [x, z] = [a + da, b + db];
+          if (!water(x, z) && ((water(x - 1, z) && water(x + 1, z)) || (water(x, z - 1) && water(x, z + 1)))) ok = false;
+        }
+      }
+      if (!ok) continue;
+      // Validate the actual candidate before mutating tiles: all four gates stay connected to the centre.
+      const seen = new Set<number>();
+      const stack = [[Math.floor(p.x - ox), Math.floor(p.z - oz)]];
+      while (stack.length) {
+        const [a, b] = stack.pop()! as [number, number];
+        const k = b * g.w + a;
+        if (!on(a, b) || seen.has(k) || water(a, b)) continue;
+        seen.add(k);
+        stack.push([a - 1, b], [a + 1, b], [a, b - 1], [a, b + 1]);
+      }
+      if (Object.values(g.gates).some(({ i: a, j: b }) => !seen.has(b * g.w + a))) continue;
+      for (const k of cells) m.kind[index(k % g.w, Math.floor(k / g.w))] = T.pool;
+      return;
+    }
+  }
 }
 
 // The tile at world tile (x, z) if it is land of platform p, else null.
