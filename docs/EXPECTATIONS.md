@@ -5,9 +5,13 @@ Do not ask for a play-test until every line holds on the deployed build with 2+ 
 ## Look
 - Matches `VisualAssetPack/BuiltDemo`. Everything in the demo is in the pack: search the tileset and Room1 before saying something is missing.
 - Pack art is 1:1. One ground square fits one tree or one farm spot. No scaling.
+- Everything sits on the tile grid. Clumps are organic in shape, never free-placed.
 - Natural layout: organic clusters and paths, no grid rows. Sand beaches, windmills with towers, dense decor.
 - Water everywhere moves like the ocean, with clean edges.
-- Farm looks like the demo: dirt field, hexagon plots, real growth stages for every crop.
+- Farm looks like the demo: plain dirt with no decor, hexagon plots touching in rows, walkable rows between, real growth stages.
+- Straight dirt roads have fences on both sides. Horizontal bridges have a shadow and posts. Bridges lie on top of normal cliffs.
+- All clouds fly above the islands. The world edge shows no hard line.
+- Layers follow docs/LAYERS.md. No tile is cut off.
 - Entering a house looks like `Interior.gif`: the roof lifts in place on the same house.
 - Even pixels at any display scale.
 
@@ -20,6 +24,7 @@ Do not ask for a play-test until every line holds on the deployed build with 2+ 
 - Replies continue the conversation: a yes to an offer acts on that offer, and nothing is asked twice.
 - Questions about the world get true answers.
 - The local model does the talking. If the tuned 1B cannot, try a bigger trained model (3B).
+- The chat log is for development only: it is gone before submission.
 - Before any play-test, run docs/NPC-CHAT-TESTS.md and read the replies. After any user play-test, read the recorded chat without being asked.
 
 ## Network
