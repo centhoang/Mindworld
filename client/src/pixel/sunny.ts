@@ -18,7 +18,7 @@ const STRIPS: Record<string, { frames: number }> = {
   spr_deco_duck_01_strip4: { frames: 4 }, spr_deco_chicken_01_strip4: { frames: 4 }, spr_deco_sheep_01_strip4: { frames: 4 }, spr_deco_pig_01_strip4: { frames: 4 }, spr_deco_cow_strip4: { frames: 4 },
   spr_deco_bird_01_strip4: { frames: 4 }, spr_deco_windmill_withshadow_strip9: { frames: 9 }, spr_deco_fire_01_strip4: { frames: 4 }, spr_deco_coracle_strip4: { frames: 4 },
 };
-const SINGLES = ["tiles", "f-isle-sand", "f-isle-green", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "label_left", "label_middle", "label_right", "itemdisc_01", "itemdisc_02", "interior", "interior-roof", "spr_deco_rug_01",
+const SINGLES = ["tiles", "f-isle-sand", "f-isle-green", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "label_left", "label_middle", "label_right", "itemdisc_01", "itemdisc_02", "interior", "interior-roof", "home-roof", "home-open", "spr_deco_rug_01",
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture"];
 export const CROPS_ART = ["wheat", "carrot", "beetroot", "cabbage", "cauliflower", "kale", "parsnip", "potato", "pumpkin", "radish"] as const;
 

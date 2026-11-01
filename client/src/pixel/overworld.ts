@@ -22,6 +22,7 @@ import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, 
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
 import { cornerBlocks, railBlocks, seaCell } from "./sunny-terrain";
+import { HOME_BLOCKS, HOME_DOOR_DX } from "../game/house";
 import { layoutBubbles, type BubbleBox, type Placed } from "./bubbles";
 import { liveName } from "../world/live";
 import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
@@ -51,7 +52,7 @@ export const OVERWORLD_MON = 20; // px: monsters in the overworld
 const WILD_PER_MEADOW = 3;
 const MEET_DIST = 1.0;
 const NPC_ROUTE_TILES = 120_000; // the NPCs may walk across the whole map
-const HOME_ART = "house-blue";
+const HOME_ART = "home-roof";
 const HOUSE_ART = ["house-red", "house-orange", "house-green", "house-purple", "house-orangelong", "house-redsmall", "house-bluesmall", "house-greentall"];
 const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
 // Farm stages 0-3 onto the pack's six growth pictures.
@@ -497,7 +498,7 @@ export class Overworld {
         if (this.noticeBoard && Math.abs(x - this.noticeBoard.x) < 2 && Math.abs(z - this.noticeBoard.z) < 2) continue;
         if (this.houses.some((hs) => Math.abs(x - hs.x) < 5 && Math.abs(z - hs.z + 2) < 5)) continue;
         if (this.nearPath(i, j)) continue;
-        if (Math.abs(x - this.house.x) < 6 && Math.abs(z - this.house.z + 2) < 6) continue;
+        if (Math.abs(x - this.house.x) < 9 && Math.abs(z - this.house.z + 3) < 7) continue;
         if (this.stall && Math.abs(x - this.stall.x) < 3.5 && Math.abs(z - this.stall.z + 1) < 3.5) continue;
         if (this.landmarks.some((l) => Math.abs(x - l.x) < 3.5 && Math.abs(z - l.z + 1) < 3.5)) continue;
         if (this.allBeds.some((b) => Math.abs(b.x + 0.5 - x) < 2.5 && Math.abs(b.z + 0.5 - z) < 2.5)) continue;
@@ -887,8 +888,8 @@ export class Overworld {
   }
 
   exitHouse(): void {
-    this.player = { x: this.house.x, z: this.house.z + 0.9 };
-    this.pet = { x: this.house.x + 0.8, z: this.house.z + 1.4 };
+    this.player = { x: this.house.x + HOME_DOOR_DX, z: this.house.z + 0.9 };
+    this.pet = { x: this.house.x + HOME_DOOR_DX + 0.8, z: this.house.z + 1.4 };
     this.cam = { ...this.player };
     this.playerMotion.dir = 0;
     this.playerMotion.flip = false;
@@ -904,7 +905,7 @@ export class Overworld {
   }
 
   atDoor(): boolean {
-    return Math.abs(this.player.x - this.house.x) < 0.8 && this.player.z > this.house.z && this.player.z < this.house.z + 1.2 && this.playerMotion.dir === 3;
+    return Math.abs(this.player.x - this.house.x - HOME_DOOR_DX) < 0.8 && this.player.z > this.house.z && this.player.z < this.house.z + 1.2 && this.playerMotion.dir === 3;
   }
 
   private footprint(art: string): [number, number] {
@@ -940,12 +941,13 @@ export class Overworld {
     });
   }
 
+  private indoors = false; // drawing the world around the house: the house and I are on the interior's layer
   underBubbles?: () => void; // the screen's own panels: speech draws over them
 
   readonly canWalk = (x: number, z: number): boolean => {
     if (!tileWalkable(this.map, x, z) || railBlocks(this.map, x, z) || cornerBlocks(this.map, x, z)) return false;
-    const [hw, hd] = this.footprint(HOME_ART);
-    if (Math.abs(x - this.house.x) < hw && z < this.house.z + 0.2 && z > this.house.z - hd) return false;
+    const [dx, dz] = [x - this.house.x, z - this.house.z];
+    if (HOME_BLOCKS.some(([x0, x1, z0, z1]) => dx > x0 && dx < x1 && dz > z0 && dz < z1)) return false;
     for (const h of this.houses) {
       const [w, d] = this.footprint(h.art);
       if (Math.abs(x - h.x) < w && z < h.z + 0.2 && z > h.z - d) return false;
@@ -1081,6 +1083,16 @@ export class Overworld {
     return met;
   }
 
+  // The world around the house while you are inside: `(sx, sy)` is where the house's foot sits on screen.
+  drawAround(g: CanvasRenderingContext2D, sw: number, sh: number, t: number, sx: number, sy: number): void {
+    const cam = this.cam;
+    this.cam = { x: this.house.x + (sw / 2 - sx) / TILE, z: this.house.z + (sh / 2 - sy) / TILE };
+    this.indoors = true;
+    this.draw(g, sw, sh, t);
+    this.indoors = false;
+    this.cam = cam;
+  }
+
   draw(g: CanvasRenderingContext2D, sw: number, sh: number, t: number): void {
     const m = this.map;
     const camX = Math.round(this.cam.x * TILE - sw / 2);
@@ -1149,7 +1161,7 @@ export class Overworld {
     }
     {
       const [hx, hy] = toScreen(this.house.x, this.house.z);
-      items.push({ z: this.house.z, draw: () => this.drawHouse(g, HOME_ART, hx, hy, t) });
+      if (!this.indoors) items.push({ z: this.house.z, draw: () => this.drawHouse(g, HOME_ART, hx, hy, t) });
     }
     for (const h of this.houses) {
       const [hx, hy] = toScreen(h.x, h.z);
@@ -1176,7 +1188,7 @@ export class Overworld {
     }
     const [px, py] = toScreen(this.player.x, this.player.z);
     const pf = spriteFrame(this.playerSprite, this.moving, this.playerMotion.walkTime, t);
-    items.push({ z: this.player.z, draw: () => (characterShadow(g, px, py), humanSprites.draw(g, this.myLook, this.playerMotion, px, py, t,
+    if (!this.indoors) items.push({ z: this.player.z, draw: () => (characterShadow(g, px, py), humanSprites.draw(g, this.myLook, this.playerMotion, px, py, t,
       () => g.drawImage(this.playerSprite.img, pf * 16, this.playerMotion.dir * 24, 16, 24, px - 8, py - 22, 16, 24))) });
     const half = OVERWORLD_MON / 2;
     for (const p of this.peers.values()) {
@@ -1209,7 +1221,7 @@ export class Overworld {
     }
     const [qx, qy] = toScreen(this.pet.x, this.pet.z);
     const hop = Math.floor(t * 4) % 2;
-    items.push({ z: this.pet.z, draw: () => g.drawImage(this.petSprite, qx - half, qy - OVERWORLD_MON + 2 - hop) });
+    if (!this.indoors) items.push({ z: this.pet.z, draw: () => g.drawImage(this.petSprite, qx - half, qy - OVERWORLD_MON + 2 - hop) });
     for (const [id, pos] of this.npcPets) {
       if (!this.npcs?.hasPet[id]) continue;
       const [nx, ny] = toScreen(pos.x, pos.z);
@@ -1329,7 +1341,7 @@ export class Overworld {
       else stand(g, "expression_chat", s.cx, s.y + 12); // their line waits its turn
     });
     const bed = this.bedNear();
-    const hint = this.atDoor()
+    const hint = this.indoors ? null : this.atDoor()
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
@@ -1355,7 +1367,7 @@ export class Overworld {
   }
 }
 
-const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 5 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) * 2 }));
+const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) + 3 + Math.floor(i / 3) * 2 }));
 
 const GATHER_HINT: Record<string, string> = { fish: "E: FISH", chop: "E: CHOP", herbs: "E: PICK HERBS" };
 

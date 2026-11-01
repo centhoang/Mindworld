@@ -51,7 +51,7 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
     const spots = Object.values(p.spots ?? {});
     const free = (x: number, z: number) => {
       if (spots.some((s) => Math.abs(s.x - x) < 3.5 && Math.abs(s.z - z) < 3.5)) return false;
-      return Math.hypot((x - p.x) / (p.ground ? 7.5 : 6), (z - p.z + 1) / 5) >= 1; // the yard: house, beds, plaza
+      return Math.hypot((x - p.x) / (p.ground ? 9 : 6), (z - p.z + 1) / (p.ground ? 6.5 : 5)) >= 1; // the yard: house, beds, plaza
     };
     if (p.kind === "picnic" && p.spots?.blanket) {
       const b = p.spots.blanket; // a string of lights on two posts behind the blanket (walk-through)

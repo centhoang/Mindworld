@@ -85,7 +85,7 @@ it("dresses real forested grounds with seeded features and keeps every route con
   expect(mills).toBeLessThanOrEqual(28);
   expect(elders).toBe(40);
   expect(details / 40).toBeGreaterThanOrEqual(55);
-  expect(trees / 40).toBeGreaterThanOrEqual(30);
+  expect(trees / 40).toBeGreaterThanOrEqual(28);
 }, 30_000);
 
 it("keeps the pure placer independent of owner identity and away flags", () => {

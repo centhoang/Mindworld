@@ -93,7 +93,7 @@ The ends lie one tile up on the land.
 - No new bitmap exports were made in this pass: `python` is unavailable in the sandbox shell, so the requested art-sunny.py / art-interior.py export part was stopped. All dressing uses already-exported native pack assets.
 
 ## Interiors
-The house is BuiltDemo/Interior.gif at 1x: `python scripts/art-interior.py` (after art-sunny.py) writes interior.png and interior-roof.png, the people removed. The roof fades out over 0.7 s on entry. Where feet can go is game/house.ts, in pixels of that picture: change it together with the art. The road carries on past the picture (`extendBand`).
+The player's house is BuiltDemo/Interior.gif at 1x, indoors and out: `python scripts/art-interior.py` (after art-sunny.py) writes home-roof.png and home-open.png, cut to the house. The overworld keeps drawing around it while you are inside (`drawAround`) and the roof fades out over 0.7 s, in place. Where feet can go is game/house.ts, in pixels of that picture: change it together with the art.
 
 ## Chimney smoke
 The smoke's mouth is per house: `CHIMNEY` in overworld.ts, pixels from the stamp's top left. A house with no chimney on its stamp has no smoke.

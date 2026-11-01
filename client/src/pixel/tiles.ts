@@ -143,7 +143,7 @@ function inYard(p: Platform, i: number, j: number, shape = true): boolean {
   return (shape && Math.hypot((i - (g.w - 1) / 2) / 8.5, (j - (g.h - 1) / 2) / 6.2) <= 1) ||
     Math.hypot(x / 7.5, (z + 1) / 5) <= 1 ||
     // Largest house stamp (103 x 97 px), at z - 2.5; protect its whole visible rectangle.
-    (Math.abs(x) <= 103 / 32 && z >= -2.5 - 97 / 16 && z <= -2.5) ||
+    (Math.abs(x) <= 8 && z >= -2.5 - 9 && z <= -1.5) || // the home house, 221 x 136 px at z - 2.5
     Object.values(g.gates).some((gate) => gate.i === i && gate.j === j);
 }
 

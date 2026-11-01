@@ -172,6 +172,7 @@ const interior = new Interior({
     mode = "world";
     world.exitHouse();
   },
+  around: (g, sw, sh, t, x, y) => world.drawAround(g, sw, sh, t, x, y),
 });
 
 // Talking to a wild pet (E when close): Muse Spark answers in character through the Worker (/api/chat,

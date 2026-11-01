@@ -25,6 +25,12 @@ const BUILT_IN: readonly Rect[] = [
 
 const inside = ([x0, y0, x1, y1]: Rect, x: number, y: number) => x >= x0 && x < x1 && y >= y0 && y < y1;
 
+// The house stands in the world as that same picture: its foot (bottom centre of home-roof.png) in picture pixels, and
+// the door's offset from that foot in tiles. What blocks, in tiles from the foot: x0, x1, z0, z1.
+export const HOME_FOOT = { x: 153, y: 113 };
+export const HOME_DOOR_DX = 4;
+export const HOME_ROOF = { w: 221, h: 136 };
+export const HOME_BLOCKS: readonly (readonly [number, number, number, number])[] = [[-0.9, 7, -7.5, 0.1], [-7, -2.1, -6.5, -0.9], [-2.2, -0.8, -5, -2]];
 export const HOUSE_DOOR = { x: 217, y: 90 }; // where you stand on coming in
 export const HOUSE_EXIT_Y = 98; // past this you are outside
 

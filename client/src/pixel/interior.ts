@@ -2,12 +2,12 @@
 // add furniture (Tab: decorate) and use the shipping crate by the door (sell the harvest, buy seeds). The floor plan
 // is in ../game/house.ts and the furniture rules in ../game/room.ts; this file draws and walks them.
 
-import { HOUSE_DOOR, HOUSE_EXIT_Y, onFloor } from "../game/house";
+import { HOME_FOOT, HOME_ROOF, HOUSE_DOOR, HOUSE_EXIT_Y, onFloor } from "../game/house";
 import { CRATE, COLS, FURNITURE, PIECE_KINDS, ROWS, blocked, canPlace, pieceAt, place, removeAt, type Piece, type PieceKind } from "../game/room";
 import { followStep, keyDir, slide, type Vec } from "../world/movement";
 import { makePlayer, PAL, spriteFrame, type Sprite } from "./art";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanSprites, newHumanMotion, stepHumanMotion, type HumanLook } from "./humans";
-import { characterShadow, drawFaded, drawGrass, extendBand, stand } from "./sunny";
+import { characterShadow, drawFaded, stand } from "./sunny";
 import { drawFrame, drawText, GLYPH } from "./text";
 
 export const ROOM_W = 264;
@@ -15,11 +15,11 @@ export const ROOM_H = 178;
 const C = 16; // cell size
 const GX = 53 / C; // where the furniture grid starts on the picture, in cells
 const GY = 28 / C;
-const ROAD_Y = 128; // the road across the picture, carried on past its edges
-const ROAD_H = 19;
 const ROOF_FADE = 0.7; // seconds for the roof to lift as you come in
 const DOOR_AT = { x: HOUSE_DOOR.x / C, z: HOUSE_DOOR.y / C };
 const EXIT_Z = HOUSE_EXIT_Y / C;
+
+type Ctx = CanvasRenderingContext2D;
 
 export interface InteriorHost {
   room(): Piece[];
@@ -29,9 +29,9 @@ export interface InteriorHost {
   look(): HumanLook;
   useCrate(): void; // opens the crate menu (main.ts owns coins and the farm)
   leave(): void;
+  around(g: Ctx, sw: number, sh: number, t: number, footX: number, footY: number): void; // the world outside
 }
 
-type Ctx = CanvasRenderingContext2D;
 export class Interior {
   player: Vec = { ...DOOR_AT };
   pet: Vec = { ...DOOR_AT };
@@ -132,9 +132,10 @@ export class Interior {
     if (this.entered < 0) this.entered = t;
     const ox = sw >= ROOM_W ? Math.floor((sw - ROOM_W) / 2) : Math.round(Math.max(sw - ROOM_W, Math.min(0, sw / 2 - this.player.x * C)));
     const oy = sh >= ROOM_H ? Math.floor((sh - ROOM_H) / 2) : Math.round(Math.max(sh - ROOM_H, Math.min(0, sh / 2 - this.player.z * C)));
-    drawGrass(g, sw, sh);
-    extendBand(g, "interior", ox, oy, ROAD_Y, ROAD_H, sw);
-    stand(g, "interior", ox + ROOM_W / 2, oy + ROOM_H);
+    // The same house on the same ground: the world stays where it was and only the roof comes off.
+    const [fx, fy] = [ox + HOME_FOOT.x, oy + HOME_FOOT.y];
+    this.host.around(g, sw, sh, t, fx, fy);
+    stand(g, "home-open", fx, fy);
     const free = (x: number, z: number): [number, number] => [ox + Math.round(x * C), oy + Math.round(z * C)];
     const at = (x: number, z: number): [number, number] => free(x + GX, z + GY);
     const room = this.pieces();
@@ -161,7 +162,7 @@ export class Interior {
     } });
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
-    drawFaded(g, "interior-roof", ox, oy, 1 - (t - this.entered) / ROOF_FADE);
+    drawFaded(g, "home-roof", fx - Math.floor(HOME_ROOF.w / 2), fy - HOME_ROOF.h, 1 - (t - this.entered) / ROOF_FADE);
 
     if (this.deco) {
       const d = this.deco;
