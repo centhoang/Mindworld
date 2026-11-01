@@ -3,37 +3,37 @@
 **Starting prompt:** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md."
 
 ## State
-- Live behind Access: https://pets.uryto.dev/ (Worker fba2a061, code at c35a017). Tests: client 628, worker 191, tsc clean.
-- The user's review of that build rejected parts of the look and chat: 10 open bugs in `docs/BUGS.md`, all blockers.
-- `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$102 (approx).
-- Claude weekly quota was ~90% before the Nov 1 17:00 UTC reset.
-- Full history and old gotchas: `docs/HISTORY.md` (grep it, written before this review).
+- Live behind Access: https://pets.uryto.dev/ (see `git log` for the deployed commit). Tests: client 632, worker 192+, tsc clean.
+- All 10 reported bugs have fixes deployed, proven with 2 players, listed in `docs/BUGS.md` until the user accepts them.
+- Chat offers work on the real model; free talk on the 1B is weak (bug 11). `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$102.
+- Full history and old gotchas: `docs/HISTORY.md` (grep it).
 
 ## Decisions
 - NPCs are the star: a player cannot tell them from a human. The sim reasons; the model picks among valid options and speaks.
 - The game must run on a local model, so it stays free after the event. Prompts are frozen at af455c4: a text change needs a retrain.
-- Questions with one true answer (where, who, doing, prices, why) come from the sim (mind/directions.ts and neighbours).
+- Questions with one true answer come from the sim (mind/directions.ts and neighbours). Offers: mind/offers.ts.
+- `cleanReply` strips bond notes read aloud and repeat invitations from model lines.
 
 ## Pending decisions (user)
-- 3B model: it can run in the browser if trained and converted the same way. It costs Modal credits and may not fit the 1050.
-  Fix chat state (bug 10) first, then decide from the chat test results.
-- Submission day: make GitHub and the 4 HF repos public, remove Access.
+- 3B model: run in the browser if trained and converted the same way. Costs Modal credits, may not fit the 1050. Evidence: bug 11.
+- Submission day: make GitHub and the 4 HF repos public, remove Access. Decide then whether to keep `/api/chatlog`: it stores strangers' chat for 14 days.
 
 ## Next actions
-1. **Chat first:** record real chat (npc, player line, reply, time) so it can be read after each play-test. Fix bug 10 by tracking the open offer, whoever voiced it. Run docs/NPC-CHAT-TESTS.md.
-2. **Bugs 1-9 in docs/BUGS.md:** start with ground scale (bug 1); placement, farm and collision depend on it.
-3. Deploy, prove with 2 players, then check docs/EXPECTATIONS.md before asking for a play-test.
+1. Ask for the user's play-test once the 3B decision is made; EXPECTATIONS holds except free-talk quality.
+2. After any play-test, read the chat log (below), add failures to BUGS and NPC-CHAT-TESTS.
 
 ## Gotchas
+- Read the chat log from `worker/`: `npx wrangler kv key list --binding GHOSTS --remote --prefix chat:`, then `kv key get`. Write-only over HTTP on purpose.
+- Chat test: rig up, then `node scripts/npc-chat-run.mjs`; results in `.scratch/chat-runs/`. Any client edit reloads the tab and kills a run.
 - Deploy only from `worker/`. If `wrangler.jsonc` appears at the root, delete it.
 - Test Chrome: `bash .scratch/mlc/chrome.sh "<url>"` (port 9333, GTX 1050, signed in to Access). Weights: `node .scratch/mlc/serve.mjs`.
 - Game with the model: `http://localhost:5173/?gpu=capable&tuned=http://127.0.0.1:8099/n4/{q}/`.
-- Drive a tab: `node scripts/cdp-tab.mjs "<url regex>" "<js or file>"`. `?p=2` = a second player. `__px.world.alwaysDay = true` for shots.
-- Hidden preview pane: rAF stalls, so drive `__px.update` from a timer.
+- Drive a tab: `node scripts/cdp-tab.mjs "<url regex>" "<js or file>"`; shot: `scripts/cdp-shot.mjs`. `?p=2` = a second player.
+- Hidden preview pane: rAF stalls, so drive `__px.update` from a timer. `__px.world.alwaysDay = true` for shots.
 - The room moves NPC hosting from a hidden tab to a visible one. E first closes a toast; beds take E before water.
 
 ## File map
 docs/{BUGS,EXPECTATIONS,NPC-CHAT-TESTS,TILE-RULES,STYLE,NPC-PLAN,EVENT,DEMO,DEPLOY,DIRECTOR,HISTORY}.md
-client/src/pixel/{main,overworld,sunny,sunny-terrain,humans,crt,grounds-decor}.ts
-client/src/mind/{npcs,brain,directions,hub}.ts · worker/src/{room,npc,app}.ts
-scripts/{art-sunny.py,art-interior.py,codex.ps1,cdp-tab.mjs,npc-chat-test.js}
+client/src/pixel/{main,overworld,interior,sunny,sunny-terrain,grounds-decor,tiles}.ts · game/house.ts
+client/src/mind/{npcs,offers,brain,directions,hub}.ts · worker/src/{room,npc,app}.ts
+scripts/{art-sunny.py,art-interior.py,codex.ps1,cdp-tab.mjs,cdp-shot.mjs,npc-chat-test.js,npc-chat-run.mjs}

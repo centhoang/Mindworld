@@ -99,10 +99,12 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
         const i = Math.floor(x0 - m.ox + mill() * w), j = Math.floor(z0 - m.oz + mill() * h);
         let ok = true;
         // A tower two tiles wide and five tall, with a wheel on top: only its foot is solid, but the whole mill keeps clear of houses.
+        // Never behind the house in the middle of the yard.
+        if (Math.abs(m.ox + i + 0.5 - p.x) < (p.ground ? 9 : 5.5) && m.oz + j + 0.5 < p.z + 2) ok = false;
         for (let dj = -6; dj <= 1 && ok; dj++) for (let di = -3; di <= 3 && ok; di++) {
-          if (featureReserved(m.ox + i + di + 0.5, m.oz + j + dj + 0.5) || !free(m.ox + i + di + 0.5, m.oz + j + dj + 0.5)) ok = false;
+          if (featureReserved(m.ox + i + di + 0.5, m.oz + j + dj + 0.5)) ok = false;
           if (Math.abs(di) > 1 || Math.abs(dj) > 1) continue;
-          if (!clearGrass(i + di, j + dj, true) || taken.has((j + dj) * m.w + i + di) || nearPath(i + di, j + dj)) ok = false;
+          if (!clearGrass(i + di, j + dj, true) || taken.has((j + dj) * m.w + i + di) || !free(m.ox + i + di + 0.5, m.oz + j + dj + 0.5) || nearPath(i + di, j + dj)) ok = false;
         }
         if (!ok) continue;
         const tiles = [j * m.w + i - 1, j * m.w + i];

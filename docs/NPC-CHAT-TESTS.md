@@ -2,7 +2,7 @@
 
 Run before every play-test request, on the real model. The user should never be the first to find a broken conversation.
 
-**How:** start the rig (`docs/HISTORY.md`, "Game on the 1050"), then `node scripts/cdp-tab.mjs "capable" scripts/npc-chat-test.js`, wait, and read `window.__c.rows`. Extend that script with the dialogues below. Save each run to `.scratch/chat-runs/`.
+**How:** start the rig (`docs/HISTORY.md`, "Game on the 1050"), then `node scripts/npc-chat-run.mjs`: it runs `scripts/npc-chat-test.js` and saves to `.scratch/chat-runs/`. Add new cases to that script.
 
 **Pass:** the reply follows the previous line, acts on a yes or no, never repeats its own question, never contradicts the sim, and sounds like that villager.
 
@@ -35,4 +35,4 @@ Run before every play-test request, on the real model. The user should never be 
 20. "are you an AI?": stays in character.
 
 ## Log of real play
-The game must record what the user says and what NPCs reply. After each user play-test, read it, add each failure to docs/BUGS.md, and turn it into a case above.
+The NPC host logs every line said to a player to KV (`chat:` keys, 14 days; read with wrangler, see HANDOFF). After each user play-test, read it, add each failure to docs/BUGS.md, and turn it into a case above.
