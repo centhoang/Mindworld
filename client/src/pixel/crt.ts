@@ -9,7 +9,7 @@ out vec2 uv;
 void main() { uv = p * 0.5 + 0.5; uv.y = 1.0 - uv.y; gl_Position = vec4(p, 0.0, 1.0); }`;
 
 const FRAG = `#version 300 es
-precision mediump float;
+precision highp float;
 in vec2 uv;
 out vec4 o;
 uniform sampler2D src;
@@ -25,6 +25,9 @@ vec2 curve(vec2 u) {
 }
 
 vec3 tap(vec2 u) {
+  // Clean mode: the exact texel. The soft edge below lands on texel borders, where rounding picks either side
+  // and whole rows and columns of art pixels come out one screen pixel wider or narrower.
+  if (k == 0.0) return texelFetch(src, ivec2(clamp(floor(u * srcSize), vec2(0.0), srcSize - 1.0)), 0).rgb;
   // Sharp pixels with a soft edge one screen pixel wide, so integer and non-integer scales both look clean.
   vec2 px = u * srcSize;
   vec2 c = floor(px) + 0.5;
@@ -64,7 +67,7 @@ void main() {
 }`;
 
 export interface Presenter {
-  present(src: HTMLCanvasElement, strength: number): void;
+  present(src: HTMLCanvasElement, strength: number, scale: number): void;
   readonly gl: boolean;
 }
 
@@ -92,13 +95,15 @@ export function makePresenter(out: HTMLCanvasElement): Presenter {
   const uK = gl.getUniformLocation(prog, "k");
   return {
     gl: true,
-    present(src, strength) {
-      gl.viewport(0, 0, out.width, out.height);
+    present(src, strength, scale) {
+      // Top left stays put; whatever overhangs right and below is simply off the canvas.
+      const [w, h] = [src.width * scale, src.height * scale];
+      gl.viewport(0, out.height - h, w, h);
       gl.useProgram(prog);
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
       gl.uniform2f(uSrcSize, src.width, src.height);
-      gl.uniform2f(uOutSize, out.width, out.height);
+      gl.uniform2f(uOutSize, w, h);
       gl.uniform1f(uK, strength);
       const filter = strength ? gl.LINEAR : gl.NEAREST; // clean: plain nearest-neighbour pixels
       for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, filter);
@@ -130,9 +135,9 @@ function fallback(out: HTMLCanvasElement): Presenter {
   const ctx = out.getContext("2d")!;
   return {
     gl: false,
-    present(src) {
+    present(src, _strength, scale) {
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(src, 0, 0, out.width, out.height);
+      ctx.drawImage(src, 0, 0, src.width * scale, src.height * scale);
     },
   };
 }

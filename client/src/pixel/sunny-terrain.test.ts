@@ -11,13 +11,15 @@ function bridge(): TileMap {
 }
 
 describe("bridge rails", () => {
-  it("stop a walker at both sides and leave the deck and tile centres free", () => {
+  it("keep a walker to the deck side of the outer rows, so routes take the middle lane", () => {
     const m = bridge();
     expect(railBlocks(m, 2.5, 1.1)).toBe(true);
     expect(railBlocks(m, 2.5, 3.9)).toBe(true);
-    expect(railBlocks(m, 2.5, 1.5)).toBe(false);
+    expect(railBlocks(m, 2.5, 1.5)).toBe(true);
+    expect(railBlocks(m, 2.5, 1.7)).toBe(false);
     expect(railBlocks(m, 2.5, 2.1)).toBe(false);
-    expect(railBlocks(m, 2.5, 3.5)).toBe(false);
+    expect(railBlocks(m, 2.5, 3.4)).toBe(false);
+    expect(railBlocks(m, 2.5, 3.5)).toBe(true);
     expect(railBlocks(m, 2.5, 0.5)).toBe(false); // off the bridge
   });
 });

@@ -16,3 +16,9 @@ export const GROUND_PROPS = {
   slide: { x: 64, y: 64, w: 32, h: 32 },
   lights: { x: 0, y: 96, w: 48, h: 16 },
 } as const;
+
+// Existing native tiles, drawn at 16px; no new export or scaled bitmap is needed.
+export const GROUND_PLANTS = {
+  grass: [27, 2],
+  flowers: [35, 3],
+} as const;

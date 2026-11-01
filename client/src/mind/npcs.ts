@@ -4,6 +4,7 @@
 // spoken lines and memories go out too, so a host change keeps the NPC's memory (stored in the room).
 // No host known (offline, alone) = the NPCs pick by the utility score here, like a mind without a model.
 
+import type { NpcSpot } from "../world/live";
 import { ACTIVITY } from "../life/activities";
 import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, newVillage, stepVillage, type Agent, type Choice, type Env, type LifeEvent, type Spots, type Village } from "../life/village";
@@ -15,6 +16,7 @@ import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, go
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
 import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
+import { askedPlace, directions, doingAnswer, topicOf, whoAnswer } from "./directions";
 import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
 import { humanize } from "./human";
 import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
@@ -28,6 +30,8 @@ export interface NpcOut {
   think?(id: Npc, text: string): void; // a thought bubble: only this screen sees it
 }
 
+// Everybody on the islands knows everybody; the model cannot guess that.
+const NEIGHBOURS = "Neighbours here are Elder the herbalist, Mo the fisher, Ama of the market, Pip the wood-cutter";
 const personaOf = (id: string): Persona | undefined => VILLAGERS.find((p) => p.id === id);
 const SPOT_NAME: Record<string, string> = { lawn: "the lawn", picnic: "the picnic spot", playground: "the playground", pond: "the pond" }; // places told to a guest
 
@@ -109,13 +113,15 @@ export class NpcVillage {
   constructor(
     private readonly sched: MindScheduler,
     private readonly hasModel: () => boolean,
-    private readonly out: NpcOut,
+    private out: NpcOut,
     homes: Record<Npc, Vec>,
     spots: Spots,
     canWalk: (x: number, z: number) => boolean,
     route?: (from: Vec, to: Vec) => Vec[] | null,
     rng: () => number = Math.random,
   ) {
+    // Whatever a villager says sets what "it" and "there" mean in the next question.
+    this.out = { ...out, line: (l) => (l.say && this.follow(l.who as Npc, l.say), out.line(l)) };
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
     this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
     this.env = { spots, canWalk, route, rng, bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0) + (act === "farm" ? this.farmPull(a.id) : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
@@ -148,6 +154,7 @@ export class NpcVillage {
     if (this.hosting(npc)) {
       if (!this.hub.minds.has(npc)) {
         const m = this.hub.add(persona, this.mems.get(npc) ?? emptyMemory());
+        if (!m.mem.facts.includes(NEIGHBOURS)) m.mem.facts = [NEIGHBOURS, ...m.mem.facts];
         this.sent.set(npc, m.mem.log.at(-1) ?? null);
       }
     } else if (this.hub.minds.has(npc)) {
@@ -155,6 +162,28 @@ export class NpcVillage {
       this.hub.remove(npc);
     }
     this.remote.delete(npc);
+    const a = this.v.agents.find((x) => x.id === npc);
+    if (a?.puppet) {
+      a.puppet = undefined;
+      a.state = "idle";
+      a.act = null;
+      a.path = undefined;
+      a.idle = 0;
+    }
+  }
+
+  // Where the NPCs I host are, for the other machines.
+  spots(): NpcSpot[] {
+    const r = (n: number) => Math.round(n * 10) / 10;
+    return this.v.agents.filter((a) => this.hosting(a.id as Npc)).map((a) => [a.id, r(a.pos.x), r(a.pos.z), a.state, a.act ?? ""]);
+  }
+
+  // A host's word on where its NPCs are. Their own minds run there, so here they only follow.
+  shadow(list: readonly NpcSpot[]): void {
+    for (const [id, x, z, state, act] of list) {
+      const a = this.v.agents.find((b) => b.id === id);
+      if (a && !this.hosting(id as Npc)) a.puppet = { x, z, state: state as Agent["state"], act: act || null };
+    }
   }
 
   // The room handed me an NPC's memory (lines "08:10 text", oldest first).
@@ -337,6 +366,21 @@ export class NpcVillage {
     return null;
   }
 
+  private readonly topics = new Map<Npc, string>();
+  private follow(npc: Npc, line: string): void {
+    const place = topicOf(line, this.hub.placesOf?.() ?? []);
+    if (place) this.topics.set(npc, place.name);
+  }
+
+  // Questions with one true answer: the way somewhere, and what this villager is doing.
+  private grounded(npc: Npc, line: string): string | null {
+    const a = this.v.agents.find((x) => x.id === npc);
+    if (!a) return null;
+    const place = askedPlace(line, this.hub.placesOf?.() ?? [], this.topics.get(npc) ?? null);
+    if (place) return directions(a.pos, place, personaOf(npc)?.name);
+    return whoAnswer(line, VILLAGERS.map((p) => ({ name: p.name, title: p.job?.title })), personaOf(npc)?.name ?? "") ?? doingAnswer(line, a.act && a.act !== "wander" ? ACTIVITY.get(a.act)?.label : null, a.state === "walk");
+  }
+
   // A player is talking to this NPC: between activities it waits instead of leaving, on the way it stops.
   hold(npc: Npc): void {
     const a = this.v.agents.find((x) => x.id === npc);
@@ -354,8 +398,10 @@ export class NpcVillage {
     const g0 = gameTime(this.v.t);
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
     if (!m || !this.hosting(npc)) return null;
+    const known = this.grounded(npc, line);
+    this.follow(npc, line);
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
-    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? this.quote(npc, line) ?? goalAnswer(line, goalOf(npc, this.purseOf(npc)), this.purseOf(npc)) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? known ?? this.quote(npc, line) ?? goalAnswer(line, goalOf(npc, this.purseOf(npc)), this.purseOf(npc)) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     if (!this.hasModel() && !answer) return null;
     const ans = answer ? { value: answer, source: "rules" }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });

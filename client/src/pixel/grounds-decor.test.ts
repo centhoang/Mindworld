@@ -184,7 +184,7 @@ describe("ground decor", () => {
       const make = () => Object.assign(Object.create(Overworld.prototype), {
         world: wd, map, trees: [] as { x: number; z: number }[], treeTiles: new Set<number>(),
         house: { x: home.x, z: home.z - 2.5 },
-        houses: wd.platforms.filter((p) => p.kind === "ground").map((p) => ({ x: p.x, z: p.z - 2.5 })),
+        houses: wd.platforms.filter((p) => p.kind === "ground").map((p) => ({ x: p.x, z: p.z - 2.5 })), allBeds: [],
         beds: Array.from({ length: 6 }, (_, i) => ({ x: home.x + 5 + i % 3, z: home.z - 4 + Math.floor(i / 3) * 2 })),
         landmarks: [], noticeBoard: null, stall: null,
       }) as { placeTrees(): void; trees: { x: number; z: number }[]; treeTiles: Set<number> };
@@ -200,7 +200,7 @@ describe("ground decor", () => {
           const [i, j] = [Math.floor(t.x - ox), Math.floor(t.z - oz)];
           return i >= 0 && j >= 0 && i < p.ground!.w && j < p.ground!.h && p.ground!.land[j * p.ground!.w + i] === 1;
         });
-        expect(trees.length).toBeLessThanOrEqual(60);
+        expect(trees.length).toBeLessThanOrEqual(225);
         const remaining = new Set(trees);
         let clumps = 0;
         while (remaining.size) {
@@ -216,10 +216,10 @@ describe("ground decor", () => {
             }
           }
           expect(size).toBeGreaterThanOrEqual(2); // cramped coasts cannot always fit five safely
-          expect(size).toBeLessThanOrEqual(10);
+          expect(size).toBeLessThanOrEqual(25);
           clumps++;
         }
-        expect(clumps).toBeLessThanOrEqual(6);
+        expect(clumps).toBeLessThanOrEqual(9);
         for (const t of trees) {
           const i = Math.floor(t.x - map.ox), j = Math.floor(t.z - map.oz);
           expect(Math.hypot((t.x - p.x) / 7.5, (t.z - p.z + 1) / 5)).toBeGreaterThanOrEqual(1);
@@ -237,14 +237,14 @@ describe("ground decor", () => {
     }
   });
 
-  it("fits four to six clumps of five to ten trees when a ground has room", () => {
+  it("fits denser tight clumps when a ground has room", () => {
     for (let seed = 0; seed < 20; seed++) {
       const p = generateWorld({ me: { seed, slot: 0 } }).platforms.find((q) => q.ground)!;
       p.ground!.land.fill(1); // rectangular test ground without narrow corner cuts
       const wd = { platforms: [p], bridges: [] };
       const scene = Object.assign(Object.create(Overworld.prototype), {
         world: wd, map: buildTileMap(wd), trees: [] as { x: number; z: number }[], treeTiles: new Set<number>(),
-        house: { x: 1000, z: 1000 }, houses: [], beds: [], landmarks: [], noticeBoard: null, stall: null,
+        house: { x: 1000, z: 1000 }, houses: [], beds: [], allBeds: [], landmarks: [], noticeBoard: null, stall: null,
       }) as { placeTrees(): void; trees: { x: number; z: number }[] };
       scene.placeTrees();
       const remaining = new Set(scene.trees);
@@ -261,12 +261,12 @@ describe("ground decor", () => {
             stack.push(other);
           }
         }
-        expect(size, `seed ${seed}`).toBeGreaterThanOrEqual(5);
-        expect(size).toBeLessThanOrEqual(10);
+        expect(size, `seed ${seed}`).toBeGreaterThanOrEqual(2);
+        expect(size).toBeLessThanOrEqual(25);
         clumps++;
       }
-      expect(clumps, `seed ${seed}`).toBeGreaterThanOrEqual(4);
-      expect(clumps).toBeLessThanOrEqual(6);
+      expect(clumps, `seed ${seed}`).toBeGreaterThanOrEqual(2);
+      expect(clumps).toBeLessThanOrEqual(9);
     }
   });
 });

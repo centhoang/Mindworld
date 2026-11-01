@@ -28,12 +28,8 @@ const ROAD: Record<EdgeName, number> = {
   inNw: tile(7, 13), inNe: tile(7, 14), inSw: tile(7, 16), inSe: tile(8, 12),
 };
 const ROAD_FILL = [tile(7, 12), tile(7, 12), tile(7, 12), tile(7, 20), tile(7, 21), tile(8, 20), tile(8, 21)];
-// Inland water (a pond) is plain water; its bank is drawn on the land cells around it, named by where the land ends.
-const BANK: Record<EdgeName, number> = {
-  n: tile(8, 26), s: tile(7, 25), w: tile(8, 24), e: tile(7, 27), nw: tile(8, 22), ne: tile(7, 26), sw: tile(7, 24), se: tile(7, 23),
-  inSe: tile(7, 29), inSw: tile(8, 25), inNw: tile(8, 28), inNe: tile(8, 29),
-};
-const POOL_FILL = tile(7, 22);
+// Ponds and rivers are the sea's own water (same repeat, same glints), so they read as one body of water.
+export const seaCell = (i: number, j: number) => tile(18 + (((j % 4) + 4) % 4), 11 + (((i % 4) + 4) % 4));
 const CLIFF = (i: number, j: number) => (((i + j) & 1) ? tile(3, 11) : tile(4, 11));
 
 // Which edge tile a cell of a shape takes, or null for the plain inside.
@@ -58,7 +54,8 @@ export function buildTerrain(m: TileMap): Terrain {
   const size = m.w * m.h;
   const out: Terrain = { land: new Int32Array(size), road: new Int32Array(size), shade: new Int32Array(size) };
   const at = (i: number, j: number) => (i < 0 || j < 0 || i >= m.w || j >= m.h ? T.water : m.kind[j * m.w + i]!);
-  const dry = (i: number, j: number) => at(i, j) !== T.water && at(i, j) !== T.bridge;
+  // Ponds and streams are coast like any other: same grass edge, same cliff and the same moving foam.
+  const dry = (i: number, j: number) => at(i, j) !== T.water && at(i, j) !== T.bridge && at(i, j) !== T.pool;
   const isRoad = (i: number, j: number) => at(i, j) === T.path;
   const high = (i: number, j: number) => m.high?.[j * m.w + i] === 1;
   const isPool = (i: number, j: number) => at(i, j) === T.pool;
@@ -68,16 +65,12 @@ export function buildTerrain(m: TileMap): Terrain {
   };
   for (let j = 0; j < m.h; j++)
     for (let i = 0; i < m.w; i++) {
-      if (!dry(i, j)) continue;
       const k = j * m.w + i;
+      if (isPool(i, j) && !out.land[k]) out.land[k] = seaCell(i + m.ox, j + m.oz);
+      if (!dry(i, j)) continue;
       const edge = edgeOf(dry, i, j);
       if (edge) out.land[k] = GRASS[edge];
       else out.land[k] = hash2(i, j, 21) < 0.07 ? ACCENT[Math.floor(hash2(i, j, 22) * ACCENT.length)]! : GRASS_FILL;
-      if (isPool(i, j)) out.land[k] = POOL_FILL;
-      else if (!edge) {
-        const bank = edgeOf((a, b) => !isPool(a, b), i, j);
-        if (bank) out.land[k] = BANK[bank];
-      }
       if (isRoad(i, j)) {
         const e = edgeOf(isRoad, i, j);
         out.road[k] = e ? ROAD[e] : ROAD_FILL[Math.floor(hash2(i, j, 23) * ROAD_FILL.length)]!;
@@ -92,7 +85,10 @@ export function buildTerrain(m: TileMap): Terrain {
       // The south face of this column, then its foam.
       const west = edge === "sw";
       const east = edge === "se";
-      const face = west ? [tile(4, 10), tile(2, 19, MIRROR), tile(6, 19, MIRROR)] : east ? [tile(4, 10, MIRROR), tile(2, 19), tile(6, 19)] : [CLIFF(i, j + 1), CLIFF(i, j + 2), tile(2, 20)];
+      const coast = west ? [tile(4, 10), tile(2, 19, MIRROR), tile(6, 19, MIRROR)] : east ? [tile(4, 10, MIRROR), tile(2, 19), tile(6, 19)] : [CLIFF(i, j + 1), CLIFF(i, j + 2), tile(2, 20)];
+      // Inland the drop is one row shorter, and a narrow stream keeps its water: only the foam line shows.
+      const room = [1, 2, 3].filter((n) => isPool(i, j + n)).length;
+      const face = !isPool(i, j + 1) ? coast : room >= 3 ? coast.slice(1) : coast.slice(2);
       let last = j;
       face.forEach((cell, n) => {
         if (last !== j + n || !free(i, j + n + 1)) return;
@@ -103,22 +99,53 @@ export function buildTerrain(m: TileMap): Terrain {
   return out;
 }
 
-const RAIL_DEPTH = 0.3; // how far a rail reaches into its tile
-
-// Rails stop a walker but leave the middle of the tile free, so routes through tile centres still work.
-export function railBlocks(m: TileMap, x: number, z: number): boolean {
-  const [fx, fz] = [x - m.ox, z - m.oz];
-  const [i, j] = [Math.floor(fx), Math.floor(fz)];
+// Which part of a cell a rail leaves free. Outer rows of a wide bridge keep only the half towards the deck, so routes
+// through tile centres use the middle lane; the posts at each end stand on the land and block the same way.
+const KEEP_S = 1, KEEP_N = 2, KEEP_E = 3, KEEP_W = 4;
+const RAIL_FREE = 0.45;
+const railMasks = new WeakMap<TileMap, Uint8Array>();
+function railMask(m: TileMap): Uint8Array {
+  const hit = railMasks.get(m);
+  if (hit) return hit;
+  const mask = new Uint8Array(m.w * m.h);
   const on = (a: number, b: number) => a >= 0 && b >= 0 && a < m.w && b < m.h && m.kind[b * m.w + a] === T.bridge;
-  if (!on(i, j)) return false;
-  const reach = (di: number, dj: number) => {
+  const put = (a: number, b: number, v: number) => {
+    if (a >= 0 && b >= 0 && a < m.w && b < m.h) mask[b * m.w + a] = v;
+  };
+  const run = (i: number, j: number, di: number, dj: number) => {
     let n = 0;
     while (n < 9 && on(i + di * (n + 1), j + dj * (n + 1))) n++;
     return n;
   };
+  for (let j = 0; j < m.h; j++)
+    for (let i = 0; i < m.w; i++) {
+      if (!on(i, j)) continue;
+      if (run(i, j, 1, 0) + run(i, j, -1, 0) >= run(i, j, 0, 1) + run(i, j, 0, -1)) {
+        const keep = !on(i, j - 1) ? KEEP_S : !on(i, j + 1) ? KEEP_N : 0;
+        if (!keep || (!on(i, j - 1) && !on(i, j + 1))) continue;
+        put(i, j, keep);
+        if (!on(i - 1, j)) put(i - 1, j, keep);
+        if (!on(i + 1, j)) put(i + 1, j, keep);
+      } else {
+        const keep = !on(i - 1, j) ? KEEP_E : !on(i + 1, j) ? KEEP_W : 0;
+        if (!keep || (!on(i - 1, j) && !on(i + 1, j))) continue;
+        put(i, j, keep);
+        if (!on(i, j - 1)) put(i, j - 1, keep);
+        if (!on(i, j + 1)) put(i, j + 1, keep);
+      }
+    }
+  railMasks.set(m, mask);
+  return mask;
+}
+
+export function railBlocks(m: TileMap, x: number, z: number): boolean {
+  const [fx, fz] = [x - m.ox, z - m.oz];
+  const [i, j] = [Math.floor(fx), Math.floor(fz)];
+  if (i < 0 || j < 0 || i >= m.w || j >= m.h) return false;
+  const keep = railMask(m)[j * m.w + i];
+  if (!keep) return false;
   const [u, v] = [fx - i, fz - j];
-  if (reach(1, 0) + reach(-1, 0) >= reach(0, 1) + reach(0, -1)) return (!on(i, j - 1) && v < RAIL_DEPTH) || (!on(i, j + 1) && v > 1 - RAIL_DEPTH);
-  return (!on(i - 1, j) && u < RAIL_DEPTH) || (!on(i + 1, j) && u > 1 - RAIL_DEPTH);
+  return keep === KEEP_S ? v < 1 - RAIL_FREE : keep === KEEP_N ? v > RAIL_FREE : keep === KEEP_E ? u < 1 - RAIL_FREE : u > RAIL_FREE;
 }
 
 // Bridge planks and rails for the whole map. Ends lie one tile up on the land, as the pack's bridges do.

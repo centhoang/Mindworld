@@ -18,6 +18,7 @@ export interface Agent {
   pos: Vec;
   needs: Needs;
   state: State;
+  puppet?: { x: number; z: number; state: State; act: string | null }; // run by another machine; this one follows
   pause?: number; // seconds left standing still on the way
   act: string | null;
   target: Vec;
@@ -200,6 +201,8 @@ export function choose(a: Agent, v: Village, env: Env): Choice | null {
 }
 
 // Advance the world by dt real seconds.
+const PUPPET_SNAP = 8; // tiles
+
 export function stepVillage(v: Village, dt: number, env: Env): LifeEvent[] {
   const ev: LifeEvent[] = [];
   v.t += dt;
@@ -207,6 +210,15 @@ export function stepVillage(v: Village, dt: number, env: Env): LifeEvent[] {
   const mins = hours * 60;
   for (const a of v.agents) {
     a.needs = decay(a.needs, a.kind, hours);
+    if (a.puppet) {
+      // Another machine runs this one: follow it, and catch up at once when far behind.
+      const far = Math.hypot(a.puppet.x - a.pos.x, a.puppet.z - a.pos.z) > PUPPET_SNAP;
+      const s = stepToward(a.pos, a.puppet, far ? PUPPET_SNAP * 2 : SPEED[a.kind] * 1.5 * dt);
+      a.pos = { x: a.pos.x + s.dx, z: a.pos.z + s.dz };
+      a.state = a.puppet.state;
+      a.act = a.puppet.act;
+      continue;
+    }
     if (a.state === "idle") {
       if ((a.idle -= dt) > 0) continue;
       const c = choose(a, v, env);

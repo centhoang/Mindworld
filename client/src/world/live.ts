@@ -56,6 +56,9 @@ const MIND_QUEUE_MS = 12_000;
 
 export type LiveStatus = "connecting" | "online" | "offline" | "full";
 
+export type NpcSpot = [string, number, number, string, string]; // id, x, z, state, activity
+export type FarmPlot = [string, number]; // crop ("" = empty), stage
+
 export interface LiveHandlers {
   welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[], npcs?: Partial<Record<Npc, string>>, talks?: [string, string][]): void;
   talking?(id: string, withWho: string, on: boolean): void; // a private chat started or ended
@@ -69,6 +72,9 @@ export interface LiveHandlers {
   join(p: LivePeer): void;
   leave(id: string): void;
   pos(id: string, x: number, z: number, px: number, pz: number): void;
+  pose(id: string, pose: string | null, flip: boolean): void;
+  npcs?(list: NpcSpot[]): void; // where the host of each villager has it
+  farm?(id: string, plots: FarmPlot[]): void;
   emote(id: string, e: Emote): void;
   status(s: LiveStatus): void;
   say?(id: string, text: string): void;
@@ -213,6 +219,16 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
       const id = str(m.id, 16), x = num(m.x), z = num(m.z), px = num(m.px), pz = num(m.pz);
       return id && x !== null && z !== null && px !== null && pz !== null ? h.pos(id, x, z, px, pz) : undefined;
     }
+    case "pose": {
+      const id = str(m.id, 16);
+      return id ? h.pose(id, str(m.pose, 12) || null, m.flip === true) : undefined;
+    }
+    case "npcs":
+      return Array.isArray(m.list) ? h.npcs?.(m.list as NpcSpot[]) : undefined;
+    case "farm": {
+      const id = str(m.id, 16);
+      return id && Array.isArray(m.plots) ? h.farm?.(id, m.plots as FarmPlot[]) : undefined;
+    }
     case "emote": {
       const id = str(m.id, 16);
       return id && (EMOTES as readonly unknown[]).includes(m.e) ? h.emote(id, m.e as Emote) : undefined;
@@ -347,6 +363,18 @@ export class LiveLink {
   // A mind line for one of my pets or an NPC I host; `mem` (NPCs only) goes to the room's NPC log.
   // The room takes one spoken line per mind per 3 s, so spoken lines wait their turn here (in order)
   // instead of being dropped; a line that would wait over MIND_QUEUE_MS is stale and skipped.
+  npcs(list: NpcSpot[]): boolean {
+    return this.send({ t: "npcs", list });
+  }
+
+  farm(plots: FarmPlot[]): boolean {
+    return this.send({ t: "farm", plots });
+  }
+
+  pose(pose: string | null, flip: boolean): boolean {
+    return this.send({ t: "pose", pose, flip });
+  }
+
   mind(line: MindLine & { mem?: string }): boolean {
     const say = line.say?.replace(/\s+/g, " ").trim().slice(0, MIND_SAY_MAX);
     const msg = { t: "mind", ...line, say: say || undefined }; // undefined fields drop out of the JSON

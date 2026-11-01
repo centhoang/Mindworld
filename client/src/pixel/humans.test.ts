@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HAIR, HUMAN_ACTIONS, HUMAN_WALK_SPEED, HumanSprites, humanLayers, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion } from "./humans";
+import { HAIR, HUMAN_ACTIONS, workSeconds, HUMAN_WALK_SPEED, HumanSprites, humanLayers, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion } from "./humans";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -8,9 +8,11 @@ describe("shared human layers", () => {
   it("derives stable saved-name looks and fixed NPC work tools", () => {
     expect(humanLook("Visitor")).toEqual(humanLook("Visitor"));
     expect(HAIR).toContain(humanLook("Visitor").hair);
-    expect(humanLayers(NPC_LOOKS.pip, "sweep", false)).toEqual({ action: "axe", files: ["base_axe_strip10.png", "spikeyhair_axe_strip10.png", "tools_axe_strip10.png"] });
-    expect(humanLayers(NPC_LOOKS.elder, "sweep", false).action).toBe("watering");
-    expect(humanLayers(NPC_LOOKS.mo, "fish", false).files).toContain("tools_waiting_strip9.png");
+    expect(humanLayers(NPC_LOOKS.pip, "chop", false).files).toEqual(["base_axe_strip10.png", "spikeyhair_axe_strip10.png", "tools_axe_strip10.png"]);
+    expect(humanLayers(NPC_LOOKS.elder, "water", false).action).toBe("watering");
+    expect(humanLayers(NPC_LOOKS.mo, "fish", false).action).toBe("casting");
+    expect(humanLayers(NPC_LOOKS.mo, "fish", false, false, 2).files).toContain("tools_waiting_strip9.png");
+    expect(humanLayers(NPC_LOOKS.mo, "fish", false, false, workSeconds("fish") - 0.05).action).toBe("caught");
     expect(humanLayers(NPC_LOOKS.ama, "sit", false).files).toEqual(["base_waiting_strip9.png", "longhair_waiting_strip9.png"]);
     expect(humanLayers(NPC_LOOKS.mo, "sleep", false).action).toBe("waiting");
     expect(humanLayers(NPC_LOOKS.mo, "dance", false).action).toBe("jump");
@@ -20,9 +22,10 @@ describe("shared human layers", () => {
 
   it("ships exactly the native files that the renderer can select, at full strip resolution", () => {
     const used = new Set<string>();
-    const poses = [null, "stand", "sit", "sweep", "fish", "dance", "cook", "sleep", "eat", "kick", "squat", "wiggle"] as const;
+    const poses = [null, "stand", "sit", "sweep", "fish", "dance", "cook", "sleep", "eat", "kick", "squat", "wiggle", "chop", "water", "dig", "serve"] as const;
+    const clocks = [0, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     for (const hair of HAIR) for (const tool of ["hands", "rod", "axe", "watering"] as const) for (const pose of poses) for (const walking of [false, true]) {
-      for (const running of [false, true]) for (const file of humanLayers({ hair, tool }, pose, walking, running).files) used.add(file);
+      for (const running of [false, true]) for (const clock of clocks) for (const file of humanLayers({ hair, tool }, pose, walking, running, clock).files) used.add(file);
     }
     const dir = new URL("../../public/art/humans/", import.meta.url);
     expect(readdirSync(dir).sort()).toEqual([...used].sort());
@@ -58,7 +61,7 @@ describe("human loading and drawing", () => {
       onerror = () => {};
       constructor() { images.push(this); }
     });
-    const g = { save: vi.fn(), restore: vi.fn(), translate: vi.fn(), scale: vi.fn(), drawImage: vi.fn(), imageSmoothingEnabled: true };
+    const g = { save: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(), restore: vi.fn(), translate: vi.fn(), scale: vi.fn(), drawImage: vi.fn(), imageSmoothingEnabled: true };
     return { images, g, ctx: g as unknown as CanvasRenderingContext2D, sprites: new HumanSprites(), fallback: vi.fn() };
   }
 

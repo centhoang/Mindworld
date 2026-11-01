@@ -13,9 +13,10 @@ import { placeDecor, type DecorPiece } from "./grounds-decor";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, drawTinyText, GLYPH, wrap } from "./text";
-import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileWalkable, type TileMap } from "./tiles";
-import { buildSunny, characterShadow, drawCropArt, drawHighClouds, drawLand, drawLowClouds, drawSea, drawSeaLife, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
-import { ACTIVITY } from "../life/activities";
+import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
+import { buildSunny, characterShadow, drawCropArt, drawHighClouds, drawLand, drawLowClouds, drawRail, drawSea, drawSeaLife, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
+import { ACTIVITY, type Pose } from "../life/activities";
+import { compass, type Place } from "../mind/directions";
 import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
@@ -30,7 +31,7 @@ import type { MindScheduler } from "../mind/scheduler";
 import { drawInspector } from "./inspector";
 import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
-import { petScene, sharedScene, type Seen } from "../mind/scene";
+import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
 import { generatedSprites, SpriteImages } from "./generated-sprites";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, humanSprites, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
@@ -43,7 +44,7 @@ const SMOKE_H = 37;
 const READ_CHARS = 12; // a bubble stays long enough to read at this many characters a second
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
 export const NAME_MAX = 10;
-const DECOR_NAME: Record<DecorPiece["kind"], string> = { stump: "a tree stump", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
+const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
 const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "the lawn", playground: "the playground slide and goal", picnic: "the picnic blanket", pond: "the fishing pond", plaza: "the village square" };
 
 export const OVERWORLD_MON = 20; // px: monsters in the overworld
@@ -132,6 +133,8 @@ export class Overworld {
   cam: Vec = { x: 0, z: 0 };
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
+  private allBeds: Vec[] = []; // the same on every ground: all machines must agree on what stands where
+  readonly peerFarms = new Map<string, readonly [string, number][]>();
   farm: Farm | null = null; // set by main.ts; drawn on the beds
   // The Reader (boss) on its island and the Elder on hers: they stand still; touch the boss to fight it,
   // press E by the Elder to talk.
@@ -217,7 +220,8 @@ export class Overworld {
     const dz = old ? home.z - old.z : 0;
     this.house = { x: home.x, z: home.z - 2.5 };
     this.houses = this.world.platforms.filter((p) => p.kind === "ground").map((p) => ({ x: p.x, z: p.z - 2.5, art: HOUSE_ART[(p.ground?.seed ?? 0) % HOUSE_ART.length]! }));
-    this.beds = Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 5 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) * 2 }));
+    this.beds = bedsAt(home);
+    this.allBeds = this.world.platforms.filter((p) => p.ground).flatMap((p) => bedsAt(p));
     this.trees = [];
     this.treeTiles.clear();
     this.decor = [];
@@ -276,8 +280,8 @@ export class Overworld {
       const touches = cells.some(([hi, hj]) => Math.abs(p.cell[0] - hi) + Math.abs(p.cell[1] - hj) === 1);
       if (!touches && !(reach && findRoute(reach, { x: at.x, z: at.z + 1 }, this.canWalk, NPC_ROUTE_TILES))) continue;
       const list = (out[use[0]] ??= []);
-      if (p.spots.pond) list.push({ ...at });
-      for (let i = 0; i < 8; i++) {
+      if (p.spots.pond) list.push(...this.fishingSpots(at, 8, 4));
+      else for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2;
         const q = { x: at.x + Math.cos(a) * 1.6, z: at.z + 0.8 + Math.sin(a) * 1.2 };
         if (this.canWalk(q.x, q.z)) list.push(q);
@@ -299,8 +303,84 @@ export class Overworld {
     // Keep dance feet within the 6x4 logical-tile floor centred on the plaza.
     const out: Spots = { ...away, home: ring(isle, 1.5, 4), bed: ring(isle, 2.2, 6, 1), lawn: ring(plaza, 2.4, 10), picnic: [...ring(plaza, 2, 6, 2), ...(away.picnic ?? [])], woods: ring(plaza, 5.5, 10) };
     if (this.stall) out.stall = [{ x: this.stall.x, z: this.stall.z + 1.2 }];
+    if (plaza) {
+      // Work happens where the work is: beside real trees, and at real water when no pond is near.
+      const sides = this.treeSides(plaza, 8);
+      if (sides.length) out.woods = sides;
+      if (!out.pond?.length) out.pond = this.fishingSpots(plaza, 16, 4);
+    }
     for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
     return out;
+  }
+
+  // Water within a rod's reach to the east (1) or west (-1) of a spot, or 0: casting art throws sideways.
+  waterSide(p: Vec): number {
+    const wet = (x: number, z: number) => [T.water, T.pool].includes(tileAt(this.map, x, z) as never);
+    for (let d = 1; d <= 3; d++) for (const dz of [0, 0.8]) for (const side of [1, -1]) if (wet(p.x + side * d, p.z + dz)) return side;
+    return 0;
+  }
+
+  // Walkable shore cells near `at` with water beside them, nearest first.
+  private fishingSpots(at: Vec, reach: number, n: number): Vec[] {
+    const out: Vec[] = [];
+    for (let z = Math.floor(at.z - reach); z <= at.z + reach; z++) for (let x = Math.floor(at.x - reach); x <= at.x + reach; x++) {
+      const q = { x: x + 0.5, z: z + 0.5 };
+      if (this.canWalk(q.x, q.z) && tileAt(this.map, q.x, q.z) !== T.bridge && this.waterSide(q)) out.push(q);
+    }
+    return out.sort((a, b) => Math.hypot(a.x - at.x, a.z - at.z) - Math.hypot(b.x - at.x, b.z - at.z)).filter((_, i) => i % 3 === 0).slice(0, n);
+  }
+
+  // Standing room beside the trees nearest `at`.
+  private treeSides(at: Vec, n: number): Vec[] {
+    const out: Vec[] = [];
+    for (const tr of [...this.trees].sort((a, b) => Math.hypot(a.x - at.x, a.z - at.z) - Math.hypot(b.x - at.x, b.z - at.z))) {
+      for (const dx of [-1.3, 1.3]) if (out.length < n && this.canWalk(tr.x + dx, tr.z) && findRoute({ x: at.x, z: at.z + 2 }, { x: tr.x + dx, z: tr.z }, this.canWalk, NPC_ROUTE_TILES)) out.push({ x: tr.x + dx, z: tr.z });
+      if (out.length >= n) break;
+    }
+    return out;
+  }
+
+  // Work faces what it works on; art only ever looks sideways.
+  private faceWork(mo: HumanMotion, pos: Vec, pose: Pose | null | undefined): void {
+    const side = pose === "fish" ? this.waterSide(pos) : pose === "chop" ? this.treeSide(pos) : 0;
+    if (side) mo.flip = side < 0;
+  }
+
+  private treeSide(p: Vec): number {
+    let [best, side] = [2.2, 0];
+    for (const tr of this.trees) {
+      const d = Math.hypot(tr.x - p.x, tr.z - p.z);
+      if (d < best) [best, side] = [d, Math.sign(tr.x - p.x) || 1];
+    }
+    return side;
+  }
+
+  // ---- the player's own hands -------------------------------------------------------------------------
+  private work: { pose: Pose; left: number; done?: () => void } | null = null;
+  onPose?: (pose: Pose | null, flip: boolean) => void; // tells the other players
+
+  // What E can do with bare surroundings, once nothing else is in reach.
+  gatherNear(): "fish" | "chop" | "herbs" | null {
+    if (this.waterSide(this.player)) return "fish";
+    if (this.treeSide(this.player)) return "chop";
+    return tileAt(this.map, this.player.x, this.player.z) === T.flowers ? "herbs" : null;
+  }
+
+  // Play a job on the player; walking off cancels it, and `done` runs only if it finished.
+  startWork(pose: Pose, secs: number, done?: () => void): void {
+    this.work = { pose, left: secs, done };
+    this.faceWork(this.playerMotion, this.player, pose);
+    this.onPose?.(pose, this.playerMotion.flip);
+  }
+
+  private stepWork(dt: number): void {
+    const w = this.work;
+    if (!w) return;
+    w.left -= dt;
+    if (!this.moving && w.left > 0) return;
+    this.work = null;
+    this.onPose?.(null, this.playerMotion.flip);
+    if (!this.moving) w.done?.();
   }
 
   private npcHomes(): Record<Npc, Vec> {
@@ -413,7 +493,7 @@ export class Overworld {
         if (Math.abs(x - this.house.x) < 6 && Math.abs(z - this.house.z + 2) < 6) continue;
         if (this.stall && Math.abs(x - this.stall.x) < 3.5 && Math.abs(z - this.stall.z + 1) < 3.5) continue;
         if (this.landmarks.some((l) => Math.abs(x - l.x) < 3.5 && Math.abs(z - l.z + 1) < 3.5)) continue;
-        if (this.beds.some((b) => Math.abs(b.x + 0.5 - x) < 2.5 && Math.abs(b.z + 0.5 - z) < 2.5)) continue;
+        if (this.allBeds.some((b) => Math.abs(b.x + 0.5 - x) < 2.5 && Math.abs(b.z + 0.5 - z) < 2.5)) continue;
         candidates.push({ x, z });
       }
       // Shuffle once per platform, then grow compact patches with trees about two tiles apart. The draw code's
@@ -422,9 +502,9 @@ export class Overworld {
         const q = Math.floor(rng() * (n + 1));
         [candidates[n], candidates[q]] = [candidates[q]!, candidates[n]!];
       }
-      const clumps = (p.ground ? 5 : 2) + Math.floor(rng() * 2);
+      const clumps = (p.ground ? 8 : 3) + Math.floor(rng() * 2);
       for (let c = 0; c < clumps; c++) {
-        const want = (p.ground ? 6 : 5) + Math.floor(rng() * 5);
+        const want = (p.ground ? 18 : 12) + Math.floor(rng() * 8);
         const available = candidates.filter((v) => !this.trees.some((t) => Math.abs(t.x - v.x) < 3 && Math.abs(t.z - v.z) < 3));
         let best: Vec[] = [];
         for (const anchor of available.slice(0, 120)) { // candidates are shuffled; a sample keeps big grounds fast
@@ -453,15 +533,29 @@ export class Overworld {
   private placeDecor(): void {
     const m = this.map;
     const near = (v: Vec, x: number, z: number, d: number) => Math.abs(v.x - x) < d && Math.abs(v.z - z + 1) < d;
-    this.decor = placeDecor(this.world, m, (x, z) =>
+    const reserved = (x: number, z: number) =>
       [this.house, ...this.houses].some((h) => near(h, x, z, 5)) ||
       this.landmarks.some((l) => near(l, x, z, 3)) ||
       (!!this.stall && near(this.stall, x, z, 3)) ||
-      this.beds.some((b) => Math.abs(b.x + 0.5 - x) < 2 && Math.abs(b.z + 0.5 - z) < 2) ||
-      this.signs.some((sg) => Math.abs(sg.x - x) < 1.5 && Math.abs(sg.z - z) < 1.5) ||
-      this.treeTiles.has(Math.floor(z - m.oz) * m.w + Math.floor(x - m.ox)),
-    );
-    for (const d of this.decor) for (const k of d.tiles) this.decorTiles.add(k);
+      this.allBeds.some((b) => Math.abs(b.x + 0.5 - x) < 2 && Math.abs(b.z + 0.5 - z) < 2) ||
+      this.signs.some((sg) => Math.abs(sg.x - x) < 1.5 && Math.abs(sg.z - z) < 1.5);
+    this.decor = placeDecor(this.world, m, (x, z) => reserved(x, z) ||
+      this.treeTiles.has(Math.floor(z - m.oz) * m.w + Math.floor(x - m.ox)), reserved);
+    // Feature clearings take priority over trees, like the pack's fields and mill yards.
+    const clearing = new Set<number>();
+    for (const d of this.decor.filter((d) => d.field || d.kind === "windmill")) {
+      for (const k of [...d.tiles, ...(d.soil ?? [])]) for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) clearing.add(k + dz * m.w + dx);
+    }
+    this.trees = this.trees.filter((t) => !clearing.has(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox)));
+    this.trees = this.trees.filter((t, _, trees) => trees.some((other) => other !== t && Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 2));
+    this.treeTiles.clear();
+    for (const t of this.trees) this.treeTiles.add(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox));
+    for (const d of this.decor) {
+      for (const k of d.tiles) this.decorTiles.add(k);
+      for (const k of d.soil ?? []) m.kind[k] = T.path;
+    }
+    // Decorative fields add dirt after the initial terrain pass.
+    this.sunny = buildSunny(m);
   }
 
   private nearPath(i: number, j: number): boolean {
@@ -538,6 +632,7 @@ export class Overworld {
       ...[...this.peers].map(([id, p]) => ({ id: `pet:${id}`, name: `${p.name}'s pet`, pos: p.pet })),
     ];
     this.minds.sceneOf = this.npcs.hub.sceneOf = (id, withPos) => this.sceneFor(id, withPos);
+    this.npcs.hub.placesOf = () => this.places();
   }
 
   // Everything a mind could notice on this screen (scene.ts filters it by distance and by who is looking).
@@ -573,10 +668,35 @@ export class Overworld {
     // Not itself, and not the one it talks to (the prompt names them already).
     const others = this.seenThings().filter((s) => s.name !== me.name && !(withPos && s.x === withPos.x && s.z === withPos.z));
     if (me.kind === "pet") return petScene(me.pos, others, place, when);
-    return sharedScene(me.pos, withPos ?? me.pos, others, place, when);
+    const near = this.places().filter((p) => !p.doing && !/^[A-Z]/.test(p.name) && p.name !== place).sort((a, b) => Math.hypot(a.x - me.pos.x, a.z - me.pos.z) - Math.hypot(b.x - me.pos.x, b.z - me.pos.z)).slice(0, 3);
+    return cleanScene(`${sharedScene(me.pos, withPos ?? me.pos, others, place, when)} Places: ${near.map((p) => `${p.name} ${compass(me.pos, p)}`).join(", ")}.`);
   }
 
   // The scene for a chat between me (the player) and an NPC, as both see it here.
+  // Everywhere a villager can point to, from the map as it is right now.
+  private places(): Place[] {
+    const out: Place[] = [];
+    const add = (name: string, words: string[], at: Vec | undefined | null, doing?: string) => {
+      if (at) out.push({ name, words, x: at.x, z: at.z, doing });
+    };
+    const spots = this.npcSpots();
+    const inland = spots.pond?.[0] && this.world.platforms.some((p) => p.spots?.pond);
+    add(inland ? "the pond" : "the shore", ["pond", "lake", "fishing spot", "shore", "water"], spots.pond?.[0]);
+    add("the market stall", ["market", "stall", "shop"], this.stall);
+    add("the town board", ["town board", "notice board", "board"], this.noticeBoard);
+    add("the woods", ["woods", "forest", "trees"], spots.woods?.[0]);
+    for (const p of this.world.platforms) {
+      const words = [p.label.toLowerCase().replace(/ \(away\)$/, "")];
+      if (p.kind === "plaza") words.push("square", "plaza", "village", "town");
+      if (p.kind === "npc") words.push("elder's", "elders", "elder's house");
+      if (p.owner && p.owner !== "me") words.push(`${p.label.split("'")[0]!.toLowerCase()}'s`, `${p.label.split("'")[0]!.toLowerCase()}s place`);
+      add(p.label.replace(/ \(away\)$/, ""), words, p);
+    }
+    for (const a of this.npcs?.v.agents ?? []) add(a.name, [a.name.toLowerCase()], a.pos, a.state === "do" && a.act !== "wander" ? ACTIVITY.get(a.act!)?.label : undefined);
+    for (const p of this.peers.values()) add(p.name, [p.name.toLowerCase()], p.pos);
+    return out;
+  }
+
   sceneWithMe(npc: Npc): string {
     return this.sceneFor(npc, this.player);
   }
@@ -773,6 +893,16 @@ export class Overworld {
   }
 
   private drawBeds(g: CanvasRenderingContext2D, toScreen: (x: number, z: number) => [number, number], t: number): void {
+    for (const p of this.world.platforms) {
+      if (!p.ground || p.owner === "me") continue;
+      const farm = this.peerFarms.get(p.owner ?? "");
+      bedsAt(p).forEach((b, i) => {
+        const [sx, sy] = toScreen(b.x, b.z);
+        stand(g, "soil", sx + 8, sy + 14);
+        const [crop, stage] = farm?.[i] ?? ["", 0];
+        if (crop) drawCropArt(g, CROP_ART[crop] ?? "carrot", CROP_STAGE[Math.min(3, stage)]!, sx + 8, sy + 13);
+      });
+    }
     this.beds.forEach((b, i) => {
       const [sx, sy] = toScreen(b.x, b.z);
       const p = this.farm?.plots[i];
@@ -807,7 +937,7 @@ export class Overworld {
     if (this.stall && Math.abs(x - this.stall.x) < 1.4 && z < this.stall.z + 0.2 && z > this.stall.z - 1.4) return false;
     // A tile-deep support footprint also blocks tile-centre routes; the panel can overhang it.
     if (this.noticeBoard && Math.abs(x - this.noticeBoard.x) < 0.8 && z > this.noticeBoard.z - 0.8 && z < this.noticeBoard.z + 0.2) return false;
-    if (this.beds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
+    if (this.allBeds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
     const i = Math.floor(x - this.map.ox);
     const j = Math.floor(z - this.map.oz);
     return !this.treeTiles.has(j * this.map.w + i) && !this.decorTiles.has(j * this.map.w + i);
@@ -826,7 +956,12 @@ export class Overworld {
   }
 
   addPeer(id: string, name: string, genes: Genes, x: number, z: number, px: number, pz: number): void {
-    this.peers.set(id, { name, look: humanLook(liveName(genes)), pos: { x, z }, motion: newHumanMotion({ x, z }), pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front") });
+    this.peers.set(id, { name, look: humanLook(liveName(genes)), pos: { x, z }, motion: newHumanMotion({ x, z }), pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front"), pose: null, flip: false });
+  }
+
+  posePeer(id: string, pose: Pose | null, flip: boolean): void {
+    const p = this.peers.get(id);
+    if (p) Object.assign(p, { pose, flip });
   }
 
   movePeer(id: string, x: number, z: number, px: number, pz: number): void {
@@ -845,7 +980,8 @@ export class Overworld {
       const speed = (keys.has("shift") ? HUMAN_RUN_SPEED : HUMAN_WALK_SPEED) * dt;
       this.player = slide(this.player, d.x * speed, d.z * speed, this.canWalk);
     }
-    stepHumanMotion(this.playerMotion, this.player, dt);
+    this.stepWork(dt);
+    stepHumanMotion(this.playerMotion, this.player, dt, this.work?.pose ?? null);
     this.moving = this.playerMotion.walking;
     this.pet = followStep(this.pet, this.player, dt, this.canWalk);
     // Camera eases toward the player; drawing snaps it to whole pixels.
@@ -862,7 +998,12 @@ export class Overworld {
     if (this.npcs) {
       for (const a of this.npcs.v.agents) if (!this.npcMotions.has(a.id as Npc)) this.npcMotions.set(a.id as Npc, newHumanMotion(a.pos));
       for (const e of this.npcs.step(dt, this.life.t)) if (e.kind === "start" && e.act !== "wander") this.say(`n:${e.who}`, ACTIVITY.get(e.act)!.label, 2.5);
-      for (const a of this.npcs.v.agents) stepHumanMotion(this.npcMotions.get(a.id as Npc)!, a.pos, dt, a.state === "do" ? ACTIVITY.get(a.act!)?.pose ?? null : null);
+      for (const a of this.npcs.v.agents) {
+        const pose = a.state === "do" ? ACTIVITY.get(a.act!)?.pose ?? null : null;
+        const mo = this.npcMotions.get(a.id as Npc)!;
+        stepHumanMotion(mo, a.pos, dt, pose);
+        this.faceWork(mo, a.pos, pose);
+      }
       for (const a of this.npcs.v.agents) {
         const id = a.id as Npc;
         if (!this.npcs.hasPet[id]) continue;
@@ -902,7 +1043,8 @@ export class Overworld {
       const step = stepToward(p.pos, p.to, HUMAN_RUN_SPEED * dt);
       p.pos.x += step.dx;
       p.pos.z += step.dz;
-      stepHumanMotion(p.motion, p.pos, dt);
+      stepHumanMotion(p.motion, p.pos, dt, p.pose);
+      if (p.pose) p.motion.flip = p.flip;
       p.pet.x += (p.to.px - p.pet.x) * k8;
       p.pet.z += (p.to.pz - p.pet.z) * k8;
     }
@@ -930,13 +1072,6 @@ export class Overworld {
     drawSeaLife(g, this.sunny.seaLife, camX, camY, sw, sh, t);
     this.drawBeds(g, toScreen, t);
     const plaza = this.world.platforms.find((p) => p.kind === "plaza");
-    if (plaza) {
-      const dancing = this.npcs?.v.agents.some((a) => a.act === "dance") ?? false;
-      if (dancing) for (let j = 0; j < 4; j++) for (let i = 0; i < 6; i++) {
-        const [sx, sy] = toScreen(plaza.x - 3 + i, plaza.z - 2 + j);
-        generatedSprites.draw(g, "dance-floor-active", sx, sy);
-      }
-    }
     // Sprites sorted by their feet, so things lower on screen stand in front.
     const items: { z: number; draw: () => void }[] = [];
     if (this.noticeBoard) {
@@ -967,6 +1102,17 @@ export class Overworld {
         const [sx, sy] = toScreen(plaza.x + (i === 0 ? -3.5 : 3.5), z);
         items.push({ z, draw: () => generatedSprites.draw(g, name, sx, sy) });
       });
+    }
+    {
+      const rail = this.sunny.rail;
+      const [i0, j0] = [Math.floor(camX / TILE) - m.ox, Math.floor(camY / TILE) - m.oz];
+      for (let j = Math.max(0, j0); j <= Math.min(m.h - 1, j0 + Math.ceil(sh / TILE) + 1); j++)
+        for (let i = Math.max(0, i0); i <= Math.min(m.w - 1, i0 + Math.ceil(sw / TILE) + 1); i++) {
+          const cell = rail[j * m.w + i];
+          if (!cell) continue;
+          const [x, y] = [(i + m.ox) * TILE - camX, (j + m.oz) * TILE - camY];
+          items.push({ z: m.oz + j + 0.5, draw: () => drawRail(g, cell, x, y) });
+        }
     }
     for (const tr of this.trees) {
       const [sx, sy] = toScreen(tr.x, tr.z);
@@ -1084,6 +1230,14 @@ export class Overworld {
       const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep");
       const f = spriteFrame(s, walking, motion.walkTime, t);
       const frame = sit ? sitFrame(s.img, (s.idle ?? 0) * 16, dir * 24, dir === 3) : null; // seated: still, legs bent
+      if (motion.pose === "sleep" && !walking) {
+        items.push({ z: a.pos.z, draw: () => {
+          stand(g, "f-bed", nx, ny + 3);
+          humanSprites.drawAsleep(g, NPC_LOOKS[a.id as Npc], nx, ny);
+          drawTinyText(g, "z".repeat(1 + Math.floor(t) % 3), nx + 9, ny - 24);
+        } });
+        continue;
+      }
       items.push({ z: a.pos.z, draw: () => (characterShadow(g, nx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, nx, ny, t, () => {
         if (a.id === "elder" && hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
         else if (frame) g.drawImage(frame, nx - 8, ny - 22);
@@ -1159,7 +1313,7 @@ export class Overworld {
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
-        : this.nearStall() ? "E: MARKET" : this.nearBoard() ? "E: BOARD" : this.npcNear() ? "E: TALK" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : "";
+        : this.nearStall() ? "E: MARKET" : this.nearBoard() ? "E: BOARD" : this.npcNear() ? "E: TALK" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : this.work ? "" : GATHER_HINT[this.gatherNear() ?? ""] ?? "";
     if (hint) {
       const w = hint.length * GLYPH + 12;
       drawFrame(g, Math.round(px - w / 2), py + 6, w, 16);
@@ -1180,6 +1334,10 @@ export class Overworld {
     }
   }
 }
+
+const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 5 + (i % 3), z: Math.floor(home.z) - 4 + Math.floor(i / 3) * 2 }));
+
+const GATHER_HINT: Record<string, string> = { fish: "E: FISH", chop: "E: CHOP", herbs: "E: PICK HERBS" };
 
 function bedHint(f: Farm, i: number): string {
   const p = f.plots[i]!;
@@ -1226,6 +1384,8 @@ interface Peer {
   to: { x: number; z: number; px: number; pz: number };
   sprite: HTMLCanvasElement;
   look: HumanLook;
+  pose: Pose | null;
+  flip: boolean;
 }
 
 // The ghost stone: a pale standing stone with a teal wisp (palette only).

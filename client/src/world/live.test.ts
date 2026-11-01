@@ -8,6 +8,7 @@ function handlers() {
     join: (...a) => void log.push(["join", ...a]),
     leave: (...a) => void log.push(["leave", ...a]),
     pos: (...a) => void log.push(["pos", ...a]),
+    pose: () => undefined,
     emote: (...a) => void log.push(["emote", ...a]),
     status: (...a) => void log.push(["status", ...a]),
   };
@@ -182,7 +183,7 @@ describe("live minds", () => {
     const got: unknown[] = [];
     const h = {
       welcome: (...a: unknown[]) => void got.push(["welcome", a[4]]),
-      join: () => undefined, leave: () => undefined, pos: () => undefined, emote: () => undefined, status: () => undefined,
+      join: () => undefined, leave: () => undefined, pos: () => undefined, pose: () => undefined, emote: () => undefined, status: () => undefined,
       mind: (from: string, l: unknown) => void got.push(["mind", from, l]),
       npcHost: (n: string, host: string | null) => void got.push(["host", n, host]),
       npcState: (n: string, log: string[]) => void got.push(["state", n, log]),
@@ -203,7 +204,7 @@ describe("live minds", () => {
   it("parses relayed questions, refusals and lines said to someone", () => {
     const got: unknown[] = [];
     const h = {
-      welcome: () => undefined, join: () => undefined, leave: () => undefined, pos: () => undefined, emote: () => undefined, status: () => undefined,
+      welcome: () => undefined, join: () => undefined, leave: () => undefined, pos: () => undefined, pose: () => undefined, emote: () => undefined, status: () => undefined,
       mind: (_f: string, l: unknown) => void got.push(l),
       ask: (...a: unknown[]) => void got.push(["ask", ...a]),
       askNo: (n: string) => void got.push(["no", n]),

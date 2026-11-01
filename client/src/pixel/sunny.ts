@@ -182,12 +182,17 @@ export function drawLand(g: Ctx, m: TileMap, w: SunnyWorld, camX: number, camY: 
     if (m.kind[k] === T.flowers) drawCell(g, base, FLOWERS[Math.floor(hash2(i, j, 33) * FLOWERS.length)]!, x, y);
     if (w.terrain.shade[k]) drawCell(g, base, w.terrain.shade[k]!, x, y);
     if (w.deck[k]) drawCell(g, base, w.deck[k]!, x, y);
-    if (w.rail[k]) drawCell(g, base, w.rail[k]!, x, y);
+    if (m.kind[k] === T.pool && hash2(i, j, 31) < 0.03) glint(g, x + 4, y + 4, i, j, t);
     if (m.look[k]! & AWAY && w.terrain.land[k]) {
       g.fillStyle = "rgba(57,70,63,0.45)"; // the owner is away
       g.fillRect(x, y, TILE, TILE);
     }
   });
+}
+
+// One bridge rail, drawn with the people so nobody walks over a fence.
+export function drawRail(g: Ctx, cell: number, x: number, y: number): void {
+  drawCell(g, sheetFor(0), cell, x, y);
 }
 
 function glint(g: Ctx, x: number, y: number, i: number, j: number, t: number): void {
@@ -222,8 +227,9 @@ export function stand(g: Ctx, name: string, footX: number, footY: number, theme 
 // Trees sway gently, each at its own moment.
 export function drawTree(g: Ctx, seed: number, footX: number, footY: number, t: number, theme: number): void {
   const kind = seed % 5;
-  if (kind >= 3) return stand(g, "pine", footX, footY, theme);
-  const name = kind === 2 ? "spr_deco_tree_02_strip4" : "spr_deco_tree_01_strip4";
+  if (kind === 4) return stand(g, "pine", footX, footY, theme);
+  // tree_02 is also a conifer in the pack; only tree_01 has a round canopy.
+  const name = "spr_deco_tree_01_strip4";
   const img = images.get(name);
   if (!img) return;
   const w = img.width / 4;

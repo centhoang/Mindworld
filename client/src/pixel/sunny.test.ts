@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { generateWorld } from "../world/layout";
-import { placeSeaLife } from "./sunny";
+import { drawTree, loadSunny, placeSeaLife } from "./sunny";
+import { drawDecor } from "./grounds-draw";
 import { buildTileMap, T, tileAt, type TileMap } from "./tiles";
 
 describe("seeded pack sea life", () => {
@@ -41,4 +42,48 @@ describe("seeded pack sea life", () => {
       expect(placeSeaLife(m)).toEqual([]);
     }
   });
+});
+
+it("draws four round trees per pine, native field crops, and advancing windmill frames", async () => {
+  class PackImage {
+    onload?: () => void;
+    width = 16; height = 16; complete = true; naturalWidth = 16;
+    private path = "";
+    get src() { return this.path; }
+    set src(value: string) {
+      this.path = value;
+      if (value.includes("tree_")) { this.width = 128; this.height = 34; }
+      if (value.includes("windmill")) { this.width = 1008; this.height = 112; }
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+  vi.stubGlobal("Image", PackImage);
+  vi.stubGlobal("fetch", vi.fn(async () => ({ json: async () => ({ stamps: { pine: [28, 43] }, anims: [], clouds: [] }) })));
+  const drawImage = vi.fn();
+  const g = { drawImage, globalAlpha: 1 } as unknown as CanvasRenderingContext2D;
+  const now = vi.spyOn(performance, "now");
+  try {
+    await loadSunny();
+    for (let seed = 0; seed < 5; seed++) drawTree(g, seed, 40, 60, 0, 0);
+    const sources = drawImage.mock.calls.map((c) => (c[0] as PackImage).src);
+    expect(sources.filter((s) => s.endsWith("pine.png"))).toHaveLength(1);
+    expect(sources.filter((s) => s.includes("tree_01"))).toHaveLength(4);
+    expect(sources.filter((s) => s.includes("tree_02"))).toHaveLength(0);
+    drawImage.mockClear();
+    now.mockReturnValue(0);
+    drawDecor(g, "windmill", 80, 120, 1, 0, false);
+    now.mockReturnValue(120);
+    drawDecor(g, "windmill", 80, 120, 1, 0, false);
+    expect(drawImage.mock.calls.map((c) => c.slice(1))).toEqual([
+      [0, 0, 112, 112, 24, 8, 112, 112], [112, 0, 112, 112, 24, 8, 112, 112],
+    ]);
+    drawImage.mockClear();
+    drawDecor(g, "crop-wheat", 40, 60, 1, 0, false);
+    expect((drawImage.mock.calls[0]![0] as PackImage).src).toContain("crop-wheat-5.png");
+    drawImage.mockClear();
+    drawDecor(g, "grass", 40, 60, 1, 0, false);
+    expect(drawImage.mock.calls[0]!.slice(1)).toEqual([27 * 16, 2 * 16, 16, 16, 32, 44, 16, 16]);
+  } finally {
+    now.mockRestore(); vi.unstubAllGlobals();
+  }
 });

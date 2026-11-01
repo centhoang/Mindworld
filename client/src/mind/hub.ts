@@ -3,6 +3,7 @@
 // shared fun, and a reflection before sleep. All model calls go through the one MindScheduler; every
 // decision has a fallback, so the village lives the same way without a model (just less personal).
 
+import type { Place as MapPlace } from "./directions";
 import { ACTIVITY, type Place } from "../life/activities";
 import { clockLabel, gameTime, type Phase } from "../life/clock";
 import { fullNeeds, NEEDS, type Needs } from "../life/needs";
@@ -42,6 +43,7 @@ export class MindHub {
 
   // What a mind sees right now (scene.ts), set by the overworld; `with` = the one it talks to. Null = no scene.
   sceneOf: ((id: string, withPos?: { x: number; z: number }) => string) | null = null;
+  placesOf: (() => MapPlace[]) | null = null; // everywhere and everyone a villager can point the way to
 
   constructor(
     private readonly v: Village,

@@ -24,7 +24,8 @@ import { LOCAL_ONLY, NO_LOCAL } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
 import { NAME_MAX, Overworld, type Wild } from "./overworld";
 import { drawDialogue, drawFrame, drawText, drawToast } from "./text";
-import { humanLook } from "./humans";
+import { humanLook, workSeconds } from "./humans";
+import type { Pose } from "../life/activities";
 import { PIXEL_HINTS, pixelGoals } from "../game/onboard";
 import { loadArt } from "./art";
 import { loadSunny } from "./sunny";
@@ -52,7 +53,7 @@ export const LOW_H = 216;
 // shows at least LOW_H rows wins, and the low-res picture takes whatever size fills the screen at that scale.
 export function lowSize(devW: number, devH: number): { w: number; h: number; scale: number } {
   const scale = Math.max(1, Math.floor(Math.max(1, devH) / LOW_H));
-  return { w: Math.max(1, Math.floor(devW / scale)), h: Math.max(1, Math.floor(devH / scale)), scale };
+  return { w: Math.max(1, Math.ceil(devW / scale)), h: Math.max(1, Math.ceil(devH / scale)), scale };
 }
 
 const TELL: Record<Intent, string> = {
@@ -106,7 +107,18 @@ function useBed(i: number): void {
     state.farm = world.farm = r.farm;
     save(state);
     toast = { text: verb, t: 2.5 };
+    world.startWork(!p.crop ? "dig" : p.stage >= RIPE ? "sweep" : "water", 1.4);
   }
+}
+// E at water, a tree or flowers: a full round of the job, then the goods. Walking off stops it empty-handed.
+const GATHER = { fish: { pose: "fish", good: "fish" }, chop: { pose: "chop", good: "wood" }, herbs: { pose: "sweep", good: "herbs" } } as const;
+function gather(kind: keyof typeof GATHER): void {
+  const { pose, good } = GATHER[kind];
+  world.startWork(pose, workSeconds(pose), () => {
+    state.pack = { ...state.pack, [good]: (state.pack?.[good] ?? 0) + 1 };
+    save(state);
+    toast = { text: `+1 ${good} (you have ${state.pack[good]}). Trade it with a villager or at the board.`, t: 3 };
+  });
 }
 let menu: { cursor: number } | null = null;
 const portraits = new Map<Genes, HTMLCanvasElement>();
@@ -413,19 +425,28 @@ function setCrt(on: boolean): void {
 crtBtn.addEventListener("click", () => setCrt(!crt));
 setCrt(crt);
 
-function resize(): void {
-  const dpr = window.devicePixelRatio || 1;
-  const s = lowSize(Math.round(window.innerWidth * dpr), Math.round(window.innerHeight * dpr));
+// The canvas has exactly the screen's device pixels, so the browser never resamples it. CSS sizes alone cannot promise
+// that at 125% or 150% Windows scaling. The low-res picture runs a little past the edge when the size does not divide.
+let lowScale = 1;
+function resize(devW = Math.round(window.innerWidth * (window.devicePixelRatio || 1)), devH = Math.round(window.innerHeight * (window.devicePixelRatio || 1))): void {
+  const s = lowSize(devW, devH);
+  lowScale = s.scale;
   low.width = s.w;
   low.height = s.h;
-  out.width = s.w * s.scale;
-  out.height = s.h * s.scale;
-  out.style.width = `${out.width / dpr}px`; // to the device pixel: any stretch here would undo the whole-number scale
-  out.style.height = `${out.height / dpr}px`;
+  out.width = devW;
+  out.height = devH;
   g.imageSmoothingEnabled = false;
 }
 
-window.addEventListener("resize", resize);
+window.addEventListener("resize", () => resize());
+try {
+  new ResizeObserver(([e]) => {
+    const box = e?.devicePixelContentBoxSize?.[0];
+    if (box && (box.inlineSize !== out.width || box.blockSize !== out.height)) resize(box.inlineSize, box.blockSize);
+  }).observe(out, { box: "device-pixel-content-box" });
+} catch {
+  /* Safari has no such box: window size times the pixel ratio it is */
+}
 window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (teach.open) {
@@ -510,9 +531,11 @@ function menuKey(k: string): void {
       else if (world.messNear() !== null) {
         world.cleanMess(world.messNear()!);
         world.say("me", "All clean!", 1.5);
+        world.startWork("sweep", 1.2);
       }
       else if (world.peerNear()) peerMenu = { id: world.peerNear()!, cursor: 0 };
       else if (world.wildNear() && chatWhoFor("wild", world.wildNear()!.arch)) openChat(world.wildNear()!);
+      else if (world.gatherNear()) gather(world.gatherNear()!);
       else if (live.status === "online" && world.peers.size) openChat("room");
     }
     if (k === "p") menu = { cursor: state.active ?? 0 };
@@ -664,6 +687,21 @@ function setNpcHost(npc: Npc, host: string | null): void {
   world.npcs?.setHost(npc, host);
 }
 const DROP_GRACE_MS = 20_000;
+// What every machine must see the same: where the villagers I host are, and what grows on my ground.
+const SHARE_MS = 500;
+let sharedAt = 0;
+let sharedNpcs = "";
+let sharedFarm = "";
+function shareState(now: number): void {
+  if (now - sharedAt < SHARE_MS || live.status !== "online") return;
+  sharedAt = now;
+  const spots = world.npcs?.spots() ?? [];
+  const key = JSON.stringify(spots);
+  if (spots.length && key !== sharedNpcs && live.npcs(spots)) sharedNpcs = key;
+  const plots = (state.farm?.plots ?? []).map((p): [string, number] => [p.crop ?? "", p.stage]);
+  const farm = JSON.stringify(plots);
+  if (farm !== sharedFarm && live.farm(plots)) sharedFarm = farm;
+}
 const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: state.groundSeed, slot: slotKnown ? mySlot : undefined, ...world.me }), {
   welcome: (id, corner, peers, awayList, npcs = {}, open = []) => {
     talks.clear();
@@ -681,6 +719,7 @@ const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myG
     relayoutGrounds();
   },
   join: (p) => {
+    sharedFarm = sharedNpcs = ""; // the newcomer has not seen them
     addPeer(p);
     trackGround(p);
     relayoutGrounds();
@@ -718,6 +757,9 @@ const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myG
     relayoutGrounds();
   },
   pos: (id, x, z, px, pz) => world.movePeer(id, x, z, px, pz),
+  pose: (id, pose, flip) => world.posePeer(id, pose as Pose | null, flip),
+  npcs: (list) => world.npcs?.shadow(list),
+  farm: (id, plots) => void world.peerFarms.set(id, plots),
   emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
   status: (s) => {
     if (s === "online") return;
@@ -740,6 +782,7 @@ const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myG
 live.connect();
 // Minds online: my pets' activity starts and lines go to the room; others' come back as bubbles. The cap
 // heartbeat tells the room how fast my local model is, so it can pick me to host village NPCs.
+world.onPose = (pose, flip) => void (live.status === "online" && live.pose(pose, flip));
 world.onMind = (l) => void (live.status === "online" && live.mind(l.say ? { ...l, ...world.speakerAt(l.who) } : l));
 setInterval(() => {
   const brain = localBrain();
@@ -950,6 +993,7 @@ setInterval(() => {
   last = now;
   for (let i = 0; i < steps; i++) world.update(0.05, new Set<string>());
   live.tick(now, world.me);
+  shareState(now);
 }, 500);
 
 function update(dt: number, t: number): void {
@@ -958,6 +1002,7 @@ function update(dt: number, t: number): void {
     const met = world.update(dt, menu || crate || board || peerMenu || duelIn ? new Set<string>() : keys);
     petChatter(dt);
     live.tick(performance.now(), world.me);
+    shareState(performance.now());
     if ((farmTickAt -= dt) <= 0) {
       farmTickAt = 1;
       const next = tick(state.farm!, Date.now());
@@ -993,7 +1038,7 @@ function update(dt: number, t: number): void {
     battleView.update(dt);
     battleView.draw(g, low.width, low.height, t);
   }
-  presenter.present(low, crt ? 1 : 0);
+  presenter.present(low, crt ? 1 : 0, lowScale);
 }
 
 // Tiles, props, frame and font PNGs (docs/STYLE.md) load before the first frame, and the setup gate runs first.

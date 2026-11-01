@@ -1,6 +1,6 @@
 import { cleanScene } from "./chat";
 import { parseGhostMemo, type GhostMemo } from "./memo-dsl";
-import { cleanCap, cleanMem, isNpc, MIND_ACTS, NpcBoard, type Cap, type HostChange, type Npc } from "./npc";
+import { cleanCap, cleanMem, isNpc, MIND_ACTS, NPCS, NpcBoard, type Cap, type HostChange, type Npc } from "./npc";
 
 // Live room logic (pure, no Workers APIs, so it is unit-tested directly). One room per world: players
 // who are online see each other's avatar + pet walk around and wave with emotes. Each player gets a slot
@@ -103,6 +103,9 @@ export interface Away {
 }
 export type PublicAway = Omit<Away, "until"> & { ttl: number }; // ms left (clients' clocks differ)
 
+export type NpcSpot = [string, number, number, string, string]; // id, x, z, state, activity
+export type FarmPlot = [string, number]; // crop ("" = empty), stage
+
 export type ServerMsg =
   | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[]; npcs: Partial<Record<Npc, string>>; talks: [string, string][] }
   | { t: "talking"; id: string; with: string; on: boolean }
@@ -116,6 +119,9 @@ export type ServerMsg =
   | { t: "join"; peer: PublicPeer }
   | { t: "leave"; id: string }
   | { t: "pos"; id: string; x: number; z: number; px: number; pz: number }
+  | { t: "pose"; id: string; pose: string | null; flip: boolean }
+  | { t: "npcs"; list: NpcSpot[] }
+  | { t: "farm"; id: string; plots: FarmPlot[] }
   | { t: "emote"; id: string; e: Emote }
   | { t: "full" }
   | { t: "say"; id: string; text: string }
@@ -361,6 +367,23 @@ export class Room {
       if (x === null || z === null || px === null || pz === null) return this.strike(peer);
       Object.assign(peer, { x, z, px, pz });
       return { out: [{ to: "others", msg: { t: "pos", id, x, z, px, pz } }], changed: true };
+    }
+    if (o.t === "pose") {
+      const pose = typeof o.pose === "string" && /^[a-z]{1,12}$/.test(o.pose) ? o.pose : null;
+      return { out: [{ to: "others", msg: { t: "pose", id, pose, flip: o.flip === true } }] };
+    }
+    if (o.t === "npcs" && Array.isArray(o.list)) {
+      // Only an NPC's host says where it is.
+      const list = o.list.slice(0, NPCS.length).flatMap((v): NpcSpot[] => {
+        if (!Array.isArray(v) || !isNpc(v[0]) || this.board.hostOf(v[0]) !== peer.id) return [];
+        const x = coord(v[1]), z = coord(v[2]);
+        return x === null || z === null || typeof v[3] !== "string" || typeof v[4] !== "string" ? [] : [[v[0], x, z, v[3].slice(0, 8), v[4].slice(0, 16)]];
+      });
+      return { out: list.length ? [{ to: "others", msg: { t: "npcs", list } }] : [] };
+    }
+    if (o.t === "farm" && Array.isArray(o.plots)) {
+      const plots = o.plots.slice(0, 12).map((p): FarmPlot => (Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "number" ? [p[0].slice(0, 12), Math.max(0, Math.min(9, Math.floor(p[1])))] : ["", 0]));
+      return { out: [{ to: "others", msg: { t: "farm", id, plots } }] };
     }
     if (o.t === "emote" && (EMOTES as readonly unknown[]).includes(o.e)) {
       return { out: [{ to: "others", msg: { t: "emote", id, e: o.e as Emote } }], changed: true };
