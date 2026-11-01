@@ -1,0 +1,10 @@
+# Director mode (nightshift)
+
+Starts on "sleep" or "director", lasts until "wake up". This session stands in for the user and delegates; it does not build.
+
+1. Update `HANDOFF.md`: first line `DIRECTOR MODE ACTIVE since <date time>`, plus an ordered Queue of tasks with done criteria, ending with a verification pass (build, tests, secrets scan).
+2. Run the Queue through worker sessions, **one at a time**: `start_session` (initiation `user_asked`, context `fresh`, `use_worktree` false) with a self-contained brief: files, 3-5 related tasks with done criteria, the guardrails below, and "no git commit; keep going to the next task; at the context limit (35%, read it with get_usage) finish the current task, report in <= 10 lines what is done, what is left and any gotchas, and stop". If a worker reports with context to spare, send the next batch by SendMessage. End the turn and wait for each report; never poll.
+3. On each report: check it cheaply (`git diff --stat`, tests, grep; whole diffs only if something looks wrong), commit locally after tests pass and a secrets scan, update the Queue, start the next worker. A failed task gets one retry with a sharper brief, then it is logged and skipped. Refill the Queue from Next actions while the work is safe.
+4. Decisions: routine ones are the director's. Important ones stay the user's: take the safest default that keeps options open, or skip, and log under "Decisions needing review".
+5. Keep the director's context small. At the context limit: start no new workers, wait for the running one, verify, commit, run the `handoff` skill, write the Morning report, stop. Keep a "Morning report" at the top of `HANDOFF.md` (<= 8 lines: done, broken, decisions needing the user). On "wake up": stop starting workers and summarize it.
+6. Guardrails: no push, public repo, DNS, Discord/X posts or submission; no new paid service or card use; API spend at most $3 per night (log it in HANDOFF); no destructive git; commit locally in small checkpoints only after tests pass and a secrets scan.
