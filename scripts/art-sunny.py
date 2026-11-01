@@ -48,6 +48,7 @@ STAMPS = {
     'house-blue': (HOUSE, 39, 24, 46, 31), 'house-red': (HOUSE, 32, 18, 37, 24), 'house-green': (HOUSE, 21, 25, 25, 29),
     'house-redsmall': (HOUSE, 30, 26, 34, 30), 'house-purple': (HOUSE, 13, 26, 19, 32), 'house-orange': (HOUSE, 54, 24, 60, 29),
     'house-orangelong': (HOUSE, 55, 31, 61, 35), 'house-bluesmall': (HOUSE, 51, 6, 56, 10), 'house-greentall': (HOUSE, 40, 32, 45, 38),
+    'mill-tower': (HOUSE, 38, 15, 45, 26),
     'stall-red': (HOUSE, 64, 27, 68, 30), 'stall-white': (HOUSE, 33, 28, 37, 31),
     'pine': (DEC, 4, 2, 6, 5), 'bush': (DEC, 20, 12, 22, 14), 'bush-berry': (DEC, 23, 12, 25, 14), 'bush-red': (DEC, 52, 13, 54, 15),
     'rock-big': (DEC, 63, 18, 65, 20), 'rock-small': (DEC, 54, 21, 56, 22), 'sign': (DEC, 9, 36, 10, 37), 'stump': (DEC, 26, 15, 27, 17), 'fence-a': (DEC, 9, 21, 12, 22), 'fence-b': (DEC, 12, 21, 15, 22),

@@ -75,11 +75,11 @@ it("draws four round trees per pine, native field crops, and advancing windmill 
     now.mockReturnValue(120);
     drawDecor(g, "windmill", 80, 120, 1, 0, false);
     expect(drawImage.mock.calls.map((c) => c.slice(1))).toEqual([
-      [0, 0, 112, 112, 24, 8, 112, 112], [112, 0, 112, 112, 24, 8, 112, 112],
+      [0, 0, 112, 112, 24, 2, 112, 112], [112, 0, 112, 112, 24, 2, 112, 112],
     ]);
     drawImage.mockClear();
     drawDecor(g, "crop-wheat", 40, 60, 1, 0, false);
-    expect((drawImage.mock.calls[0]![0] as PackImage).src).toContain("crop-wheat-5.png");
+    expect((drawImage.mock.calls[0]![0] as PackImage).src).toContain("crop-wheat-4.png");
     drawImage.mockClear();
     drawDecor(g, "grass", 40, 60, 1, 0, false);
     expect(drawImage.mock.calls[0]!.slice(1)).toEqual([27 * 16, 2 * 16, 16, 16, 32, 44, 16, 16]);

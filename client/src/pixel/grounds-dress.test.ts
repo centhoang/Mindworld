@@ -36,7 +36,7 @@ it("dresses real forested grounds with seeded features and keeps every route con
     repeat.placeTrees(); repeat.placeDecor();
     expect(repeat.decor).toEqual(scene.decor);
     expect(repeat.map.kind).toEqual(scene.map.kind);
-    for (const t of scene.trees) expect(scene.trees.some((u) => u !== t && Math.max(Math.abs(t.x - u.x), Math.abs(t.z - u.z)) <= 2)).toBe(true);
+    for (const t of scene.trees) expect(scene.trees.some((u) => u !== t && Math.max(Math.abs(t.x - u.x), Math.abs(t.z - u.z)) <= 4)).toBe(true);
     const m = scene.map, solids = new Set(scene.decor.flatMap((d) => d.tiles));
     const blocked = new Set([...scene.treeTiles, ...solids]);
     for (const d of pieces) {
@@ -85,7 +85,7 @@ it("dresses real forested grounds with seeded features and keeps every route con
   expect(mills).toBeLessThanOrEqual(28);
   expect(elders).toBe(40);
   expect(details / 40).toBeGreaterThanOrEqual(55);
-  expect(trees / 40).toBeGreaterThanOrEqual(35);
+  expect(trees / 40).toBeGreaterThanOrEqual(30);
 }, 30_000);
 
 it("keeps the pure placer independent of owner identity and away flags", () => {

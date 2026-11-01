@@ -55,7 +55,7 @@ const HOME_ART = "house-blue";
 const HOUSE_ART = ["house-red", "house-orange", "house-green", "house-purple", "house-orangelong", "house-redsmall", "house-bluesmall", "house-greentall"];
 const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
 // Farm stages 0-3 onto the pack's six growth pictures.
-const CROP_STAGE = [1, 2, 3, 5];
+const CROP_STAGE = [1, 2, 3, 4]; // the pack's stage 5 is the harvested item, not a plant
 
 // Fixed buildings and big pieces on shared places: solid, and drawn with the people.
 interface Landmark {
@@ -308,6 +308,7 @@ export class Overworld {
       const sides = this.treeSides(plaza, 8);
       if (sides.length) out.woods = sides;
       if (!out.pond?.length) out.pond = this.fishingSpots(plaza, 16, 4);
+      if (!out.playground?.length) out.playground = ring(plaza, 3.2, 8); // no pitch near the hub: the square does for a kickabout
     }
     for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
     return out;
@@ -514,11 +515,11 @@ export class Overworld {
         const available = candidates.filter((v) => !this.trees.some((t) => Math.abs(t.x - v.x) < 3 && Math.abs(t.z - v.z) < 3));
         let best: Vec[] = [];
         for (const anchor of available.slice(0, 120)) { // candidates are shuffled; a sample keeps big grounds fast
-          const patch = available.filter((v) => Math.abs(v.x - anchor.x) <= CLUMP && Math.abs(v.z - anchor.z) <= CLUMP)
-            .sort((a, b) => Math.hypot(a.x - anchor.x, a.z - anchor.z) - Math.hypot(b.x - anchor.x, b.z - anchor.z));
+          const dist = (v: Vec) => Math.hypot(v.x - anchor.x, v.z - anchor.z) + hash2(v.x, v.z, 77) * 3; // uneven reach: a blob, not a block
+          const patch = available.filter((v) => Math.abs(v.x - anchor.x) <= CLUMP && Math.abs(v.z - anchor.z) <= CLUMP).sort((a, b) => dist(a) - dist(b));
           const group: Vec[] = [anchor];
           while (group.length < want) {
-            const v = patch.find((q) => group.every((t) => Math.max(Math.abs(t.x - q.x), Math.abs(t.z - q.z)) >= 2) && group.some((t) => Math.max(Math.abs(t.x - q.x), Math.abs(t.z - q.z)) === 2));
+            const v = patch.find((q) => group.every((t) => Math.max(Math.abs(t.x - q.x), Math.abs(t.z - q.z)) >= 2) && group.some((t) => Math.max(Math.abs(t.x - q.x), Math.abs(t.z - q.z)) <= 3));
             if (!v) break;
             group.push(v);
           }
@@ -528,7 +529,8 @@ export class Overworld {
         // Crowded islands may have less room; clearances take priority over the target count.
         if (best.length < 2) break;
         for (const t of best) {
-          this.trees.push(t);
+          // Each stands off its tile centre, so no two line up; it stays inside its tile, which is what blocks.
+          this.trees.push({ x: t.x + (hash2(t.x, t.z, 78) - 0.5) * 0.8, z: t.z + (hash2(t.x, t.z, 79) - 0.5) * 0.8 });
           this.treeTiles.add(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox));
         }
       }
@@ -548,17 +550,29 @@ export class Overworld {
     this.decor = placeDecor(this.world, m, (x, z) => reserved(x, z) ||
       this.treeTiles.has(Math.floor(z - m.oz) * m.w + Math.floor(x - m.ox)), reserved);
     // Feature clearings take priority over trees, like the pack's fields and mill yards.
+    // Farm ground is the pack's light dirt: real beds with a tile around them, and the decorative fields.
+    const soil = (m.soil = new Uint8Array(m.w * m.h));
+    for (const p of this.world.platforms) if (p.ground) {
+      const { x, z } = bedsAt(p)[0]!;
+      for (let dz = -1; dz <= 4; dz++) for (let dx = -1; dx <= 3; dx++) {
+        const k = (z + dz - m.oz) * m.w + x + dx - m.ox;
+        if (m.kind[k] === T.grass || m.kind[k] === T.tall || m.kind[k] === T.flowers) soil[k] = 1;
+      }
+    }
     const clearing = new Set<number>();
     for (const d of this.decor.filter((d) => d.field || d.kind === "windmill")) {
       for (const k of [...d.tiles, ...(d.soil ?? [])]) for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) clearing.add(k + dz * m.w + dx);
     }
     this.trees = this.trees.filter((t) => !clearing.has(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox)));
-    this.trees = this.trees.filter((t, _, trees) => trees.some((other) => other !== t && Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 2));
+    this.trees = this.trees.filter((t, _, trees) => trees.some((other) => other !== t && Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 4));
     this.treeTiles.clear();
     for (const t of this.trees) this.treeTiles.add(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox));
     for (const d of this.decor) {
       for (const k of d.tiles) this.decorTiles.add(k);
-      for (const k of d.soil ?? []) m.kind[k] = T.path;
+      for (const k of d.soil ?? []) {
+        m.kind[k] = T.path;
+        soil[k] = 1;
+      }
     }
     // Decorative fields add dirt after the initial terrain pass.
     this.sunny = buildSunny(m);

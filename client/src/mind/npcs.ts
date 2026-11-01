@@ -114,7 +114,7 @@ export class NpcVillage {
   private readonly asked = new Map<string, { invite: Invite; turns: number }>(); // "npc:player" -> what it invited them to
   private readonly lastSaid = new Map<string, string>(); // "npc:player" -> their previous line
   private readonly quiet = new Map<string, number>(); // "npc:player" -> model lines before it may invite again
-  private readonly noThanks = new Map<string, number>(); // "npc:player" -> the day they said no: not asked again that day
+  private readonly noThanks = new Map<string, number>(); // "npc:player:act" -> the day they said no: not asked again that day
 
   constructor(
     private readonly sched: MindScheduler,
@@ -792,7 +792,7 @@ export class NpcVillage {
       return true;
     }
     const act = PITCH_ACTS.find((a) => traitBias(m.persona, a) > 0 && this.env.spots[ACTIVITY.get(a)!.place]?.length);
-    if (!act || g.phase === "evening" || g.phase === "night" || dueNow(m.mem.promises, g.day, "evening").length || this.noThanks.get(`${npc}:${guest.name}`) === g.day) return false;
+    if (!act || g.phase === "evening" || g.phase === "night" || dueNow(m.mem.promises, g.day, "evening").length || this.noThanks.get(`${npc}:${guest.name}:${act}`) === g.day) return false;
     this.open(npc, guest.name, { act, occasion: "", day: g.day, phase: "evening" });
     m.mem.why = `feel like ${act} > ${guest.name} is around > asked them along`;
     this.said(npc, `${guest.name}, ${act} this evening? Say yes if you are in.`, guest.name);
@@ -811,7 +811,7 @@ export class NpcVillage {
     const g = gameTime(this.v.t);
     const invite = offerIn(line, g.day, g.phase);
     if (invite) {
-      if (this.noThanks.get(`${npc}:${player}`) !== g.day) this.open(npc, player, invite);
+      if (this.noThanks.get(`${npc}:${player}:${invite.act}`) !== g.day) this.open(npc, player, invite);
       return;
     }
     const good = goodOfferedIn(line);
@@ -838,7 +838,7 @@ export class NpcVillage {
     if (said === "later") return `Sure, ${player}. Just say when.`;
     this.asked.delete(key);
     if (said === "no") {
-      this.noThanks.set(key, g.day);
+      this.noThanks.set(`${key}:${invite.act}`, g.day);
       remember(m.mem, g.day, clockLabel(g.hour), `${player} did not want to ${invite.act} today`);
       return `Alright, ${player}. Another day then.`;
     }

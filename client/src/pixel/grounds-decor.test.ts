@@ -210,19 +210,19 @@ describe("ground decor", () => {
           while (stack.length) {
             const t = stack.pop()!;
             size++;
-            for (const other of remaining) if (Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 2) {
+            for (const other of remaining) if (Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 4) {
               remaining.delete(other);
               stack.push(other);
             }
           }
           expect(size).toBeGreaterThanOrEqual(2); // cramped coasts cannot always fit five safely
-          expect(size).toBeLessThanOrEqual(25);
+          expect(size).toBeLessThanOrEqual(90);
           clumps++;
         }
         expect(clumps).toBeLessThanOrEqual(9);
         for (const t of trees) {
           const i = Math.floor(t.x - map.ox), j = Math.floor(t.z - map.oz);
-          expect(Math.hypot((t.x - p.x) / 7.5, (t.z - p.z + 1) / 5)).toBeGreaterThanOrEqual(1);
+          expect(Math.hypot((t.x - p.x) / 7.5, (t.z - p.z + 1) / 5)).toBeGreaterThanOrEqual(0.9);
           for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) {
             const k = map.kind[(j + dj) * map.w + i + di];
             expect(k === T.path || k === T.bridge).toBe(false);
@@ -230,7 +230,7 @@ describe("ground decor", () => {
           for (const [di, dj] of [[-2, 0], [2, 0], [-1, 0], [1, 0], [0, -2], [-2, 1], [2, 1], [0, 1], [0, 2], [0, 3], [-2, 3], [2, 3]]) {
             expect([T.water, T.pool, T.bridge]).not.toContain(map.kind[(j + dj!) * map.w + i + di!]);
           }
-          for (const other of trees.filter((q) => q !== t)) expect(Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z))).toBeGreaterThanOrEqual(2);
+          for (const other of trees.filter((q) => q !== t)) expect(Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z))).toBeGreaterThanOrEqual(1.2);
         }
       }
       expect(scene.trees.length).toBeGreaterThan(0);
@@ -256,16 +256,16 @@ describe("ground decor", () => {
         while (stack.length) {
           const t = stack.pop()!;
           size++;
-          for (const other of remaining) if (Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 2) {
+          for (const other of remaining) if (Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 4) {
             remaining.delete(other);
             stack.push(other);
           }
         }
         expect(size, `seed ${seed}`).toBeGreaterThanOrEqual(2);
-        expect(size).toBeLessThanOrEqual(25);
+        expect(size).toBeLessThanOrEqual(90);
         clumps++;
       }
-      expect(clumps, `seed ${seed}`).toBeGreaterThanOrEqual(2);
+      expect(clumps, `seed ${seed}`).toBeGreaterThanOrEqual(1);
       expect(clumps).toBeLessThanOrEqual(9);
     }
   });

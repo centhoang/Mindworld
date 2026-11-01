@@ -100,7 +100,8 @@ export function drawDecor(g: Ctx, kind: DecorKind, x: number, y: number, tiles: 
       for (let k = -18; k <= 18; k += 9) r(g, x + k - 2, y - 24, 5, 5, PAL.flowerY);
     }
   } else if (kind === "windmill") {
-    strip(g, "spr_deco_windmill_withshadow_strip9", x - 56, y - 112, Math.floor(performance.now() / 120));
+    stand(g, "mill-tower", x, y);
+    strip(g, "spr_deco_windmill_withshadow_strip9", x - 56, y - 118, Math.floor(performance.now() / 120)); // the wheel turns on the tower's top
   } else if (kind === "grass" || kind === "flowers") {
     if (!plantSheet) {
       plantSheet = new Image();
@@ -109,7 +110,7 @@ export function drawDecor(g: Ctx, kind: DecorKind, x: number, y: number, tiles: 
     const [col, row] = GROUND_PLANTS[kind];
     if (plantSheet.complete && plantSheet.naturalWidth) g.drawImage(plantSheet, col * 16, row * 16, 16, 16, Math.round(x - 8), Math.round(y - 16), 16, 16);
   } else if (kind === "crop-wheat" || kind === "crop-carrot") {
-    drawCropArt(g, kind.slice(5), 5, x, y);
+    drawCropArt(g, kind.slice(5), 4, x, y);
   } else if (kind === "fence") {
     const w = stampSize("fence-a")[0];
     const count = Math.max(1, Math.round((tiles * 16) / w));

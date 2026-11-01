@@ -24,6 +24,12 @@ const GRASS: Record<EdgeName, number> = {
 // One visible square of ground is one tile: the pack's 3.1 is an 8 px checker, four squares to a tile. 1.1 and 1.2 are its two greens, flat.
 const grassFill = (i: number, j: number) => tile(1, 1 + ((i + j) & 1));
 const ACCENT = [tile(2, 1), tile(2, 2), tile(2, 3), tile(2, 5), tile(2, 6)];
+const SOIL_ROWS = 4 * 64; // the light dirt family is the grass table moved down 4 rows
+const SOIL_FILL = tile(7, 1);
+const SAND = tile(1, 5);
+const SAND_ACCENT = [tile(1, 7), tile(1, 8), tile(1, 9)];
+const SAND_EDGE = tile(5, 20); // the wet end of a beach, foam and all
+const BEACH_RUN = 6; // straight south coast this long may be a beach
 const ROAD: Record<EdgeName, number> = {
   nw: tile(7, 19), n: tile(7, 15), ne: tile(8, 15), w: tile(7, 17), e: tile(8, 14), sw: tile(8, 17), s: tile(8, 16), se: tile(8, 18),
   inNw: tile(7, 13), inNe: tile(7, 14), inSw: tile(7, 16), inSe: tile(8, 12),
@@ -57,7 +63,8 @@ export function buildTerrain(m: TileMap): Terrain {
   const at = (i: number, j: number) => (i < 0 || j < 0 || i >= m.w || j >= m.h ? T.water : m.kind[j * m.w + i]!);
   // Ponds and streams are coast like any other: same grass edge, same cliff and the same moving foam.
   const dry = (i: number, j: number) => at(i, j) !== T.water && at(i, j) !== T.bridge && at(i, j) !== T.pool;
-  const isRoad = (i: number, j: number) => at(i, j) === T.path;
+  const isSoil = (i: number, j: number) => m.soil?.[j * m.w + i] === 1;
+  const isRoad = (i: number, j: number) => at(i, j) === T.path && !isSoil(i, j);
   const high = (i: number, j: number) => m.high?.[j * m.w + i] === 1;
   const isPool = (i: number, j: number) => at(i, j) === T.pool;
   const free = (i: number, j: number) => i >= 0 && j >= 0 && i < m.w && j < m.h && !dry(i, j);
@@ -76,6 +83,10 @@ export function buildTerrain(m: TileMap): Terrain {
         const e = edgeOf(isRoad, i, j);
         out.road[k] = e ? ROAD[e] : ROAD_FILL[Math.floor(hash2(i, j, 23) * ROAD_FILL.length)]!;
       }
+      if (isSoil(i, j)) {
+        const e = edgeOf(isSoil, i, j);
+        out.road[k] = e ? GRASS[e] + SOIL_ROWS : SOIL_FILL;
+      }
       if (at(i, j) === T.ledge) {
         // Terrace walls sit on the road layer, over plain grass: the lip of the top, or the cliff below it.
         out.land[k] = grassFill(i + m.ox, j + m.oz);
@@ -89,7 +100,14 @@ export function buildTerrain(m: TileMap): Terrain {
       const coast = west ? [tile(4, 10), tile(2, 19, MIRROR), tile(6, 19, MIRROR)] : east ? [tile(4, 10, MIRROR), tile(2, 19), tile(6, 19)] : [CLIFF(i, j + 1), CLIFF(i, j + 2), tile(2, 20)];
       // Inland the drop is one row shorter, and a narrow stream keeps its water: only the foam line shows.
       const room = [1, 2, 3].filter((n) => isPool(i, j + n)).length;
-      const face = !isPool(i, j + 1) ? coast : room >= 3 ? coast.slice(1) : coast.slice(2);
+      // Some straight south coast is a beach below its cliff, as in the pack's scene. Decoration: nobody walks there.
+      const straight = (a: number) => a >= 0 && a < m.w && dry(a, j) && !dry(a, j + 1) && !isPool(a, j + 1) && !isPool(a, j + 2) && edgeOf(dry, a, j) === "s";
+      let [a, b] = [i, i];
+      while (straight(a - 1)) a--;
+      while (straight(b + 1)) b++;
+      const beach = straight(i) && b - a + 1 >= BEACH_RUN && hash2(a, j, 31) < 0.6;
+      const sand = hash2(i, j, 32) < 0.15 ? SAND_ACCENT[Math.floor(hash2(i, j, 33) * SAND_ACCENT.length)]! : SAND;
+      const face = beach ? [CLIFF(i, j + 1), sand, SAND_EDGE] : !isPool(i, j + 1) ? coast : room >= 3 ? coast.slice(1) : coast.slice(2);
       let last = j;
       face.forEach((cell, n) => {
         if (last !== j + n || !free(i, j + n + 1)) return;

@@ -98,15 +98,16 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
       for (let tries = 0; tries < 1200; tries++) {
         const i = Math.floor(x0 - m.ox + mill() * w), j = Math.floor(z0 - m.oz + mill() * h);
         let ok = true;
-        // The pack strip is the turning wheel; only its support foot is solid.
-        for (let dj = -1; dj <= 1 && ok; dj++) for (let di = -1; di <= 1 && ok; di++) {
-          if (!clearGrass(i + di, j + dj, true) || taken.has((j + dj) * m.w + i + di) ||
-            !free(m.ox + i + 0.5, m.oz + j + 0.5) || nearPath(i + di, j + dj)) ok = false;
+        // A tower two tiles wide and five tall, with a wheel on top: only its foot is solid, but the whole mill keeps clear of houses.
+        for (let dj = -6; dj <= 1 && ok; dj++) for (let di = -3; di <= 3 && ok; di++) {
+          if (featureReserved(m.ox + i + di + 0.5, m.oz + j + dj + 0.5) || !free(m.ox + i + di + 0.5, m.oz + j + dj + 0.5)) ok = false;
+          if (Math.abs(di) > 1 || Math.abs(dj) > 1) continue;
+          if (!clearGrass(i + di, j + dj, true) || taken.has((j + dj) * m.w + i + di) || nearPath(i + di, j + dj)) ok = false;
         }
         if (!ok) continue;
-        const tiles = [j * m.w + i];
-        out.push({ kind: "windmill", x: m.ox + i + 0.5, z: m.oz + j + 0.5, tiles, platform: p.id });
-        for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) taken.add((j + dj) * m.w + i + di);
+        const tiles = [j * m.w + i - 1, j * m.w + i];
+        out.push({ kind: "windmill", x: m.ox + i, z: m.oz + j + 0.5, tiles, platform: p.id });
+        for (let dj = -6; dj <= 2; dj++) for (let di = -2; di <= 2; di++) taken.add((j + dj) * m.w + i + di);
         break;
       }
     }
