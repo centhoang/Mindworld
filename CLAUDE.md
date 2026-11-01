@@ -7,7 +7,7 @@ Deadline: **Nov 4, 9 PM ET** (CV platform). Event facts: `docs/EVENT.md`. Live s
 Read `HANDOFF.md` only, then follow its Next actions. Read other docs when a task needs them. Never re-read the raw event files (`EventDetails/`, `EventFrontPage/`, `Event_CURRENT_F&Qs.txt`).
 
 ## Keep start-up small (rule for every session)
-- This file stays under 60 lines, `HANDOFF.md` under 40 lines, with lines under 200 characters. Over the limit: move detail out before adding.
+- This file stays under 70 lines, `HANDOFF.md` under 40 lines, with lines under 200 characters. Over the limit: move detail out before adding.
 - HANDOFF holds only what the next session needs now. History and old gotchas go to `docs/HISTORY.md` (grep it, never read it whole).
 - New rules go in the doc for that topic, with a one-line pointer here only if every session needs it.
 
