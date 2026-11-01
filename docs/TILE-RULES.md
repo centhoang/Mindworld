@@ -8,6 +8,7 @@ Target look: `VisualAssetPack/BuiltDemo` and the pack's `Sunnyside_World_Example
 - Source of truth: the pack's GameMaker room `Sunnyside_World_Gamemaker/rooms/Room1/Room1.yy`, 86 x 48 tiles of 16 px. It holds the real layers, so read a rule off it instead of guessing.
 - Layers, bottom to top: sea, clouds_02, land, paths, shadows, decoration_01, forest (32 px tiles), Assets_2, building, walls, decoration_02, decoration_03, Assets_1, cloud_shadow, clouds_01.
 - Export: `python scripts/art-sunny.py` writes client/public/art/sunny (tiles.png, stamps, strips, sunny.json, interior.png). The pack stays gitignored; never hand-edit the output.
+- Draw order: `docs/LAYERS.md`.
 - Rules in code: `client/src/pixel/sunny-terrain.ts` (pure tile choice), `client/src/pixel/sunny.ts` (drawing).
 - Decoding: tile id = row * 64 + col in the 16 px sheet. Room values: bit 28 mirror, bit 29 flip, bit 30 rotate, bit 31 empty. Mask the id with 0x7ffff. The `sea` layer is uncompressed (`TileSerialiseData`); the others are run-length encoded.
 - Notation below: `r.c` = row.col, `m` = mirrored, `F` = flipped.
@@ -29,8 +30,8 @@ Decide each tile from the land shape alone, with 4 neighbours and then diagonals
 - The light road family is the grass table moved down 4 rows (3.k becomes 7.k, 4.k becomes 8.k). Not used yet.
 - Roads are 3 tiles wide and stay on land.
 - Island outlines are straight edges with stepped corners, never slants or circles: coast, cliff and foam tiles only join on those. Grounds are stepped rectangles (world/ground.ts), other places squares with corner notches (`inBlock` in world/layout.ts). Roads run along one axis, then the other.
-- Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in tight clumps, about 2 tiles apart. Try 8-9 clumps per player ground and 3-4 elsewhere (previously 5-6 / 2-3); larger compact patches use available clear grass before starting another clump. Clearance takes priority over the density target. Four seed residues in five draw the round `tree_01` strip; one draws a pine. The pack's `tree_02` strip is also a conifer, not a second round tree.
-- Fence rows run on the grass row just north of a straight road of 6+ tiles: segments 3-6 tiles, gaps 2+, kept 2 tiles clear of junctions, gates and bridges (grounds-decor.ts).
+- Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in tight clumps, about 2 tiles apart. Try 8-9 clumps per player ground and 3-4 elsewhere (previously 5-6 / 2-3); larger compact patches use available clear grass before starting another clump. Clearance takes priority over the density target. Trees stand on tile centres (bug 14): only the clump's outline is uneven. Four seed residues in five draw the round `tree_01` strip; one draws a pine. The pack's `tree_02` strip is also a conifer, not a second round tree.
+- Straight roads of 6+ tiles carry a fence on both sides, either direction: segments 3-8 tiles, gaps 2+, kept 2 tiles clear of junctions, gates and bridges (grounds-decor.ts). East-west uses `fence-a`, north-south the rail tiles 1.40 / 3.40 / 4.40 (`fence-v`).
 
 ## Cliffs, foam, sea shadow
 Only south edges have a face, worked out per column. Cells below the land, from the top:
@@ -63,25 +64,25 @@ Room1's `land` layer uses sand fill **1.5**, with accents **1.7-1.9**. Sea edges
 | Outer foam/corner | 6.19 | (20,1), mirror + flip; (23,2), mirror + flip + rotate |
 | Extra corner joins | 5.21, 6.21 | Seen on the large eastern sand area |
 
-Correction: 5.20 is a straight sand and foam edge. South coast runs of 6+ tiles may be beaches: cliff, sand 1.5, edge 5.20 (`buildTerrain`). The rest of this note covers walkable beaches only. These are sloping/pointed coast pieces, not a complete straight N/E/W edge family for our orthogonal islands. Room1's sand sits below cliffs and uses diagonal outlines. Do not substitute its foam corners for straight shore edges or repaint grass edges yellow. Walkable 6-12 by 2-3 rectangular beaches are therefore **skipped**, pending a clean orthogonal sand/sea and sand/grass family; `T.sand` is unchanged.
+Correction: 5.20 is a straight sand and foam edge. South coast runs of 6+ tiles may be beaches: cliff, sand, sand, edge 5.20; the two end columns are cliff, sand, 5.19 (mirrored at the west end), which carries the corner's diagonal foam down to the straight edge (`buildTerrain`). The rest of this note covers walkable beaches only. These are sloping/pointed coast pieces, not a complete straight N/E/W edge family for our orthogonal islands. Room1's sand sits below cliffs and uses diagonal outlines. Do not substitute its foam corners for straight shore edges or repaint grass edges yellow. Walkable 6-12 by 2-3 rectangular beaches are therefore **skipped**, pending a clean orthogonal sand/sea and sand/grass family; `T.sand` is unchanged.
 
 ## Bridges
 The ends lie one tile up on the land.
 - Vertical, 3 wide: deck 12.39 / 12.40 / 12.41; top cap 11.39-41; bottom cap 11.41mF / 11.40mF / 11.39mF. Rails on the two outer columns: 1.40 top, 3.40 middle, 4.40 bottom.
-- Horizontal, 3 tall: rows 11 / 12 / 13, deck col 40 (alternate m), ends col 39 and 39m. Top rail 2.39 with ends 2.42m and 2.42; bottom rail 0.39 with ends 0.38 and 0.38m. Posts under it (5.37) are not drawn yet.
+- Horizontal, 3 tall: rows 11 / 12 / 13, deck col 40 (alternate m), ends col 39 and 39m. Top rail 2.39 with ends 2.42m and 2.42; bottom rail 0.39 with ends 0.38 and 0.38m. Under it on water: shadow 1.12 for one row, and two columns of posts every 4 tiles (1.37, braced 5.37, feet 2.37).
 
 - Rails are solid and sort with people by feet (`drawRail`, `railBlocks`). Outer rows of a bridge 3+ wide keep only the 0.45 of the cell towards the deck, and the end posts on land block the same way, so routes use the middle lane.
 
 ## Clouds and sky
 - White rows 18-19, grey underside rows 21-22 (+3), shadow rows 24-25 (+6), cols 1-7. Solid sky 18.1.
-- Low clouds go over the sea and under the land. High clouds go over everything, with a soft shadow on the ground.
-- Past the map edge the world ends in sky, hidden by a bank of cloud along the edge. Keep high clouds sparse so they never hide play.
+- All clouds are high: over everything, with a soft shadow below. Nothing cloud-like goes under land. Keep them sparse so they never hide play.
+- The sea repeat runs on past the map edge: no sky, no edge line.
 
 ## Buildings, props, crops, furniture
 - Stamps are cut from room rects in `STAMPS` in art-sunny.py and keep only the largest connected blob, because rects catch neighbours. Add a name to `LOOSE` when the stamp has several pieces on purpose.
 - Tile rects are easy to misread on a labelled sheet: column = first + (x - 24) / cell width. Check the output on a review sheet.
 - Anchor: bottom centre at the foot (`stand`). Draw with people, sorted by foot z. Solid area comes from `footprint`: half width, depth about half the height plus 0.6.
-- Crops: pack art 0 is the seed, 1-4 grow, 5 is the harvested item. Farm stages 0-3 map to 1, 2, 3, 4. Farm ground is the light dirt family (`m.soil`), fill 7.1. Wheat comes from the GameMaker sprites. Tomato uses radish art.
+- Crops: pack art 0 is the seed, 1-4 grow, 5 is the harvested item. Farm stages 0-3 map to 1, 2, 3, 4. Farm ground is one plain block of the light dirt family (`m.soil`), fill 7.1, with no flowers or decor: slots side by side, a walkable row between. Wheat comes from the GameMaker sprites. Tomato uses radish art.
 - Furniture: rows 33-37 of the tileset, listed in `FURNITURE`. Big rug is at 35.40, table at 35.50.
 
 ### Ground dressing (2026-11-01)
@@ -93,7 +94,7 @@ The ends lie one tile up on the land.
 - No new bitmap exports were made in this pass: `python` is unavailable in the sandbox shell, so the requested art-sunny.py / art-interior.py export part was stopped. All dressing uses already-exported native pack assets.
 
 ## Interiors
-The player's house is BuiltDemo/Interior.gif at 1x, indoors and out: `python scripts/art-interior.py` (after art-sunny.py) writes home-roof.png and home-open.png, cut to the house. The overworld keeps drawing around it while you are inside (`drawAround`) and the roof fades out over 0.7 s, in place. Where feet can go is game/house.ts, in pixels of that picture: change it together with the art.
+The player's house is BuiltDemo/Interior.gif at 1x, indoors and out: `python scripts/art-interior.py` (after art-sunny.py) writes home-roof.png and home-open.png, cut to the house. The demo's bush, stools and pots are planked over in art-interior.py (`PLANK`, `STRIP`), keeping the picture's size. The overworld keeps drawing around it while you are inside (`drawAround`) and the roof fades out over 0.7 s, in place. Where feet can go is game/house.ts, in pixels of that picture: change it together with the art.
 
 ## Chimney smoke
 The smoke's mouth is per house: `CHIMNEY` in overworld.ts, pixels from the stamp's top left. A house with no chimney on its stamp has no smoke.

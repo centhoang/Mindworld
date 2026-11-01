@@ -29,7 +29,7 @@ const SOIL_FILL = tile(7, 1);
 const SAND = tile(1, 5);
 const SAND_ACCENT = [tile(1, 7), tile(1, 8), tile(1, 9)];
 const SAND_EDGE = tile(5, 20); // the wet end of a beach, foam and all
-const SAND_END = tile(5, 19); // the beach tapers out at its east end; mirrored at its west end
+const SAND_END = tile(5, 19); // a beach's east end; mirrored at its west end
 const BEACH_RUN = 6; // straight south coast this long may be a beach
 const ROAD: Record<EdgeName, number> = {
   nw: tile(7, 19), n: tile(7, 15), ne: tile(8, 15), w: tile(7, 17), e: tile(8, 14), sw: tile(8, 17), s: tile(8, 16), se: tile(8, 18),
@@ -108,8 +108,9 @@ export function buildTerrain(m: TileMap): Terrain {
       while (straight(b + 1)) b++;
       const beach = straight(i) && b - a + 1 >= BEACH_RUN && hash2(a, j, 31) < 0.6;
       const sand = hash2(i, j, 32) < 0.15 ? SAND_ACCENT[Math.floor(hash2(i, j, 33) * SAND_ACCENT.length)]! : SAND;
-      const wet = i === a ? SAND_END | MIRROR : i === b ? SAND_END : SAND_EDGE;
-      const face = beach ? [CLIFF(i, j + 1), sand, wet] : !isPool(i, j + 1) ? coast : room >= 3 ? coast.slice(1) : coast.slice(2);
+      // The ends carry the corner's diagonal foam down one row, where the straight edge picks it up.
+      const shore = i === a ? [SAND_END | MIRROR] : i === b ? [SAND_END] : [sand, SAND_EDGE];
+      const face = beach ? [CLIFF(i, j + 1), sand, ...shore] : !isPool(i, j + 1) ? coast : room >= 3 ? coast.slice(1) : coast.slice(2);
       let last = j;
       face.forEach((cell, n) => {
         if (last !== j + n || !free(i, j + n + 1)) return;
