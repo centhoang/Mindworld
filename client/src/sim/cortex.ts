@@ -115,7 +115,7 @@ export class CortexUnavailable extends Error {}
 
 export class LlmCortex implements Cortex {
   // Reflect goes to Meta's Muse Spark: on the open-weights model its reasoning ran past 4000 output tokens
-  // (docs/SPIKES.md "Live eval"); Teach stays on the open-weights model, which handles it well and cheaper.
+  // (docs/archive/SPIKES.md "Live eval"); Teach stays on the open-weights model, which handles it well and cheaper.
   constructor(
     private readonly llm: LlmClient,
     private readonly provider: "baseten" | "meta" = "baseten",
@@ -127,7 +127,7 @@ export class LlmCortex implements Cortex {
   }
 
   teach(memo: Memo, instruction: string): Promise<CortexResult> {
-    // Low effort too: at full effort ~1 in 8 teach replies ran out of tokens while reasoning (docs/SPIKES.md).
+    // Low effort too: at full effort ~1 in 8 teach replies ran out of tokens while reasoning (docs/archive/SPIKES.md).
     return this.run("teach", memo, buildTeachPrompt(memo, instruction), this.provider, "low");
   }
 

@@ -1,4 +1,4 @@
-"""Convert a tuned Llama 3.2 1B on the `llama-coach` volume to MLC q4f32_1 weights for WebLLM (docs/FINETUNE.md step 7).
+"""Convert a tuned Llama 3.2 1B on the `llama-coach` volume to MLC q4f32_1 weights for WebLLM (docs/archive/FINETUNE.md step 7).
 
 The browser reuses the prebuilt Llama-3.2-1B-Instruct q4f32_1 WebGPU library, so only the weights change. The weights
 come from `mlc_q4.py` (plain NumPy; the mlc_llm wheels would not install or load). `--check` first converts Meta's stock

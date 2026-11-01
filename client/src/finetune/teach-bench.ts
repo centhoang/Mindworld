@@ -1,4 +1,4 @@
-// Teach benchmark for the local coach (docs/FINETUNE.md step 0 and step 6): every held-out lesson is taught
+// Teach benchmark for the local coach (docs/archive/FINETUNE.md step 0 and step 6): every held-out lesson is taught
 // to an untrained pet, and each memo is scored by Prove (paired held-out seeds vs the uncoached pet).
 // Usage: npx tsx src/finetune/teach-bench.ts <coach> [--label x] [--limit n] [--free] [--out file.json] [--resume file.json]
 //   --resume keeps the rows of an earlier run and re-asks only lessons the server refused (budget/rate limit).

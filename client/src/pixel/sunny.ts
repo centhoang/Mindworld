@@ -219,7 +219,7 @@ export function strip(g: Ctx, name: string, x: number, y: number, frame: number,
   } else g.drawImage(img, f * w, 0, w, img.height, Math.round(x), Math.round(y), w, img.height);
 }
 
-// A stamp's columns grouped by their lowest opaque pixel, for a shape with several feet (docs/LAYERS.md).
+// A stamp's columns grouped by their lowest opaque pixel, for a shape with several feet (docs/visual/layers.md).
 export interface FootRun { x0: number; x1: number; foot: number } // columns [x0, x1); foot = rows above the stamp's bottom
 const FOOT_STEP = 6; // px: smaller steps along a wall's base stay one foot
 const footCache = new Map<string, FootRun[]>();

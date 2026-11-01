@@ -1,6 +1,6 @@
 # Mindworld pixel art bible
 
-Version **2.0** · 2026-10-31 · approved output: `docs/STYLE.md`.
+Version **2.0** · 2026-10-31 · approved output: `docs/visual/style.md`.
 Replaces v1's palette and proposed pack conventions. This is an art specification;
 the current renderer and its v1 colors have not been migrated.
 

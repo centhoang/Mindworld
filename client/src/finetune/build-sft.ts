@@ -1,4 +1,4 @@
-// SFT dataset for the local coach (docs/FINETUNE.md steps 3-4): chat examples in the exact prompts the game sends.
+// SFT dataset for the local coach (docs/archive/FINETUNE.md steps 3-4): chat examples in the exact prompts the game sends.
 //   teach: teacher rows that are valid, pass the train-seed gate, and fit MEMO_JSON_SCHEMA (what grammar-constrained
 //          decoding can emit) -> system/user from buildTeachPrompt, assistant = the memo as compact JSON.
 //   voice: observations from simulated fights under random teacher memos -> buildVoicePrompt, assistant =

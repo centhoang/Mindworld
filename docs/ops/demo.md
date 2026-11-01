@@ -1,7 +1,7 @@
 # Demo video + submission text: Mindworld v3 (DRAFT 2026-10-31, for the user's review)
 
 Claude drafts, the user records and submits. Track: **Build for Your World**. 3 minutes max, about 380 spoken words.
-Numbers come from `docs/SPIKES.md` / `docs/FINETUNE.md`; re-check them before recording. Lines marked **[USER]** need your
+Numbers come from `docs/archive/SPIKES.md` / `docs/archive/FINETUNE.md`; re-check them before recording. Lines marked **[USER]** need your
 words or your OK. Rewritten 2026-10-31: the villagers are the star; the birthday promise is the core shot, Teach gets one beat.
 
 Setup: record https://pets.uryto.dev at 1x, 1080p. Two windows side by side: **A** (normal profile, the "laptop
@@ -96,5 +96,5 @@ distillation of Muse Spark Open into Llama 3.2 with a held-out bench.
 - [ ] **[USER]** Confirm the opening line and write the firsthand motivation in your own words.
 - [ ] Remove the access gate (user's call) and test both windows on the deployed site.
 - [ ] Check that a picnic hill is next to A's ground today (in-between grounds are rolled per room and day).
-- [ ] Re-check the numbers (`docs/SPIKES.md`) and the inspector labels on camera.
+- [ ] Re-check the numbers (`docs/archive/SPIKES.md`) and the inspector labels on camera.
 - [ ] Repo public + HF coach repos public (user's call, default Nov 3); README quick start works for a stranger.

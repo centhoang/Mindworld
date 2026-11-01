@@ -1,4 +1,4 @@
-// Teacher data for the village minds (docs/FINETUNE.md "Stage 5"): seeded scenarios for the five mind decisions
+// Teacher data for the village minds (docs/archive/FINETUNE.md "Stage 5"): seeded scenarios for the five mind decisions
 // (plan, choose, line, emote, reflect), each prompt built by the game's own builders in mind/brain.ts, answered by
 // Muse Spark Open on Modal through the capped ModalClient (ledger kind "village"), and kept only if the answer
 // passes the same check the game applies (the grammar's option sets, parseLine, word limits). Each kept row holds

@@ -64,7 +64,7 @@ def require(condition, message):
 
 
 def load_palette():
-    style = (ROOT / "docs/STYLE.md").read_text(encoding="utf-8")
+    style = (ROOT / "docs/visual/style.md").read_text(encoding="utf-8")
     block = style.split("<!-- moodboard:palette:start -->", 1)[1]
     block = block.split("<!-- moodboard:palette:end -->", 1)[0]
     palette = {rgba(color)[:3] for color in re.findall(r"#[0-9A-Fa-f]{6}", block)}

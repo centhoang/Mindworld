@@ -1,4 +1,4 @@
-// Voice benchmark for the local coach (docs/FINETUNE.md acceptance: 100% valid with grammar, >= 98% without,
+// Voice benchmark for the local coach (docs/archive/FINETUNE.md acceptance: 100% valid with grammar, >= 98% without,
 // line <= 8 words). Observations come from simulated fights under val teacher memos (or none), on seeds the
 // training set never used; each prompt goes to a llama-server (NativeVoice).
 // Usage: npx tsx src/finetune/voice-bench.ts <llama-server url> [--free] [--n 200] [--label x]

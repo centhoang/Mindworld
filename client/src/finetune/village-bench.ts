@@ -1,4 +1,4 @@
-// Village-mind benchmark (docs/FINETUNE.md stage 5): the held-out village scenarios (seed 2, never trained on) go to a
+// Village-mind benchmark (docs/archive/FINETUNE.md stage 5): the held-out village scenarios (seed 2, never trained on) go to a
 // llama-server exactly as the game builds them, without grammar, and each answer is scored by the game's own check
 // (gen-village `validate`). Free: it only talks to a local llama-server.
 // Usage: npx tsx src/finetune/village-bench.ts <llama-server url> [--n 200] [--label x] [--out file.json]

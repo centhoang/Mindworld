@@ -396,7 +396,7 @@ def build():
 
 
 def palette():
-    text = (ROOT / "docs/STYLE.md").read_text(encoding="utf-8")
+    text = (ROOT / "docs/visual/style.md").read_text(encoding="utf-8")
     marked = text.split("<!-- moodboard:palette:start -->", 1)[1].split(
         "<!-- moodboard:palette:end -->", 1)[0]
     colors = {rgba(value)[:3] for value in re.findall(r"#[0-9A-Fa-f]{6}", marked)}

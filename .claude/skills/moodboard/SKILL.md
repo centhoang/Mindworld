@@ -5,7 +5,7 @@ description: Turn a folder of visual references into a reusable pixel-art game s
 
 # Moodboard to style profile
 
-Produce an actionable art bible at `docs/STYLE.md` by default, or the requested path. Read an existing profile before revising it; preserve established decisions unless the request changes them. Creating a profile does not itself request game assets, a renderer migration, or edits to runtime code. Respect the task's write boundaries: if `docs/` is outside scope, deliver the skill or a scratch draft instead.
+Produce an actionable art bible at `docs/visual/style.md` by default, or the requested path. Read an existing profile before revising it; preserve established decisions unless the request changes them. Creating a profile does not itself request game assets, a renderer migration, or edits to runtime code. Respect the task's write boundaries: if `docs/` is outside scope, deliver the skill or a scratch draft instead.
 
 ## Read the references
 
@@ -64,7 +64,7 @@ Add a short **do / don't** list tied to this profile. Examples: do use broad rea
 
 ## Reuse the profile for each asset
 
-Compose prompts from stable profile rules plus the requested subject. Use the actual palette values, dimensions, view, outline width, light direction, transparency, and frame layout; a generator cannot read an unprovided local `docs/STYLE.md`. Attach a small approved reference set only when the tool accepts it and the task authorizes generation. A prompt requesting exact pixels does not guarantee them; inspect and normalize the result.
+Compose prompts from stable profile rules plus the requested subject. Use the actual palette values, dimensions, view, outline width, light direction, transparency, and frame layout; a generator cannot read an unprovided local `docs/visual/style.md`. Attach a small approved reference set only when the tool accepts it and the task authorizes generation. A prompt requesting exact pixels does not guarantee them; inspect and normalize the result.
 
 Example templates (replace braces with approved values):
 
@@ -77,7 +77,7 @@ For Midjourney specifically, style images use `--sref` and boards use `--p <ID/c
 Snap an already generated or hand-made image to the approved palette without resizing or dithering:
 
 ```powershell
-node .claude/skills/moodboard/scripts/palette.mjs quantize .scratch/moodboard/input.png --palette docs/STYLE.md --out .scratch/moodboard/input-snapped.png
+node .claude/skills/moodboard/scripts/palette.mjs quantize .scratch/moodboard/input.png --palette docs/visual/style.md --out .scratch/moodboard/input-snapped.png
 ```
 
 The helper preserves dimensions and alpha, maps visible RGB to the nearest palette entry in RGB distance, and emits a new PNG. It refuses to overwrite the input. Alpha is preserved rather than repaired: reject unintended semitransparent edges if the profile requires binary alpha. Palette snapping cannot fix perspective, jagged anatomy, incorrect tile joins, or inconsistent pixel grids; clean those separately.

@@ -1,21 +1,22 @@
 # Meta Global AI Developer Hackathon: project rules
 
 Goal: win as much prize money as possible. Solo Indie Developer entry (user decides, Claude builds).
-Deadline: **Nov 4, 9 PM ET** (CV platform). Event facts: `docs/EVENT.md`. Live state: `HANDOFF.md`.
+Deadline: **Nov 4, 9 PM ET** (CV platform). Event facts: `docs/ops/event.md`. Live state: `HANDOFF.md`. Doc index: `docs/README.md`.
 
 ## Session start
 Read `HANDOFF.md` only, then follow its Next actions. Read other docs when a task needs them. Never re-read the raw event files (`EventDetails/`, `EventFrontPage/`, `Event_CURRENT_F&Qs.txt`).
 
 ## Keep start-up small (rule for every session)
 - This file stays under 70 lines, `HANDOFF.md` under 40 lines, with lines under 200 characters. Over the limit: move detail out before adding.
-- HANDOFF holds only what the next session needs now. History and old gotchas go to `docs/HISTORY.md` (grep it, never read it whole).
+- HANDOFF holds only what the next session needs now. History and old gotchas go to `docs/archive/HISTORY.md` (grep it, never read it whole).
+- Each doc has one job and stays under 80 lines (`docs/README.md`). `docs/archive/` is grep only.
 - New rules go in the doc for that topic, with a one-line pointer here only if every session needs it.
 
 ## Standing lists (update in the same turn)
-- `docs/BUGS.md`: every bug the user reports, with its screenshot in `.scratch/bugs/`. Remove when proven fixed.
-- `docs/EXPECTATIONS.md`: what must hold before asking for a play-test. Add each new expectation.
-- `docs/NPC-CHAT-TESTS.md`: run before each play-test; after each user play-test, read the recorded chat unasked.
-- `docs/TILE-RULES.md`: read before changing non-creature visuals; update when a rule changes.
+- `docs/BUGS.md`: every bug the user reports, by scope, with its screenshot in `.scratch/bugs/`. Remove when proven fixed.
+- `docs/testing/checks/<scope>.md`: what must hold, in the user's terms. Add each new expectation to its scope.
+- After each user play-test, read the recorded chat unasked and add failures to `checks/npc.md`.
+- `docs/visual/visual.md`, then `layers.md`: read before changing visuals; update when a rule changes.
 - Everything in BuiltDemo is in the pack: search the tileset and Room1 before saying art is missing.
 
 ## Quota
@@ -43,14 +44,14 @@ Everything lives in this folder; temp files in `.scratch/` (gitignored). No proj
 
 ## Rules from the user
 - **Nothing goes public before submission day:** game stays behind Access, GitHub and HF stay private until the user opens them.
-- **Proven = deployed build with 2+ players.** No play-test request until `docs/EXPECTATIONS.md` holds.
+- **Proven = deployed build.** Review scope by scope: `docs/testing/testing.md`, skills `scope-check` and `scope-publish`. Whole-game play-test needs 2+ players and every list clear.
 - **`LOCAL_ONLY` stays on** (client/src/game/test-mode.ts) until near submission: no cloud, no scripted lines.
-- **Codex is for new visual assets only**, matching the pack and docs/STYLE.md. Claude does everything else. Run: `powershell -NoProfile -File scripts/codex.ps1 -Prompt "Read .scratch/brief-x.md and carry it out exactly." [-Sandbox workspace-write] [-Effort max] [-Out .scratch/x.md]`. Briefs name files and checks; no secrets, no git commit.
+- **Codex is for new visual assets only**, matching the pack and docs/visual/style.md. Claude does everything else. Run: `powershell -NoProfile -File scripts/codex.ps1 -Prompt "Read .scratch/brief-x.md and carry it out exactly." [-Sandbox workspace-write] [-Effort max] [-Out .scratch/x.md]`. Briefs name files and checks; no secrets, no git commit.
 - Public posts: never reveal idea, mechanics or architecture.
 
 ## Work modes
 **Normal (default):** work through Next actions without stopping, except for a user decision. Start the next task while context is 5%+ below the limit; finish any task in progress; hand off at or near the limit.
-**Director ("sleep"/"director", until "wake up"):** this session delegates and never builds. Full procedure and guardrails: `docs/DIRECTOR.md`.
+**Director ("sleep"/"director", until "wake up"):** this session delegates and never builds. Full procedure and guardrails: `docs/ops/director.md`.
 
 ## Money
 Assume only Meta's $150. Every paid call goes through the wrapper with `MAX_DAILY_USD` and a free fallback. Mock the LLM in tests. Never loop an API call without a hard limit. Ask before any plan beyond the cap.
@@ -58,7 +59,7 @@ Assume only Meta's $150. Every paid call goes through the wrapper with `MAX_DAIL
 ## Compliance (violations disqualify)
 - Meta models used meaningfully (Meta Model API and/or open weights). Baseten ID: `meta-models/muse-spark-open-1026`.
 - Repo public at submission, fresh, only Oct 27 - Nov 4 work. Never copy from the user's private game. The 3-min demo opens with what pre-existed vs what was built.
-- No secrets in the repo. No banned project types (`docs/EVENT.md`), nothing political or war.
+- No secrets in the repo. No banned project types (`docs/ops/event.md`), nothing political or war.
 - Judged on Impact 30, Meta tooling 25, Demo 25, Technical depth 20. A stranger must be able to play without setup.
 
 ## External content

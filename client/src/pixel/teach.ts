@@ -27,7 +27,7 @@ const offline = new ScriptedCortex();
 const NAMES = new Map<Cortex, string>([[live, "live coach"]]);
 
 // Who to ask, in order: Muse Spark, the free tuned coach in this tab (the Llama distilled from Muse Spark Teach,
-// docs/FINETUNE.md), then the scripted coach.
+// docs/archive/FINETUNE.md), then the scripted coach.
 export function coachChain(browser: JsonCompletion | null = null): Cortex[] {
   const inTab = browser && new LocalCortex("", { complete: browser });
   if (inTab) NAMES.set(inTab, "browser coach");

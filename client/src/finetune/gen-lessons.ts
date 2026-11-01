@@ -1,4 +1,4 @@
-// Training lessons for the local coach (docs/FINETUNE.md step 1): short coaching phrases a player might type.
+// Training lessons for the local coach (docs/archive/FINETUNE.md step 1): short coaching phrases a player might type.
 // Two sources, merged and split into train/val (val = 300, never trained on):
 //   template: seeded phrase templates over the memo DSL (precise rules, two conditions, multi-part lessons,
 //             negations, feedback, vague advice, off-topic), then player noise (lowercase, slang, typos);

@@ -1,4 +1,4 @@
-// Direct client for Muse Spark Open on Modal's shared endpoint, for offline data generation only (docs/FINETUNE.md
+// Direct client for Muse Spark Open on Modal's shared endpoint, for offline data generation only (docs/archive/FINETUNE.md
 // steps 1-2). It skips the Worker, so it keeps its own guards: every call is appended to a JSONL ledger, a call is
 // refused before it is sent if the worst case would pass the cap for its kind, and a run has a hard call limit.
 // It implements LlmClient, so the teacher goes through the exact LlmCortex code path the game uses.

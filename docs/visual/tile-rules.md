@@ -1,6 +1,6 @@
 # Tile rules (living document)
 
-Covers every visual asset that is not a creature or an animated character: terrain, water, bridges, clouds, buildings, props, crops, furniture, interiors. Read this before touching world visuals, and update it when a rule is added, corrected or found wrong. Humans and pets are not covered here (docs/STYLE.md).
+Covers every visual asset that is not a creature or an animated character: terrain, water, bridges, clouds, buildings, props, crops, furniture, interiors. Read this before touching world visuals, and update it when a rule is added, corrected or found wrong. Humans and pets are not covered here (docs/visual/style.md).
 
 Target look: `VisualAssetPack/BuiltDemo` and the pack's `Sunnyside_World_ExampleScene.png`.
 
@@ -8,7 +8,7 @@ Target look: `VisualAssetPack/BuiltDemo` and the pack's `Sunnyside_World_Example
 - Source of truth: the pack's GameMaker room `Sunnyside_World_Gamemaker/rooms/Room1/Room1.yy`, 86 x 48 tiles of 16 px. It holds the real layers, so read a rule off it instead of guessing.
 - Layers, bottom to top: sea, clouds_02, land, paths, shadows, decoration_01, forest (32 px tiles), Assets_2, building, walls, decoration_02, decoration_03, Assets_1, cloud_shadow, clouds_01.
 - Export: `python scripts/art-sunny.py` writes client/public/art/sunny (tiles.png, stamps, strips, sunny.json, interior.png). The pack stays gitignored; never hand-edit the output.
-- Draw order: `docs/LAYERS.md`.
+- Draw order: `docs/visual/layers.md`.
 - Rules in code: `client/src/pixel/sunny-terrain.ts` (pure tile choice), `client/src/pixel/sunny.ts` (drawing).
 - Decoding: tile id = row * 64 + col in the 16 px sheet. Room values: bit 28 mirror, bit 29 flip, bit 30 rotate, bit 31 empty. Mask the id with 0x7ffff. The `sea` layer is uncompressed (`TileSerialiseData`); the others are run-length encoded.
 - Notation below: `r.c` = row.col, `m` = mirrored, `F` = flipped.
@@ -100,7 +100,7 @@ The player's house is BuiltDemo/Interior.gif at 1x, indoors and out: `python scr
 The smoke's mouth is per house: `CHIMNEY` in overworld.ts, pixels from the stamp's top left. A house with no chimney on its stamp has no smoke.
 
 ## Rules for changes
-- Use pack pixels. Make new art only for real gaps, and only by the rules in docs/STYLE.md.
+- Use pack pixels. Make new art only for real gaps, and only by the rules in docs/visual/style.md.
 - Do not recolour tiles with palette swaps: they gave broken checker grass. Seasonal looks need real art.
 - After a visual change, compare a daytime shot with BuiltDemo (`__px.world.alwaysDay = true`).
 - One art pixel is always a whole number of screen pixels (`lowSize` in main.ts). Never scale the picture by a fraction.

@@ -136,7 +136,7 @@ function inspect(im,row,rule,palette) {
 
 try {
   assert(process.argv.length===3,'usage: node scripts/check-art.mjs <manifest.json>');
-  const style=await readFile(path.join(ROOT,'docs/STYLE.md'),'utf8');
+  const style=await readFile(path.join(ROOT,'docs/visual/style.md'),'utf8');
   const block=style.split('<!-- moodboard:palette:start -->')[1]?.split('<!-- moodboard:palette:end -->')[0];
   assert(block,'STYLE.md palette block missing');const palette=new Set(block.match(/#[0-9a-fA-F]{6}/g)?.map(c=>c.toUpperCase()));
   assert(palette.size,'STYLE.md palette empty');

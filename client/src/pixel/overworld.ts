@@ -420,7 +420,7 @@ export class Overworld {
     }
   }
 
-  // A house with its chimney smoke. Each stretch of wall sorts on its own foot (docs/LAYERS.md).
+  // A house with its chimney smoke. Each stretch of wall sorts on its own foot (docs/visual/layers.md).
   private pushHouse(items: { z: number; draw: () => void }[], g: CanvasRenderingContext2D, art: string, z: number, x: number, y: number, t: number): void {
     for (const r of footRuns(art)) items.push({ z: z - r.foot / TILE, draw: () => standRun(g, art, r, x, y) });
     const top = CHIMNEY[art];
@@ -1158,7 +1158,7 @@ export class Overworld {
       const [sx, sy] = toScreen(d.x, d.z);
       if (sx < -40 || sy < -40 || sx > sw + 40 || sy > sh + 40) continue;
       if (d.kind === "fence-v") {
-        // One item per tile, so people passing along it sort with each post (docs/LAYERS.md).
+        // One item per tile, so people passing along it sort with each post (docs/visual/layers.md).
         d.tiles.forEach((k, n) => {
           const [ti, tj] = [m.ox + (k % m.w), m.oz + Math.floor(k / m.w)];
           const [fx, fy] = toScreen(ti, tj);

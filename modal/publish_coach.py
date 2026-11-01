@@ -1,4 +1,4 @@
-"""Publish the tuned coach from the `llama-coach` Modal volume to Hugging Face (docs/FINETUNE.md step 7).
+"""Publish the tuned coach from the `llama-coach` Modal volume to Hugging Face (docs/archive/FINETUNE.md step 7).
 
   gguf: <user>/Llama-3.2-{3B,1B}-PetMind-Coach-GGUF   (Q4_K_M, for llama-server / power mode)
   mlc:  <user>/Llama-3.2-1B-PetMind-Coach-q4f{32,16}_1-MLC (WebLLM in the browser; reuses the prebuilt

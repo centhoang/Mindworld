@@ -1,4 +1,4 @@
-// Teacher data for the local coach (docs/FINETUNE.md step 2): every training lesson is taught by Muse Spark Open
+// Teacher data for the local coach (docs/archive/FINETUNE.md step 2): every training lesson is taught by Muse Spark Open
 // on Modal through the same LlmCortex code path as the game. Each row keeps the validated memo and its score on
 // the 40 train seeds against the memo it started from (the Reflect gate: delta >= 0). Rejection sampling happens
 // later, at training time, from these rows; held-out seeds are never touched here.

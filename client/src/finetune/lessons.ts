@@ -1,4 +1,4 @@
-// Held-out coaching lessons for the local-coach fine-tune (docs/FINETUNE.md). These are never trained on:
+// Held-out coaching lessons for the local-coach fine-tune (docs/archive/FINETUNE.md). These are never trained on:
 // the generator for training lessons (step 1) must drop any lesson that matches one of these.
 // Written by hand to cover what players actually type: precise rules, vague advice, slang, typos,
 // per-enemy tips, HP thresholds, and a few that conflict with good play.

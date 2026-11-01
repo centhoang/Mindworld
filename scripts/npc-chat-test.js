@@ -1,4 +1,4 @@
-// docs/NPC-CHAT-TESTS.md on the real model. Each dialogue is a fresh talk: [npc, opening line by the villager or "", ...player lines].
+// docs/testing/checks/npc.md on the real model. Each dialogue is a fresh talk: [npc, opening line by the villager or "", ...player lines].
 (() => { const w=__px.world,n=w.npcs; window.__c={done:false,rows:[]};
  const ask=async(npc,line)=>{const t=performance.now();let r;try{r=await n.reply(npc,'Kai',line)}catch(e){r={text:'ERR '+e}};window.__c.rows.push([npc,line,r?.text??null,r?.source??'',Math.round(performance.now()-t)])};
  const talk=async(npc,open,...lines)=>{window.__c.rows.push(['--',npc,open]);if(open)n.noteOffer(npc,n.hub.minds.get(npc),'Kai',open);for(const l of lines)await ask(npc,l)};

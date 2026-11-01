@@ -1044,7 +1044,7 @@ function update(dt: number, t: number): void {
   presenter.present(low, crt ? 1 : 0, lowScale);
 }
 
-// Tiles, props, frame and font PNGs (docs/STYLE.md) load before the first frame, and the setup gate runs first.
+// Tiles, props, frame and font PNGs (docs/visual/style.md) load before the first frame, and the setup gate runs first.
 const setup = runSetup({
   load: (progress) => webBrain.load(progress),
   ready: () => (instinct.voice = webBrain),

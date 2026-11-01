@@ -1,6 +1,6 @@
 # Layer rule (bug 23)
 
-One fixed draw order, read off Room1 (`docs/TILE-RULES.md`). Every visual change is held to it. A thing belongs to exactly one band.
+One fixed draw order, read off Room1 (`docs/visual/tile-rules.md`). Every visual change is held to it. A thing belongs to exactly one band.
 
 ## Bands, bottom to top
 | # | Band | What | Sort |

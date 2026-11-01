@@ -1,4 +1,4 @@
-"""LoRA fine-tune of Meta Llama 3.2 Instruct (1B or 3B) into the game's free local coach, on Modal (docs/FINETUNE.md step 4).
+"""LoRA fine-tune of Meta Llama 3.2 Instruct (1B or 3B) into the game's free local coach, on Modal (docs/archive/FINETUNE.md step 4).
 
 Data: data/finetune/sft-{train,val}.jsonl from client/src/finetune/build-sft.ts (Teach memos distilled from
 Muse Spark Open + pet voice lines), in the exact prompts the game sends. Loss is on the assistant reply only.

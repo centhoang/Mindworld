@@ -1,4 +1,4 @@
-// Geographic Use Policy: we must not serve end users in the Restricted Territories (docs/EVENT.md).
+// Geographic Use Policy: we must not serve end users in the Restricted Territories (docs/ops/event.md).
 const RESTRICTED_COUNTRIES = new Set([
   "AF", "BY", "KH", "CN", "HK", "MO", "CU", "ER", "ET", "HT", "IR",
   "IQ", "LY", "MM", "NI", "KP", "PK", "RU", "SO", "SY", "VE", "EH",

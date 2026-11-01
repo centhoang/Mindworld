@@ -149,7 +149,7 @@ export function tunedRecord<T extends { model: string; model_id: string }>(list:
 const tunedRepo = (): string => (import.meta.env.DEV && new URLSearchParams(location.search).get("tuned")) || (TUNED_1B.repo.startsWith("/") ? location.origin + TUNED_1B.repo : TUNED_1B.repo);
 
 // One prefill dispatch of about 190+ tokens crashes the GPU process on a GTX 1050, with mlc-ai's stock weights too
-// (docs/FINETUNE.md), and WebLLM ignores a prefill_chunk_size override. Long prompts survive when set on the pipeline.
+// (docs/archive/FINETUNE.md), and WebLLM ignores a prefill_chunk_size override. Long prompts survive when set on the pipeline.
 export const PREFILL_CHUNK = 128;
 const WARM_TOKENS = 300;
 export function limitPrefill(engine: unknown): void {

@@ -12,7 +12,7 @@ export interface GpuInfo {
   fallback: boolean; // a software adapter
 }
 
-// From real results: a GTX 1050 runs the model, Intel Gen 9 crashes on it (docs/FINETUNE.md). Newer Intel gets a try;
+// From real results: a GTX 1050 runs the model, Intel Gen 9 crashes on it (docs/archive/FINETUNE.md). Newer Intel gets a try;
 // the warm-up prompt decides.
 const WEAK_INTEL = /^gen-[0-9]$/;
 export function gpuVerdict(info: GpuInfo | null, mobile = false): GpuVerdict {

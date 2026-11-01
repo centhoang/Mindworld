@@ -1,4 +1,4 @@
-"""Independent audit of the published MLC weights (docs/FINETUNE.md stage 5): downloads them back from Hugging Face.
+"""Independent audit of the published MLC weights (docs/archive/FINETUNE.md stage 5): downloads them back from Hugging Face.
 
 1. Files: every shard's md5 matches tensor-cache.json; tokenizer and chat config match mlc-ai's; prompts tokenize alike.
 2. Weights: 4-bit values and scales are decoded back to float and compared with the tuned merged weights (reconstruction
