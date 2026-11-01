@@ -89,3 +89,5 @@ Only 140/300 outputs match the GGUF exactly: 4-bit MLC weights differ. The 5 ext
 
 ## Compliance notes
 - Llama 3.2 community license: derived model names must start with "Llama" and the README must say "Built with Llama"; keep the license file. Repo contains only code written this week (generators, Modal scripts, eval); weights live on Hugging Face, not in the repo; no secrets.
+
+**3B in the browser (2026-11-01), GTX 1050 4 GB, stock `Llama-3.2-3B-Instruct-q4f32_1-MLC` (prebuilt in WebLLM, no conversion needed):** 1.82 GB download, 2.95 GB VRAM, load 59 s, warm 8 s, prefill capped at 128 ran fine. Decode 2.7 tok/s (the 1B does about 12), prefill 20-32 tok/s. 48 tokens out: 21 s at 66 prompt tokens, 30 s at 330, 41 s at 730. Runs, but a reply takes 4x longer than the 1B on this GPU. Training run: `llama32-3b-n4-e2-r16`.

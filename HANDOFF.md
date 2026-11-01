@@ -18,7 +18,7 @@
 - Chat log is development only: remove `/api/chatlog`, the client call and the KV rows before submission.
 
 ## Next actions
-1. 3B: convert the base model, prove it runs in the 1050 browser, report size and speed, then train on Modal.
+1. 3B: runs on the 1050 at 2.7 tok/s (docs/FINETUNE.md end). Run `llama32-3b-n4-e2-r16` started on Modal: check it, convert, bench reply quality.
 2. Prove with 2 players, run the chat tests and check EXPECTATIONS before asking for a play-test.
 3. After any play-test, read the chat log (below), add failures to BUGS and NPC-CHAT-TESTS.
 
