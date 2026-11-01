@@ -21,7 +21,8 @@ const GRASS: Record<EdgeName, number> = {
   nw: tile(3, 8), n: tile(3, 4), ne: tile(4, 4), w: tile(3, 6), e: tile(4, 3), sw: tile(4, 6), s: tile(4, 5), se: tile(4, 7),
   inNw: tile(3, 2), inNe: tile(3, 3), inSw: tile(3, 5), inSe: tile(4, 1),
 };
-const GRASS_FILL = tile(3, 1);
+// One visible square of ground is one tile: the pack's 3.1 is an 8 px checker, four squares to a tile. 1.1 and 1.2 are its two greens, flat.
+const grassFill = (i: number, j: number) => tile(1, 1 + ((i + j) & 1));
 const ACCENT = [tile(2, 1), tile(2, 2), tile(2, 3), tile(2, 5), tile(2, 6)];
 const ROAD: Record<EdgeName, number> = {
   nw: tile(7, 19), n: tile(7, 15), ne: tile(8, 15), w: tile(7, 17), e: tile(8, 14), sw: tile(8, 17), s: tile(8, 16), se: tile(8, 18),
@@ -70,14 +71,14 @@ export function buildTerrain(m: TileMap): Terrain {
       if (!dry(i, j)) continue;
       const edge = edgeOf(dry, i, j);
       if (edge) out.land[k] = GRASS[edge];
-      else out.land[k] = hash2(i, j, 21) < 0.07 ? ACCENT[Math.floor(hash2(i, j, 22) * ACCENT.length)]! : GRASS_FILL;
+      else out.land[k] = hash2(i, j, 21) < 0.07 ? ACCENT[Math.floor(hash2(i, j, 22) * ACCENT.length)]! : grassFill(i + m.ox, j + m.oz);
       if (isRoad(i, j)) {
         const e = edgeOf(isRoad, i, j);
         out.road[k] = e ? ROAD[e] : ROAD_FILL[Math.floor(hash2(i, j, 23) * ROAD_FILL.length)]!;
       }
       if (at(i, j) === T.ledge) {
         // Terrace walls sit on the road layer, over plain grass: the lip of the top, or the cliff below it.
-        out.land[k] = GRASS_FILL;
+        out.land[k] = grassFill(i + m.ox, j + m.oz);
         // Corner cliff tiles carry sea and foam, so a terrace face is plain cliff from end to end.
         out.road[k] = high(i, j) ? GRASS[edgeOf(high, i, j) ?? "n"] : CLIFF(i, j);
       }
@@ -136,6 +137,17 @@ function railMask(m: TileMap): Uint8Array {
     }
   railMasks.set(m, mask);
   return mask;
+}
+
+// An outer corner tile shows land on one side of its diagonal only; the sea side is not ground.
+export function cornerBlocks(m: TileMap, x: number, z: number): boolean {
+  const [fx, fz] = [x - m.ox, z - m.oz];
+  const [i, j] = [Math.floor(fx), Math.floor(fz)];
+  const dry = (a: number, b: number) => a >= 0 && b >= 0 && a < m.w && b < m.h && m.kind[b * m.w + a] !== T.water && m.kind[b * m.w + a] !== T.bridge && m.kind[b * m.w + a] !== T.pool;
+  if (!dry(i, j)) return false;
+  const [u, v] = [fx - i, fz - j];
+  const [n, s, w, e] = [dry(i, j - 1), dry(i, j + 1), dry(i - 1, j), dry(i + 1, j)];
+  return (!n && !w && u + v < 0.75) || (!n && !e && 1 - u + v < 0.75) || (!s && !w && u + 1 - v < 0.75) || (!s && !e && 2 - u - v < 0.75);
 }
 
 export function railBlocks(m: TileMap, x: number, z: number): boolean {

@@ -9,8 +9,8 @@ export interface Place {
   doing?: string; // people only: "fishes"
 }
 
-const ASKS_WAY = /\b(where|wheres|which way|how (do|can|would) (i|we) (get|find|reach)|how far|find|way to|show me|take me)\b/i;
-const POINTS_BACK = /\b(it|that|there|this place|that place)\b/i;
+const ASKS_WAY = /\b(where|wheres|which way|how (do|can|would) (i|we) (get|find|reach)|how far|is it far|find|way to|show me|take me)\b/i;
+const POINTS_BACK = /\b(it|that|there|this place|that place)\b|^\s*where\s*[?!.]*\s*$/i;
 const ASKS_DOING = /\bwhat(?:'?s| are| r| is)? (?:you|u|up|going on)\b.*\b(doing|up to|up)\b|\bwhat(?:'?re| are) (?:you|u) (?:doing|up to)\b|\bbusy\b/i;
 
 const named = (line: string, words: readonly string[]) => words.some((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(line));
@@ -62,3 +62,15 @@ export function doingAnswer(line: string, label: string | null | undefined, walk
   if (!label) return "Not much. Enjoying the day.";
   return walking ? `Off to ${firstPerson(label)}.` : `Right now? I ${firstPerson(label)}.`;
 }
+
+// What the talk itself already holds: the time, who is speaking, what was just said.
+export function talkAnswer(line: string, player: string, last: string | undefined, time: string): string | null {
+  if (/\bwhat(?:'?s| is)? (?:the )?time\b|\bwhat time\b/i.test(line)) return `About ${time}.`;
+  if (/\bwhat(?:'?s| is) my name\b|\bwho am i\b|\bdo you know my name\b/i.test(line)) return `You are ${player}.`;
+  if (/\bwhat did i (?:just |last )?(?:say|ask|tell)/i.test(line)) return last ? `You said "${last}".` : "You have not said much yet.";
+  return null;
+}
+
+// "Why?" right after talking about a neighbour.
+export const whyPerson = (line: string, who: { name: string; title?: string } | undefined): string | null =>
+  who && /^\s*why\b\s*[?!.]*\s*$/i.test(line) ? `${who.name} ${who.title ? `is a good ${who.title}` : "is good company"}, and has always been decent to me.` : null;

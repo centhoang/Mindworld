@@ -16,9 +16,10 @@ import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, go
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
 import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
-import { askedPlace, directions, doingAnswer, topicOf, whoAnswer } from "./directions";
+import { askedPlace, directions, doingAnswer, talkAnswer, topicOf, whoAnswer, whyPerson } from "./directions";
 import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
 import { humanize } from "./human";
+import { answerTo, cleanReply, goodOfferedIn, offerIn } from "./offers";
 import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
 import { addCommitment, answerLine, type Invite, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
@@ -52,7 +53,8 @@ const PITCH_SELL = 0.5; // how often a saver offers its stock instead of an invi
 const PITCH_ACTS = ["soccer", "dance", "picnic", "fish"];
 const FARM_PULL = 0.5; // a villager short of coins or with a crop in the ground goes to its garden
 const FARM_COINS = 30;
-const YES = /^\s*(ok|okay|deal|yes|yep|sure|fine|agreed)\b/i;
+const OFFER_TURNS = 4; // player lines an unanswered offer stays open
+const QUIET_LINES = 4; // model lines after an invitation before the next one
 const INVITE_HINT = /\b(party|birthday|danc|soccer|football|fish|picnic|lunch)/i; // only these lines cost a model call
 
 // A pet the NPCs can see (mine, at home or following me, or an online player's). `busy` = walking or doing
@@ -92,6 +94,7 @@ export class NpcVillage {
   private readonly mems = new Map<Npc, MindMemory>(); // memories handed over (npcState) before hosting
   private myId: string | null = null;
   people: () => Person[] = () => []; // players around (me + online peers), for greetings
+  onChat: ((e: { npc: string; player: string; line: string; reply: string; source: string }) => void) | null = null; // every line said to a player, for the chat log
   private readonly greeted = new Map<string, number>(); // "npc:player" -> sim time of the greeting
   pets: () => PetSeen[] = () => []; // pets around, for a passing word
   private readonly petted = new Map<string, number>(); // "npc:pet" (and "npc" for its last pet line) -> sim time
@@ -108,7 +111,10 @@ export class NpcVillage {
   pocket: Pocket | null = null;
   private readonly offers = new Map<string, { o: Offer; price: number }>(); // "npc:player" -> the counter it made
   private readonly purses = new Map<string, string>(); // npc -> purse line the room has
-  private readonly asked = new Map<string, Invite>(); // "npc:player" -> what it invited them to
+  private readonly asked = new Map<string, { invite: Invite; turns: number }>(); // "npc:player" -> what it invited them to
+  private readonly lastSaid = new Map<string, string>(); // "npc:player" -> their previous line
+  private readonly quiet = new Map<string, number>(); // "npc:player" -> model lines before it may invite again
+  private readonly noThanks = new Map<string, number>(); // "npc:player" -> the day they said no: not asked again that day
 
   constructor(
     private readonly sched: MindScheduler,
@@ -265,12 +271,18 @@ export class NpcVillage {
       if (!this.hosting(npc)) return; // moved to another host meanwhile
       c.said.push(`${m.persona.name}: ${ans.value}`);
       m.source = ans.source;
-      const say = humanize(ans.value, m.persona);
+      const say = humanize(cleanReply(ans.value, true), m.persona);
       // A line to another player is theirs alone: their machine shows it, the host's does not.
       if (!to || to === this.me || NPCS.includes(to as Npc)) this.out.say(npc, say, other.name);
       this.out.line({ who: npc, say, to });
       const g = gameTime(this.v.t);
-      if (c.said.length <= 2) remember(m.mem, g.day, clockLabel(g.hour), `talked with ${other.name}`);
+      if (NPCS.includes(other.id as Npc)) {
+        if (c.said.length <= 2) remember(m.mem, g.day, clockLabel(g.hour), `talked with ${other.name}`);
+      } else {
+        remember(m.mem, g.day, clockLabel(g.hour), `I said to ${other.name} "${say.slice(0, 60)}"`);
+        this.noteOffer(npc, m, other.name, say);
+        this.onChat?.({ npc, player: other.name, line: "", reply: say, source: ans.source });
+      }
     } finally {
       this.busy.delete(npc);
     }
@@ -398,18 +410,29 @@ export class NpcVillage {
     const g0 = gameTime(this.v.t);
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
     if (!m || !this.hosting(npc)) return null;
-    const known = this.grounded(npc, line);
+    const key = `${npc}:${player}`;
+    const person = VILLAGERS.find((p) => p.name === this.topics.get(npc));
+    const known = talkAnswer(line, player, this.lastSaid.get(key), clockLabel(g0.hour)) ?? whyPerson(line, person && { name: person.name, title: person.job?.title }) ?? this.grounded(npc, line);
+    this.lastSaid.set(key, line);
     this.follow(npc, line);
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
     const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? known ?? this.quote(npc, line) ?? goalAnswer(line, goalOf(npc, this.purseOf(npc)), this.purseOf(npc)) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    this.ageOffer(npc, player);
     if (!this.hasModel() && !answer) return null;
     const ans = answer ? { value: answer, source: "rules" }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
     if (!ans.value) return null;
     const g = gameTime(this.v.t);
     remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);
-    const say = answer ? ans.value : humanize(ans.value, m.persona); // the sim's answers stay exact
+    const wait = this.quiet.get(key) ?? 0;
+    const say = answer ? ans.value : humanize(cleanReply(ans.value, !wait && !this.asked.has(key)), m.persona); // the sim's answers stay exact
+    this.quiet.set(key, Math.max(0, wait - 1));
+    if (!answer) {
+      if (offerIn(say, g.day, g.phase)) this.quiet.set(key, QUIET_LINES);
+      this.noteOffer(npc, m, player, say);
+    }
     if (this.hosting(npc)) this.out.line(to ? { who: npc, say, to } : { who: npc, say });
+    this.onChat?.({ npc, player, line, reply: say, source: ans.source });
     return { text: say, source: ans.source };
   }
 
@@ -516,9 +539,13 @@ export class NpcVillage {
   private async traded(npc: Npc, m: Mind, player: string, line: string, to?: string): Promise<string | null> {
     const key = `${npc}:${player}`;
     const pending = this.offers.get(key);
-    if (pending) {
+    const said = pending ? answerTo(line) : null;
+    if (pending && said) {
       this.offers.delete(key);
-      if (YES.test(line)) return this.closeDeal(npc, m, player, pending.o, pending.price);
+      if (said === "yes") return this.closeDeal(npc, m, player, pending.o, pending.price);
+      const g = gameTime(this.v.t);
+      remember(m.mem, g.day, clockLabel(g.hour), `${player} passed on my ${pending.o.good}`);
+      return said === "later" ? `Whenever you like, ${player}.` : `No harm in asking, ${player}.`;
     }
     const o = parseOffer(line);
     if (!o) return null;
@@ -765,25 +792,65 @@ export class NpcVillage {
       return true;
     }
     const act = PITCH_ACTS.find((a) => traitBias(m.persona, a) > 0 && this.env.spots[ACTIVITY.get(a)!.place]?.length);
-    if (!act || g.phase === "evening" || g.phase === "night" || dueNow(m.mem.promises, g.day, "evening").length) return false;
-    this.asked.set(`${npc}:${guest.name}`, { act, occasion: "", day: g.day, phase: "evening" });
+    if (!act || g.phase === "evening" || g.phase === "night" || dueNow(m.mem.promises, g.day, "evening").length || this.noThanks.get(`${npc}:${guest.name}`) === g.day) return false;
+    this.open(npc, guest.name, { act, occasion: "", day: g.day, phase: "evening" });
     m.mem.why = `feel like ${act} > ${guest.name} is around > asked them along`;
     this.said(npc, `${guest.name}, ${act} this evening? Say yes if you are in.`, guest.name);
     return true;
   }
 
-  // The player said yes to what the villager asked: now it is a promise like any other.
+  // The villager has just asked something: the answer belongs to that, and "where?" means that place.
+  private open(npc: Npc, player: string, invite: Invite): void {
+    this.asked.set(`${npc}:${player}`, { invite, turns: 0 });
+    const place = SPOT_NAME[ACTIVITY.get(invite.act)!.place];
+    if (place) this.topics.set(npc, place);
+  }
+
+  // A line this villager said to a player, in its own words: did it ask them to something?
+  noteOffer(npc: Npc, m: Mind, player: string, line: string): void {
+    const g = gameTime(this.v.t);
+    const invite = offerIn(line, g.day, g.phase);
+    if (invite) {
+      if (this.noThanks.get(`${npc}:${player}`) !== g.day) this.open(npc, player, invite);
+      return;
+    }
+    const good = goodOfferedIn(line);
+    if (!good || !(this.purseOf(npc).goods[good] ?? 0)) return;
+    openDay(this.market, g.day, VILLAGERS);
+    const price = priceOf(this.market, good);
+    this.offers.set(`${npc}:${player}`, { o: { kind: "buy", good, qty: 1, price }, price });
+    m.mem.why = `offered ${player} ${good} at ${price}c`;
+  }
+
+  private ageOffer(npc: Npc, player: string): void {
+    const a = this.asked.get(`${npc}:${player}`);
+    if (a && ++a.turns >= OFFER_TURNS) this.asked.delete(`${npc}:${player}`);
+  }
+
+  // The player answered what the villager asked. A yes makes it a promise like any other; a no ends it for today.
   private tookUp(npc: Npc, m: Mind, player: string, playerId: string, line: string): string | null {
     const key = `${npc}:${player}`;
-    const invite = this.asked.get(key);
+    const invite = this.asked.get(key)?.invite;
+    const said = invite && answerTo(line);
+    if (!invite || !said) return null;
+    const g = gameTime(this.v.t);
+    const event = invite.act === "fish" ? "fishing" : invite.act;
+    if (said === "later") return `Sure, ${player}. Just say when.`;
     this.asked.delete(key);
-    if (!invite || !YES.test(line)) return null;
+    if (said === "no") {
+      this.noThanks.set(key, g.day);
+      remember(m.mem, g.day, clockLabel(g.hour), `${player} did not want to ${invite.act} today`);
+      return `Alright, ${player}. Another day then.`;
+    }
+    const spot = ACTIVITY.get(invite.act)!.place;
+    if (!this.env.spots[spot]?.length) return `Oh, there is nowhere for ${event} around here after all, ${player}.`;
     const c: Commitment = { ...invite, id: `${npc}${this.v.nextId++}`, from: player, fromId: playerId, state: "open", importance: 5 };
     m.mem.promises = addCommitment(m.mem.promises, c);
     this.out.line({ who: npc, mem: promiseLine(c) });
-    const g = gameTime(this.v.t);
-    remember(m.mem, g.day, clockLabel(g.hour), `${player} agreed to ${invite.act} with me this evening`, 6);
-    return answerLine("accept", invite, player, SPOT_NAME[ACTIVITY.get(invite.act)!.place] ?? "");
+    const now = invite.day === g.day && invite.phase === g.phase;
+    remember(m.mem, g.day, clockLabel(g.hour), `${player} agreed to ${invite.act} with me${now ? " now" : ` ${invite.phase}`}`, 6);
+    if (now) this.leaving.add(c.id); // it already said so; no second "time to go"
+    return now ? `Great, ${player}! Come on, to ${SPOT_NAME[spot] ?? "the spot"}.` : answerLine("accept", invite, player, SPOT_NAME[spot] ?? "");
   }
 
   // The first meeting after a broken promise: the NPC says so to their face, once for each grudge.
@@ -820,6 +887,7 @@ export class NpcVillage {
   private said(npc: Npc, text: string, to?: string): void {
     this.out.say(npc, text, to);
     if (text !== "..." && this.hosting(npc)) this.out.line({ who: npc, say: text });
+    if (to && !personaOf(to.toLowerCase())) this.onChat?.({ npc, player: to, line: "", reply: text, source: "rules" });
   }
 
   // `t` = the sim clock to follow (the pets' clock, so day and night match on this screen).

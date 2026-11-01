@@ -21,7 +21,7 @@ import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/cl
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
-import { railBlocks } from "./sunny-terrain";
+import { cornerBlocks, railBlocks, seaCell } from "./sunny-terrain";
 import { layoutBubbles, type BubbleBox, type Placed } from "./bubbles";
 import { liveName } from "../world/live";
 import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
@@ -315,8 +315,14 @@ export class Overworld {
 
   // Water within a rod's reach to the east (1) or west (-1) of a spot, or 0: casting art throws sideways.
   waterSide(p: Vec): number {
-    const wet = (x: number, z: number) => [T.water, T.pool].includes(tileAt(this.map, x, z) as never);
-    for (let d = 1; d <= 3; d++) for (const dz of [0, 0.8]) for (const side of [1, -1]) if (wet(p.x + side * d, p.z + dz)) return side;
+    // Cliff and foam stand on water cells: only open water takes a line.
+    const open = (x: number, z: number) => {
+      const [i, j] = [Math.floor(x), Math.floor(z)];
+      const cell = this.sunny.terrain.land[(j - this.map.oz) * this.map.w + i - this.map.ox] ?? 0;
+      return cell === 0 || cell === seaCell(i, j);
+    };
+    const wet = (x: number, z: number) => [T.water, T.pool].includes(tileAt(this.map, x, z) as never) && open(x, z);
+    for (let d = 1; d <= 2; d++) for (const dz of [0, 0.8]) for (const side of [1, -1]) if (wet(p.x + side * d, p.z + dz)) return side;
     return 0;
   }
 
@@ -923,7 +929,7 @@ export class Overworld {
   underBubbles?: () => void; // the screen's own panels: speech draws over them
 
   readonly canWalk = (x: number, z: number): boolean => {
-    if (!tileWalkable(this.map, x, z) || railBlocks(this.map, x, z)) return false;
+    if (!tileWalkable(this.map, x, z) || railBlocks(this.map, x, z) || cornerBlocks(this.map, x, z)) return false;
     const [hw, hd] = this.footprint(HOME_ART);
     if (Math.abs(x - this.house.x) < hw && z < this.house.z + 0.2 && z > this.house.z - hd) return false;
     for (const h of this.houses) {

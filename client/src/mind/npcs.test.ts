@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sim/rng";
 import type { MindLine } from "../world/live";
 import { NpcVillage } from "./npcs";
+import { answerTo, offerIn } from "./offers";
 import { MindScheduler } from "./scheduler";
 
 const HOMES = { elder: { x: 0, z: 0 }, mo: { x: 2, z: 0 }, ama: { x: 0, z: 2 }, pip: { x: 2, z: 2 } };
@@ -436,5 +437,54 @@ describe("NpcVillage talks to pets", () => {
       expect((await nv.reply("pip", "Kai", "what are you saving for?"))?.text).toBe("I am saving for a pet of my own. 30 of 45 coins so far.");
       expect((await nv.reply("pip", "Kai", "sell you a tomato for 12 coins"))?.text).toContain("I am saving for a pet of my own");
     });
+  });
+});
+
+describe("open offers", () => {
+  const SPOTS2 = { ...SPOTS, playground: [{ x: 4, z: 4 }], pond: [{ x: 8, z: 8 }] };
+  function ready() {
+    const nv = new NpcVillage(new MindScheduler(() => null), () => false, { line: () => {}, say: () => {} }, HOMES, SPOTS2, () => true, undefined, mulberry32(5));
+    nv.hub.placesOf = () => [{ name: "the lawn", words: ["lawn"], x: 0, z: 3 }, { name: "the playground", words: ["playground"], x: 4, z: 4 }];
+    nv.v.t = DAY_SECONDS * 0.5; // noon
+    const m = nv.hub.minds.get("pip")!;
+    return { nv, m };
+  }
+
+  it("a free model line opens an offer, and yes acts on it", async () => {
+    const { nv, m } = ready();
+    nv.noteOffer("pip", m, "Kai", "Wanna dance?");
+    expect((await nv.reply("pip", "Kai", "yes"))?.text).toMatch(/lawn/);
+    expect(m.mem.promises.filter((c) => c.act === "dance" && c.state === "open")).toHaveLength(1);
+  });
+
+  it("where? follows the offer and keeps it open", async () => {
+    const { nv, m } = ready();
+    nv.noteOffer("pip", m, "Kai", "Wanna play soccer?");
+    expect((await nv.reply("pip", "Kai", "where?"))?.text).toMatch(/playground/i);
+    await nv.reply("pip", "Kai", "ok let's go");
+    expect(m.mem.promises.some((c) => c.act === "soccer")).toBe(true);
+  });
+
+  it("no ends it and maybe later keeps it", async () => {
+    const { nv, m } = ready();
+    nv.noteOffer("pip", m, "Kai", "Wanna play soccer?");
+    expect((await nv.reply("pip", "Kai", "maybe later"))?.text).toMatch(/say when/i);
+    await nv.reply("pip", "Kai", "ok now");
+    expect(m.mem.promises).toHaveLength(1);
+    nv.noteOffer("pip", m, "Kai", "Wanna dance?");
+    expect((await nv.reply("pip", "Kai", "no thanks"))?.text).toMatch(/another day/i);
+    nv.noteOffer("pip", m, "Kai", "Wanna dance?");
+    expect(await nv.reply("pip", "Kai", "yes")).toBeNull(); // not open again today; no model here
+  });
+
+  it("a statement or a question about fishing is no offer", () => {
+    expect(offerIn("I want to fish.", 0, "noon")).toBeNull();
+    expect(offerIn("Do you like fishing?", 0, "noon")).toBeNull();
+    expect(offerIn("Kai, soccer this evening?", 0, "noon")?.phase).toBe("evening");
+    expect(offerIn("Wanna dance?", 0, "morning")?.phase).toBe("evening"); // nobody dances in the morning
+    expect(answerTo("maybe later")).toBe("later");
+    expect(answerTo("yep!")).toBe("yes");
+    expect(answerTo("nah")).toBe("no");
+    expect(answerTo("what bait?")).toBeNull();
   });
 });

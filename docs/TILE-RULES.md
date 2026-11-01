@@ -23,8 +23,9 @@ Decide each tile from the land shape alone, with 4 neighbours and then diagonals
 | W / E edge | 3.6 / 4.3 | 7.17 / 8.14 |
 | Inner NW / NE | 3.2 / 3.3 | 7.13 / 7.14 |
 | Inner SW / SE | 3.5 / 4.1 | 7.16 / 8.12 |
-| Fill | 3.1, about 7% 2.1-2.6 | 7.12, 7.20, 7.21, 8.20, 8.21 |
+| Fill | 1.1 / 1.2 by (i + j) parity, about 7% 2.1-2.6 | 7.12, 7.20, 7.21, 8.20, 8.21 |
 
+- Fill: nothing in the game scales; the pack's 3.1 is an 8 px checker, so one 16 px thing covered four squares. The user wants one square per tree or farm spot, so the fill is the same two greens, flat, one per tile.
 - The light road family is the grass table moved down 4 rows (3.k becomes 7.k, 4.k becomes 8.k). Not used yet.
 - Roads are 3 tiles wide and stay on land.
 - Island outlines are straight edges with stepped corners, never slants or circles: coast, cliff and foam tiles only join on those. Grounds are stepped rectangles (world/ground.ts), other places squares with corner notches (`inBlock` in world/layout.ts). Roads run along one axis, then the other.
