@@ -16,7 +16,7 @@ import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, go
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
 import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
-import { askedPlace, directions, doingAnswer, talkAnswer, topicOf, whoAnswer, whyPerson } from "./directions";
+import { askedPlace, directions, doingAnswer, type Place, talkAnswer, topicOf, whoAnswer, whyPerson } from "./directions";
 import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
 import { humanize } from "./human";
 import { answerTo, cleanReply, goodOfferedIn, offerIn } from "./offers";
@@ -379,6 +379,7 @@ export class NpcVillage {
   }
 
   private readonly topics = new Map<Npc, string>();
+  private readonly meeting = new Map<Npc, Place>(); // where its last offer would happen
   private follow(npc: Npc, line: string): void {
     const place = topicOf(line, this.hub.placesOf?.() ?? []);
     if (place) this.topics.set(npc, place.name);
@@ -388,7 +389,9 @@ export class NpcVillage {
   private grounded(npc: Npc, line: string): string | null {
     const a = this.v.agents.find((x) => x.id === npc);
     if (!a) return null;
-    const place = askedPlace(line, this.hub.placesOf?.() ?? [], this.topics.get(npc) ?? null);
+    // Where we are meeting may be a spot no map name covers, like the square doing for a pitch.
+    const spot = this.meeting.get(npc);
+    const place = askedPlace(line, [...(this.hub.placesOf?.() ?? []), ...(spot ? [spot] : [])], this.topics.get(npc) ?? null);
     if (place) return directions(a.pos, place, personaOf(npc)?.name);
     return whoAnswer(line, VILLAGERS.map((p) => ({ name: p.name, title: p.job?.title })), personaOf(npc)?.name ?? "") ?? doingAnswer(line, a.act && a.act !== "wander" ? ACTIVITY.get(a.act)?.label : null, a.state === "walk");
   }
@@ -803,7 +806,9 @@ export class NpcVillage {
   private open(npc: Npc, player: string, invite: Invite): void {
     this.asked.set(`${npc}:${player}`, { invite, turns: 0 });
     const place = SPOT_NAME[ACTIVITY.get(invite.act)!.place];
+    const at = this.env.spots[ACTIVITY.get(invite.act)!.place]?.[0];
     if (place) this.topics.set(npc, place);
+    if (place && at) this.meeting.set(npc, { name: place, words: [], ...at });
   }
 
   // A line this villager said to a player, in its own words: did it ask them to something?
