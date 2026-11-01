@@ -4,7 +4,7 @@
 
 ## State
 - Live behind Access: https://pets.uryto.dev/ (Worker dc0d031d, the commit before this handoff). Tests: client 632, worker 192, tsc clean.
-- The user reviewed that build: 12 new blockers, entries 13-23 in `docs/BUGS.md` (images `.scratch/bugs/2026-11-01b-img*.png`).
+- The user reviewed that build: 11 new blockers, entries 13-23 in `docs/BUGS.md` (images `.scratch/bugs/2026-11-01b-img*.png`).
 - Chat offers work on the real model; free talk on the 1B is weak (bug 11). `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$102.
 - Full history and old gotchas: `docs/HISTORY.md` (grep it).
 
@@ -14,10 +14,8 @@
 - Questions with one true answer come from the sim (mind/directions.ts and neighbours). Offers: mind/offers.ts.
 - `cleanReply` strips bond notes read aloud and repeat invitations from model lines.
 - 3B (user, 2026-11-01): convert it and check it runs in the browser on the 1050 FIRST, then train. No training spend before that.
+- Submission day (user): make GitHub and the 4 HF repos public, remove Access.
 - Chat log is development only: remove `/api/chatlog`, the client call and the KV rows before submission.
-
-## Pending decisions (user)
-- Submission day: make GitHub and the 4 HF repos public, remove Access.
 
 ## Next actions
 1. Write `docs/LAYERS.md` (bug 23), then fix bugs 13-22: undo tree jitter and road bulges first, they are mine.
@@ -32,8 +30,7 @@
 - Test Chrome: `bash .scratch/mlc/chrome.sh "<url>"` (port 9333, GTX 1050, signed in to Access). Weights: `node .scratch/mlc/serve.mjs`.
 - Game with the model: `http://localhost:5173/?gpu=capable&tuned=http://127.0.0.1:8099/n4/{q}/`.
 - Drive a tab: `node scripts/cdp-tab.mjs "<url regex>" "<js or file>"`; shot: `scripts/cdp-shot.mjs`. `?p=2` = a second player.
-- Hidden preview pane: rAF stalls, so drive `__px.update` from a timer. `__px.world.alwaysDay = true` for shots.
-- The room moves NPC hosting from a hidden tab to a visible one. E first closes a toast; beds take E before water.
+- `__px.world.alwaysDay = true` for shots. Hidden pane: rAF stalls, drive `__px.update` from a timer. The room moves NPC hosting from a hidden tab to a visible one. E first closes a toast; beds take E before water.
 
 ## File map
 docs/{BUGS,EXPECTATIONS,NPC-CHAT-TESTS,TILE-RULES,STYLE,NPC-PLAN,EVENT,DEMO,DEPLOY,DIRECTOR,HISTORY}.md
