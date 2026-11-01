@@ -70,6 +70,8 @@ export interface SunnyWorld {
   terrain: Terrain;
   deck: Int32Array;
   rail: Int32Array;
+  shadow: Int32Array;
+  posts: Int32Array;
   seaLife: SeaLife[];
 }
 
@@ -146,12 +148,11 @@ export function drawSeaLife(g: Ctx, life: SeaLife[], camX: number, camY: number,
   }
 }
 
-const SKY = tile(18, 1);
 const FLOWERS = [tile(3, 35), tile(3, 34), tile(3, 28)];
 
 const mod4 = (n: number) => ((n % 4) + 4) % 4;
 
-// The tiles on screen; past the map's edge the world ends in cloud.
+// The tiles on screen; k is -1 past the map's edge.
 function eachTile(m: TileMap, camX: number, camY: number, sw: number, sh: number, fn: (i: number, j: number, x: number, y: number, k: number) => void): void {
   const i0 = Math.floor(camX / TILE);
   const j0 = Math.floor(camY / TILE);
@@ -166,9 +167,8 @@ function eachTile(m: TileMap, camX: number, camY: number, sw: number, sh: number
 export function drawSea(g: Ctx, m: TileMap, camX: number, camY: number, sw: number, sh: number, t: number): void {
   const base = sheetFor(0);
   eachTile(m, camX, camY, sw, sh, (i, j, x, y, k) => {
-    if (k < 0) return drawCell(g, base, SKY, x, y);
-    drawCell(g, base, tile(18 + mod4(j), 11 + mod4(i)), x, y);
-    if (m.kind[k] === T.water && hash2(i, j, 31) < 0.012) glint(g, x + 4, y + 4, i, j, t);
+    drawCell(g, base, tile(18 + mod4(j), 11 + mod4(i)), x, y); // the sea runs on past the map: the world has no edge
+    if (k >= 0 && m.kind[k] === T.water && hash2(i, j, 31) < 0.012) glint(g, x + 4, y + 4, i, j, t);
   });
 }
 
@@ -181,6 +181,8 @@ export function drawLand(g: Ctx, m: TileMap, w: SunnyWorld, camX: number, camY: 
     if (w.terrain.road[k]) drawCell(g, base, w.terrain.road[k]!, x, y);
     if (m.kind[k] === T.flowers) drawCell(g, base, FLOWERS[Math.floor(hash2(i, j, 33) * FLOWERS.length)]!, x, y);
     if (w.terrain.shade[k]) drawCell(g, base, w.terrain.shade[k]!, x, y);
+    if (w.shadow[k]) drawCell(g, base, w.shadow[k]!, x, y);
+    if (w.posts[k]) drawCell(g, base, w.posts[k]!, x, y);
     if (w.deck[k]) drawCell(g, base, w.deck[k]!, x, y);
     if (m.kind[k] === T.pool && hash2(i, j, 31) < 0.03) glint(g, x + 4, y + 4, i, j, t);
     if (m.look[k]! & AWAY && w.terrain.land[k]) {
@@ -215,6 +217,41 @@ export function strip(g: Ctx, name: string, x: number, y: number, frame: number,
     g.drawImage(img, f * w, 0, w, img.height, 0, 0, w, img.height);
     g.restore();
   } else g.drawImage(img, f * w, 0, w, img.height, Math.round(x), Math.round(y), w, img.height);
+}
+
+// A stamp's columns grouped by their lowest opaque pixel, for a shape with several feet (docs/LAYERS.md).
+export interface FootRun { x0: number; x1: number; foot: number } // columns [x0, x1); foot = rows above the stamp's bottom
+const FOOT_STEP = 6; // px: smaller steps along a wall's base stay one foot
+const footCache = new Map<string, FootRun[]>();
+export function footRuns(name: string): FootRun[] {
+  const hit = footCache.get(name);
+  if (hit) return hit;
+  const i = images.get(name);
+  if (!i) return [];
+  const c = document.createElement("canvas");
+  [c.width, c.height] = [i.width, i.height];
+  const h = c.getContext("2d", { willReadFrequently: true })!;
+  h.drawImage(i, 0, 0);
+  const px = h.getImageData(0, 0, i.width, i.height).data;
+  const out: FootRun[] = [];
+  for (let x = 0; x < i.width; x++) {
+    let y = i.height - 1;
+    while (y >= 0 && px[(y * i.width + x) * 4 + 3] === 0) y--;
+    const foot = i.height - 1 - y;
+    const last = out[out.length - 1];
+    if (last && Math.abs(last.foot - foot) < FOOT_STEP) last.x1 = x + 1;
+    else out.push({ x0: x, x1: x + 1, foot });
+  }
+  footCache.set(name, out);
+  return out;
+}
+
+// One run of a stamp standing on (footX, footY).
+export function standRun(g: Ctx, name: string, run: FootRun, footX: number, footY: number): void {
+  const i = images.get(name);
+  if (!i) return;
+  const [x, y] = [Math.round(footX - i.width / 2), Math.round(footY - i.height)];
+  g.drawImage(i, run.x0, 0, run.x1 - run.x0, i.height, x + run.x0, y, run.x1 - run.x0, i.height);
 }
 
 // A sprite or stamp standing on (footX, footY), bottom centre.
@@ -286,35 +323,10 @@ function eachCloud(camX: number, camY: number, sw: number, sh: number, t: number
     }
 }
 
-// Under the land: low cloud over the sea, grey underside first.
-export function drawLowClouds(g: Ctx, m: TileMap, camX: number, camY: number, sw: number, sh: number, t: number): void {
-  const base = sheetFor(0);
-  const puff = (cells: [number, number, number][], x: number, y: number) => {
-    for (const [a, b, id] of cells) drawCell(g, base, shifted(id, 3), x + a * TILE + 4, y + b * TILE + 6);
-    for (const [a, b, id] of cells) drawCell(g, base, fromRoom(id), x + a * TILE, y + b * TILE);
-  };
-  eachCloud(camX, camY, sw, sh, t, 0, 0.55, puff);
-  // A bank of cloud along the map's edge, so the sea does not stop on a straight line.
-  const edge = (i: number, j: number) => {
-    const x = i * TILE - camX;
-    const y = j * TILE - camY;
-    if (x < -160 || y < -160 || x > sw + 32 || y > sh + 32 || !data.clouds.length) return;
-    puff(data.clouds[Math.floor(hash2(i, j, 90) * data.clouds.length)]!, x, y);
-  };
-  for (let n = -8; n < m.w + 8; n += 5) {
-    edge(m.ox + n, m.oz - 4);
-    edge(m.ox + n, m.oz + m.h - 3);
-  }
-  for (let n = -8; n < m.h + 8; n += 5) {
-    edge(m.ox - 5, m.oz + n);
-    edge(m.ox + m.w - 3, m.oz + n);
-  }
-}
-
 // Over everything: a few high clouds, with soft shadows on the ground.
 export function drawHighClouds(g: Ctx, camX: number, camY: number, sw: number, sh: number, t: number): void {
   const base = sheetFor(0);
-  eachCloud(camX, camY, sw, sh, t, 1, 0.14, (cells, x, y) => {
+  eachCloud(camX, camY, sw, sh, t, 1, 0.2, (cells, x, y) => {
     for (const [a, b, id] of cells) drawCell(g, base, shifted(id, 6), x + a * TILE + 10, y + b * TILE + 34);
     for (const [a, b, id] of cells) drawCell(g, base, fromRoom(id), x + a * TILE, y + b * TILE);
   });

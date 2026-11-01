@@ -115,17 +115,6 @@ export function buildTileMap(w: WorldMap): TileMap {
     if (pa.kind !== "islet") pathLine(pa.x + 0.5, pa.z + 0.5, b.ax, b.az);
     if (pb.kind !== "islet") pathLine(pb.x + 0.5, pb.z + 0.5, b.bx, b.bz);
   }
-  // Road verges wander: a tile-deep bulge here and there, on grass well away from water.
-  const at = (x: number, z: number) => (x < ox || z < oz || x >= ox + tw || z >= oz + th ? T.water : kind[idx(x, z)]!);
-  const bulge: number[] = [];
-  for (let z = oz; z < oz + th; z++) for (let x = ox; x < ox + tw; x++) {
-    if (at(x, z) !== T.grass && at(x, z) !== T.flowers) continue;
-    if (![at(x - 1, z), at(x + 1, z), at(x, z - 1), at(x, z + 1)].includes(T.path) || hash2(Math.floor(x / 3), Math.floor(z / 3), 91) > 0.35) continue;
-    let dry = true;
-    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if ([T.water, T.bridge, T.pool].includes(at(x + dx, z + dz) as never)) dry = false;
-    if (dry) bulge.push(idx(x, z));
-  }
-  for (const k of bulge) kind[k] = T.path;
   const map: TileMap = { w: tw, h: th, ox, oz, kind, look, high: new Uint8Array(tw * th) };
   // Roads must be final before choosing water: never carve a route that would need a bridge.
   for (const p of w.platforms) if (p.ground) {

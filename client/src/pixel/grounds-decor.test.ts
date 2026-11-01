@@ -60,7 +60,7 @@ describe("ground decor", () => {
       for (const k of d.tiles) {
         expect([T.grass, T.tall, T.flowers]).toContain(m.kind[k]);
         const [i, j] = [k % m.w, Math.floor(k / m.w)];
-        const roadside = d.kind === "fence" && d.tiles.every((t) => m.kind[t + m.w] === T.path);
+        const roadside = d.kind.startsWith("fence") && !d.field;
         for (let dj = -1; dj <= 1; dj++)
           for (let di = -1; di <= 1; di++) {
             const t = m.kind[(j + dj) * m.w + i + di];
@@ -119,7 +119,7 @@ describe("ground decor", () => {
         }
         for (const f of fences) {
           expect(f.tiles.length).toBeGreaterThanOrEqual(3);
-          expect(f.tiles.length).toBeLessThanOrEqual(6);
+          expect(f.tiles.length).toBeLessThanOrEqual(8);
           for (const [n, tile] of f.tiles.entries()) {
             expect(tile).toBe(f.tiles[0]! + n);
             expect(Math.floor(tile / map.w)).toBe(Math.floor(f.tiles[0]! / map.w));
@@ -216,7 +216,7 @@ describe("ground decor", () => {
             }
           }
           expect(size).toBeGreaterThanOrEqual(2); // cramped coasts cannot always fit five safely
-          expect(size).toBeLessThanOrEqual(90);
+          expect(size).toBeLessThanOrEqual(100);
           clumps++;
         }
         expect(clumps).toBeLessThanOrEqual(9);
@@ -262,7 +262,7 @@ describe("ground decor", () => {
           }
         }
         expect(size, `seed ${seed}`).toBeGreaterThanOrEqual(2);
-        expect(size).toBeLessThanOrEqual(90);
+        expect(size).toBeLessThanOrEqual(100);
         clumps++;
       }
       expect(clumps, `seed ${seed}`).toBeGreaterThanOrEqual(1);

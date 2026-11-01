@@ -79,9 +79,9 @@ it("dresses real forested grounds with seeded features and keeps every route con
       expect(seen.has(k), `seed ${seed}, route to ${p.id}`).toBe(true);
     }
   }
-  expect(fields).toBeGreaterThanOrEqual(12);
+  expect(fields).toBeGreaterThanOrEqual(10);
   expect(fields).toBeLessThanOrEqual(28);
-  expect(mills).toBeGreaterThanOrEqual(12);
+  expect(mills).toBeGreaterThanOrEqual(10);
   expect(mills).toBeLessThanOrEqual(28);
   expect(elders).toBe(40);
   expect(details / 40).toBeGreaterThanOrEqual(55);

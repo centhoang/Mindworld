@@ -59,8 +59,18 @@ keep &= rise
 walls &= keep
 ys, xs = np.where(keep)
 box = (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+# What stood against the walls in the demo (a bush, stools, two pots) is cut by the mask: plank over it from a clear
+# stretch of wall, and let the grass strip under the walls go. Pixels of the finished picture, so its size never moves.
+PLANK = [(10, 58, 105, 120, 69), (184, 204, 128, 134, 206)]      # x0, x1, y0, y1, the clear column to copy
+STRIP = [(0, 80, 117), (97, 221, 133)]                          # x0, x1, first row of grass under the wall
+def tidy(b):
+    for x0, x1, y0, y1, src in PLANK:
+        b[y0 + box[1]:y1 + box[1], x0 + box[0]:x1 + box[0]] = b[y0 + box[1]:y1 + box[1], src + box[0]:src + box[0] + 1]
+    for x0, x1, y in STRIP:
+        b[y + box[1]:box[3], x0 + box[0]:x1 + box[0], 3] = 0
 for name, a, shape in (('home-roof', roof2, keep), ('home-open', inside2, walls)):
     b = a.copy()
+    tidy(b)
     b[~shape, 3] = 0
     Image.fromarray(b).crop(box).save(OUT + name + '.png', optimize=True)
 print('home box', box)

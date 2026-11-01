@@ -29,6 +29,7 @@ const SOIL_FILL = tile(7, 1);
 const SAND = tile(1, 5);
 const SAND_ACCENT = [tile(1, 7), tile(1, 8), tile(1, 9)];
 const SAND_EDGE = tile(5, 20); // the wet end of a beach, foam and all
+const SAND_END = tile(5, 19); // the beach tapers out at its east end; mirrored at its west end
 const BEACH_RUN = 6; // straight south coast this long may be a beach
 const ROAD: Record<EdgeName, number> = {
   nw: tile(7, 19), n: tile(7, 15), ne: tile(8, 15), w: tile(7, 17), e: tile(8, 14), sw: tile(8, 17), s: tile(8, 16), se: tile(8, 18),
@@ -99,7 +100,7 @@ export function buildTerrain(m: TileMap): Terrain {
       const east = edge === "se";
       const coast = west ? [tile(4, 10), tile(2, 19, MIRROR), tile(6, 19, MIRROR)] : east ? [tile(4, 10, MIRROR), tile(2, 19), tile(6, 19)] : [CLIFF(i, j + 1), CLIFF(i, j + 2), tile(2, 20)];
       // Inland the drop is one row shorter, and a narrow stream keeps its water: only the foam line shows.
-      const room = [1, 2, 3].filter((n) => isPool(i, j + n)).length;
+      const room = [1, 2, 3].filter((n) => isPool(i, j + n) || at(i, j + n) === T.bridge).length; // a pier lies on the water: it never shortens a cliff
       // Some straight south coast is a beach below its cliff, as in the pack's scene. Decoration: nobody walks there.
       const straight = (a: number) => a >= 0 && a < m.w && dry(a, j) && !dry(a, j + 1) && !isPool(a, j + 1) && !isPool(a, j + 2) && edgeOf(dry, a, j) === "s";
       let [a, b] = [i, i];
@@ -107,7 +108,8 @@ export function buildTerrain(m: TileMap): Terrain {
       while (straight(b + 1)) b++;
       const beach = straight(i) && b - a + 1 >= BEACH_RUN && hash2(a, j, 31) < 0.6;
       const sand = hash2(i, j, 32) < 0.15 ? SAND_ACCENT[Math.floor(hash2(i, j, 33) * SAND_ACCENT.length)]! : SAND;
-      const face = beach ? [CLIFF(i, j + 1), sand, SAND_EDGE] : !isPool(i, j + 1) ? coast : room >= 3 ? coast.slice(1) : coast.slice(2);
+      const wet = i === a ? SAND_END | MIRROR : i === b ? SAND_END : SAND_EDGE;
+      const face = beach ? [CLIFF(i, j + 1), sand, wet] : !isPool(i, j + 1) ? coast : room >= 3 ? coast.slice(1) : coast.slice(2);
       let last = j;
       face.forEach((cell, n) => {
         if (last !== j + n || !free(i, j + n + 1)) return;
@@ -178,9 +180,15 @@ export function railBlocks(m: TileMap, x: number, z: number): boolean {
   return keep === KEEP_S ? v < 1 - RAIL_FREE : keep === KEEP_N ? v > RAIL_FREE : keep === KEEP_E ? u < 1 - RAIL_FREE : u > RAIL_FREE;
 }
 
+const WATER = new Set<number>([T.water, T.pool]);
+const BRIDGE_SHADOW = tile(1, 12);
+const BENT = [tile(1, 37), tile(5, 37), tile(2, 37)]; // posts, braced posts, post feet
+
 // Bridge planks and rails for the whole map. Ends lie one tile up on the land, as the pack's bridges do.
-export function bridgeLayers(m: TileMap): { deck: Int32Array; rail: Int32Array } {
+export function bridgeLayers(m: TileMap): { deck: Int32Array; rail: Int32Array; shadow: Int32Array; posts: Int32Array } {
   const deck = new Int32Array(m.w * m.h);
+  const shadow = new Int32Array(m.w * m.h);
+  const posts = new Int32Array(m.w * m.h);
   const rail = new Int32Array(m.w * m.h);
   const on = (a: number, b: number) => a >= 0 && b >= 0 && a < m.w && b < m.h && m.kind[b * m.w + a] === T.bridge;
   const put = (i: number, j: number, d: number, r: number) => {
@@ -193,12 +201,23 @@ export function bridgeLayers(m: TileMap): { deck: Int32Array; rail: Int32Array }
     while (n < 9 && on(i + di * (n + 1), j + dj * (n + 1))) n++;
     return n;
   };
+  // Below a bridge running east-west: its shadow on the water, and a pair of post columns every four tiles.
+  const wet = (a: number, b: number) => a >= 0 && b >= 0 && a < m.w && b < m.h && WATER.has(m.kind[b * m.w + a]!);
+  const under = (i: number, j: number) => {
+    if (!wet(i, j + 1)) return;
+    shadow[(j + 1) * m.w + i] = BRIDGE_SHADOW;
+    if (((i % 4) + 4) % 4 > 1 || !on(i - 1, j) || !on(i + 1, j)) return;
+    BENT.forEach((cell, n) => {
+      if (wet(i, j + 1 + n)) posts[(j + 1 + n) * m.w + i] = cell;
+    });
+  };
   for (let j = 0; j < m.h; j++)
     for (let i = 0; i < m.w; i++) {
       if (!on(i, j)) continue;
       const across = run(i, j, 1, 0) + run(i, j, -1, 0) >= run(i, j, 0, 1) + run(i, j, 0, -1);
       if (across) {
         const row = !on(i, j - 1) ? 11 : !on(i, j + 1) ? 13 : 12;
+        if (row === 13) under(i, j);
         put(i, j, tile(row, 40, i & 1 ? MIRROR : 0), row === 11 ? tile(2, 39) : row === 13 ? tile(0, 39) : 0);
         if (!on(i - 1, j)) put(i - 1, j, tile(row, 39), row === 11 ? tile(2, 42, MIRROR) : row === 13 ? tile(0, 38) : 0);
         if (!on(i + 1, j)) put(i + 1, j, tile(row, 39, MIRROR), row === 11 ? tile(2, 42) : row === 13 ? tile(0, 38, MIRROR) : 0);
@@ -211,5 +230,5 @@ export function bridgeLayers(m: TileMap): { deck: Int32Array; rail: Int32Array }
         if (!on(i, j + 1)) put(i, j + 1, tile(11, 80 - col, MIRROR | FLIP), side ? tile(4, 40) : 0);
       }
     }
-  return { deck, rail };
+  return { deck, rail, shadow, posts };
 }

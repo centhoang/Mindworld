@@ -14,14 +14,14 @@ import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, drawTinyText, GLYPH, wrap } from "./text";
 import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
-import { buildSunny, characterShadow, drawCropArt, drawHighClouds, drawLand, drawLowClouds, drawRail, drawSea, drawSeaLife, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
+import { buildSunny, characterShadow, footRuns, standRun, drawCropArt, drawHighClouds, drawLand, drawRail, drawSea, drawSeaLife, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
 import { compass, type Place } from "../mind/directions";
 import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
-import { cornerBlocks, railBlocks, seaCell } from "./sunny-terrain";
+import { cornerBlocks, railBlocks, seaCell, tile } from "./sunny-terrain";
 import { HOME_BLOCKS, HOME_DOOR_DX } from "../game/house";
 import { layoutBubbles, type BubbleBox, type Placed } from "./bubbles";
 import { liveName } from "../world/live";
@@ -45,7 +45,7 @@ const SMOKE_H = 37;
 const READ_CHARS = 12; // a bubble stays long enough to read at this many characters a second
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
 export const NAME_MAX = 10;
-const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
+const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", "fence-v": "a fence", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
 const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "the lawn", playground: "the playground slide and goal", picnic: "the picnic blanket", pond: "the fishing pond", plaza: "the village square" };
 
 export const OVERWORLD_MON = 20; // px: monsters in the overworld
@@ -317,7 +317,8 @@ export class Overworld {
 
   // Water within a rod's reach to the east (1) or west (-1) of a spot, or 0: casting art throws sideways.
   waterSide(p: Vec): number {
-    // Cliff and foam stand on water cells: only open water takes a line.
+    // Cliff and foam stand on water cells: only open water takes a line. A south coast edge or corner is cliff top.
+    if ([T.water, T.pool].includes(tileAt(this.map, p.x, p.z + 1) as never)) return 0;
     const open = (x: number, z: number) => {
       const [i, j] = [Math.floor(x), Math.floor(z)];
       const cell = this.sunny.terrain.land[(j - this.map.oz) * this.map.w + i - this.map.ox] ?? 0;
@@ -419,13 +420,13 @@ export class Overworld {
     }
   }
 
-  // A house with its chimney smoke.
-  private drawHouse(g: CanvasRenderingContext2D, art: string, x: number, y: number, t: number): void {
-    stand(g, art, x, y);
+  // A house with its chimney smoke. Each stretch of wall sorts on its own foot (docs/LAYERS.md).
+  private pushHouse(items: { z: number; draw: () => void }[], g: CanvasRenderingContext2D, art: string, z: number, x: number, y: number, t: number): void {
+    for (const r of footRuns(art)) items.push({ z: z - r.foot / TILE, draw: () => standRun(g, art, r, x, y) });
     const top = CHIMNEY[art];
     if (!top) return;
     const [w, h] = stampSize(art);
-    strip(g, "chimneysmoke_01_strip30", x - w / 2 + top[0] - SMOKE_W / 2, y - h + top[1] - SMOKE_H + 3, Math.floor(t * 10));
+    items.push({ z, draw: () => strip(g, "chimneysmoke_01_strip30", x - w / 2 + top[0] - SMOKE_W / 2, y - h + top[1] - SMOKE_H + 3, Math.floor(t * 10)) });
   }
 
   // A small name over every person, players and villagers alike.
@@ -530,8 +531,7 @@ export class Overworld {
         // Crowded islands may have less room; clearances take priority over the target count.
         if (best.length < 2) break;
         for (const t of best) {
-          // Each stands off its tile centre, so no two line up; it stays inside its tile, which is what blocks.
-          this.trees.push({ x: t.x + (hash2(t.x, t.z, 78) - 0.5) * 0.8, z: t.z + (hash2(t.x, t.z, 79) - 0.5) * 0.8 });
+          this.trees.push({ x: t.x, z: t.z }); // on the tile grid; the clump's outline is what looks natural
           this.treeTiles.add(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox));
         }
       }
@@ -555,9 +555,11 @@ export class Overworld {
     const soil = (m.soil = new Uint8Array(m.w * m.h));
     for (const p of this.world.platforms) if (p.ground) {
       const { x, z } = bedsAt(p)[0]!;
+      // One plain block of dirt: slots side by side, a walkable row between, nothing else on it.
       for (let dz = -1; dz <= 4; dz++) for (let dx = -1; dx <= 3; dx++) {
         const k = (z + dz - m.oz) * m.w + x + dx - m.ox;
-        if (m.kind[k] === T.grass || m.kind[k] === T.tall || m.kind[k] === T.flowers) soil[k] = 1;
+        if (m.kind[k] === T.flowers || m.kind[k] === T.tall) m.kind[k] = T.grass;
+        if (m.kind[k] === T.grass || m.kind[k] === T.path) soil[k] = 1;
       }
     }
     const clearing = new Set<number>();
@@ -1099,7 +1101,6 @@ export class Overworld {
     const camY = Math.round(this.cam.z * TILE - sh / 2);
     const toScreen = (x: number, z: number): [number, number] => [Math.round(x * TILE) - camX, Math.round(z * TILE) - camY];
     drawSea(g, m, camX, camY, sw, sh, t);
-    drawLowClouds(g, m, camX, camY, sw, sh, t);
     drawLand(g, m, this.sunny, camX, camY, sw, sh, t);
     drawSeaLife(g, this.sunny.seaLife, camX, camY, sw, sh, t);
     this.drawBeds(g, toScreen, t);
@@ -1156,17 +1157,27 @@ export class Overworld {
     for (const d of this.decor) {
       const [sx, sy] = toScreen(d.x, d.z);
       if (sx < -40 || sy < -40 || sx > sw + 40 || sy > sh + 40) continue;
+      if (d.kind === "fence-v") {
+        // One item per tile, so people passing along it sort with each post (docs/LAYERS.md).
+        d.tiles.forEach((k, n) => {
+          const [ti, tj] = [m.ox + (k % m.w), m.oz + Math.floor(k / m.w)];
+          const [fx, fy] = toScreen(ti, tj);
+          const part = n === 0 ? tile(1, 40) : n === d.tiles.length - 1 ? tile(4, 40) : tile(3, 40);
+          items.push({ z: tj + 0.5, draw: () => drawRail(g, part, fx, fy) });
+        });
+        continue;
+      }
       const look = lookAt(m, Math.floor(d.x), Math.floor(d.z));
       items.push({ z: d.z - (d.kind === "lights" ? 0.2 : 0), draw: () => drawDecor(g, d.kind, sx, sy + 8, Math.max(1, d.tiles.length), look, lit === "evening" || lit === "night") });
     }
     {
       const [hx, hy] = toScreen(this.house.x, this.house.z);
-      if (!this.indoors) items.push({ z: this.house.z, draw: () => this.drawHouse(g, HOME_ART, hx, hy, t) });
+      if (!this.indoors) this.pushHouse(items, g, HOME_ART, this.house.z, hx, hy, t);
     }
     for (const h of this.houses) {
       const [hx, hy] = toScreen(h.x, h.z);
       if (hx < -64 || hy < -16 || hx > sw + 64 || hy > sh + 110) continue;
-      items.push({ z: h.z, draw: () => this.drawHouse(g, h.art, hx, hy, t) });
+      this.pushHouse(items, g, h.art, h.z, hx, hy, t);
     }
     for (const l of this.landmarks) {
       const [lx, ly] = toScreen(l.x, l.z);

@@ -10,7 +10,7 @@ import { mulberry32 } from "../sim/rng";
 import { groundOrigin, type Platform, type WorldMap } from "../world/layout";
 import { T, type TileMap } from "./tiles";
 
-export const DECOR_KINDS = ["bush", "bush-big", "rock", "rock-big", "fence", "stump", "jar", "crates", "lights", "grass", "flowers", "windmill", "crop-wheat", "crop-carrot"] as const;
+export const DECOR_KINDS = ["bush", "bush-big", "rock", "rock-big", "fence", "fence-v", "stump", "jar", "crates", "lights", "grass", "flowers", "windmill", "crop-wheat", "crop-carrot"] as const;
 export type DecorKind = (typeof DECOR_KINDS)[number];
 
 export interface DecorPiece {
@@ -114,14 +114,15 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
       }
     }
     if (p.ground) {
-      // Only the north edge of a horizontal road has a grassy row above it. Scan all road rows,
-      // letting the grass check discard inner rows and the junction buffer leave entrances open.
-      const fenceFree = (i: number, j: number) => {
+      // Straight roads carry a fence on both sides. Scan every road line and side, letting the grass check
+      // discard inner lines and the junction buffer leave entrances open. (dx, dz) points away from the road.
+      const fenceFree = (i: number, j: number, dx: number, dz: number) => {
         if (!GRASSY.has(kindAt(i, j)) || !onPlatform(p, m.ox + i + 0.5, m.oz + j + 0.5)) return false;
         if (gates.some(([gi, gj]) => Math.abs(i - gi!) <= 2 && Math.abs(j - gj!) <= 2)) return false;
-        for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) {
-          if (kindAt(i + di, j + dj) === T.bridge) return false;
-          if ((dj === -1 || dj === 0) && kindAt(i + di, j + dj) === T.path) return false;
+        for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {
+          const [q, r] = [i + a * Math.abs(dz) + b * dx, j + a * Math.abs(dx) + b * dz];
+          if (kindAt(q, r) === T.bridge) return false;
+          if ((b === 0 || b === 1) && kindAt(q, r) === T.path) return false;
         }
         // A clear ring provides a detour around either end, even when the road borders the coast.
         for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
@@ -130,26 +131,39 @@ export function placeDecor(world: WorldMap, m: TileMap, reserved: (x: number, z:
         }
         return true;
       };
-      for (let road = z0 - m.oz; road < z0 - m.oz + h; road++) {
-        for (let i = x0 - m.ox; i < x0 - m.ox + w;) {
-          if (kindAt(i, road) !== T.path) { i++; continue; }
-          const start = i;
-          while (i < x0 - m.ox + w && kindAt(i, road) === T.path) i++;
-          if (i - start < 6) continue;
-          const j = road - 1;
-          for (let a = start; a < i;) {
-            if (!fenceFree(a, j)) { a++; continue; }
-            let end = a;
-            while (end < i && fenceFree(end, j)) end++;
-            if (end - a < 3) { a = end; continue; }
-            const len = Math.min(end - a, 3 + Math.floor(rng() * 4));
-            const tiles = Array.from({ length: len }, (_, di) => j * m.w + a + di);
-            out.push({ kind: "fence", x: m.ox + a + len / 2, z: m.oz + j + 0.5, tiles, platform: p.id });
-            for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= len + 1; di++) taken.add((j + dj) * m.w + a + di);
-            a += len + 2 + Math.floor(rng() * 3);
+      const fenceRow = (start: number, stop: number, line: number, side: number, across: boolean) => {
+        const cell = (n: number): [number, number] => (across ? [n, line + side] : [line + side, n]);
+        const ok = (n: number) => fenceFree(...cell(n), across ? 0 : side, across ? side : 0);
+        for (let a = start; a < stop;) {
+          if (!ok(a)) { a++; continue; }
+          let end = a;
+          while (end < stop && ok(end)) end++;
+          if (end - a < 3) { a = end; continue; }
+          const len = Math.min(end - a, 5 + Math.floor(rng() * 4));
+          const tiles = Array.from({ length: len }, (_, n) => { const [i, j] = cell(a + n); return j * m.w + i; });
+          const [i, j] = cell(a);
+          if (across) out.push({ kind: "fence", x: m.ox + a + len / 2, z: m.oz + j + 0.5, tiles, platform: p.id });
+          else out.push({ kind: "fence-v", x: m.ox + i + 0.5, z: m.oz + a + len - 0.5, tiles, platform: p.id });
+          const [wide, deep] = across ? [len, 1] : [1, len];
+          for (let dj = -2; dj < deep + 2; dj++) for (let di = -2; di < wide + 2; di++) taken.add((j + dj) * m.w + i + di);
+          a += len + 2;
+        }
+      };
+      const roads = (lines: number, along: number, first: number, begin: number, across: boolean) => {
+        for (let line = first; line < first + lines; line++) {
+          const at = (n: number) => (across ? kindAt(n, line) : kindAt(line, n));
+          for (let n = begin; n < begin + along;) {
+            if (at(n) !== T.path) { n++; continue; }
+            const start = n;
+            while (n < begin + along && at(n) === T.path) n++;
+            if (n - start < 6) continue;
+            fenceRow(start, n, line, -1, across);
+            fenceRow(start, n, line, 1, across);
           }
         }
-      }
+      };
+      roads(h, w, z0 - m.oz, x0 - m.ox, true);
+      roads(w, h, x0 - m.ox, z0 - m.oz, false);
     }
     for (let tries = 0, placed = 0; tries < 1800 && placed < want; tries++) {
       // Small plants are walk-through clusters, so doubling detail need not double collision obstacles.
