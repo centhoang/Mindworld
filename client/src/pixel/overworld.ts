@@ -2,7 +2,7 @@
 // camera and the place banner. Game rules (movement, the map) come from ../world; this file only decides
 // what is where on screen.
 
-import { generateWorld, groundOrigin, onGround, platformAt, worldDay, type LayoutInput, type Platform, type WorldMap } from "../world/layout";
+import { groundOrigin, onGround, platformAt, worldDay, type LayoutInput, type Platform, type WorldMap } from "../world/layout";
 import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../world/movement";
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
@@ -27,6 +27,7 @@ import { findRoute } from "../world/route";
 import { cornerBlocks, railBlocks, seaCell, tile } from "./sunny-terrain";
 import { HOME_BLOCKS, HOME_DOOR_DX } from "../game/house";
 import { liveName } from "../world/live";
+import { villageWorld } from "../world/village-map";
 import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
@@ -36,6 +37,7 @@ import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
 import { SpriteImages } from "./generated-sprites";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
+const LANDMARK_PROP: Record<string, string> = { spr_deco_well: "well", statue: "statue" };
 const CLUMP = 6; // tiles: trees gather in cells of this size
 const SHORE: readonly (readonly [number, number])[] = [[-2, 0], [2, 0], [-1, 0], [1, 0], [0, -2], [-2, 1], [2, 1], [0, 1], [0, 2], [0, 3], [-2, 3], [2, 3]];
 // The mouth of each house's chimney, in pixels from the stamp's top left. Houses not listed have none.
@@ -211,7 +213,7 @@ export class Overworld {
     const old = this.world ? this.home : null;
     const wasHome = !!old && onGround(old, this.player.x, this.player.z);
     this.layoutIn = { ...this.layoutIn, ...next };
-    this.world = generateWorld(this.layoutIn);
+    this.world = villageWorld(this.layoutIn);
     this.map = buildTileMap(this.world);
     this.sunny = buildSunny(this.map);
     const plaza = this.world.platforms.find((p) => p.kind === "plaza");
@@ -232,7 +234,7 @@ export class Overworld {
     this.placeTrees();
     this.placeSigns();
     this.placeDecor();
-    this.bowl = { x: this.house.x - 5, z: this.house.z + 1.6 };
+    this.bowl = { x: this.house.x - 2, z: this.house.z + 1.6 };
     const lawn: Vec[] = [];
     for (let i = 0; i < 24; i++) {
       const a = (i / 24) * Math.PI * 2;
@@ -245,7 +247,7 @@ export class Overworld {
       bowl: [{ x: this.bowl.x, z: this.bowl.z + 0.5 }, { x: this.bowl.x - 0.8, z: this.bowl.z + 0.2 }],
       bed: [{ x: this.house.x - 2, z: this.house.z + 1.2 }, { x: this.house.x + 2, z: this.house.z + 1.2 }, { x: this.house.x - 2.6, z: this.house.z + 1.8 }],
       lawn,
-      ...this.betweenSpots([home.cell]),
+      ...this.betweenSpots([home.cell], { x: home.x, z: home.z + 2 }),
     };
     this.npcs?.setSpots(this.npcSpots());
     this.minds?.setPlaces(new Set(Object.keys(this.lifeEnv.spots) as (keyof Spots)[]));
@@ -404,7 +406,7 @@ export class Overworld {
     for (const p of this.world.platforms) {
       if (!p.ground) continue;
       const [ci, cj] = p.cell;
-      const side = Math.abs(ci) >= Math.abs(cj) ? (ci > 0 ? "w" : "e") : cj > 0 ? "n" : "s";
+      const side = p.rect ? "s" : Math.abs(ci) >= Math.abs(cj) ? (ci > 0 ? "w" : "e") : cj > 0 ? "n" : "s";
       const [ox, oz] = groundOrigin(p);
       const gate = p.ground.gates[side];
       const inX = side === "w" ? 2 : side === "e" ? -2 : 0; // a couple of tiles inside the gate
@@ -424,6 +426,13 @@ export class Overworld {
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
   private placeTrees(): void {
     const m = this.map;
+    if (this.world.things) {
+      for (const t of this.world.things) if (t.kind === "tree") {
+        this.trees.push({ x: t.x, z: t.z });
+        this.treeTiles.add(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox));
+      }
+      return;
+    }
     const kindAt = (i: number, j: number) => i < 0 || j < 0 || i >= m.w || j >= m.h ? T.water : m.kind[j * m.w + i];
     for (const p of this.world.platforms) {
       if (p.kind === "islet") continue;
@@ -494,12 +503,13 @@ export class Overworld {
       (!!this.stall && near(this.stall, x, z, 3)) ||
       this.allBeds.some((b) => Math.abs(b.x + 0.5 - x) < 2 && Math.abs(b.z + 0.5 - z) < 2) ||
       this.signs.some((sg) => Math.abs(sg.x - x) < 1.5 && Math.abs(sg.z - z) < 1.5);
-    this.decor = placeDecor(this.world, m, (x, z) => reserved(x, z) ||
-      this.treeTiles.has(Math.floor(z - m.oz) * m.w + Math.floor(x - m.ox)), reserved);
+    this.decor = this.world.things
+      ? this.world.things.filter((t) => t.kind !== "tree").map((t) => ({ kind: t.kind as DecorPiece["kind"], x: t.x, z: t.z, tiles: [Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox)], platform: "" }))
+      : placeDecor(this.world, m, (x, z) => reserved(x, z) || this.treeTiles.has(Math.floor(z - m.oz) * m.w + Math.floor(x - m.ox)), reserved);
     // Feature clearings take priority over trees, like the pack's fields and mill yards.
     // Farm ground is the pack's light dirt: real beds with a tile around them, and the decorative fields.
     const soil = (m.soil = new Uint8Array(m.w * m.h));
-    for (const p of this.world.platforms) if (p.ground) {
+    if (!this.world.things) for (const p of this.world.platforms) if (p.ground) {
       const { x, z } = bedsAt(p)[0]!;
       // One plain block of dirt: slots side by side, a walkable row between, nothing else on it.
       for (let dz = -1; dz <= 4; dz++) for (let dx = -1; dx <= 3; dx++) {
@@ -513,7 +523,7 @@ export class Overworld {
       for (const k of [...d.tiles, ...(d.soil ?? [])]) for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) clearing.add(k + dz * m.w + dx);
     }
     this.trees = this.trees.filter((t) => !clearing.has(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox)));
-    this.trees = this.trees.filter((t, _, trees) => trees.some((other) => other !== t && Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 4));
+    if (!this.world.things) this.trees = this.trees.filter((t, _, trees) => trees.some((other) => other !== t && Math.max(Math.abs(t.x - other.x), Math.abs(t.z - other.z)) <= 4));
     this.treeTiles.clear();
     for (const t of this.trees) this.treeTiles.add(Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox));
     for (const d of this.decor) {
@@ -1048,6 +1058,7 @@ export class Overworld {
       ...this.trees.map((t) => ({ kind: "tree", x: t.x, z: t.z })),
       ...this.decor.map((d) => ({ kind: d.kind, x: d.x, z: d.z })),
       ...this.houses.map((h) => ({ kind: "house", x: h.x, z: h.z })),
+      ...this.landmarks.map((l) => ({ kind: LANDMARK_PROP[l.art] ?? "house", x: l.x, z: l.z })),
       ...this.signs.map((s) => ({ kind: "sign", x: s.x, z: s.z, text: s.text })),
       ...this.world.platforms.flatMap((p) => Object.entries(p.spots ?? {}).map(([kind, at]) => ({ kind, x: at.x, z: at.z }))),
       ...this.life.messes.map((m) => ({ kind: "mess", x: m.pos.x, z: m.pos.z })),
@@ -1111,7 +1122,7 @@ export class Overworld {
   }
 }
 
-export const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) + 3 + Math.floor(i / 3) * 2 }));
+export const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 2 + Math.floor(i / 3) * 2 }));
 
 const GATHER_HINT: Record<string, string> = { fish: "E: FISH", chop: "E: CHOP", herbs: "E: PICK HERBS" };
 

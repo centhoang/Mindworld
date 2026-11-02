@@ -90,7 +90,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   for (const b of scene.beds) {
     const x = cellOf(b.x), y = cellOf(b.z);
     if (x < camX - 3 || y < camY - 3 || x > camX + cols || y > camY + rows) continue;
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) put(x + c, y + r, r === 1 && c !== 1 ? "=" : " ", C.soilInk, b.wet ? C.soilInk : (c + r) & 1 ? C.soil : C.soil2);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) put(x + c, y + r, r === 1 && c !== 1 ? "=" : " ", C.soilInk, b.wet ? C.soilInk : c === 0 || r === 0 ? mix(C.soil, C.soilInk, 0.5) : (c + r) & 1 ? C.soil : C.soil2);
     if (b.crop) {
       const stage = Math.min(3, b.stage);
       put(x + 1, y + 1, ".,Y@".charAt(stage), stage === 3 ? C.berry : C.sprout);
@@ -163,6 +163,11 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
     else if (kind === "blanket") for (let r = 0; r < 3; r++) write(x - 3, y + r, "+ + + +", C.paper, C.flowerA);
     else if (kind === "basket") write(x - 1, y, "\\_/", C.woodInk, C.wood);
     else if (kind === "bench") write(x - 3, y, "=======", C.woodInk, C.wood);
+    else if (kind === "well") { write(x - 2, y - 3, "/===\\", C.roofInk, C.roof); put(x - 2, y - 2, "|", C.woodInk); put(x + 2, y - 2, "|", C.woodInk); write(x - 2, y - 1, "[ ~ ]", C.woodInk, 0xb9b2a4); write(x - 2, y, "[___]", C.woodInk, 0xb9b2a4); }
+    else if (kind === "statue") { write(x - 1, y - 4, "(o)", C.ink, 0xb9b2a4); write(x - 1, y - 3, "/|\\", C.ink, 0xb9b2a4); write(x - 1, y - 2, " | ", C.ink, 0xb9b2a4); write(x - 2, y - 1, "#####", C.shadow, 0xb9b2a4); write(x - 2, y, "#####", C.shadow, 0x8f897d); }
+    else if (kind === "goal") { write(x - 4, y - 3, "+-------+", C.paper); for (let r = 2; r >= 0; r--) { put(x - 4, y - r, "|", C.paper); put(x + 4, y - r, "|", C.paper); } }
+    else if (kind === "ball") put(x, y, "o", C.ink, C.paper);
+    else if (kind === "slide") { write(x - 2, y - 2, "[=\\", C.woodInk, C.sky); write(x - 2, y - 1, "| =\\", C.woodInk, C.sky); write(x - 2, y, "|  ==", C.woodInk, C.sky); }
   };
   const addProp = (p: SceneProp) => {
     const x = cellOf(p.x), y = cellOf(p.z);

@@ -1,5 +1,5 @@
 import { parseGenes } from "../game/genes";
-import { SLOT_COUNT } from "./layout";
+import { PLOT_COUNT } from "./village-map";
 import { cleanScene } from "../mind/scene";
 import { parseFighter, type Fighter } from "../sim/duel";
 import type { Genes } from "../sim/ghost";
@@ -109,7 +109,7 @@ interface SocketLike {
 }
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 160 ? v : null);
-const slotOf = (v: unknown): number | null => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < SLOT_COUNT ? v : null);
+const slotOf = (v: unknown): number | null => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < PLOT_COUNT ? v : null);
 const seedOf = (v: unknown): number => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < 2 ** 31 ? v : 0);
 const cleanName = (n: string) => n.replace(/[^\p{L}\p{N} _'-]+/gu, "");
 
@@ -183,7 +183,7 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
     case "welcome": {
       const id = str(m.id, 16);
       if (!id || !Array.isArray(m.peers)) return;
-      const aways = (Array.isArray(m.aways) ? m.aways : []).map(parseAway).filter((a): a is LiveAway => !!a).slice(0, SLOT_COUNT);
+      const aways = (Array.isArray(m.aways) ? m.aways : []).map(parseAway).filter((a): a is LiveAway => !!a).slice(0, PLOT_COUNT);
       const talks = (Array.isArray(m.talks) ? m.talks : []).flatMap((t: unknown): [string, string][] => {
         const [a, b] = Array.isArray(t) ? [str(t[0], 16), str(t[1], 16)] : [null, null];
         return a && b ? [[a, b]] : [];

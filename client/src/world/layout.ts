@@ -12,6 +12,8 @@
 
 import { mulberry32 } from "../sim/rng";
 import { groundFromSeed, GROUND_H, GROUND_W, isLand, type Ground, type Side } from "./ground";
+import type { TileMap } from "./tilemap";
+import type { VillageThing } from "./village-map";
 
 export const PLATFORM_KINDS = ["plaza", "home", "ground", "wild", "boss", "npc", "event", "playground", "picnic", "pond", "islet"] as const;
 export type PlatformKind = (typeof PLATFORM_KINDS)[number];
@@ -35,6 +37,7 @@ export interface Platform {
   ground?: Ground; // seeded shape for home + players' grounds
   away?: boolean; // the owner left: a ghost ground until the slot frees
   spots?: Record<string, Vec2>; // activity anchors on in-between grounds
+  rect?: [number, number, number, number]; // the village's places and plots: x0, z0, x1, z1, end exclusive
 }
 
 export interface Bridge {
@@ -50,6 +53,8 @@ export interface Bridge {
 export interface WorldMap {
   platforms: Platform[];
   bridges: Bridge[];
+  tiles?: TileMap; // the village: authored tiles, used as they are
+  things?: readonly VillageThing[]; // the village: its trees, bushes and rocks
 }
 
 export interface GroundOwner {
@@ -236,7 +241,7 @@ export function generateWorld(input: LayoutInput = {}): WorldMap {
 }
 
 // Grounds: origin of the shape's tile (0, 0) in world tiles, so tile (gi, gj) covers [ox+gi, ox+gi+1).
-export const groundOrigin = (p: Platform): [number, number] => [p.x - Math.floor(GROUND_W / 2), p.z - Math.floor(GROUND_H / 2)];
+export const groundOrigin = (p: Platform): [number, number] => p.rect ? [p.rect[0], p.rect[1]] : [p.x - Math.floor(GROUND_W / 2), p.z - Math.floor(GROUND_H / 2)];
 
 // Where a bridge meets a platform on one side: the gate tile for grounds, the rim for round places.
 // Bridges run on the cell's centre line + 0.5, which is exactly the grounds' gate row/column.
@@ -264,6 +269,7 @@ export function inBlock(p: Platform, x: number, z: number): boolean {
 }
 
 export function onGround(p: Platform, x: number, z: number): boolean {
+  if (p.rect) return x >= p.rect[0] && z >= p.rect[1] && x < p.rect[2] && z < p.rect[3];
   if (!p.ground) return inBlock(p, x, z);
   const [ox, oz] = groundOrigin(p);
   return isLand(p.ground, Math.floor(x - ox), Math.floor(z - oz));

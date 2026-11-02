@@ -42,6 +42,7 @@ function bounds(p: Platform): [number, number, number, number] {
 }
 
 export function buildTileMap(w: WorldMap): TileMap {
+  if (w.tiles) return w.tiles;
   let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
   for (const p of w.platforms) {
     const [x0, z0, x1, z1] = bounds(p);

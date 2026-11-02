@@ -5,7 +5,8 @@ import type { Save } from "../game/save";
 import type { Pose } from "../life/activities";
 import type { Fighter } from "../sim/duel";
 import type { Genes } from "../sim/ghost";
-import { SLOT_COUNT, worldDay, type GroundOwner } from "./layout";
+import { worldDay, type GroundOwner } from "./layout";
+import { GUEST_SLOT, PLOT_COUNT } from "./village-map";
 import { isNpc, LiveLink, NPCS, roomUrl, type Emote, type LivePeer, type Npc } from "./live";
 
 export const EMOTE_TEXT: Record<Emote, string> = { wave: "*waves*", heart: "<3 <3", dance: "*dances*", laugh: "haha!" };
@@ -44,7 +45,7 @@ export function makeRoomFlow(d: RoomDeps) {
     if (!add) fakes.pop();
     else {
       const used = new Set([mySlot, ...[...grounds.values()].map((o) => o.slot), ...aways.keys(), ...fakes.map((o) => o.slot)]);
-      const slot = Array.from({ length: SLOT_COUNT }, (_, n) => n).find((n) => !used.has(n));
+      const slot = Array.from({ length: PLOT_COUNT }, (_, n) => n).find((n) => !used.has(n));
       if (slot !== undefined) fakes.push({ id: `fake${slot}`, name: `Test ${slot}`, seed: slot * 7919 + 13, slot });
     }
     relayoutGrounds();
@@ -97,7 +98,7 @@ export function makeRoomFlow(d: RoomDeps) {
       world.peers.clear();
       grounds.clear();
       aways.clear();
-      mySlot = corner ?? 0;
+      mySlot = corner ?? GUEST_SLOT;
       slotKnown = corner !== null;
       for (const a of awayList) aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
       for (const p of peers) (addPeer(p), trackGround(p));

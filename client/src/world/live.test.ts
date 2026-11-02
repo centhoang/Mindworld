@@ -37,8 +37,8 @@ describe("live messages", () => {
     expect(parsePeer(peer)).toEqual(peer);
     expect(parsePeer({ ...peer, x: 999 })).toBeNull();
     expect(parsePeer({ ...peer, name: "" })).toBeNull();
-    expect(parsePeer({ ...peer, corner: 24, seed: -1, genes: null })).toMatchObject({ corner: null, seed: 0, genes: { hue: 0.6 } });
-    expect(parsePeer({ ...peer, corner: 23, x: 150 })).toMatchObject({ corner: 23, x: 150 });
+    expect(parsePeer({ ...peer, corner: 12, seed: -1, genes: null })).toMatchObject({ corner: null, seed: 0, genes: { hue: 0.6 } });
+    expect(parsePeer({ ...peer, corner: 11, x: 150 })).toMatchObject({ corner: 11, x: 150 });
   });
 
   it("dispatches valid messages and ignores the rest", () => {
