@@ -12,7 +12,7 @@
 Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams, decor density, fences. Each is a cost in rules and bugs.
 
 ## Look options
-**Open (user, 2026-11-02):** mosaic plane spike, the whole screen is one grid of cells and only changed cells repaint. Compare: `client/spike-compare.html`, proof `../testing/proof/visual/mosaic-*`.
+**Open (user, 2026-11-02):** mosaic plane spike, the whole screen is one grid of cells and only changed cells repaint. Compare: `client/spike-compare.html`, proof `../testing/proof/visual/mosaic-*`. Variants (`src/view/mosaic/skins.ts`): Tile, Dense, Night, Sketch, Stitch, Soft.
 
 **Decided (user, 2026-11-02):** A, glyph look, after judging the spike's image and clip. If 5c runs late: B, compact Sunnyside. Spike: `client/glyph-spike.html`, proof in `../testing/proof/visual/glyph-spike*`.
 

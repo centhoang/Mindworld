@@ -1,6 +1,8 @@
 // The whole screen is one plane of cells. A cell is a character, an ink and a background, and nothing else exists.
 // Callers write the frame they want; flush() compares it with what is shown and paints only the cells that differ.
 export const KEEP = -1; // as a background: leave the cell's background, so a character can sit on the ground
+export type StyleCell = { ch: number; ink: number; bg: number };
+export type Restyle = (c: StyleCell, x: number, y: number, bgAt: (x: number, y: number) => number) => void;
 export type PaintCell = (x: number, y: number, ch: string, ink: number, bg: number) => void;
 
 export class CellGrid {
@@ -41,6 +43,22 @@ export class CellGrid {
     for (let i = 0; i < this.bg.length; i++) {
       this.bg[i] = f(this.bg[i]!);
       this.ink[i] = f(this.ink[i]!);
+    }
+  }
+
+  // Rewrites every cell. bgAt reads the backgrounds as they were before this pass; off the plane it repeats the edge.
+  restyle(f: Restyle): void {
+    const before = this.bg.slice();
+    const bgAt = (x: number, y: number) => before[Math.max(0, Math.min(this.rows - 1, y)) * this.cols + Math.max(0, Math.min(this.cols - 1, x))]!;
+    const c: StyleCell = { ch: 0, ink: 0, bg: 0 };
+    for (let i = 0; i < before.length; i++) {
+      c.ch = this.ch[i]!;
+      c.ink = this.ink[i]!;
+      c.bg = before[i]!;
+      f(c, i % this.cols, Math.floor(i / this.cols), bgAt);
+      this.ch[i] = c.ch;
+      this.ink[i] = c.ink;
+      this.bg[i] = c.bg;
     }
   }
 

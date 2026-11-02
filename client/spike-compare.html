@@ -20,19 +20,26 @@
     <iframe id="b" title="Mosaic cell plane" src="/mosaic-spike.html"></iframe>
     <div id="bar" role="group" aria-label="Which version">
       <button data-v="a">A current</button>
-      <button data-v="b">B mosaic</button>
+      <button data-v="b" data-s="1">Tile</button>
+      <button data-v="b" data-s="2">Dense</button>
+      <button data-v="b" data-s="3">Night</button>
+      <button data-v="b" data-s="4">Sketch</button>
+      <button data-v="b" data-s="5">Stitch</button>
+      <button data-v="b" data-s="6">Soft</button>
       <button data-v="both">Side by side</button>
     </div>
     <script type="module">
       const buttons = [...document.querySelectorAll("button")];
       const b = document.getElementById("b");
-      const show = (v) => {
+      let skin = "1";
+      const show = (v, s = skin) => {
+        skin = s;
         document.body.dataset.show = v;
-        buttons.forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === v)));
-        for (const f of document.querySelectorAll("iframe")) f.contentWindow?.location.reload();
-        setTimeout(() => b.focus(), 0);
+        buttons.forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === v && (v !== "b" || x.dataset.s === skin))));
+        document.getElementById("a").contentWindow?.location.reload();
+        b.src = `/mosaic-spike.html?v=${skin}`;
       };
-      buttons.forEach((x) => x.addEventListener("click", () => show(x.dataset.v)));
+      buttons.forEach((x) => x.addEventListener("click", () => show(x.dataset.v, x.dataset.s)));
       buttons[1].setAttribute("aria-pressed", "true");
       // Tab flips A and B, inside the frame too.
       const flip = (e) => { if (e.key === "Tab") { e.preventDefault(); show(document.body.dataset.show === "a" ? "b" : "a"); } };

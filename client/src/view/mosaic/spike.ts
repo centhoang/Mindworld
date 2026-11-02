@@ -3,6 +3,7 @@
 // Same-time rule: compose(t) is pure in t apart from the player's keys, so a frame can be frozen (?t=9) or stepped (window.__draw).
 import { CELL, PAL, cell, wrap } from "../glyph/atlas";
 import { CellGrid, KEEP } from "./grid";
+import { QUAD, SKINS, STITCH } from "./skins";
 
 const rgb = (hex: string) => parseInt(hex.slice(1), 16);
 const css = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
@@ -15,6 +16,8 @@ const g = canvas.getContext("2d", { alpha: false })!;
 let grid = new CellGrid(1, 1);
 let camX = 0, camY = 0;
 let grout = true;
+let skin = SKINS[Number(new URLSearchParams(location.search).get("v") ?? 1) - 1] ?? SKINS[0]!;
+let bigger = 0;
 let showStats = false;
 
 const hash = (a: number, b: number, s = 0) => {
@@ -29,6 +32,7 @@ const mix = (a: number, b: number, k: number) => {
 };
 const put = (x: number, y: number, ch: string, ink: number, bg: number = KEEP) => grid.put(x - camX, y - camY, ch, ink, bg);
 const shade = (x: number, y: number) => {
+  if (!skin.shadows) return;
   const bg = grid.background(x - camX, y - camY);
   grid.setBackground(x - camX, y - camY, mix(bg, C.shadow, 0.28));
 };
@@ -278,6 +282,7 @@ function compose(t: number): void {
   [[69, 15, "_"], [70, 15, "_"], [71, 16, "\\"], [71, 17, ":"], [71, 18, ":"], [71, 19, ":"], [71, 20, ":"], [71, 21, ":"], [71, 22, ":"]].forEach(([x, y, c]) => put(x as number, y as number, c as string, C.ink));
   put(71, 23 + (Math.floor(t * 2) & 1), "o", C.berry);
 
+  skin.apply?.(grid, camX, camY);
   const step = Math.round(lerp(0, 6, (t - 10) / 5));
   if (step > 0) dusk(step);
 
@@ -308,9 +313,38 @@ function compose(t: number): void {
   }
 }
 
+const stitches = new Map<number, HTMLCanvasElement>();
+function stitch(ink: number): HTMLCanvasElement {
+  let c = stitches.get(ink);
+  if (!c) {
+    c = document.createElement("canvas");
+    c.width = c.height = CELL;
+    const s = c.getContext("2d")!;
+    s.fillStyle = css(ink);
+    s.globalAlpha = 0.35;
+    s.fillRect(0, 0, CELL, CELL);
+    s.globalAlpha = 1;
+    for (let i = 0; i < 8; i++) { s.fillRect(i - 1, i, 3, 1); s.fillRect(6 - i, i, 3, 1); }
+    s.fillStyle = "rgba(255,255,255,.28)";
+    s.fillRect(3, 3, 2, 1);
+    stitches.set(ink, c);
+  }
+  return c;
+}
+
 function paintCell(x: number, y: number, ch: string, ink: number, bg: number): void {
-  cell(g, x, y, ch, css(ink), css(bg));
-  if (grout) {
+  const n = ch.charCodeAt(0);
+  if (n === STITCH) {
+    g.fillStyle = css(bg);
+    g.fillRect(x * CELL, y * CELL, CELL, CELL);
+    g.drawImage(stitch(ink), x * CELL, y * CELL);
+  } else if (n >= QUAD && n < QUAD + 16) {
+    g.fillStyle = css(bg);
+    g.fillRect(x * CELL, y * CELL, CELL, CELL);
+    g.fillStyle = css(ink);
+    for (let b = 0; b < 4; b++) if ((n - QUAD) & (1 << b)) g.fillRect(x * CELL + (b & 1) * 4, y * CELL + (b >> 1) * 4, 4, 4);
+  } else cell(g, x, y, ch, css(ink), css(bg));
+  if (grout && skin.grout) {
     g.fillStyle = "rgba(43,58,58,.08)";
     g.fillRect(x * CELL + CELL - 1, y * CELL, 1, CELL);
     g.fillRect(x * CELL, y * CELL + CELL - 1, CELL - 1, 1);
@@ -336,7 +370,7 @@ function tick(t: number): void {
 // Whole device pixels per art pixel, about 45 rows or more; the plane then takes as many cells as the window holds.
 function fit(): void {
   const dpr = devicePixelRatio || 1;
-  const k = Math.max(1, Math.floor((innerHeight * dpr) / (45 * CELL)));
+  const k = Math.max(1, Math.floor((innerHeight * dpr) / (45 * CELL))) + bigger;
   const size = (CELL * k) / dpr;
   const cols = Math.ceil(innerWidth / size), rows = Math.ceil(innerHeight / size);
   grid = new CellGrid(cols, rows);
@@ -369,6 +403,8 @@ function key(e: KeyboardEvent): void {
     me.moved = clock;
     e.preventDefault();
   } else if (e.key === "Enter") { me ??= { x: 42, y: 20, dirX: 1, moved: 0 }; typing = ""; }
+  else if (e.key >= "1" && e.key <= String(SKINS.length)) { skin = SKINS[Number(e.key) - 1]!; fit(); }
+  else if (e.key === "z") { bigger = 1 - bigger; fit(); }
   else if (e.key === "g") { grout = !grout; fit(); }
   else if (e.key === "i") { showStats = !showStats; stats.ticks = stats.painted = stats.composeMs = stats.paintMs = 0; }
 }
@@ -382,6 +418,7 @@ const w = window as unknown as Record<string, unknown>;
 w.__stats = stats;
 w.__resetStats = () => { stats.ticks = stats.painted = stats.composeMs = stats.paintMs = 0; };
 w.__draw = (t: number) => { tick(t); return canvas.toDataURL("image/png"); };
+w.__skin = (n: number) => { skin = SKINS[n - 1]!; fit(); };
 w.__tick = tick;
 
 if (frozenT() === null) {
