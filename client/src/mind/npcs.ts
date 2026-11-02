@@ -423,7 +423,7 @@ export class NpcVillage {
     this.lastSaid.set(key, line);
     this.follow(npc, line);
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
-    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? known ?? this.quote(npc, line) ?? goalAnswer(line, goalOf(npc, this.purseOf(npc)), this.purseOf(npc)) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
+    const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? known ?? this.quote(npc, player, line) ?? goalAnswer(line, goalOf(npc, this.purseOf(npc)), this.purseOf(npc)) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     this.ageOffer(npc, player);
     const seen = scene ?? this.hub.sceneOf?.(npc) ?? "";
     const heard = this.talks.get(key) ?? [];
@@ -519,9 +519,13 @@ export class NpcVillage {
     return `I have nothing to say to you, ${player}.`;
   }
 
-  private quote(npc: Npc, line: string): string | null {
+  // "How much?" with no good named means the deal on the table, or else the good just talked about.
+  private quote(npc: Npc, player: string, line: string): string | null {
     openDay(this.market, gameTime(this.v.t).day, VILLAGERS);
-    return priceAnswer(line, this.market, this.purseOf(npc));
+    const key = `${npc}:${player}`, pending = this.offers.get(key), asked = pending?.o.good ?? this.askedGood.get(key);
+    const said = priceAnswer(line, this.market, this.purseOf(npc));
+    if (!said || !asked || parseOffer(line) || /\b(?:wheat|carrots?|tomato(?:e?s)?|fish|wood|herbs?)\b/i.test(line)) return said;
+    return pending ? dealLine("counter", pending.o, pending.price, player) : priceAnswer(`how much is ${asked}`, this.market, this.purseOf(npc));
   }
 
   // A villager's purse: it travels with the mind, and every villager starts with a little.
@@ -547,6 +551,8 @@ export class NpcVillage {
 
   // The player offers a gift or a deal in their own words. The sim settles what is possible; with a model, the NPC
   // chooses among what is left. Returns the answer, or null if the line is no offer.
+  private readonly askedGood = new Map<string, Good>(); // npc:player -> the good last asked about
+
   private async traded(npc: Npc, m: Mind, player: string, line: string, to?: string): Promise<string | null> {
     const key = `${npc}:${player}`;
     const pending = this.offers.get(key);
@@ -560,8 +566,9 @@ export class NpcVillage {
     }
     const o = parseOffer(line);
     if (!o) return null;
+    this.askedGood.set(key, o.good);
     const pocket = !to ? this.pocket : null;
-    if (!pocket) return `Bring it to me in person, ${player}.`;
+    if (!pocket) return o.kind === "buy" ? `Come by in person, ${player}.` : `Bring it to me in person, ${player}.`;
     const g = gameTime(this.v.t);
     openDay(this.market, g.day, VILLAGERS);
     const purse = this.purseOf(npc);

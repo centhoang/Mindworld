@@ -87,6 +87,10 @@ describe("offers in plain words", () => {
     ["can I buy 2 wood for 8 coins", { kind: "buy", good: "wood", qty: 2, price: 4 }],
     ["I'll sell you three carrots for 7 each", { kind: "sell", good: "carrot", qty: 3, price: 7 }],
     ["do you want to buy my wheat", { kind: "sell", good: "wheat", qty: 1, price: null }],
+    ["Do you sell fish?", { kind: "buy", good: "fish", qty: 1, price: null }],
+    ["got any carrots?", { kind: "buy", good: "carrot", qty: 1, price: null }],
+    ["are you selling wood", { kind: "buy", good: "wood", qty: 1, price: null }],
+    ["I'm selling fish", { kind: "sell", good: "fish", qty: 1, price: null }],
   ])("%s", (line, want) => expect(parseOffer(line)).toEqual(want));
 
   it("a line about a good with no offer in it is not one", () => {
@@ -162,6 +166,17 @@ describe("deals in the village", () => {
     expect(nv.purseOf("pip").goods.carrot).toBe(1);
     const mem = nv.hub.minds.get("pip")!.mem;
     expect(mem.bonds.Kai!.why.at(-1)!.text).toBe("Kai gave me 1 carrot");
+  });
+
+  it("asking what a villager sells is buying, and 'how much?' means that good", async () => {
+    const { nv, mine } = town();
+    nv.purseOf("ama").goods.fish = 2;
+    const first = await nv.reply("ama", "Kai", "Do you sell fish?");
+    expect(first?.text).not.toMatch(/Bring it/);
+    expect(mine.goods.fish ?? 0).toBeLessThanOrEqual(1);
+    const none = town();
+    await none.nv.reply("ama", "Kai", "Do you sell fish?");
+    expect((await none.nv.reply("ama", "Kai", "how much?"))?.text).toContain("Fish is");
   });
 
   it("a counter waits for a yes, then coins and goods change hands once", async () => {

@@ -176,7 +176,7 @@ export function parseOffer(line: string): Offer | null {
   const asked = /\bfor (\d+)|\b(\d+) ?(?:c|coins?)\b/.exec(l);
   const price = asked ? Math.round(Number(asked[1] ?? asked[2]) / (/\beach\b/.test(l) ? 1 : qty)) : null;
   const kind: OfferKind | null =
-    /\b(sell me|give me|can i (?:have|get|buy)|i(?:'ll| will) take|i want|i'?d like|could i (?:have|get|buy))\b/.test(l) ? "buy"
+    /\b(sell me|give me|can i (?:have|get|buy)|i(?:'ll| will) take|i want|i'?d like|could i (?:have|get|buy)|do you (?:sell|have|stock)|have you got|you got|got any|are you selling|any .* for sale)\b/.test(l) ? "buy"
     : /\b(buy (?:my|this|these|some of my)|want to buy|sell|selling)\b/.test(l) ? "sell"
     : /\bbuy\b/.test(l) ? "buy"
     : /\b(gift|give|gave|brought|bring|here'?s|for you|take this|take these|have this|have these|have some)\b/.test(l) ? "gift"
