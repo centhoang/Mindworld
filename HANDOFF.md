@@ -21,7 +21,7 @@
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-1. See the Teach refusal on live (`.scratch/pet-lesson.js`): bug 25. Home network was slow, TCP over 1 s to every host. Then bug 26.
+1. Bug 26: a valid lesson can leave the memo unchanged, and the player is not told.
 2. Visual left: house entry, window sizes, pet genes. Pet left: hatch, follow, mood. Walking outlines and slide: `docs/visual/layers.md`.
 3. Step 6: wire and cut. Remove boss, ghosts, furniture editing, `generateWorld` and its tests, goal "Outsmart The Reader". `checks/game.md`, 2+ players, drop `/api/chatlog`.
 4. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off.
