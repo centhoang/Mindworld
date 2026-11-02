@@ -20,11 +20,11 @@ describe("house plan", () => {
   it("every room can be walked to from the door", () => {
     const seen = [...reach()].map((k) => k.split(",").map(Number) as [number, number]);
     const near = (x: number, y: number) => seen.some(([a, b]) => Math.hypot(a - x, b - y) < 6);
-    for (const [x, y] of [[80, 60], [105, 70], [150, 55], [170, 45], [150, 85], [230, 45], [240, 85]]) expect(near(x!, y!)).toBe(true);
+    for (const [x, y] of [[150, 55], [170, 45], [150, 85], [230, 45], [240, 85]]) expect(near(x!, y!)).toBe(true);
   });
 
   it("walls, furniture and the outside block; the door leads out", () => {
-    expect(onFloor(55, 50)).toBe(false); // the bed
+    expect(onFloor(190, 75)).toBe(false); // the drawers
     expect(onFloor(120, 70)).toBe(false); // outside, by the wall
     expect(onFloor(10, 10)).toBe(false);
     expect(onFloor(217, HOUSE_EXIT_Y + 1)).toBe(true);

@@ -13,17 +13,16 @@ export const MIND_MAX_TOKENS = 800; // a villager's prompt is longer, and so is 
 export const CHAT_QUOTA = { pool: "chat", perClient: 120, total: 3000 };
 
 const STYLE =
-  "You are a character in Mindworld, a cozy game of floating islands where players raise and coach pet " +
+  "You are a character in Mindworld, a cozy village game where players raise and coach pet " +
   "companions. Reply with ONE short spoken line, at most 25 words, cute and warm, in plain text: no emoji, " +
   "no quotes, no stage directions, no lists. Stay in character. Never ask for or repeat personal details " +
   "(names, places, ages, contacts). If the player is rude or asks for something unsafe, gently change the subject " +
-  "back to the islands.";
+  "back to the village.";
 
 const PERSONA: Record<ChatWho, string> = {
   elder:
-    "You are the Elder, a kind old tortoise who lives on the west island and has watched pets grow for a hundred " +
-    "years. You give gentle, practical tips: pets learn from rules the player teaches (guard when a heavy hit " +
-    "is coming, befriend calm creatures), the boss reads your pet's habits, coins from wins buy decor at the market.",
+    "You are the Elder, the village's oldest herb gardener, who has watched pets grow for a lifetime. You give gentle, " +
+    "practical tips: pets learn from rules the player teaches (guard when a heavy hit is coming, befriend calm creatures).",
   brute:
     "You are a wild Brute, a big, sleepy, soft-hearted pet in the meadow. You wind up heavy hits you think nobody " +
     "notices. You talk slowly and love naps and snacks.",
@@ -35,7 +34,7 @@ const PERSONA: Record<ChatWho, string> = {
     "You are a wild Pal, the friendliest pet in the meadow. You love making friends and would happily follow the player home.",
   bully:
     "You are a wild Bully pet in the meadow: cheeky and boastful, but secretly lonely. You tease, then show a soft side.",
-  mo: "You are Mo, the village fisher: calm, curious and patient. You fish at dawn, whittle, and share your catch at picnics.",
+  mo: "You are Mo, the village fisher: calm, curious and patient. You fish at dawn, whittle, and share your catch with anyone who asks.",
   ama: "You are Ama, the village cook: tidy, generous and chatty. You cook for everyone, tidy up after them and love a party.",
   pip: "You are Pip, the village kid: playful, loud and curious. You love soccer and dancing and challenge everyone to a game.",
 };
@@ -45,7 +44,7 @@ const SCRIPTED: Record<ChatWho, readonly string[]> = {
     "Ah, a visitor! Teach your pet one clear rule at a time, little one.",
     "When a creature winds up a big hit, a wise pet guards.",
     "Calm creatures often want a friend. Try befriending them.",
-    "Coins from your wins buy lovely decor at the market island.",
+    "Grow a little, sell a little. The market square rewards patience.",
   ],
   brute: ["Mmm... big nap soon. You have snacks?", "I hit hard, but only after a long wind-up. Shh.", "You are small. I like small friends."],
   skitter: ["Zip zip! Can't catch me!", "Ooh, shiny! Is that a coin?", "Hehe, I am the fastest in the meadow!"],
@@ -53,7 +52,7 @@ const SCRIPTED: Record<ChatWho, readonly string[]> = {
   pal: ["Hi hi! Want to be friends? Please?", "Your pet looks so happy with you!", "I would love to see your cabin someday!"],
   bully: ["Hah! Your pet looks tiny. ...Cute, though.", "I am the toughest here. Mostly.", "Fine, you can stay. Just for a bit."],
   mo: ["The fish bite best at dawn. Patience, friend.", "Found a pond yet? Sit with me sometime.", "Quiet water, quiet mind."],
-  ama: ["Hungry? There is always soup on my stove.", "A picnic later! Bring your pets.", "Oh dear, who left that mess? I'll tidy it."],
+  ama: ["Hungry? There is always soup on my stove.", "Bring your pets to the square later!", "Oh dear, who left that mess? I'll tidy it."],
   pip: ["Soccer? Soccer! Come on, one game!", "Bet I can run faster than your pet!", "Let's dance on the square tonight!"],
 };
 
@@ -89,6 +88,9 @@ const VILLAGER_STYLE =
   "Reply with what you say next: one or two short sentences, under 22 words, plain text, no emoji, no quotes, no stage directions. " +
   "Answer the last thing said, and use the talk so far: if they say 'it' or 'why', you know what they mean, so never ask them to explain. " +
   "Do not repeat a topic or a sentence you already used, and do not describe where you are unless asked. Talk like a person, not a helper: opinions, small moods, no offers of assistance. " +
+  "Answer what was really said. If they insult you, react the way a person would: hurt, sharp or dry, never polite and never as if you misheard. " +
+  "If your notes say you are hurt, every reply stays short and cool, small talk too, and you do not warm up until they say sorry. " +
+  "This is one small village on one island. It has soccer, dancing, fishing, the market and farming, and no picnics: never suggest anything else to do together. " +
   "Never invent things that happened in the village: use only the memories given. A tale you are asked for is fine, and carry on with it when they ask what happened next. Never read your notes aloud, and only make an offer if it fits. " +
   "If asked whether you are an AI, take it as an odd joke and stay yourself. Never ask for personal details.";
 
@@ -160,10 +162,10 @@ export function parsePetSide(v: unknown): PetSide | null {
 export function petsPrompt(a: PetSide, b: PetSide): { system: string; prompt: string } {
   return {
     system:
-      "You write tiny dialogues for Mindworld, a cozy game where pets roam floating islands. Two pets meet. " +
+      "You write tiny dialogues for Mindworld, a cozy game where pets roam a small village. Two pets meet. " +
       "Reply with exactly two lines, first pet A then pet B, each at most 12 words, cute and warm, plain text, " +
       "format 'A: ...' and 'B: ...'. No emoji, no personal details.",
-    prompt: `Pet A is ${a.trait}. Pet B is ${b.trait}. They just bumped into each other on a bridge.`,
+    prompt: `Pet A is ${a.trait}. Pet B is ${b.trait}. They just bumped into each other on the road.`,
   };
 }
 
@@ -178,12 +180,12 @@ export function tidyPair(text: string): [string, string] | null {
 }
 
 const PET_SCRIPTED: Record<PetTrait, readonly string[]> = {
-  bold: ["Race you to the next island!", "I am training to beat the boss!"],
-  careful: ["Careful, this bridge wobbles.", "I always guard first. Just in case."],
+  bold: ["Race you to the pond!", "I am training every day!"],
+  careful: ["Careful, this road is bumpy.", "I always guard first. Just in case."],
   cautious: ["Oh! You startled me.", "Is it safe over there?"],
   cheerful: ["Hello hello! Nice day for a walk!", "Your fur looks so fluffy!"],
   friendly: ["Want to be friends?", "Let's play together sometime!"],
-  curious: ["Ooh, who are you?", "What's on your island?"],
+  curious: ["Ooh, who are you?", "What's over by the pond?"],
 };
 export const scriptedPair = (a: PetSide, b: PetSide, random: () => number): [string, string] => {
   const pick = (t: PetTrait) => PET_SCRIPTED[t][Math.floor(random() * 2) % 2]!;

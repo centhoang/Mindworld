@@ -1,21 +1,22 @@
-# Every human activity (deployed build, 2026-11-03)
+# Human activities on Sunnyside (2026-11-03)
 
-The list is `client/src/life/activities.ts`, `who` human or any: 13. Villagers: every 1.5 s, what all four did through about three game days on live (three runs). Players: driven by keys, player moved beside the spot.
+Rule from the user: an activity that needs a human animation the pack does not have is dropped. Pack strips: idle, walk, run, jump, doing, waiting, axe, dig, watering, casting, reeling, caught, attack, carry, hammering, mining, roll, swimming, hurt, death.
 
-| Activity | Villagers on live | Player on live |
+| Activity | Strip | State |
 |---|---|---|
-| sleep | Yes, all four | No way to do it |
-| dance | Yes (Pip, Mo, Ama) | Yes: at the birthday party, and the Dance emote reached the other tab |
-| wander | Yes, all four | Walking |
-| cook | Yes (Elder, Mo, Ama, Pip) | No way to do it |
-| clean | **Never** | Yes: E, sweep, mess gone. Mess planted by the driver: no natural mess in any run |
-| feed | **Never** | No way to do it |
-| sell | Yes (Ama's job) | Yes: market ships harvest and sells seeds |
-| chop | Yes (Pip's job) | Yes: wood +1, other tab saw pose `chop` |
-| tend | Yes (Elder's job) | Herbs: pose sweep, herbs +1 |
-| farm | Once (Pip, hour 20.2, not explained: no villager has this job) | Yes: plant, water, harvest |
-| fish | Yes (Mo) | Yes: fish +1 |
-| picnic | Yes, all four | Promise kept with Elder at 18.0, "Glad you came". No pose: the player just stands |
-| soccer | Yes (Pip, Ama) | Promise kept with Pip at 11.0. No pose: the player just stands |
+| fish | casting, waiting, reeling, caught | Kept |
+| chop | axe | Kept |
+| tend | watering | Kept |
+| farm | dig, watering | Kept |
+| sell | idle, doing | Kept |
+| clean | doing (its dust puff) | Kept, player only: villagers have no messes |
+| wander | walk | Kept |
+| dance | jump | Kept: closest strip, no real dance. The birthday party rests on it |
+| soccer | run | Kept: villagers run the pitch after a moving ball. No kick strip |
+| sleep | none | At home: own door, unseen |
+| cook, the villagers' eating | none needed | At home: own door, unseen |
+| **picnic** | no sit strip | **Dropped**, with the blanket and basket |
+| **feed** | no one could ever do it | **Dropped** |
 
-Why the gaps: `clean` needs a mess and the villagers' sim has no pets to make one; `feed` needs a bowl spot, which `npcSpots` does not have. Both are bug 29. Which player gaps matter is a design call.
+Not proven: `clean` and `dance` were forced by the driver for a shot, not seen in a natural run on this build.
+Shots: `sunny-activities.jpg`, `../visual/sunny-village.jpg`, `../visual/sunny-home.jpg`.

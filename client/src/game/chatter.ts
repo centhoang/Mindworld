@@ -9,7 +9,7 @@ export const LINES: Record<Speaker, readonly string[]> = {
   pet: ["What a nice breeze!", "Can we nap on the porch?", "I'm learning so much!", "Look, petals!", "Teach me a new trick?", "Snack time?"],
   elder: ["Ah, a young trainer!", "Lessons stick when they are short.", "Sit a while, child.", "The clouds are kind today."],
   mo: ["The fish bite best at dawn.", "Quiet water, quiet mind.", "Patience, friend."],
-  ama: ["Hungry? There's soup!", "A picnic later! Bring your pets.", "Who left that mess?"],
+  ama: ["Hungry? There's soup!", "Bring your pets to the square!", "Who left that mess?"],
   pip: ["Soccer? Soccer!", "Race you!", "Let's dance tonight!"],
   merchant: ["Fresh decor, fair prices!", "Coins from fights spend here!", "Pretty things for your corner!"],
   brute: ["Grr! Me strong!", "Smash first, think later!", "Hmph."],

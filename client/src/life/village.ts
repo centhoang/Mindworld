@@ -72,6 +72,7 @@ export interface Env {
   chooser?: (a: Agent, choices: Choice[], v: Village) => string | null | undefined;
   bias?: (a: Agent, act: string) => number; // personality nudge on the scores
   jobOf?: (a: Agent) => string | null; // the job activity only this agent may do
+  doorOf?: (a: Agent) => Vec | undefined; // where this agent goes in to sleep and eat
   route?: (from: Vec, to: Vec) => Vec[] | null; // waypoints around water (null = no route: walk straight)
 }
 
@@ -168,7 +169,8 @@ function begin(a: Agent, c: Choice, v: Village, env: Env): void {
     a.target = { ...m.pos };
     return;
   }
-  const spot = def.place === "home" ? near(a.pos, 3, env.rng) : { ...pick(env.spots[def.place]!, env.rng) };
+  const door = def.indoors ? env.doorOf?.(a) : undefined;
+  const spot = door ? { ...door } : def.place === "home" ? near(a.pos, 3, env.rng) : { ...pick(env.spots[def.place]!, env.rng) };
   a.target = spot;
   a.path = env.route?.(a.pos, a.target) ?? undefined;
   if (def.min > 1) {

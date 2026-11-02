@@ -13,8 +13,7 @@ describe("shared human layers", () => {
     expect(humanLayers(NPC_LOOKS.mo, "fish", false).action).toBe("casting");
     expect(humanLayers(NPC_LOOKS.mo, "fish", false, false, 2).files).toContain("tools_waiting_strip9.png");
     expect(humanLayers(NPC_LOOKS.mo, "fish", false, false, workSeconds("fish") - 0.05).action).toBe("caught");
-    expect(humanLayers(NPC_LOOKS.ama, "sit", false).files).toEqual(["base_waiting_strip9.png", "longhair_waiting_strip9.png"]);
-    expect(humanLayers(NPC_LOOKS.mo, "sleep", false).action).toBe("waiting");
+    expect(humanLayers(NPC_LOOKS.pip, "kick", false).action).toBe("run");
     expect(humanLayers(NPC_LOOKS.mo, "dance", false).action).toBe("jump");
     expect(humanLayers(NPC_LOOKS.ama, "cook", false).action).toBe("doing");
     expect(humanLayers(NPC_LOOKS.pip, "sweep", true).action).toBe("walk");
@@ -97,14 +96,4 @@ describe("human loading and drawing", () => {
     expect(g.restore).toHaveBeenCalledOnce();
   });
 
-  it("holds a resting waiting frame for sleeping without a rod", () => {
-    const { images, g, ctx, sprites, fallback } = setup();
-    const m = newHumanMotion({ x: 0, z: 0 });
-    m.pose = "sleep";
-    sprites.draw(ctx, NPC_LOOKS.ama, m, 0, 0, 100, fallback);
-    images.forEach(i => i.onload());
-    sprites.draw(ctx, NPC_LOOKS.ama, m, 0, 0, 100, fallback);
-    expect(images).toHaveLength(2);
-    expect(g.drawImage).toHaveBeenCalledWith(images[0], 0, 0, 96, 64, -48, -39, 96, 64);
-  });
 });

@@ -72,9 +72,9 @@ describe("the market keeper in the village", () => {
   it("is closed off hours, and says where the keeper is", () => {
     const { nv, a } = make();
     nv.v.t = at("evening");
-    Object.assign(a, { act: "picnic", state: "do" });
+    Object.assign(a, { act: "soccer", state: "do" });
     expect(nv.dealWith("Kai")).toMatchObject({ ok: false, refused: false });
-    expect((nv.dealWith("Kai") as { text: string }).text).toContain("Ama has a picnic");
+    expect((nv.dealWith("Kai") as { text: string }).text).toContain("Ama plays soccer");
   });
 
   it("serves a stranger, refuses someone rude, and comes round after an apology", async () => {

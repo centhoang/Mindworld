@@ -178,16 +178,16 @@ describe("invitations from other players", () => {
     const hub = new MindHub(v, new MindScheduler(() => null), { say: () => undefined }, () => false);
     hub.add(petPersona("Mallow", GENES));
     hub.add(petPersona("Sprig", { ...GENES, hue: 0.8 }));
-    const first = hub.heardInvite("Pip", "picnic");
-    const second = hub.heardInvite("Pip", "picnic");
+    const first = hub.heardInvite("Pip", "soccer");
+    const second = hub.heardInvite("Pip", "soccer");
     expect(first).not.toBeNull();
     expect(second).not.toBe(first);
-    expect(hub.heardInvite("Pip", "picnic")).toBeNull(); // both have it now
+    expect(hub.heardInvite("Pip", "soccer")).toBeNull(); // both have it now
     expect(hub.heardInvite("Pip", "nap")).toBeNull();
     expect(hub.heardInvite("Pip", "steal")).toBeNull();
     const m = hub.minds.get(first!)!;
-    expect(Object.values(m.mem.plan).flat()).toContain("picnic");
-    expect(m.mem.log.at(-1)!.text).toMatch(/Pip from next door invited me to picnic/);
+    expect(Object.values(m.mem.plan).flat()).toContain("soccer");
+    expect(m.mem.log.at(-1)!.text).toMatch(/Pip from next door invited me to soccer/);
     expect(v.agents.find((a) => a.id === first)!.plan).toBe(m.mem.plan);
   });
 });

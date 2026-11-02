@@ -26,17 +26,17 @@ describe("rule invitation extraction", () => {
     ["Join me for soccer today morning", { act: "soccer", occasion: "", day: 4, phase: "morning" }],
     ["Football tomorrow noon?", { act: "soccer", occasion: "", day: 5, phase: "noon" }],
     ["Can you fish tomorrow morning?", { act: "fish", occasion: "", day: 5, phase: "morning" }],
-    ["Let's have a picnic today noon", { act: "picnic", occasion: "", day: 4, phase: "noon" }],
-    ["Want to have lunch tonight?", { act: "picnic", occasion: "", day: 4, phase: "evening" }],
     ["Come to the party", { act: "dance", occasion: "party", day: 4, phase: "evening" }],
     ["LET’S GO DANCING TONIGHT!", { act: "dance", occasion: "", day: 4, phase: "evening" }],
-    ["Join our picnic", { act: "picnic", occasion: "", day: 4, phase: "evening" }],
     ["Soccer today?", { act: "soccer", occasion: "", day: 4, phase: "evening" }],
     ["Fishing in the morning?", { act: "fish", occasion: "", day: 4, phase: "morning" }],
     ["Come to my birthday tomorrow", { act: "dance", occasion: "birthday", day: 5, phase: "evening" }],
     ["Want   to\nfish?", { act: "fish", occasion: "", day: 4, phase: "evening" }],
-    ["Yesterday was fun; let's picnic tomorrow noon!", { act: "picnic", occasion: "", day: 5, phase: "noon" }],
   ];
+  it("has no picnics: the pack cannot show a person sitting", () => {
+    expect(extractRules("want to have a picnic today?", 4)).toBeNull();
+  });
+
   it.each(examples)("extracts %s", (line, expected) => {
     expect(extractRules(line, 4)).toEqual(expected);
   });
@@ -74,7 +74,7 @@ describe("model invitation extraction", () => {
     expect(long.user).not.toContain("\n\n");
   });
 
-  const answers = ["dance", "soccer", "fish", "picnic"].flatMap((act) =>
+  const answers = ["dance", "soccer", "fish"].flatMap((act) =>
     ["today", "tomorrow"].flatMap((day) =>
       (["morning", "noon", "evening"] as const).map((phase) => ({ act, day, phase }))));
   it.each(answers)("parses $act,$day,$phase", ({ act, day, phase }) => {
@@ -87,7 +87,7 @@ describe("model invitation extraction", () => {
   });
   it.each([
     "none", "", "dance", "party,today,evening", "cook,today,noon", "dance,yesterday,evening",
-    "soccer,5,noon", "fish,tomorrow,night", "picnic,today,afternoon", "dance,today",
+    "soccer,5,noon", "fish,tomorrow,night", "picnic,today,evening", "dance,today",
     "dance,today,evening,extra", "dance,today,evening\nI will come", '"dance,today,evening"',
     "none,today,evening", "```dance,today,evening```",
   ])("rejects %j", (text) => {

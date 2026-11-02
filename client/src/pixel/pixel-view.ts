@@ -13,8 +13,8 @@ import { generatedSprites } from "./generated-sprites";
 import { drawDecor, drawSpotProp } from "./grounds-draw";
 import { humanSprites, newHumanMotion, NPC_LOOKS } from "./humans";
 import { drawInspector } from "./inspector";
-import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
-import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_SMALL, OVERWORLD_MON, type Overworld } from "./overworld";
+import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint } from "./life-draw";
+import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_ART, OVERWORLD_MON, type Overworld } from "./overworld";
 import { characterShadow, drawCropArt, drawLand, drawRail, drawSea, drawTree, footRuns, stampSize, stand, standRun, strip } from "./sunny";
 import { tile } from "./sunny-terrain";
 
@@ -200,7 +200,7 @@ export class PixelView implements View {
     }
     {
       const [hx, hy] = toScreen(o.house.x, o.house.z);
-      if (!scene.indoors) this.pushHouse(items, g, HOME_SMALL, o.house.z, hx, hy, t);
+      if (!scene.indoors) this.pushHouse(items, g, HOME_ART, o.house.z, hx, hy, t);
     }
     for (const h of o.houses) {
       const [hx, hy] = toScreen(h.x, h.z);
@@ -287,20 +287,17 @@ export class PixelView implements View {
       const s = o.npcSprite(a.id as Npc);
       const motion = o.npcMotions.get(a.id as Npc) ?? newHumanMotion(a.pos);
       const { walking, dir } = motion;
-      const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep");
       const f = spriteFrame(s, walking, motion.walkTime, t);
-      const frame = sit ? sitFrame(s.img, (s.idle ?? 0) * 16, dir * 24, dir === 3) : null; // seated: still, legs bent
-      if (motion.pose === "sleep" && !walking) {
-        items.push({ z: a.pos.z, draw: () => {
-          stand(g, "f-bed", nx, ny + 3);
-          humanSprites.drawAsleep(g, NPC_LOOKS[a.id as Npc], nx, ny);
-          drawTinyText(g, "z".repeat(1 + Math.floor(t) % 3), nx + 9, ny - 24);
-        } });
+      if (a.state === "do" && ACTIVITY.get(a.act!)?.indoors) continue; // home to sleep or eat: inside, out of sight
+      if (motion.pose === "kick" && !walking) {
+        // Soccer: up and down the pitch after the ball, on the pack's run.
+        const phase = t * 0.9 + a.id.length * 1.7;
+        const sx = nx + Math.round(Math.sin(phase) * 2.4 * TILE);
+        items.push({ z: a.pos.z, draw: () => (characterShadow(g, sx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], { ...motion, flip: Math.cos(phase) < 0 }, sx, ny, t, () => {})) });
         continue;
       }
       items.push({ z: a.pos.z, draw: () => (characterShadow(g, nx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, nx, ny, t, () => {
         if (a.id === "elder" && hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
-        else if (frame) g.drawImage(frame, nx - 8, ny - 22);
         else g.drawImage(s.img, f * 16, dir * 24, 16, 24, nx - 8, ny - 22, 16, 24);
       })) });
     }
@@ -313,16 +310,11 @@ export class PixelView implements View {
         if (near) drawTinyText(g, sg.text, Math.round(sx), sy - 16);
       } });
     }
-    // A picnic away from a picnic hill (the NPCs on the plaza) spreads its own blanket.
-    for (const gt of [...o.life.gatherings, ...(o.npcs?.v.gatherings ?? [])]) {
-      if (gt.act !== "picnic" || !gt.started) continue;
-      if (o.world.platforms.some((p) => p.spots?.blanket && Math.hypot(p.spots.blanket.x - gt.at.x, p.spots.blanket.z - gt.at.z) < 4)) continue;
-      const ps = [...o.life.agents, ...(o.npcs?.v.agents ?? [])].filter((a) => gt.members.includes(a.id) && a.gather === gt.id);
-      if (!ps.length) continue;
-      const cx = ps.reduce((sum, a) => sum + a.pos.x, 0) / ps.length; // under the group, wherever they sat down
-      const cz = ps.reduce((sum, a) => sum + a.pos.z, 0) / ps.length;
-      const [bx, by] = toScreen(cx, cz + 0.7);
-      items.push({ z: cz - 9, draw: () => drawSpotProp(g, "blanket", bx, by, t) });
+    // The ball in a game of soccer runs ahead of the players.
+    for (const gt of o.npcs?.v.gatherings ?? []) {
+      if (gt.act !== "soccer" || !gt.started) continue;
+      const [bx, by] = toScreen(gt.at.x + Math.sin(t * 1.3) * 3, gt.at.z + Math.sin(t * 2.1) * 0.6);
+      items.push({ z: gt.at.z, draw: () => drawBall(g, bx, by - Math.round(Math.abs(Math.sin(t * 5)) * 3)) });
     }
     // A ball bounces between pets playing together.
     for (const gt of o.life.gatherings) {

@@ -15,6 +15,7 @@ import { cloudLine } from "../game/npc-chat";
 import { CLOUD_CHAT } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
+import { NPC_HOMES } from "../world/village-map";
 import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
 import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePanel, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
@@ -52,8 +53,7 @@ export const OVERWORLD_MON = 20; // px: monsters in the overworld
 const WILD_PER_MEADOW = 3;
 const MEET_DIST = 1.0;
 const NPC_ROUTE_TILES = 120_000; // the NPCs may walk across the whole map
-export const HOME_ART = "home-roof";
-export const HOME_SMALL = "house-blue"; // the home as the Sunnyside look shows it outside: home-roof is wider than the plot
+export const HOME_ART = "home-wing-roof";
 const HOUSE_ART = ["house-red", "house-green", "house-redsmall", "house-bluesmall"];
 export const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
 // Farm stages 0-3 onto the pack's six growth pictures.
@@ -175,8 +175,7 @@ export class Overworld {
     this.stall = { x: plaza.x - 7, z: plaza.z - 3 };
     const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
     if (npcIsle) this.elder = { pos: this.elder?.pos ?? { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: this.elder?.sprite ?? drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
-    this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, { art: "statue", x: plaza.x - 6.5, z: plaza.z + 4 }];
-    if (npcIsle) this.landmarks.push({ art: "house-bluesmall", x: npcIsle.x, z: npcIsle.z - 2.5 });
+    this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, { art: "statue", x: plaza.x - 9.5, z: plaza.z }, ...Object.values(NPC_HOMES)];
     this.critters = [];
     for (const p of this.world.platforms) {
       if (p.kind === "plaza" || p.kind === "islet") continue;
@@ -275,7 +274,7 @@ export class Overworld {
   // from that point (the NPCs walk the whole map: Mo goes fishing at whichever pond exists).
   private betweenSpots(cells: readonly [number, number][], reach?: Vec): Spots {
     const out: Spots = {};
-    const anchor: Record<string, [keyof Spots, string]> = { picnic: ["picnic", "blanket"], playground: ["playground", "ball"], pond: ["pond", "dock"] };
+    const anchor: Record<string, [keyof Spots, string]> = { playground: ["playground", "ball"], pond: ["pond", "dock"] };
     for (const p of this.world.platforms) {
       const use = p.spots?.pond ? anchor.pond : anchor[p.kind];
       if (!use || !p.spots) continue;
@@ -821,6 +820,7 @@ export class Overworld {
     let best: Npc | null = null;
     let bd = 2.2;
     for (const a of this.npcs?.v.agents ?? []) {
+      if (a.state === "do" && ACTIVITY.get(a.act!)?.indoors) continue; // at home, behind the door
       const d = Math.hypot(a.pos.x - this.player.x, a.pos.z - this.player.z);
       if (d < bd) [best, bd] = [a.id as Npc, d];
     }
@@ -874,6 +874,12 @@ export class Overworld {
 
   indoors = false; // drawing the world around the house: the house and I are on the interior's layer
   underBubbles?: () => void; // the screen's own panels: speech draws over them
+
+  // Standing in a dance that has started, you dance too.
+  private partyPose(): Pose | null {
+    const near = this.npcs?.v.gatherings.some((g) => g.act === "dance" && g.started && Math.hypot(g.at.x - this.player.x, g.at.z - this.player.z) < 5);
+    return near ? "dance" : null;
+  }
 
   readonly canWalk = (x: number, z: number): boolean => {
     if (!tileWalkable(this.map, x, z) || railBlocks(this.map, x, z) || cornerBlocks(this.map, x, z)) return false;
@@ -956,7 +962,7 @@ export class Overworld {
       this.player = slide(this.player, d.x * speed, d.z * speed, this.canWalk);
     }
     this.stepWork(dt);
-    stepHumanMotion(this.playerMotion, this.player, dt, this.work?.pose ?? null);
+    stepHumanMotion(this.playerMotion, this.player, dt, this.work?.pose ?? (this.moving ? null : this.partyPose()));
     this.moving = this.playerMotion.walking;
     this.stepPet(dt);
     // Camera eases toward the player; drawing snaps it to whole pixels.

@@ -12,9 +12,15 @@
 Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams, decor density, fences. Each is a cost in rules and bugs.
 
 ## Look options
-**Decided (user, 2026-11-02):** B, the mosaic plane, Tile skin: the whole screen is one grid of cells and only changed cells repaint. Replaces A below. Spike and other skins: `client/spike-compare.html`, proof `../testing/proof/visual/mosaic-*`.
+**Decided (user, 2026-11-03):** compact Sunnyside. It loads about 60 of the 141 art files and draws no clouds, sea life or farm animals. Compare: `../testing/proof/visual/looks-compare.jpg`. The mosaic stays in the code, set aside, at `?look=mosaic`; labs still use it.
 
-**Open again (user, 2026-11-03):** compact Sunnyside is built to compare, behind `?look=pixel` and the `Look` chip. It loads 59 of the 141 art files and draws no clouds, sea life or farm animals. Compare: `../testing/proof/visual/looks-compare.jpg`.
+**Angle (user, every asset, every Codex brief):** the pack is top-down, showing the front side only. Never iso or three-quarter. New art that breaks this goes back for rework.
+
+**Humans:** only the pack's own strips. A dance is its jump, soccer its run. Villagers sleep and eat at home, unseen. An activity with no matching strip is dropped.
+
+**Pets:** shading follows the shape, round on a round head. No marks too small to read at pet size.
+
+Earlier: the mosaic, Tile skin (2026-11-02), spike `client/spike-compare.html`.
 
 Earlier pick, replaced: A, glyph look, after judging the spike's image and clip. If 5c runs late: B, compact Sunnyside. Spike: `client/glyph-spike.html`, proof in `../testing/proof/visual/glyph-spike*`.
 

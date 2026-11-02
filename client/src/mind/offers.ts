@@ -10,11 +10,10 @@ const ACT_WORD: readonly [RegExp, string][] = [
   [/\b(?:danc(?:e|es|ing)|part(?:y|ies))\b/, "dance"],
   [/\b(?:soccer|football)\b/, "soccer"],
   [/\b(?:fish(?:ing)?|pond)\b/, "fish"],
-  [/\b(?:picnic(?:s|king)?|lunch)\b/, "picnic"],
 ];
 const URGES = /\b(?:shall we|let's|lets|join me|come (?:with|and|along))\b/; // an offer even without a question mark
 const ASKS = /\b(?:wanna|want (?:to|a|an|some)|care to|how about|what about|up for|fancy|would you like|feel like|ready to)\b/; // "I want to fish." is not one
-const BARE = /(?:^|[.,!]\s+)(?:a\s+|some\s+)?(?:dance|soccer|football|fishing|picnic)\b[^.!?]*\?/; // "Kai, soccer this evening?"
+const BARE = /(?:^|[.,!]\s+)(?:a\s+|some\s+)?(?:dance|soccer|football|fishing)\b[^.!?]*\?/; // "Kai, soccer this evening?"
 const SELLS = /\b(?:buy|take|want|need|like)\b.*\b(wheat|carrots?|tomato(?:e?s)?|fish|wood|herbs?)\b.*\?/;
 
 // `phase` is now: an offer with no time in it means now, or the next part of the day the activity can happen.

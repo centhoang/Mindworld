@@ -7,7 +7,7 @@ export const NPCS = ["elder", "mo", "ama", "pip"] as const;
 export type Npc = (typeof NPCS)[number];
 
 // Activity ids a mind may announce (client: life/activities.ts).
-export const MIND_ACTS = ["eat", "sleep", "nap", "poop", "groom", "ball", "dance", "wander", "cook", "clean", "feed", "fish", "picnic", "soccer", "sell", "chop", "tend", "farm"] as const;
+export const MIND_ACTS = ["eat", "sleep", "nap", "poop", "groom", "ball", "dance", "wander", "cook", "clean", "fish", "soccer", "sell", "chop", "tend", "farm"] as const;
 
 export const HOST_STALE_MS = 15_000; // no heartbeat for this long: the NPC moves to another player
 export const MEM_MAX = 120;

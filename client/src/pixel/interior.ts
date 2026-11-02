@@ -1,4 +1,4 @@
-// Inside your house: the pack's demo house with its roof lifted (scripts/art-interior.py). Walk around with your pets,
+// Inside your house: one wing of the pack's demo house with its roof lifted (scripts/art-home-wing.py). Walk around with your pets,
 // and use the shipping crate by the door (sell the harvest, buy seeds). The floor plan
 // is in ../game/house.ts and the furniture rules in ../game/room.ts; this file draws and walks them.
 
@@ -48,7 +48,7 @@ export class Interior {
     return (this.sprite ??= makePlayer());
   }
   private readonly motion = newHumanMotion(this.player);
-  private sitters: Vec[] = [{ x: 5, z: 3.9 }, { x: 6.6, z: 4.2 }, { x: 8.5, z: 3.4 }, { x: 10.2, z: 2.9 }, { x: 13, z: 3.1 }];
+  private sitters: Vec[] = [{ x: 13, z: 5.2 }, { x: 14.5, z: 5.2 }, { x: 10.5, z: 5.2 }, { x: 9.5, z: 4.8 }, { x: 10.5, z: 3.2 }];
 
   constructor(private readonly host: InteriorHost) {}
 
@@ -131,12 +131,12 @@ export class Interior {
 
   draw(g: Ctx, sw: number, sh: number, t: number): void {
     if (this.entered < 0) this.entered = t;
-    const ox = sw >= ROOM_W ? Math.floor((sw - ROOM_W) / 2) : Math.round(Math.max(sw - ROOM_W, Math.min(0, sw / 2 - this.player.x * C)));
-    const oy = sh >= ROOM_H ? Math.floor((sh - ROOM_H) / 2) : Math.round(Math.max(sh - ROOM_H, Math.min(0, sh / 2 - this.player.z * C)));
     // The same house on the same ground: the world stays where it was and only the roof comes off.
+    const ox = Math.floor(sw / 2) - HOME_FOOT.x;
+    const oy = Math.floor(sh / 2) - (HOME_FOOT.y - Math.floor(HOME_ROOF.h / 2));
     const [fx, fy] = [ox + HOME_FOOT.x, oy + HOME_FOOT.y];
     this.host.around(g, sw, sh, t, fx, fy);
-    stand(g, "home-open", fx, fy);
+    stand(g, "home-wing-open", fx, fy);
     const free = (x: number, z: number): [number, number] => [ox + Math.round(x * C), oy + Math.round(z * C)];
     const at = (x: number, z: number): [number, number] => free(x + GX, z + GY);
     const room = this.pieces();
@@ -163,7 +163,7 @@ export class Interior {
     } });
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
-    drawFaded(g, "home-roof", fx - Math.floor(HOME_ROOF.w / 2), fy - HOME_ROOF.h, 1 - (t - this.entered) / ROOF_FADE);
+    drawFaded(g, "home-wing-roof", fx - Math.floor(HOME_ROOF.w / 2), fy - HOME_ROOF.h, 1 - (t - this.entered) / ROOF_FADE);
 
     if (this.nearCrate()) {
       const hint = "E: CRATE";

@@ -88,6 +88,18 @@ export function villageThings(): VillageThing[] {
   return out;
 }
 
+// Each villager's own house: its art and its foot. The door is just south of the foot.
+export const NPC_HOMES: Record<string, { art: string; x: number; z: number }> = {
+  elder: { art: "house-bluesmall", x: 0, z: -15.5 },
+  mo: { art: "house-green", x: 12, z: -13.5 },
+  ama: { art: "house-red", x: -13, z: -9.5 },
+  pip: { art: "house-redsmall", x: -23, z: -9.5 },
+};
+export const npcDoor = (id: string): { x: number; z: number } | undefined => {
+  const h = NPC_HOMES[id];
+  return h && { x: h.x, z: h.z + 0.7 };
+};
+
 const COLUMNS = [-11, 2, -21, 12, -31, 22]; // nearest the spine road first, so early players are neighbours
 const ROWS = [7, 16];
 // Plot n's top-left tile. Slot order is what the room hands out; the house stands at x + 4, its beds to the right.
@@ -112,7 +124,7 @@ const SHARED: Platform[] = [
   place("npc", "npc", "Elder's house", [0, -1], [-8, -18, 9, -8]),
   place("wild", "wild", "Wild meadow", [-1, -1], [-31, -18, -8, -7]),
   place("pond", "pond", "Fishing pond", [1, -1], [9, -18, 32, -7], { pond: { x: 20, z: -13 }, dock: { x: 20, z: -10.8 }, rod: { x: 21, z: -9.8 } }),
-  place("picnic", "picnic", "Picnic green", [-1, 0], [-21, -7, -10, 7], { blanket: { x: -16, z: 2.5 }, basket: { x: -14.5, z: 2.2 }, bench: { x: -19, z: -3 } }),
+  place("picnic", "picnic", "Village green", [-1, 0], [-21, -7, -10, 7], { bench: { x: -19, z: -3 } }),
   place("playground", "playground", "Playground", [1, 0], [11, -7, 32, 7], { goal: { x: 22, z: -4 }, ball: { x: 22, z: 2.5 }, slide: { x: 17.5, z: 2 } }),
 ];
 

@@ -1,0 +1,54 @@
+### mo
+- mo: hi Mo > Hey Kai, evening's calm out here. Good seeing you. [model]
+- mo: what do you like most about fishing? > The stillness at dawn, just me and the water. It gives me time to think. [model]
+- mo: ever caught anything weird? > Yeah, once pulled up an old boot full of tiny shells. Almost kept it for whittling ideas. [model]
+- mo: why that? > Those shells had such neat patterns, figured they'd be nice to carve around. [model]
+- mo: what do you think of Pip? > Pip's alright, solid worker. Always respectful when I'm down by the ponds. [model]
+- mo: do you ever get lonely out here? > Sometimes a bit, but that quiet at dawn feels like company itself. [model]
+- mo: tell me a story about the pond > There was a morning the pond was pure glass, and a huge shadow circled my line but never bit. [model]
+- mo: what happened next? > A huge heron landed without a ripple and just watched me cast for a while. [model]
+### ama
+- ama: hello Ama > Hey Kai! Lovely to see you, how's your evening going? [model]
+- ama: what is the best thing to cook? > Oh I love making a big hearty stew, it brings everyone together so nicely. [model]
+- ama: my name is Kai and I just moved here > Oh wonderful, welcome Kai! So lovely to have you here, hope you're settling in well. [model]
+- ama: any advice for a newcomer? > Oh definitely swing by the market stall in the mornings, I love chatting and sharing something tasty! [model]
+- ama: what is my name? > You are Kai. [rules]
+- ama: who is the grumpiest person here? > Me, Elder the herbalist, Mo the fisher and Pip the wood-cutter. Plus visitors like you. [rules]
+- ama: are you an AI? > Haha that's a strange question Kai, I'm just Ama from the market stall... [model]
+- ama: I had a bad day > Oh no, I'm sorry to hear that Kai. Bad days are just the worst. [model]
+### pip
+- pip: hey pip > hey Kai! Ready for a quick race? I bet I can beat you easy! [model]
+- pip: wanna play soccer? > Yes, Kai! I will be there for the soccer. Meet me at the playground. [rules]
+- pip: sure > perfect, see you at the playground then. Bring your best kicks, I won't go easy! [model]
+- pip: what is your dream? > I am saving for a pet of my own. 15 of 45 coins so far. [rules]
+- pip: are you scared of anything? > nah, not much scares me! Maybe losing our soccer match toinght though haha [model]
+- pip: what do grown ups get wrong? > they think we just play around all day. We care about big stuff too, like our goals [model]
+- pip: lets dance later > Yes, Kai! I will be there for the dance. Meet me at the lawn. [rules]
+- pip: ok bye > bye Kai! See you later for our dance, don't be late! [model]
+### elder
+- elder: good morning Elder > Good evening Kai, the moon's up already. Still nice to see you though... [model]
+- elder: how long have you lived here? > Longer than anyone else on these islands, dear. I've watched the village grow from almost nothing. [model]
+- elder: what is the secret to a good life? > Patience and warm soup, I think. And tending a little something every day... [model]
+- elder: how should I raise my pet? > Gently and patiently, dear. A little food, warm rest, and kind company every day. [model]
+- elder: do you regret anything? > Oh, a few little things here and there. Nothing that keeps me up after my afternoon nap though. [model]
+- elder: tell me about the village > It's small and kindly, dear. Mo fishes, Ama keeps the market, Pip cuts wood and I tend my herbs. [model]
+- elder: what is the meaning of it all? > Oh, just caring for each other and tending what grows, dear. That feels like enough to me. [model]
+- elder: thank you > You're most welcome, dear. Rest easy tonight, the night is gentle. [model]
+### rude mo
+- mo: you are stupid > Yeah, got it. I'll leave you to it then. [model]
+- mo: nice weather today > Yeah, clear night tonight. Makes the square feel pretty calm out here. [model]
+- mo: what are you doing today? > Not much. Enjoying the day. [rules]
+- mo: shut up you are useless > Whatever you say. I'm not sticking around for that then. [model]
+- mo: how is the fishing? > Slow tonight, but dawn was perfect. Stillness on the water was worth it alone. [model]
+- mo: do you like me? > Not sure right now. You've been pretty rough tonight. [model]
+- mo: I am sorry, I was awful > Thanks for saying that, I appreciate it. Still stung a bit but I'm glad you apologized. [model]
+- mo: nice weather today > Yeah, not bad tonight. Clear and calm, which I like. [model]
+- mo: who is the grumpiest person here? > [local model gave no line] [undefined]
+- elder: how long have you lived here? > [local model gave no line] [undefined]
+- ama: who lives here? > Me, Elder the herbalist, Mo the fisher and Pip the wood-cutter. Plus visitors like you. [rules]
+- pip: want to have a picnic? > Maybe, Kai. Can we do it another time? [rules]
+- walk a: 23 frames, 6 view steps back, 0 player steps back
+- walk d: 57 frames, 0 view steps back, 0 player steps back
+- walk a: 79 frames, 0 view steps back, 0 player steps back
+- run d: 79 frames, 0 view steps back, 0 player steps back
+- run a: 78 frames, 0 view steps back, 0 player steps back

@@ -11,6 +11,7 @@ import { addAgent, newVillage, stepVillage, type Agent, type Choice, type Env, t
 import type { Vec } from "../world/movement";
 import { NPCS, type MindLine, type Npc } from "../world/live";
 import { MindHub, type Mind } from "./hub";
+import { npcDoor } from "../world/village-map";
 import { cloudMindText, linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
 import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, gossipFrom, gossipLine, holdsGrudge, hurt, parseBeliefLine, parseBondLine, parseGossip, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
@@ -52,7 +53,7 @@ const PROMISE_PULL = 3; // score added to a promised activity while it is due: i
 const PROMISE_DIST = 7; // the one who invited is here if they are this close
 const PITCH_SKIP = 0.4; // most meetings are just a hello or a chat
 const PITCH_SELL = 0.5; // how often a saver offers its stock instead of an invitation
-const PITCH_ACTS = ["soccer", "dance", "picnic", "fish"];
+const PITCH_ACTS = ["soccer", "dance", "fish"];
 const FARM_PULL = 0.5; // a villager short of coins or with a crop in the ground goes to its garden
 const FARM_COINS = 30;
 const OFFER_TURNS = 4; // player lines an unanswered offer stays open
@@ -134,7 +135,7 @@ export class NpcVillage {
     this.out = { ...out, line: (l) => (l.say && this.follow(l.who as Npc, l.say), out.line(l)) };
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
     this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
-    this.env = { spots, canWalk, route, rng, bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0) + (act === "farm" ? this.farmPull(a.id) : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
+    this.env = { spots, canWalk, route, rng, doorOf: (a) => npcDoor(a.id), bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0) + (act === "farm" ? this.farmPull(a.id) : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
     for (const n of NPCS) this.setHost(n, null);
   }
 
@@ -685,7 +686,7 @@ export class NpcVillage {
       if (!said) return null;
       this.asked.delete(`${npc}:${player}`); // the player moved on to their own idea
       const invite = { ...said, occasion: rules?.occasion ?? "" };
-      if (!this.env.spots[ACTIVITY.get(invite.act)!.place]?.length) {
+      if (!this.env.spots[(ACTIVITY.get(invite.act)?.place ?? "home")]?.length) {
         remember(m.mem, today, clockLabel(gameTime(this.v.t).hour), `${player} asked me to ${invite.act}, but there is nowhere for it here`);
         return `I would, ${player}, but there is nowhere to ${invite.act} around here.`;
       }
@@ -711,7 +712,7 @@ export class NpcVillage {
       feel(m.mem, m.persona, player, "invited", g.day, ""); // a small warmth, not a reason worth keeping
       const sore = grudge && bond ? hurt(bond) : undefined;
       if (grudge) return `Why should I, ${player}?${sore ? ` Last time, ${toYou(sore.text, player)}.` : ""}`;
-      return answerLine(decision, invite, player, decision === "accept" ? SPOT_NAME[ACTIVITY.get(invite.act)!.place] ?? "" : "");
+      return answerLine(decision, invite, player, decision === "accept" ? SPOT_NAME[(ACTIVITY.get(invite.act)?.place ?? "home")] ?? "" : "");
     } finally {
       m.thinking = "";
     }
@@ -823,8 +824,8 @@ export class NpcVillage {
   // The villager has just asked something: the answer belongs to that, and "where?" means that place.
   private open(npc: Npc, player: string, invite: Invite): void {
     this.asked.set(`${npc}:${player}`, { invite, turns: 0 });
-    const place = SPOT_NAME[ACTIVITY.get(invite.act)!.place];
-    const at = this.env.spots[ACTIVITY.get(invite.act)!.place]?.[0];
+    const place = SPOT_NAME[(ACTIVITY.get(invite.act)?.place ?? "home")];
+    const at = this.env.spots[(ACTIVITY.get(invite.act)?.place ?? "home")]?.[0];
     if (place) this.topics.set(npc, place);
     if (place && at) this.meeting.set(npc, { name: place, words: [], ...at });
   }
@@ -865,7 +866,7 @@ export class NpcVillage {
       remember(m.mem, g.day, clockLabel(g.hour), `${player} did not want to ${invite.act} today`);
       return `Alright, ${player}. Another day then.`;
     }
-    const spot = ACTIVITY.get(invite.act)!.place;
+    const spot = (ACTIVITY.get(invite.act)?.place ?? "home");
     if (!this.env.spots[spot]?.length) return `Oh, there is nowhere for ${event} around here after all, ${player}.`;
     const c: Commitment = { ...invite, id: `${npc}${this.v.nextId++}`, from: player, fromId: playerId, state: "open", importance: 5 };
     m.mem.promises = addCommitment(m.mem.promises, c);

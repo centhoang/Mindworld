@@ -56,16 +56,16 @@ export function humanLook(name: string): HumanLook {
   return { hair: HAIR[hash % HAIR.length]!, tool: tools[Math.floor(hash / HAIR.length) % tools.length]! };
 }
 
-// No native sit/dance/sleep strips: those keep aligned native cells, and drawing does the rest.
+// The pack has no sit, sleep, dance or kick. A dance is its jump, soccer is its run, and villagers sleep and eat at home, unseen.
 export function humanLayers(look: HumanLook, pose: Pose | null, walking: boolean, running = false, clock = 0): { action: Action; frame?: number; files: string[] } {
   const work = !walking && pose ? workFrame(pose, clock) : null;
   let action: Action = work?.action ?? "idle";
   if (walking) action = running ? "run" : "walk";
-  else if (pose === "sleep" || pose === "sit" || pose === "squat") action = "waiting";
-  else if (pose === "dance" || pose === "kick") action = "jump";
+  else if (pose === "dance") action = "jump";
+  else if (pose === "kick") action = "run";
   const layers = ["base", look.hair];
   // The waiting tool is a rod: use it only for fishing. Jump needs no tool.
-  if (action !== "jump" && (action !== "waiting" || work)) layers.push("tools");
+  if (action !== "jump") layers.push("tools");
   return { action, frame: work?.frame, files: layers.map(layer => `${layer}_${action}_strip${HUMAN_ACTIONS[action]}.png`) };
 }
 
@@ -111,29 +111,13 @@ export class HumanSprites {
     const images = files.map(file => this.images.get(`/art/humans/${file}`));
     if (images.some(image => !image)) return fallback();
     const count = HUMAN_ACTIONS[action];
-    const seated = !motion.walking && (motion.pose === "sit" || motion.pose === "sleep");
-    const frame = seated ? 0 : step ?? Math.floor(clock / FRAME_SECONDS) % count;
-    const dancing = !motion.walking && motion.pose === "dance" && Math.floor(clock / 0.68) % 2 === 1;
+    const frame = step ?? Math.floor(clock / FRAME_SECONDS) % count;
     g.save();
     g.imageSmoothingEnabled = false;
     g.translate(Math.round(x), Math.round(y));
-    if (seated) {
-      // Sitting: the body drops onto the ground and the feet go under it.
-      g.beginPath();
-      g.rect(-48, -39, 96, 39);
-      g.clip();
-      g.translate(0, 3);
-    }
-    if (motion.flip !== dancing) g.scale(-1, 1);
+    if (motion.flip) g.scale(-1, 1);
     for (const image of images) g.drawImage(image!, frame * 96, 0, 96, 64, -48, -39, 96, 64);
     g.restore();
-  }
-
-  // Asleep in a bed: only the head shows above the blanket.
-  drawAsleep(g: CanvasRenderingContext2D, look: HumanLook, x: number, y: number): void {
-    const images = ["base", look.hair].map(layer => this.images.get(`/art/humans/${layer}_idle_strip9.png`));
-    if (images.some(image => !image)) return;
-    for (const image of images) g.drawImage(image!, 40, 20, 16, 10, Math.round(x) - 8, Math.round(y) - 20, 16, 10);
   }
 }
 

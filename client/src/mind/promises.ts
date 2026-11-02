@@ -42,8 +42,7 @@ export function extractRules(line: string, today: number): Invite | null {
   if (!asks && !timedQuestion) return null;
   const act = /\b(?:danc(?:e|es|ing)|part(?:y|ies)|birthdays?)\b/.test(t) ? "dance"
     : /\b(?:soccer|football)\b/.test(t) ? "soccer"
-    : /\bfish(?:es|ing)?\b/.test(t) ? "fish"
-    : /\b(?:picnic(?:s|king)?|lunch)\b/.test(t) ? "picnic" : null;
+    : /\bfish(?:es|ing)?\b/.test(t) ? "fish" : null;
   if (!act) return null;
   const day = today + (/\btomorrow\b/.test(t) ? 1 : 0);
   if (!validDay(day)) return null;
@@ -66,7 +65,7 @@ export function extractPrompt(line: string): LmRequest {
 export function parseExtract(text: string, today: number): Invite | null {
   if (!validDay(today)) return null;
   const parts = /^(dance|soccer|fish|picnic)\s*,\s*(today|tomorrow)\s*,\s*(morning|noon|evening)$/.exec(text.trim().toLowerCase());
-  if (!parts) return null;
+  if (!parts || parts[1] === "picnic") return null; // the frozen grammar can still say it; the game has no picnics
   const day = today + (parts[2] === "tomorrow" ? 1 : 0);
   if (!validDay(day)) return null;
   return { act: parts[1]!, occasion: "", day, phase: parts[3] as Phase };

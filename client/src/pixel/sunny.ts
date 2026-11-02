@@ -16,13 +16,16 @@ const animOf = new Map<number, number[]>();
 const STRIPS: Record<string, { frames: number }> = {
   spr_deco_tree_01_strip4: { frames: 4 }, spr_deco_tree_02_strip4: { frames: 4 }, spr_deco_glint_01_strip6: { frames: 6 }, spr_deco_glint_02_strip4: { frames: 4 }, chimneysmoke_01_strip30: { frames: 30 },
 };
-const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "expression_chat", "interior", "interior-roof", "home-roof", "home-open",
+const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "expression_chat", "home-wing-roof", "home-wing-open",
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture"];
-const STAMPS = ["house-blue", "house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "statue", "jar", "crates", "crate", "soil", "bench"];
+const STAMPS = ["house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "statue", "jar", "crates", "crate", "soil", "bench"];
 export const CROPS_ART = ["wheat", "carrot", "radish"] as const;
 
 export const sunnyReady = (): boolean => images.has("tiles");
-export const stampSize = (name: string): [number, number] => data.stamps[name] ?? [16, 16];
+export const stampSize = (name: string): [number, number] => {
+  const i = images.get(name);
+  return data.stamps[name] ?? (i ? [i.width, i.height] : [16, 16]);
+};
 
 // Without this one file there is no game, so it gets the same second chances as an image.
 async function sheetData(tries = 3): Promise<typeof data> {

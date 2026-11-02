@@ -45,8 +45,8 @@ import { runSetup, storeSetup } from "./setup";
 import { TeachScreen } from "./teach";
 
 export const LOW_H = 216;
-// The mosaic plane wants about 45 rows of 8-pixel cells. ?look=pixel is the old Sunnyside view.
-const pixelLook = new URLSearchParams(location.search).get("look") === "pixel";
+// The game's look is Sunnyside. ?look=mosaic is the set-aside view of about 45 rows of 8-pixel cells.
+const pixelLook = new URLSearchParams(location.search).get("look") !== "mosaic";
 const lowRows = pixelLook ? LOW_H : 360;
 
 // One art pixel is always a whole number of screen pixels, or pixels come out in different sizes. The scale that
@@ -300,12 +300,6 @@ document.getElementById("ui")!.addEventListener("click", (e) => {
   if (!b) return;
   b.blur();
   if (b.dataset.ui === "rename") return void (mode === "world" && !chat.target() && openChat("name"));
-  if (b.dataset.ui === "look") {
-    const url = new URL(location.href);
-    if (pixelLook) url.searchParams.delete("look");
-    else url.searchParams.set("look", "pixel");
-    return location.assign(url);
-  }
   if (b.dataset.dev) return fakeIsle(b.dataset.dev === "add");
   const name = b.dataset.ui!;
   state.hide = { ...state.hide, [name]: !hidden(name) };
@@ -314,6 +308,7 @@ document.getElementById("ui")!.addEventListener("click", (e) => {
   applyUi();
 });
 applyUi();
+if (pixelLook) document.querySelector<HTMLElement>("#ui [data-ui=grid]")!.hidden = true; // the Grid chip is the mosaic's
 
 // What goes on the plane next frame, in place of menus drawn over it.
 let nextPanels: ScenePanel[] = [];
