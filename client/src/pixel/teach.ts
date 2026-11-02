@@ -12,6 +12,7 @@ import type { Replay } from "../sim/types";
 import { LOCAL_ONLY } from "../game/test-mode";
 import { PAL } from "./art";
 import { drawFrame, drawText, GLYPH, LINE, wrap } from "./text";
+import type { ScenePanel } from "../game/ports";
 
 export interface TeachHost {
   memo(): Memo;
@@ -129,6 +130,32 @@ export class TeachScreen {
 
   private setButtons(off: boolean): void {
     for (const b of this.form.querySelectorAll("button, input")) (b as HTMLButtonElement).disabled = off && (b as HTMLElement).dataset.act !== "close";
+  }
+
+  review(): void {
+    void this.coach((c) => c.reflect(this.host.memo(), this.host.recent()), true);
+  }
+
+  // The same screen as one panel on the plane.
+  panel(t: number): ScenePanel {
+    const talk = this.busy ? `${this.host.petName()} is ${thinkingLabel(performance.now() - this.busySince)}` : this.status;
+    const rules = this.host.memo().rules.map((r, i) => ({ label: `${i + 1}. ${r.do.toUpperCase()}: when ${r.if.map(describeCond).join(" and ")}` }));
+    const h = this.proof?.heldout;
+    const proof = h ? [{ label: `Proof: ${h.winRateDelta >= 0 ? "+" : ""}${(100 * h.winRateDelta).toFixed(1)} pts, ${Math.round(h.before.winRate * 100)}% > ${Math.round(h.after.winRate * 100)}% wins, ${h.n} new fights`, ink: h.winRateDelta > 0 ? PAL.grassD : h.winRateDelta < 0 ? PAL.coral : PAL.wood }] : [];
+    return {
+      place: "middle",
+      title: `Teach ${this.host.petName()}`,
+      width: 64,
+      rows: [
+        { label: talk, ink: PAL.wood },
+        { label: " " },
+        ...(rules.length ? rules : [{ label: "(no rules yet: it just tackles)" }]),
+        ...proof,
+        { label: " " },
+        { label: `> ${this.input.value}${Math.floor(t * 2) & 1 ? "_" : " "}` },
+      ],
+      footer: "Enter: teach  Tab: review fights  Esc: close",
+    };
   }
 
   draw(g: CanvasRenderingContext2D, sw: number, sh: number, t: number): void {

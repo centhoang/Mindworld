@@ -21,6 +21,9 @@
       #teach { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 760px); display: flex; gap: 6px; flex-wrap: wrap;
         font: 11px "Press Start 2P", monospace; }
       #teach[hidden], #chat[hidden] { display: none; }
+      /* The plane draws these: the forms only catch typing. */
+      body.cells #ui { display: none; }
+      body.cells #chat, body.cells #teach { left: -9999px; }
       #chat { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(92vw, 640px); display: flex; gap: 6px;
         font: 11px "Press Start 2P", monospace; }
       #chat input { flex: 1 1 auto; font: inherit; padding: 9px 10px; color: #39463F; background: #FFF3D8; border: 3px solid #795849; outline: none; }

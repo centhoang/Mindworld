@@ -37,6 +37,7 @@ import type { Good } from "../mind/economy";
 import type { Pocket } from "../mind/npcs";
 import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water, type CropId } from "../game/farm";
 import { drawMenu, type MenuRow } from "./menu";
+import { chipSpots } from "../view/mosaic/compose";
 import { MosaicView } from "../view/mosaic/mosaic-view";
 import type { ScenePanel } from "../game/ports";
 import { runSetup, storeSetup } from "./setup";
@@ -66,7 +67,10 @@ if (!state.groundSeed) {
   save(state);
 }
 const world = new Overworld(state.genes, state.groundSeed);
-if (!pixelLook) world.view = new MosaicView();
+if (!pixelLook) {
+  world.view = new MosaicView();
+  document.body.classList.add("cells");
+}
 
 // Who is out with you: 0 = the hatched pet, i = party[i - 1]. Everyone else lives at your corner.
 interface Member { name: string; genes: Genes; arch?: PartyMon["arch"] }
@@ -155,6 +159,8 @@ const interior = new Interior({
   petSprite: () => world.petSprite,
   residents: () => world.residentSprites(),
   look: () => world.myLook,
+  genes: () => world.petGenes,
+  residentGenes: () => world.residents.map((r) => r.genes),
   useCrate: () => {
     const no = world.npcs?.shipRefused(myName());
     if (no) toast = { text: no, t: 4 };
@@ -263,7 +269,9 @@ function nextToast(): void {
   }
 }
 
-// The small buttons (bottom left) open and close every panel but the clock; remembered in the save.
+// The small buttons (bottom left) open and close every panel but the clock; remembered in the save. The plane draws
+// them and a click on it presses the real one.
+const chips = () => [...document.querySelectorAll<HTMLButtonElement>("#ui button")].filter((b) => !b.hidden).map((button) => ({ button, label: button.textContent!, off: button.classList.contains("off") }));
 const hidden = (name: string) => !!state.hide?.[name];
 function applyUi(): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>("#ui [data-ui]")) b.classList.toggle("off", hidden(b.dataset.ui!));
@@ -346,6 +354,10 @@ window.addEventListener("keydown", (e) => {
   const k = e.key.toLowerCase();
   if (teach.open) {
     if (k === "escape") teach.hide();
+    if (k === "tab") {
+      e.preventDefault();
+      teach.review();
+    }
     return; // typing in the teach box
   }
   if (chat.target()) {
@@ -361,6 +373,7 @@ window.addEventListener("keydown", (e) => {
   if (k === "escape" && mode === "world" && toast && !menu && !crate) nextToast();
   if (k === "n" && !e.repeat && mode === "world" && !menu && !crate && !board && !peerMenu && !duelIn) {
     keys.clear();
+    e.preventDefault(); // the letter is not part of the name
     return void openChat("name");
   }
   if (k === "m" && !e.repeat) {
@@ -393,11 +406,16 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener("blur", () => keys.clear());
 out.addEventListener("pointerdown", (e) => {
-  if (mode !== "battle") return;
   const r = out.getBoundingClientRect();
   const x = ((e.clientX - r.left) / r.width) * low.width;
   const y = ((e.clientY - r.top) / r.height) * low.height;
-  if (!battleView.cmdAt(x, y, low.width, low.height)) battleView.skip();
+  if (chat.target() || teach.open) e.preventDefault(); // the hidden form keeps the keyboard
+  if (!pixelLook && mode !== "battle" && Math.floor(y / 8) === Math.ceil(low.height / 8) - 1) {
+    const hit = chipSpots(chips()).find((c) => x / 8 >= c.x && x / 8 < c.x + c.label.length + 2);
+    return hit?.button.click();
+  }
+  if (mode !== "battle") return;
+  if (!(pixelLook ? battleView.cmdAt(x, y, low.width, low.height) : battleView.cmdAtCells(x, y, low.width, low.height))) battleView.skip();
 });
 resize();
 
@@ -454,7 +472,7 @@ function menuKey(k: string): void {
 
 function side(m: Member): Side {
   const build = m.arch ? BUILDS[m.arch] : undefined;
-  return { name: m.name, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3 };
+  return { name: m.name, genes: m.genes, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3 };
 }
 
 // A fight against a wild pet, or "boss": The Reader, which reads your memo rules and counters them until
@@ -640,8 +658,14 @@ setInterval(() => {
 }, 500);
 
 function update(dt: number, t: number): void {
-  if (teach.open) teach.draw(g, low.width, low.height, t);
-  else if (mode === "world") {
+  if (!pixelLook) world.chips = chips();
+  if (teach.open) {
+    if (pixelLook) teach.draw(g, low.width, low.height, t);
+    else {
+      world.panels = [teach.panel(t)];
+      world.draw(g, low.width, low.height, t);
+    }
+  } else if (mode === "world") {
     const met = world.update(dt, menu || crate || board || peerMenu || duelIn ? new Set<string>() : keys);
     petChatter(dt);
     live.tick(performance.now(), world.me);
@@ -671,6 +695,7 @@ function update(dt: number, t: number): void {
     else if (peerMenu) showMenu(world.peers.get(peerMenu.id)?.name ?? "Player", PEER_ROWS.map((label) => ({ label })), peerMenu.cursor, t, "Enter: pick  Esc: close  1-4: emotes");
     else if (crate) showMenu(`Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
     else if (board) showMenu("Town board", world.npcs?.board() ?? [], -1, t, "Prices move with real trades. Esc: close");
+    else if (chat.target() && !pixelLook) nextPanels.push({ place: "bottom", title: chat.target() === "name" ? "Your name" : "Say", rows: [{ label: `> ${chat.draft()}${Math.floor(t * 2) & 1 ? "_" : " "}` }], width: 60, footer: "Enter: send  Esc: bye" });
     else if (toast) {
       toast.t -= dt;
       if (!hidden("hints")) {
@@ -682,11 +707,17 @@ function update(dt: number, t: number): void {
     }
   } else if (mode === "home") {
     interior.update(dt, crate || interior.deco ? new Set<string>() : keys);
-    interior.draw(g, low.width, low.height, t);
+    if (pixelLook) interior.draw(g, low.width, low.height, t);
+    else {
+      world.panels = nextPanels;
+      nextPanels = [];
+      world.view.draw(interior.scene(world.buildScene()), g, low.width, low.height, t);
+    }
     if (crate) showMenu(`Crate  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
   } else {
     battleView.update(dt);
-    battleView.draw(g, low.width, low.height, t);
+    if (pixelLook) battleView.draw(g, low.width, low.height, t);
+    else world.view.battle?.(battleView.scene(), g, low.width, low.height, t);
   }
   presenter.present(low, crt ? 1 : 0, lowScale);
 }

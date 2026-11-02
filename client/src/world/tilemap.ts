@@ -8,7 +8,7 @@ import { mulberry32 } from "../sim/rng";
 
 export const TILE = 16;
 
-export const T = { water: 0, grass: 1, path: 2, bridge: 3, sand: 4, flowers: 5, tall: 6, pool: 7, ledge: 8 } as const;
+export const T = { water: 0, grass: 1, path: 2, bridge: 3, sand: 4, flowers: 5, tall: 6, pool: 7, ledge: 8, floor: 9, wall: 10 } as const;
 export type TileKind = (typeof T)[keyof typeof T];
 
 export const AWAY = 4; // look bit: the tile belongs to a ghost ground (drawn dimmed)

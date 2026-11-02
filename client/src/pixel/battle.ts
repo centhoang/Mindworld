@@ -5,12 +5,17 @@
 import type { Action, EnemyAct, Outcome } from "../sim/types";
 import { drawProp, PAL, TREE } from "./art";
 import { drawDialogue, drawFrame, drawText, GLYPH } from "./text";
+import { MENU_H, MENU_W as CELL_MENU_W } from "../view/mosaic/battle";
+import { wrap } from "../view/glyph/atlas";
+import type { SceneBattle, SceneFighter } from "../game/ports";
+import type { Genes } from "../sim/ghost";
 
 export interface Side {
   name: string;
   sprite: HTMLCanvasElement;
   maxHp: number;
   portrait?: HTMLCanvasElement; // 32x32 face for the text box
+  genes?: Genes;
   level?: number;
 }
 
@@ -111,6 +116,35 @@ export class BattleView {
     c.cursor = (x > mx + MENU_W / 2 ? 1 : 0) + (y > my + 24 ? 2 : 0);
     c.pick(COMMANDS[c.cursor]!);
     return true;
+  }
+
+  // The same pick on the cell menu (view/mosaic/battle.ts), in low-res pixels.
+  cmdAtCells(x: number, y: number, sw: number, sh: number): boolean {
+    const c = this.cmd;
+    if (!c) return false;
+    const [col, row, cols, rows] = [Math.floor(x / 8), Math.floor(y / 8), Math.ceil(sw / 8), Math.ceil(sh / 8)];
+    const left = cols - CELL_MENU_W - 2, top = rows - MENU_H - 7;
+    if (col < left || col >= left + CELL_MENU_W || row <= top || row >= top + MENU_H - 1) return false;
+    c.cursor = (col >= left + 14 ? 1 : 0) + (row > top + 1 ? 2 : 0);
+    c.pick(COMMANDS[c.cursor]!);
+    return true;
+  }
+
+  // Plain data for a view that draws cells.
+  scene(): SceneBattle {
+    const side = (s: Side | null, hp: number, dx: number, flash: number, gone: number, shield: boolean): SceneFighter | null =>
+      s && { name: s.name.toUpperCase(), level: s.level ?? 1, hp, maxHp: s.maxHp, genes: s.genes ?? null, dx: dx / 4, flash: !!flash, gone, shield };
+    const text = this.cmd ? this.text : this.text.slice(0, this.typed);
+    return {
+      foe: side(this.foe, this.foeHpShown, this.foeDx, this.foeFlash, this.foeGone, this.foeShield),
+      mine: side(this.mine, this.myHpShown, this.myDx, this.myFlash, this.myGone, this.myShield),
+      slide: this.intro,
+      hearts: this.hearts,
+      text,
+      lines: (w) => wrap(text, w),
+      tag: this.typed >= this.text.length ? this.tag.toUpperCase() : "",
+      menu: this.cmd && { labels: COMMANDS.map((c) => CMD_LABEL[c]), cursor: this.cmd.cursor },
+    };
   }
 
   swapMine(mine: Side): Promise<void> {

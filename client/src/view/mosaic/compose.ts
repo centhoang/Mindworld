@@ -72,6 +72,10 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
     if (kind === T.water || kind === T.pool) {
       const w = (((x + (y & 1) * 5 + wave * (1 + (y & 1))) % 11) + 11) % 11;
       grid.put(sx, sy, w === 0 ? "~" : w === 5 ? "-" : " ", C.waterInk, pick ? C.water : C.water2);
+    } else if (kind === T.floor) {
+      grid.put(sx, sy, y % 3 === 0 ? "_" : " ", C.woodInk, (y >> 1) & 1 ? C.wood : C.wood2);
+    } else if (kind === T.wall) {
+      grid.put(sx, sy, y % 3 === 0 ? "=" : " ", C.wallInk, C.wall);
     } else if (kind === T.bridge) {
       grid.put(sx, sy, x & 1 ? "|" : " ", C.woodInk, y & 1 ? C.wood : C.wood2);
     } else if (m.soil?.[k]) {
@@ -162,6 +166,15 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
     else if (kind === "rod") put(x, y, "/", C.ink);
     else if (kind === "blanket") for (let r = 0; r < 3; r++) write(x - 3, y + r, "+ + + +", C.paper, C.flowerA);
     else if (kind === "basket") write(x - 1, y, "\\_/", C.woodInk, C.wood);
+    else if (kind === "rug") for (let r = -2; r <= 0; r++) write(x - 4, y + r, "%%%%%%%%%", C.roofInk, C.pink);
+    else if (kind === "bed") { for (let r = -5; r <= 0; r++) write(x - 3, y + r, r < -3 ? "       " : "=======", C.roofInk, r < -3 ? C.paper : C.roof); }
+    else if (kind === "table") { write(x - 3, y - 2, "#######", C.woodInk, C.wood); write(x - 3, y - 1, "|     |", C.woodInk); write(x - 3, y, "|     |", C.woodInk); }
+    else if (kind === "chair") { write(x - 1, y - 1, "[=]", C.woodInk, C.wood); write(x - 1, y, "| |", C.woodInk); }
+    else if (kind === "lamp") { write(x - 1, y - 2, "/#\\", C.woodInk, C.glow); put(x, y - 1, "|", C.woodInk); write(x - 1, y, "===", C.woodInk); }
+    else if (kind === "plant") { write(x - 1, y - 2, "&%&", C.leafInk, C.leaf); put(x, y - 1, "|", C.leafInk); write(x - 1, y, "\\_/", C.woodInk, C.wood); }
+    else if (kind === "shelf") for (let r = -4; r <= 0; r++) write(x - 3, y + r, r & 1 ? "#o#=#O#" : "=======", C.woodInk, C.wood);
+    else if (kind === "cushion") write(x - 2, y, "(###)", C.plum, C.pink);
+    else if (kind === "cursor") { write(x - 4, y - 3, "+       +", C.berry); write(x - 4, y, "+       +", C.berry); }
     else if (kind === "bench") write(x - 3, y, "=======", C.woodInk, C.wood);
     else if (kind === "well") { write(x - 2, y - 3, "/===\\", C.roofInk, C.roof); put(x - 2, y - 2, "|", C.woodInk); put(x + 2, y - 2, "|", C.woodInk); write(x - 2, y - 1, "[ ~ ]", C.woodInk, 0xb9b2a4); write(x - 2, y, "[___]", C.woodInk, 0xb9b2a4); }
     else if (kind === "statue") { write(x - 1, y - 4, "(o)", C.ink, 0xb9b2a4); write(x - 1, y - 3, "/|\\", C.ink, 0xb9b2a4); write(x - 1, y - 2, " | ", C.ink, 0xb9b2a4); write(x - 2, y - 1, "#####", C.shadow, 0xb9b2a4); write(x - 2, y, "#####", C.shadow, 0x8f897d); }
@@ -286,6 +299,9 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   }
   if (scene.banner) panelLine(grid, (cols - scene.banner.text.length - 2) >> 1, 1, scene.banner.text, C.woodInk);
   for (const p of scene.panels) panel(grid, p, t);
+  if (scene.chips) chipSpots(scene.chips).forEach(({ x, label, off }) => {
+    for (let c = 0; c < label.length + 2; c++) grid.put(x + c, grid.rows - 1, c && c <= label.length ? label.charAt(c - 1) : " ", off ? C.woodInk : C.paper, off ? C.wood2 : C.woodInk);
+  });
   const ins = scene.inspector;
   if (ins) {
     const width = Math.min(38, cols - 6);
@@ -312,6 +328,24 @@ function box(grid: CellGrid, left: number, top: number, s: { lines: string[]; he
 
 function text(grid: CellGrid, x: number, y: number, s: string, ink: number, bg: number): void {
   for (let i = 0; i < s.length; i++) grid.put(x + i, y, s.charAt(i), ink, bg);
+}
+export const printText = text;
+
+// Where each small button sits on the bottom row, so clicks land on what is drawn.
+export function chipSpots<C extends { label: string }>(chips: readonly C[]): (C & { x: number })[] {
+  let x = 1;
+  return chips.map((c) => {
+    const at = { ...c, x };
+    x += c.label.length + 3;
+    return at;
+  });
+}
+
+export function panelBox(grid: CellGrid, left: number, top: number, w: number, h: number): void {
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
+    if ((r === 0 || r === h - 1) && (c === 0 || c === w - 1)) continue;
+    grid.put(left + c, top + r, r === 0 || r === h - 1 ? "-" : c === 0 || c === w - 1 ? "|" : " ", C.pathInk, C.paper);
+  }
 }
 
 function panelLine(grid: CellGrid, x: number, y: number, s: string, ink: number): void {

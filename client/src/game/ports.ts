@@ -94,13 +94,38 @@ export interface Scene {
   banner: { text: string; left: number } | null;
   inspector: SceneInspector | null;
   panels: readonly ScenePanel[];
+  chips?: readonly { label: string; off: boolean }[]; // the small buttons, on the bottom row of cells
 }
 
 // Whether a bubble found room this frame: a held one keeps its time on screen.
 export type BubbleFate = readonly [id: string, held: boolean];
 
+export interface SceneFighter {
+  name: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+  genes: Genes | null;
+  dx: number; // lunge, in cells
+  flash: boolean;
+  gone: number; // 0..1 fainting or fleeing
+  shield: boolean;
+}
+
+export interface SceneBattle {
+  foe: SceneFighter | null;
+  mine: SceneFighter | null;
+  slide: number; // 0..1 the fighters coming in
+  hearts: number;
+  text: string;
+  lines: (width: number) => string[];
+  tag: string;
+  menu: { labels: readonly string[]; cursor: number } | null;
+}
+
 export interface View {
   draw(scene: Scene, g: CanvasRenderingContext2D, w: number, h: number, t: number): BubbleFate[];
+  battle?(b: SceneBattle, g: CanvasRenderingContext2D, w: number, h: number, t: number): void;
 }
 
 // The part of the live room the game uses. `LiveLink` is the real one; labs pass a fake.

@@ -160,5 +160,5 @@ export function makeChatFlow(d: ChatDeps) {
   });
   chatForm.querySelector("[data-act=close]")!.addEventListener("click", closeChat);
 
-  return { open: openChat, close: closeChat, target: () => chatWith, isPeerChat, talkTarget, talks, asking };
+  return { open: openChat, close: closeChat, draft: () => chatInput.value, target: () => chatWith, isPeerChat, talkTarget, talks, asking };
 }

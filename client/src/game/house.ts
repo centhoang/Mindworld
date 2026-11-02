@@ -23,6 +23,11 @@ const BUILT_IN: readonly Rect[] = [
   [204, 50, 251, 73], // dining table and chairs
 ];
 
+// The same built-ins, to draw on the cell plane: foot centre, in picture pixels.
+export const BUILT_IN_PIECES: readonly { kind: string; x: number; y: number }[] = [
+  { kind: "bed", x: 57, y: 62 }, { kind: "bed", x: 58, y: 77 }, { kind: "table", x: 83, y: 50 }, { kind: "shelf", x: 188, y: 83 }, { kind: "table", x: 227, y: 73 },
+];
+
 const inside = ([x0, y0, x1, y1]: Rect, x: number, y: number) => x >= x0 && x < x1 && y >= y0 && y < y1;
 
 // The house stands in the world as that same picture: its foot (bottom centre of home-roof.png) in picture pixels, and

@@ -67,7 +67,7 @@ export function makeFightFlow(d: FightDeps) {
     const them = me === "a" ? b : a;
     const v = duelView(a, b, seed, me);
     const mine = { ...d.side(d.activeMember()), maxHp: v.myMaxHp };
-    await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), maxHp: v.theirMaxHp, level: 3 }, mine);
+    await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), genes: them.genes, maxHp: v.theirMaxHp, level: 3 }, mine);
     await battleView.say(`Live duel! Both pets follow their own memo rules. Same fight on both screens.`);
     for (const t of v.turns) await battleView.playTurn(t.mine, "", "duel", t.theirAct, t.dealt, t.taken, t.myHp, t.theirHp);
     await battleView.end(...DUEL_END[v.result]);
@@ -98,7 +98,7 @@ export function makeFightFlow(d: FightDeps) {
       : ghost
         ? drawMonster(petLook(parseGenes(ghost.genes) ?? randomGenes(1)), 64, "front")
         : drawMonster(petLook(w!.genes), 64, "front", BUILDS[arch]);
-    await battleView.open({ name: foeName, sprite: foeSprite, maxHp: def.maxHp, level: boss ? 9 : ghost ? 5 : 2 + (w!.id % 3) }, d.side(d.activeMember()));
+    await battleView.open({ name: foeName, sprite: foeSprite, genes: boss ? randomGenes(4242) : ghost ? parseGenes(ghost.genes) ?? undefined : w!.genes, maxHp: def.maxHp, level: boss ? 9 : ghost ? 5 : 2 + (w!.id % 3) }, d.side(d.activeMember()));
     if (ghost) await battleView.say(`${ghost.name}'s ghost fights with its owner's memo: ${ghost.memo.rules.length} rule${ghost.memo.rules.length === 1 ? "" : "s"}.`);
     if (boss) {
       await battleView.say(d.wildMemos().boss?.summary ? `"${d.wildMemos().boss?.summary}"` : `"I can read your pet's memo. Every rule. Surprise me."`);

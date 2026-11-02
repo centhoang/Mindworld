@@ -99,6 +99,7 @@ export class Overworld {
   sunny!: SunnyWorld;
   view: View = new PixelView(this); // what draws the frame
   panels: ScenePanel[] = []; // set by the game each frame
+  chips: Scene["chips"] = undefined; // the small buttons, when the view draws them
   ui = { names: true, map: true }; // the small buttons (main.ts)
   alwaysDay = false; // dev hook: screenshots at any hour
   player: Vec = { x: 0, z: 0 };
@@ -1099,6 +1100,7 @@ export class Overworld {
       banner: this.bannerT > 0 && this.place ? { text: this.place, left: this.bannerT } : null,
       inspector: this.inspected(),
       panels: this.panels,
+      chips: this.chips,
     };
   }
 

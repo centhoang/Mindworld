@@ -2,7 +2,10 @@
 // add furniture (Tab: decorate) and use the shipping crate by the door (sell the harvest, buy seeds). The floor plan
 // is in ../game/house.ts and the furniture rules in ../game/room.ts; this file draws and walks them.
 
-import { HOME_FOOT, HOME_ROOF, HOUSE_DOOR, HOUSE_EXIT_Y, onFloor } from "../game/house";
+import { BUILT_IN_PIECES, HOME_FOOT, HOME_ROOF, HOUSE_DOOR, HOUSE_EXIT_Y, onFloor } from "../game/house";
+import type { Scene, SceneProp } from "../game/ports";
+import type { Genes } from "../sim/ghost";
+import { T, type TileMap } from "../world/tilemap";
 import { CRATE, COLS, FURNITURE, PIECE_KINDS, ROWS, blocked, canPlace, pieceAt, place, removeAt, type Piece, type PieceKind } from "../game/room";
 import { followStep, keyDir, slide, type Vec } from "../world/movement";
 import { makePlayer, PAL, spriteFrame, type Sprite } from "./art";
@@ -27,6 +30,8 @@ export interface InteriorHost {
   petSprite(): HTMLCanvasElement;
   residents(): HTMLCanvasElement[];
   look(): HumanLook;
+  genes(): Genes;
+  residentGenes(): (Genes | null)[];
   useCrate(): void; // opens the crate menu (main.ts owns coins and the farm)
   leave(): void;
   around(g: Ctx, sw: number, sh: number, t: number, footX: number, footY: number): void; // the world outside
@@ -128,6 +133,35 @@ export class Interior {
     if (this.player.z > EXIT_Z) this.host.leave();
   }
 
+  // The room as a scene for a view that reads scenes: the same plane as the village, on its own small map.
+  scene(base: Scene): Scene {
+    const props: SceneProp[] = BUILT_IN_PIECES.map((p) => ({ kind: p.kind, x: p.x / C, z: p.y / C }));
+    for (const p of this.pieces()) {
+      const f = FURNITURE[p.kind];
+      props.push({ kind: p.kind, x: p.x + GX + f.w / 2, z: p.y + GY + f.h });
+    }
+    props.push({ kind: "crates", x: CRATE.x + GX + 0.5, z: CRATE.y + GY + 1 });
+    const d = this.deco;
+    if (d) props.push({ kind: "cursor", x: d.x + GX + 0.5, z: d.y + GY + 1 });
+    const pets = this.host.residentGenes().slice(0, this.sitters.length).flatMap((genes, i) => {
+      const pos = this.sitters[i]!;
+      return this.walk(pos.x, pos.z) ? [{ id: `r${i}`, kind: "resident" as const, x: pos.x, z: pos.z, genes, pose: null }] : [];
+    });
+    pets.push({ id: "pet", kind: "resident" as const, x: this.pet.x, z: this.pet.z, genes: this.host.genes(), pose: null });
+    const kind = d ? PIECE_KINDS[d.kind]! : null;
+    return {
+      ...base,
+      map: roomMap(),
+      cam: { x: ROOM_W / C / 2, z: ROOM_H / C / 2 - 1 },
+      indoors: true,
+      showMap: false,
+      people: [{ id: "me", name: "", kind: "me", x: this.player.x, z: this.player.z, dir: this.dir as 0 | 1 | 2 | 3, walking: this.moving, pose: null, look: this.host.look() }],
+      pets, props, beds: [], bubbles: [], banner: null, inspector: null,
+      hint: d ? null : this.nearCrate() ? "E: CRATE" : "TAB: DECORATE",
+      panels: kind ? [{ place: "corner", title: `Place: ${FURNITURE[kind].label} (Q/E)`, rows: [{ label: `Enter put  X ${pieceAt(this.pieces(), d!.x, d!.y) >= 0 ? "take" : "-"}  Esc done` }] }] : base.panels,
+    };
+  }
+
   draw(g: Ctx, sw: number, sh: number, t: number): void {
     if (this.entered < 0) this.entered = t;
     const ox = sw >= ROOM_W ? Math.floor((sw - ROOM_W) / 2) : Math.round(Math.max(sw - ROOM_W, Math.min(0, sw / 2 - this.player.x * C)));
@@ -191,6 +225,21 @@ export class Interior {
       drawText(g, hint, sw - w, 10, PAL.wood);
     }
   }
+}
+
+let room: TileMap | null = null;
+function roomMap(): TileMap {
+  if (room) return room;
+  const w = Math.ceil(ROOM_W / C), h = Math.ceil(ROOM_H / C) + 2;
+  const kind = new Uint8Array(w * h).fill(T.grass);
+  const floor = (i: number, j: number) => [2, 8, 14].some((a) => [2, 8, 14].some((b) => onFloor(i * C + a, j * C + b)));
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (floor(i, j)) kind[j * w + i] = T.floor;
+  // Walls fill the building's box, so the rooms read as one house.
+  const on = [...kind.keys()].filter((k) => kind[k] === T.floor);
+  const [x0, x1] = [Math.min(...on.map((k) => k % w)) - 1, Math.max(...on.map((k) => k % w)) + 1];
+  const [z0, z1] = [Math.floor(on[0]! / w) - 2, Math.floor(on[on.length - 1]! / w) - 1];
+  for (let j = z0; j <= z1; j++) for (let i = x0; i <= x1; i++) if (kind[j * w + i] !== T.floor) kind[j * w + i] = T.wall;
+  return (room = { w, h, ox: 0, oz: 0, kind, look: new Uint8Array(w * h) });
 }
 
 function cellsOnFloor(p: Piece): boolean {
