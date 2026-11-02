@@ -25,7 +25,7 @@ Read `HANDOFF.md` only, then follow its Next actions. Read other docs when a tas
 - Over ~2 min waits: background the job and use the `claude-queue` skill. Never poll.
 - PDFs/HTML: extract to `.scratch/`, grep. Many images: view one contact sheet.
 - **Context limit 35%** of 1M: read with `get_usage` (ToolSearch `select:mcp__ccd_session_mgmt__get_usage`, `session_id: "self"`) at milestones.
-- Update HANDOFF at milestones and at session end, with a starting prompt.
+- Update HANDOFF at milestones and at session end, with a starting prompt. Before hand-off, check every background job is done and close it (dev servers and test Chrome too).
 
 ## Stay in project
 Everything lives in this folder; temp files in `.scratch/` (gitignored). No project files or memories in `~/.claude` or the OS temp folder. Memory = `HANDOFF.md` and this file.

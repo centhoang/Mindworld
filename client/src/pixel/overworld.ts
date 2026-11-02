@@ -39,7 +39,7 @@ import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
 import { SpriteImages } from "./generated-sprites";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
-const LANDMARK_PROP: Record<string, string> = { spr_deco_well: "well", statue: "statue" };
+const LANDMARK_PROP: Record<string, string> = { spr_deco_well: "well" };
 const CLUMP = 6; // tiles: trees gather in cells of this size
 const SHORE: readonly (readonly [number, number])[] = [[-2, 0], [2, 0], [-1, 0], [1, 0], [0, -2], [-2, 1], [2, 1], [0, 1], [0, 2], [0, 3], [-2, 3], [2, 3]];
 // The mouth of each house's chimney, in pixels from the stamp's top left. Houses not listed have none.
@@ -175,7 +175,7 @@ export class Overworld {
     this.stall = { x: plaza.x - 7, z: plaza.z - 3 };
     const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
     if (npcIsle) this.elder = { pos: this.elder?.pos ?? { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: this.elder?.sprite ?? drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
-    this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, { art: "statue", x: plaza.x - 9.5, z: plaza.z }, ...Object.values(NPC_HOMES)];
+    this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, ...Object.values(NPC_HOMES)];
     this.critters = [];
     for (const p of this.world.platforms) {
       if (p.kind === "plaza" || p.kind === "islet") continue;

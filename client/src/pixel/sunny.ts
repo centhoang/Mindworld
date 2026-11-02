@@ -18,7 +18,7 @@ const STRIPS: Record<string, { frames: number }> = {
 };
 const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "expression_chat", "home-wing-roof", "home-wing-open",
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture"];
-const STAMPS = ["house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "statue", "jar", "crates", "crate", "soil", "bench"];
+const STAMPS = ["house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "jar", "crates", "crate", "soil", "bench"];
 export const CROPS_ART = ["wheat", "carrot", "radish"] as const;
 
 export const sunnyReady = (): boolean => images.has("tiles");

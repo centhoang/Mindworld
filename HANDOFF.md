@@ -9,7 +9,7 @@ Free talk tested on the real model (`proof/npc/5f-free-talk.md`): good, and it s
 Open: bugs 30-33 (Codex rework, Next action 1). Report of dropped activities: `proof/game/activities.md`.
 
 ## State
-- Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/, version 1e6257cf. Fallback: `main`, the last pixel build.
+- Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/, see `wrangler deployments`. Fallback: `main`, the last pixel build.
 - Tests: client 590, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
 - User has not reviewed bugs 13-23. Two tabs driven on live (`proof/game/2-players.md`); no 2-person play yet. Labs still use the mosaic. Tuned 3B stays out.
