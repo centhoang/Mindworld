@@ -13,3 +13,4 @@ Lab: `/lab/pet`. It reads your save and never writes it. Proof so far: `proof/pe
 - [ ] Teach works with no setup, and doesn't stall. Took 12-30 s per lesson on a GTX 1050. Waits for step 7: with `LOCAL_ONLY` on and no model it says "No coach answered" ([live](../proof/pet/5d-live-no-coach.jpg)).
 - [x] The light on a pet's head follows the round head: no square edges, on every build, front and back. [close-up](../proof/pet/heads-round.png)
 - [x] No small marks on a pet's body, front or back. Old pets that had spots still load and show plain. [unit tests](../../../client/src/game/genes.test.ts)
+- [x] On a new save the egg line stays readable through the hatch; the Brain line waits. [live](../proof/game/sunny-hatch-line.jpg)

@@ -1,6 +1,7 @@
 // The game's entry (index.html): a low-res canvas, the scene stack (overworld, battle, interior, teach) and
 // the CRT presenter, wired to the save, the pet brain, Meta-model chat/coach and the live room.
 
+import { afterLine, brainMayShow, type Line } from "../game/hatch-line";
 import { petLook } from "../game/genes";
 import { EMOTES, liveName, type Emote } from "../world/live";
 import { newGroundSeed } from "../world/ground";
@@ -269,17 +270,22 @@ function crateKey(k: string): void {
   } else crate = null;
   save(state);
 }
-let toast: { text: string; who?: string; t: number } | null = { text: "WASD: walk. Shift: run. E: use/talk. T: teach. P: pets. B: brain. N: name. M: mute.", who: "Hint", t: 7 };
+let toast: Line | null = { text: "WASD: walk. Shift: run. E: use/talk. T: teach. P: pets. B: brain. N: name. M: mute.", who: "Hint", t: 7 };
 // First visit: the hatch line, then the control hints one after another (each 6 s, Esc skips), once.
-const hintQueue: { text: string; who?: string; t: number }[] = [];
+const hintQueue: Line[] = [];
+let heldBrain: Line | null = null;
 if (!state.onboard?.seen) {
   world.startHatch();
-  toast = { text: "Something is wiggling inside your egg...", who: "Hint", t: HATCH_TIME };
-  hintQueue.push({ text: `Your egg hatched! Meet ${pet.name}. It learns to fight from what you teach it.`, who: pet.name, t: 6 });
+  toast = { text: "Something is wiggling inside your egg...", who: "Hint", t: HATCH_TIME, keep: true };
+  hintQueue.push({ text: `Your egg hatched! Meet ${pet.name}. It learns to fight from what you teach it.`, who: pet.name, t: 6, keep: true });
   hintQueue.push(...PIXEL_HINTS.map((text) => ({ text, who: "Hint", t: 6 })));
 }
+const brainSay = (line: Line): void => {
+  if (brainMayShow(toast)) toast = line;
+  else heldBrain = line;
+};
 function nextToast(): void {
-  toast = hintQueue.shift() ?? null;
+  ({ next: toast, held: heldBrain } = afterLine(hintQueue, heldBrain));
   if (!toast && !state.onboard?.seen) {
     state.onboard = { ...state.onboard, seen: true };
     save(state);
@@ -503,20 +509,20 @@ const brainTag = () => (instinct.voice === webBrain ? "llama 1b" : "cloud");
 async function switchBrain(): Promise<void> {
   if (instinct.voice) {
     instinct.voice = null;
-    toast = { text: "Brain: rules only (the measured memo policy).", who: "Brain", t: 3 };
+    brainSay({ text: "Brain: rules only (the measured memo policy).", who: "Brain", t: 3 });
     return;
   }
   if (!WebLlmVoice.supported()) {
-    toast = { text: "No WebGPU here, so your pet stays on rules.", who: "Brain", t: 5 };
+    brainSay({ text: "No WebGPU here, so your pet stays on rules.", who: "Brain", t: 5 });
     return;
   }
   try {
-    await webBrain.load((_text, frac) => (toast = { text: `Loading Llama 3.2 1B in this tab: ${Math.round(100 * frac)}%`, who: "Brain", t: 30 }));
+    await webBrain.load((_text, frac) => brainSay({ text: `Loading Llama 3.2 1B in this tab: ${Math.round(100 * frac)}%`, who: "Brain", t: 30 }));
     instinct.voice = webBrain;
-    toast = { text: "Llama 3.2 1B runs in this tab now. B again: back to rules only.", who: "Brain", t: 5 };
+    brainSay({ text: "Llama 3.2 1B runs in this tab now. B again: back to rules only.", who: "Brain", t: 5 });
   } catch (e) {
     storeSetup(null, false); // next visit runs the setup gate again
-    toast = { text: `Could not load the model (${(e as Error).message}). Rules only.`, who: "Brain", t: 5 };
+    brainSay({ text: `Could not load the model (${(e as Error).message}). Rules only.`, who: "Brain", t: 5 });
   }
 }
 void (async () => {

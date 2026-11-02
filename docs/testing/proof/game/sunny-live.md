@@ -22,12 +22,15 @@ Teleported in from far away, key held at once, 0.9 s, about 53 frames each.
 - Noon, same save: wheat sold, coins 0 > 3; seed bought, coins 3 > 2, seeds 2 > 3 (`sunny-market.jpg`).
 - Peer menu, duel, accept, battle, back to the village: `sunny-duel.jpg`. No page errors; only the favicon 404.
 
-## Villagers, 200 s unforced, night into morning
-Seen doing: sell, fish, tend, farm, wander. Walking to chop and soccer; Pip waits at soccer with nobody to play.
-Not seen unforced: dance, chop itself, clean (player only). The forced shots proved no pose: the camera was elsewhere.
+## Villagers unforced, over a full game day
+Build main-Dp6B-Vqo, Friday 21:00 to Sunday 15:00. Samples every 3 s for 16 min, then about 12 min more.
+- Seen doing: sell, fish (`sunny-fish.jpg`), tend, farm, cook, sleep, wander, chop.
+- Chop: Pip, Sunday noon, unforced, axe pose in `sunny-chop.jpg`. No chop in the first 16 min: Pip's noon was skipped or lost that day. The shift can skip by design (`jobs.ts`, playful); which one it was here was not read.
+- Dance: never started. Pip twice waited alone for soccer, about 5 game hours on Sunday morning. The others were at work.
+- Clean is player only, not a failure.
 
 ## Hatch and follow
-Fresh save, cold cache: first frame 1.9 s, egg already showing, 4 s hatch in view, pet out. The Brain panel replaces the "wiggling" line after about 1 s (bug 36).
+Fresh save, cold cache: first frame 1.9 s, egg already showing, 4 s hatch in view, pet out. Build main-Dp6B-Vqo: the "wiggling" line stays to the end of the hatch, then "Your egg hatched", then the Brain line (`sunny-hatch-line.jpg`).
 Pet gap after a walk 1.13 tiles.
 
 ## Redeploy
