@@ -19,6 +19,32 @@ export function glide(from: number, to: number, dt: number): number {
   return Math.abs(to - next) < 0.02 ? to : next;
 }
 
+// One axis of the view, in cells. While you walk both ends chase your real position, not a whole cell, so nothing moves
+// in bursts and neither ever steps back. The distance between them is what the eye sees: it holds still to the pixel
+// unless it really changed. At rest both land on whole cells.
+class Follow {
+  cam: number | null = null;
+  me = 0;
+  gap = 0; // pixels from the view's edge to you
+  private lastCam = 0;
+  private lastMe = 0;
+
+  private chase(from: number, to: number, last: number, moving: boolean, dt: number): number {
+    const next = glide(from, moving ? to : Math.round(to), dt);
+    if (Math.abs(to - last) > JUMP) return next;
+    return to > last ? Math.max(from, next) : to < last ? Math.min(from, next) : next;
+  }
+
+  step(cam: number, me: number, moving: boolean, dt: number): void {
+    if (this.cam === null) [this.cam, this.me] = [Math.round(cam), Math.round(me)];
+    else [this.cam, this.me] = [this.chase(this.cam, cam, this.lastCam, moving, dt), this.chase(this.me, me, this.lastMe, moving, dt)];
+    const exact = (this.me - this.cam) * CELL, want = Math.round(exact);
+    const hold = Math.abs(exact - this.gap) < 1 || (want - this.gap) * (me - this.lastMe) < 0;
+    [this.lastCam, this.lastMe] = [cam, me];
+    this.gap = moving && hold ? this.gap : want;
+  }
+}
+
 class Plane {
   readonly canvas = document.createElement("canvas");
   private g: CanvasRenderingContext2D;
@@ -73,8 +99,9 @@ export class MosaicView implements View {
   private top = new Plane(true, () => this.grout);
   private last = "";
   private lastT = 0;
-  private cam: { x: number; y: number } | null = null; // the top-left cell of the view, between whole cells while it moves
-  private me: { x: number; y: number } | null = null;
+  private x = new Follow(); // the top-left cell of the view and you, between whole cells while they move
+  private y = new Follow();
+  private drawnMe = { x: 0, y: 0 }; // the cell you were last composed at: your plane moves on from there
   private fates: BubbleFate[] = [];
   painted = 0;
 
@@ -93,31 +120,30 @@ export class MosaicView implements View {
     this.planes(cols, rows);
     const dt = Math.max(0, Math.min(0.1, t - this.lastT));
     this.lastT = t;
-    const toX = Math.round(scene.cam.x * CELLS_PER_TILE) - (cols >> 1), toY = Math.round(scene.cam.z * CELLS_PER_TILE) - (rows >> 1);
-    this.cam = this.cam ? { x: glide(this.cam.x, toX, dt), y: glide(this.cam.y, toY, dt) } : { x: toX, y: toY };
     const you = scene.people.find((p) => p.kind === "me");
-    const youX = you ? Math.round(you.x * CELLS_PER_TILE) : 0, youY = you ? Math.round(you.z * CELLS_PER_TILE) : 0;
-    this.me = you && this.me ? { x: glide(this.me.x, youX, dt), y: glide(this.me.y, youY, dt) } : { x: youX, y: youY };
-    const camX = Math.floor(this.cam.x), camY = Math.floor(this.cam.y);
+    const moving = you?.walking ?? false;
+    this.x.step(scene.cam.x * CELLS_PER_TILE - (cols >> 1), (you?.x ?? 0) * CELLS_PER_TILE, moving, dt);
+    this.y.step(scene.cam.z * CELLS_PER_TILE - (rows >> 1), (you?.z ?? 0) * CELLS_PER_TILE, moving, dt);
+    const camX = Math.floor(this.x.cam!), camY = Math.floor(this.y.cam!);
     const key = `${Math.floor(t * TICK)},${camX},${camY},${this.wipe}`;
     if (key !== this.last) {
       this.last = key;
       this.mine.grid.clear();
       this.top.grid.clear();
       this.fates = compose(scene, this.world.grid, t, { me: this.mine.grid, top: this.top.grid, camX, camY });
+      this.drawnMe = { x: Math.round((you?.x ?? 0) * CELLS_PER_TILE), y: Math.round((you?.z ?? 0) * CELLS_PER_TILE) };
       if (this.wipe > 0) iris(this.top.grid, this.wipe);
       this.painted = this.world.flush() + this.mine.flush() + this.top.flush();
     }
-    const sx = -Math.round((this.cam.x - camX) * CELL), sy = -Math.round((this.cam.y - camY) * CELL);
-    g.drawImage(this.world.canvas, sx, sy);
-    g.drawImage(this.mine.canvas, sx + Math.round((this.me.x - youX) * CELL), sy + Math.round((this.me.y - youY) * CELL));
+    g.drawImage(this.world.canvas, -Math.round((this.x.cam! - camX) * CELL), -Math.round((this.y.cam! - camY) * CELL));
+    g.drawImage(this.mine.canvas, this.x.gap - (this.drawnMe.x - camX) * CELL, this.y.gap - (this.drawnMe.y - camY) * CELL);
     g.drawImage(this.top.canvas, 0, 0);
     return this.fates;
   }
 
   battle(b: SceneBattle, g: CanvasRenderingContext2D, w: number, h: number, t: number): void {
     this.planes(Math.ceil(w / CELL), Math.ceil(h / CELL));
-    this.cam = null; // back in the village, the view starts where it stands
+    this.x.cam = this.y.cam = null; // back in the village, the view starts where it stands
     const key = `battle${Math.floor(t * TICK)}`;
     if (key !== this.last) {
       this.last = key;

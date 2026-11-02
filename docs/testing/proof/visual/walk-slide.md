@@ -1,7 +1,6 @@
-# Walk slide, deployed build (2026-11-02, version d99f011e)
+# Walk slide and the grid at rest (deployed build, 2026-11-03)
 
-Held D for 1.2 s on pets.uryto.dev, logged the world plane's blit offset each frame (85 frames in 2.1 s, plane px, 1 cell = 8).
-
-`0 x18, -1 -2 -3 -4 -5 -5 -6 -6 -6 -7 -7 -7 | -1 -2 -3 -4 -4 -5 -6 -6 -6 -7 -7 -7 | -1 -2 -3 -4 -6 -6 -7 -2 ...`
-
-Each `|` is a whole-cell rollover, not a visible jump. Steps are 1-2 px, with a rare 3-4 px on a slow frame. After release it settled at `0,0`, so the planes line up on one grid at rest.
+Replaces the 2026-11-02 run: the view now follows your real position, not whole cells, so walking has no rollover bursts.
+- Moving: every step along travel is 0-3 px forward, on all sides: `../game/walk-steady.md`.
+- At rest: after walking right and after walking down, all three planes were drawn at `[0,0]`, so they sit on one grid.
+- Lab scenes 1-5, night, and the village on live: `5c-live.jpg`. No console errors. The lab page no longer shows scrollbars.

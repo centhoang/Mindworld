@@ -16,5 +16,5 @@ Each doc has one job. Keep each under 80 lines. Old detail lives in `archive/`: 
 | `network/network.md` | Sync, AOI, capacity |
 | `testing/testing.md` | Labs, checklists and the review loop |
 | `testing/checks/*.md` | One short checklist per scope |
-| `ops/` | Event rules, deploy, credits, demo script, drafts, Director mode |
+| `ops/` | Event rules, deploy, credits, demo script, drafts, Director mode, test tooling |
 | `archive/` | Superseded plans and full history |

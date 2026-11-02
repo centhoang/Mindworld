@@ -8,5 +8,6 @@ Run on `/` only when every other list is clear. Two or more players, deployed bu
 - [ ] Teach, then Prove, then a duel with a friend.
 - [ ] Every human activity works for players and villagers.
 - [ ] No fishing without water, no walking through solid things.
+- [x] Holding one direction, walking or running, your character moves smoothly and never jumps back. (proof: ../proof/game/walk-steady.md)
 - [ ] Two players in the village see the same day.
 - [ ] Runs with no GPU: rules and cached lines, and it says so.
