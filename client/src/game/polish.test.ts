@@ -23,7 +23,7 @@ describe("chatter", () => {
     expect(speakerFor("wild", "turtle")).toBe("turtle");
     expect(speakerFor("porch")).toBeNull();
     for (const pool of Object.values(LINES)) for (const l of pool) expect(l.length).toBeLessThanOrEqual(34);
-    expect(voiceFor("boss").pitch).toBeLessThan(voiceFor("skitter").pitch);
+    expect(voiceFor("elder").pitch).toBeLessThan(voiceFor("skitter").pitch);
   });
 
   it("spaces ambient chatter 6 to 11 seconds apart", () => {

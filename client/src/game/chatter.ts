@@ -3,7 +3,7 @@ import type { ArchetypeId } from "../sim/types";
 // Canned in-world chatter: short cute lines for whoever the player walks up to, plus the pet's own
 // musings. No model calls; picking is pure and seeded by the caller's rng so it is testable.
 
-export type Speaker = "pet" | "elder" | "mo" | "ama" | "pip" | "boss" | "merchant" | "ghost" | ArchetypeId;
+export type Speaker = "pet" | "elder" | "mo" | "ama" | "pip" | "merchant" | ArchetypeId;
 
 export const LINES: Record<Speaker, readonly string[]> = {
   pet: ["What a nice breeze!", "Can we nap on the porch?", "I'm learning so much!", "Look, petals!", "Teach me a new trick?", "Snack time?"],
@@ -11,9 +11,7 @@ export const LINES: Record<Speaker, readonly string[]> = {
   mo: ["The fish bite best at dawn.", "Quiet water, quiet mind.", "Patience, friend."],
   ama: ["Hungry? There's soup!", "A picnic later! Bring your pets.", "Who left that mess?"],
   pip: ["Soccer? Soccer!", "Race you!", "Let's dance tonight!"],
-  boss: ["I can read your pet's mind...", "Your memo is an open book.", "Come closer. If you dare."],
   merchant: ["Fresh decor, fair prices!", "Coins from fights spend here!", "Pretty things for your corner!"],
-  ghost: ["Boo! Just kidding.", "My owner taught me well.", "Want a friendly match?"],
   brute: ["Grr! Me strong!", "Smash first, think later!", "Hmph."],
   skitter: ["Zip zip!", "Can't catch me!", "Tee-hee!"],
   turtle: ["Slow and steady...", "Shell is cozy.", "Mm... sleepy."],
@@ -21,14 +19,13 @@ export const LINES: Record<Speaker, readonly string[]> = {
   bully: ["Out of my meadow!", "Think you can take me?", "Hmph, tiny."],
 };
 
-// Voice tuning per speaker: small creatures squeak, the elder and boss are low.
+// Voice tuning per speaker: small creatures squeak, the elder is low.
 export function voiceFor(who: Speaker): { pitch: number; rate: number } {
   switch (who) {
     case "elder": return { pitch: 0.7, rate: 0.9 };
     case "mo": return { pitch: 0.85, rate: 0.85 };
     case "ama": return { pitch: 1.2, rate: 1.05 };
     case "pip": return { pitch: 1.6, rate: 1.25 };
-    case "boss": return { pitch: 0.4, rate: 0.85 };
     case "brute": case "bully": return { pitch: 0.75, rate: 1 };
     case "skitter": return { pitch: 1.9, rate: 1.3 };
     case "turtle": return { pitch: 1, rate: 0.8 };
@@ -50,8 +47,6 @@ export const nextChatter = (rng: () => number): number => 6 + rng() * 5;
 export function speakerFor(kind: string, archetype?: ArchetypeId): Speaker | null {
   if (kind === "wild" || kind === "tamed") return archetype ?? null;
   if (kind === "npc") return "elder";
-  if (kind === "boss") return "boss";
   if (kind === "market") return "merchant";
-  if (kind === "ghost" || kind === "arena") return "ghost";
   return null;
 }

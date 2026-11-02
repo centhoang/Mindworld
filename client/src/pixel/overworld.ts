@@ -145,15 +145,11 @@ export class Overworld {
   private allBeds: Vec[] = []; // the same on every ground: all machines must agree on what stands where
   readonly peerFarms = new Map<string, readonly [string, number][]>();
   farm: Farm | null = null; // set by main.ts; drawn on the beds
-  // The Reader (boss) on its island and the Elder on hers: they stand still; touch the boss to fight it,
-  // press E by the Elder to talk.
-  boss: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
+  // The Elder on her island stands still: press E by her to talk.
   elder: { pos: Vec; sprite: HTMLCanvasElement } | null = null;
   // The market stall on the market island: E there opens the same buy/sell menu as the crate at home.
   stall: Vec | null = null;
   noticeBoard: Vec | null = null;
-  // The ghost stone on the event island: touch it to fight a random shared ghost.
-  ghostStone: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
   // Other players online (live room): their walker and pet, eased toward the last position received.
   readonly peers = new Map<string, Peer>();
   // My minds' public moments (activity starts, spoken lines), sent to the live room by main.ts.
@@ -176,10 +172,6 @@ export class Overworld {
   private placeShared(): void {
     const plaza = this.world.platforms.find((p) => p.kind === "plaza")!;
     this.stall = { x: plaza.x - 7, z: plaza.z - 3 };
-    const bossIsle = this.world.platforms.find((p) => p.kind === "boss");
-    if (bossIsle) this.boss = { pos: { x: bossIsle.x, z: bossIsle.z - 1 }, sprite: this.boss?.sprite ?? drawMonster(petLook(randomGenes(4242)), 40, "front", BUILDS.bully), cool: this.boss?.cool ?? 0 };
-    const eventIsle = this.world.platforms.find((p) => p.kind === "event");
-    this.ghostStone = eventIsle ? { pos: { x: eventIsle.x, z: eventIsle.z - 1 }, sprite: this.ghostStone?.sprite ?? ghostSprite(), cool: this.ghostStone?.cool ?? 0 } : null;
     const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
     if (npcIsle) this.elder = { pos: this.elder?.pos ?? { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: this.elder?.sprite ?? drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
     this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, { art: "statue", x: plaza.x - 6.5, z: plaza.z + 4 }];
@@ -955,7 +947,7 @@ export class Overworld {
     this.petGlad = GLAD_TIME;
   }
 
-  update(dt: number, keys: ReadonlySet<string>): Wild | "boss" | "ghost" | null {
+  update(dt: number, keys: ReadonlySet<string>): Wild | null {
     const d = keyDir(keys);
     this.moving = d.x !== 0 || d.z !== 0;
     if (this.moving) {
@@ -1030,16 +1022,6 @@ export class Overworld {
       p.pet.x += (p.to.px - p.pet.x) * k8;
       p.pet.z += (p.to.pz - p.pet.z) * k8;
     }
-    const gs = this.ghostStone;
-    if (gs) {
-      gs.cool = Math.max(0, gs.cool - dt);
-      if (!met && !gs.cool && Math.hypot(gs.pos.x - this.player.x, gs.pos.z - this.player.z) < MEET_DIST + 0.3) return "ghost";
-    }
-    const b = this.boss;
-    if (b) {
-      b.cool = Math.max(0, b.cool - dt);
-      if (!met && !b.cool && Math.hypot(b.pos.x - this.player.x, b.pos.z - this.player.z) < MEET_DIST + 0.4) return "boss";
-    }
     return met;
   }
 
@@ -1110,7 +1092,7 @@ export class Overworld {
     }
     const bubbles: SceneBubble[] = [];
     for (const [who, b] of this.bubbles) {
-      const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" || who === "n:elder" ? this.elder?.pos : who.startsWith("n:") ? this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
+      const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" || who === "n:elder" ? this.elder?.pos : who.startsWith("n:") ? this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
       if (!pos) continue;
       const head = this.speaker(who);
       bubbles.push({ id: who, x: pos.x, z: pos.z, head: b.thought ? `${head} thinks` : head && b.to ? `${head} > ${b.to}` : head, text: b.text, thought: !!b.thought, first: who === "me" || b.to === this.myName });
@@ -1183,27 +1165,4 @@ interface Peer {
   look: HumanLook;
   pose: Pose | null;
   flip: boolean;
-}
-
-// The ghost stone: a pale standing stone with a teal wisp (palette only).
-function ghostSprite(): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = 20;
-  c.height = 28;
-  const g = c.getContext("2d")!;
-  const r = (x: number, y: number, w: number, h: number, col: string) => {
-    g.fillStyle = col;
-    g.fillRect(x, y, w, h);
-  };
-  r(3, 10, 14, 18, PAL.ink);
-  r(4, 11, 12, 16, PAL.stone);
-  r(4, 11, 4, 16, PAL.stoneL);
-  r(5, 9, 10, 2, PAL.ink);
-  r(6, 8, 8, 1, PAL.ink);
-  r(8, 16, 4, 4, PAL.teal);
-  r(9, 17, 2, 2, PAL.waterL);
-  r(7, 1, 6, 5, PAL.waterL);
-  r(8, 0, 4, 1, PAL.foam);
-  r(9, 6, 2, 2, PAL.foam);
-  return c;
 }

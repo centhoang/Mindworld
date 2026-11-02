@@ -241,12 +241,6 @@ export class PixelView implements View {
         else g.drawImage(o.elder!.sprite, nx - 12, ny - 22);
       }) });
     }
-    for (const npc of [o.boss, o.ghostStone]) {
-      if (!npc) continue;
-      const [nx, ny] = toScreen(npc.pos.x, npc.pos.z);
-      const s = npc.sprite;
-      items.push({ z: npc.pos.z, draw: () => g.drawImage(s, nx - s.width / 2, ny - s.height + 2 - (Math.floor(t * 1.5) % 2)) });
-    }
     const [qx, qy] = toScreen(o.pet.x, o.pet.z);
     const hop = Math.floor(t * 4) % 2;
     if (!scene.indoors) items.push({ z: o.pet.z, draw: () => g.drawImage(o.petSprite, qx - half, qy - OVERWORLD_MON + 2 - hop) });

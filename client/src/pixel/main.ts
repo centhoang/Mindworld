@@ -323,7 +323,7 @@ function showMenu(title: string, rows: readonly MenuRow[], cursor: number, t: nu
 // The goals card (top left, G hides it): what a first visit should try. Gone once all four are done.
 function drawGoals(): void {
   if (hidden("goals") || state.onboard?.goalsHidden || world.inspect) return;
-  const list = pixelGoals({ taught: !!state.steps?.proved, party: (state.party ?? []).length, shipped: !!state.steps?.shipped, boss: !!state.steps?.boss });
+  const list = pixelGoals({ taught: !!state.steps?.proved, party: (state.party ?? []).length, shipped: !!state.steps?.shipped });
   if (list.every((x) => x.done)) return;
   if (!pixelLook) {
     nextPanels.push({ place: "corner", title: "GOALS  (G)", rows: list.map((x) => ({ label: `${x.done ? "+" : "-"} ${x.label}`.slice(0, 26), ink: x.done ? "#7A8F89" : "#39463F" })) });
@@ -498,8 +498,6 @@ function side(m: Member): Side {
   return { name: m.name, genes: m.genes, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3 };
 }
 
-// A fight against a wild pet, or "boss": The Reader, which reads your memo rules and counters them until
-// it runs out of focus (sim/boss.ts); a dazed boss can be befriended.
 // ---- pet brain: rules only by default; B switches to our tuned Llama 3.2 1B in the browser (WebGPU).
 // Per-move cloud picks are opt-in with ?cloudmoves.
 const instinct = new Instinct(null);
@@ -562,10 +560,8 @@ setInterval(saveMinds, 20_000);
 window.addEventListener("beforeunload", saveMinds);
 
 const memoKey = () => JSON.stringify([state.memo.rules.map((r) => [r.if, r.do]), state.home]);
-function coolFoe(foe: Wild | "boss" | "ghost"): void {
-  if (foe === "boss") world.boss!.cool = 10;
-  else if (foe === "ghost") world.ghostStone!.cool = 10;
-  else foe.cool = 8;
+function coolFoe(foe: Wild): void {
+  foe.cool = 8;
 }
 
 // Live room: other players online walk around this world (WebSocket Durable Object, ~10 Hz while moving).
@@ -657,7 +653,6 @@ const fights = makeFightFlow({
     if (duelOut) clearTimeout(duelOut.timer);
     duelOut = null;
   },
-  toast: say,
 });
 const fight = fights.fight;
 

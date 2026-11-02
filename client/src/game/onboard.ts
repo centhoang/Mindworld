@@ -6,33 +6,18 @@ export interface OnboardSave {
   goalsHidden?: boolean; // the player closed the goals card
 }
 
-export interface GoalInput {
-  tamed: number; // wild pets befriended
-  decor: number; // decor placed in your corner
-  boss: boolean; // beat the boss once
-}
-
 export interface Goal {
-  id: "befriend" | "decorate" | "boss" | "teach" | "farm";
+  id: "befriend" | "teach" | "farm";
   label: string;
   how: string;
   done: boolean;
 }
 
-export function goals(g: GoalInput): Goal[] {
-  return [
-    { id: "befriend", label: "Befriend a wild pet", how: "Meadow (east): weaken one, then befriend it", done: g.tamed > 0 },
-    { id: "decorate", label: "Decorate your cabin", how: "Find the signpost by your A-frame", done: g.decor > 0 },
-    { id: "boss", label: "Beat the boss", how: "North-east island; it reads your memo", done: g.boss },
-  ];
-}
-
-// The pixel build's goals card: the four things a first visit should touch (teach, tame, farm, boss).
+// The goals card: the three things a first visit should touch (teach, tame, farm).
 export interface PixelGoalInput {
   taught: boolean; // a lesson changed the memo (steps.proved)
   party: number; // pets befriended
   shipped: boolean; // sold a harvest at the crate or the market
-  boss: boolean;
 }
 
 export function pixelGoals(g: PixelGoalInput): Goal[] {
@@ -40,7 +25,6 @@ export function pixelGoals(g: PixelGoalInput): Goal[] {
     { id: "teach", label: "Teach your pet (T)", how: "Plain words; it is tested on new fights", done: g.taught },
     { id: "befriend", label: "Befriend a wild pet", how: "Wild meadows; weaken it, then befriend", done: g.party > 0 },
     { id: "farm", label: "Grow and sell a crop", how: "Beds by your A-frame; sell at the crate", done: g.shipped },
-    { id: "boss", label: "Outsmart The Reader", how: "Boss island; it reads your memo", done: g.boss },
   ];
 }
 

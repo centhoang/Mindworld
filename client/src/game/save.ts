@@ -29,7 +29,7 @@ export interface Save {
   muted?: boolean; // in-world voice off
   name?: string; // the name over your head; empty = the one your pet's genes give you
   hide?: Record<string, boolean>; // UI panels closed with the small buttons
-  steps?: { fought?: boolean; proved?: boolean; boss?: boolean; shipped?: boolean }; // first-steps guide progress
+  steps?: { fought?: boolean; proved?: boolean; shipped?: boolean }; // first-steps guide progress
   tamed?: ArchetypeId[]; // wild pets befriended in the meadow; they live in your corner
   genes: Genes; // the pet's looks, rolled at hatch (older saves get one on first load)
   onboard?: OnboardSave; // first-run hatch + hints seen, goals card closed
@@ -73,7 +73,7 @@ export function load(): Save {
         ...(typeof raw.groundSeed === "number" && Number.isInteger(raw.groundSeed) && raw.groundSeed > 0 && raw.groundSeed < 2 ** 31 ? { groundSeed: raw.groundSeed } : {}),
         ...(parseOnboard(raw.onboard) ? { onboard: parseOnboard(raw.onboard) } : {}),
         ...(raw.steps && typeof raw.steps === "object"
-          ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, boss: raw.steps.boss === true, shipped: raw.steps.shipped === true } }
+          ? { steps: { fought: raw.steps.fought === true, proved: raw.steps.proved === true, shipped: raw.steps.shipped === true } }
           : {}),
       };
     }

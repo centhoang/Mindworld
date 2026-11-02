@@ -1,6 +1,6 @@
-// Fights: a wild pet, the boss, a ghost, or a live duel, played on the battle screen.
-import { parseGenes, petLook, randomGenes } from "../game/genes";
-import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
+// Fights: a wild pet or a live duel, played on the battle screen.
+import { petLook } from "../game/genes";
+import { shareGhost } from "../game/ghost-api";
 import type { Speaker } from "../game/chatter";
 import type { Instinct } from "../game/instinct";
 import { addToParty } from "../game/party";
@@ -8,10 +8,9 @@ import type { FightWorld, Transport } from "../game/ports";
 import { MAX_TAMED, save, type Save } from "../game/save";
 import { addCoins, coinsFor } from "../game/shop";
 import { Battle } from "../sim/battle";
-import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "../sim/boss";
 import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
 import { ENEMIES } from "../sim/enemies";
-import { GHOST_ARCHETYPE, ghostEnemyDef, type Genes, type Ghost } from "../sim/ghost";
+import type { Genes } from "../sim/ghost";
 import { withTactics, type WildMemos } from "../sim/tactics";
 import type { DEFAULT_PET, Intent, Outcome } from "../sim/types";
 import type { BattleView, Side } from "./battle";
@@ -46,14 +45,11 @@ export interface FightDeps {
   activeMember: () => Member;
   side: (m: Member) => Side;
   refreshParty: () => void;
-  coolFoe: (foe: Foe) => void;
+  coolFoe: (foe: Wild) => void;
   memoKey: () => string;
   brainTag: () => string;
   duelBegun: () => void;
-  toast: (text: string, t: number) => void;
 }
-
-type Foe = Wild | "boss" | "ghost";
 
 export function makeFightFlow(d: FightDeps) {
   const { world, state, pet, battleView, teach, instinct } = d;
@@ -80,30 +76,16 @@ export function makeFightFlow(d: FightDeps) {
     d.setMode("world");
   }
 
-  async function fight(foe: Wild | "boss" | "ghost"): Promise<void> {
+  async function fight(w: Wild): Promise<void> {
     d.setMode("battle");
     d.keys.clear();
-    const w = typeof foe === "string" ? null : foe;
-    const boss: Boss | null = foe === "boss" ? makeBoss(state.memo, pet) : null;
-    // A ghost: another player's shared pet (looks + memo rules) from the Worker, or a bundled one offline.
-    const ghost: Ghost | null = foe === "ghost" ? (await fetchRandomGhost()).ghost : null;
-    const arch = w ? w.arch : ghost ? GHOST_ARCHETYPE : BOSS_ARCHETYPE;
-    const tactic = w ? d.wildMemos()[w.arch] : undefined;
-    d.setFoeVoice(ghost ? "ghost" : arch);
-    const def = boss ? boss.def : ghost ? ghostEnemyDef(ghost, pet) : withTactics(ENEMIES[arch], tactic);
-    const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def, ...(boss ? { maxTurns: BOSS_TURNS } : {}) });
-    const foeName = boss ? BOSS_STATS.label : ghost ? ghost.name.slice(0, 12) : arch[0]!.toUpperCase() + arch.slice(1);
-    const foeSprite = boss
-      ? drawMonster(petLook(randomGenes(4242)), 80, "front", BUILDS.bully)
-      : ghost
-        ? drawMonster(petLook(parseGenes(ghost.genes) ?? randomGenes(1)), 64, "front")
-        : drawMonster(petLook(w!.genes), 64, "front", BUILDS[arch]);
-    await battleView.open({ name: foeName, sprite: foeSprite, genes: boss ? randomGenes(4242) : ghost ? parseGenes(ghost.genes) ?? undefined : w!.genes, maxHp: def.maxHp, level: boss ? 9 : ghost ? 5 : 2 + (w!.id % 3) }, d.side(d.activeMember()));
-    if (ghost) await battleView.say(`${ghost.name}'s ghost fights with its owner's memo: ${ghost.memo.rules.length} rule${ghost.memo.rules.length === 1 ? "" : "s"}.`);
-    if (boss) {
-      await battleView.say(d.wildMemos().boss?.summary ? `"${d.wildMemos().boss?.summary}"` : `"I can read your pet's memo. Every rule. Surprise me."`);
-      await battleView.say(`It loses focus after ${BOSS_FOCUS} reads. A dazed boss might make friends.`);
-    }
+    const arch = w.arch;
+    d.setFoeVoice(arch);
+    const def = withTactics(ENEMIES[arch], d.wildMemos()[arch]);
+    const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def });
+    const foeName = arch[0]!.toUpperCase() + arch.slice(1);
+    const foeSprite = drawMonster(petLook(w.genes), 64, "front", BUILDS[arch]);
+    await battleView.open({ name: foeName, sprite: foeSprite, genes: w.genes, maxHp: def.maxHp, level: 2 + (w.id % 3) }, d.side(d.activeMember()));
     // Fight = watch the pet play its memo; Teach = change the memo first; Swap = next party member; Run = leave.
     for (;;) {
       const c = await battleView.choose();
@@ -123,7 +105,7 @@ export function makeFightFlow(d: FightDeps) {
         }
       } else {
         await battleView.say("You slip away safely.");
-        d.coolFoe(foe);
+        d.coolFoe(w);
         d.setMode("world");
         return;
       }
@@ -141,9 +123,6 @@ export function makeFightFlow(d: FightDeps) {
       const rec = battle.step(choice.action);
       if (!battle.done) next = instinct.decide(name, state.memo, battle.observe());
       await battleView.playTurn(choice.action, choice.line, tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp);
-      const read = boss?.reads.find((r) => r.turn === obs.turn);
-      if (read) await battleView.say(`It read memo #${read.rule + 1}! ${read.did === "idle" ? "It faked the tell." : "It hit hard anyway."}`, "boss read");
-      else if (boss?.dazedTurns.includes(obs.turn)) await battleView.say(`${foeName} is dazed: it can't read you now.`, "dazed");
     }
     const replay = battle.replay();
     await battleView.end(replay.outcome, replay.how);
@@ -152,36 +131,29 @@ export function makeFightFlow(d: FightDeps) {
       const earned = coinsFor(replay.outcome, replay.how);
       state.coins = addCoins(state.coins ?? 0, earned);
       let msg = `+${earned} coins.`;
-      if (replay.how === "befriended" && w) {
+      if (replay.how === "befriended") {
         state.tamed = [...(state.tamed ?? []), w.arch].slice(-MAX_TAMED); // v1 readers
         state.party = addToParty(state.party ?? [], w.arch, w.genes);
         state.active = Math.min(state.active ?? 0, state.party.length);
         d.refreshParty();
         msg = `${state.party.at(-1)!.name} the ${w.arch} is yours now! It waits at your corner. ${msg}`;
       }
-      if (boss) msg = `You outsmarted The Reader! ${msg}`;
       await battleView.say(msg);
-      if (w) {
-        world.removeWild(w.id);
-        const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
-        if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
-      } else d.coolFoe(foe);
-    } else {
-      if (boss) await battleView.say("Tip: it reads your rules. Teach a plan it can't predict, then come back.");
-      d.coolFoe(foe); // give the player time to walk away
-    }
-    if (w) state.recent = [...state.recent, replay].slice(-8);
-    // Winning wild fights with a taught memo shares your pet as a ghost others can fight (rules only).
-    if (w && replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== d.memoKey()) {
+      world.removeWild(w.id);
+      const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
+      if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
+    } else d.coolFoe(w); // give the player time to walk away
+    state.recent = [...state.recent, replay].slice(-8);
+    // A win with a taught memo shares its rules: the Worker's cron has Muse Spark re-teach wild pets from them.
+    if (replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== d.memoKey()) {
       void shareGhost(pet.name, state.genes, state.memo, state.home).then((r) => {
         if (!r.ok) return;
         state.shared = d.memoKey();
         state.mine = [...(state.mine ?? []), r.id].slice(-20);
         save(state);
-        d.toast(`${pet.name}'s ghost is out there now: other players can fight its memo.`, 4);
       });
     }
-    state.steps = { ...state.steps, fought: true, ...(boss && replay.outcome === "win" ? { boss: true } : {}) };
+    state.steps = { ...state.steps, fought: true };
     save(state);
     d.setMode("world");
   }
