@@ -3,7 +3,7 @@ import { generateWorld, groundOrigin, type Platform, type WorldMap } from "../wo
 import { placeDecor } from "./grounds-decor";
 import { Overworld } from "./overworld";
 import { buildTerrain, edgeOf, tile } from "./sunny-terrain";
-import { buildTileMap, T, tileAt, tileWalkable, type TileMap } from "./tilemap";
+import { buildTileMap, T, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
 
 // Extra room exercises successful carving without changing production ground dimensions or rules.
 function roomy(seed: number): WorldMap {

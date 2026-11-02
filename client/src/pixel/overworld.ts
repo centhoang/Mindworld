@@ -7,15 +7,15 @@ import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
-import { hasArt, img, makePlayer, PAL, spriteFrame, type ArtName, type Sprite } from "./art";
-import { drawDecor, drawSpotProp } from "./grounds-draw";
+import { hasArt, img, makePlayer, PAL, type ArtName, type Sprite } from "./art";
 import { placeDecor, type DecorPiece } from "./grounds-decor";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
-import { drawFrame, drawText, drawTinyText, GLYPH, wrap } from "./text";
-import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
-import { buildSunny, characterShadow, footRuns, standRun, drawCropArt, drawHighClouds, drawLand, drawRail, drawSea, drawSeaLife, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
+import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
+import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
+import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
+import { PixelView } from "./pixel-view";
 import { compass, type Place } from "../mind/directions";
 import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
@@ -23,25 +23,20 @@ import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
 import { cornerBlocks, railBlocks, seaCell, tile } from "./sunny-terrain";
 import { HOME_BLOCKS, HOME_DOOR_DX } from "../game/house";
-import { layoutBubbles, type BubbleBox, type Placed } from "./bubbles";
 import { liveName } from "../world/live";
-import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
 import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
-import { drawInspector } from "./inspector";
-import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
+import { isNpc, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
 import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
-import { generatedSprites, SpriteImages } from "./generated-sprites";
-import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, humanSprites, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
+import { SpriteImages } from "./generated-sprites";
+import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
 const CLUMP = 6; // tiles: trees gather in cells of this size
 const SHORE: readonly (readonly [number, number])[] = [[-2, 0], [2, 0], [-1, 0], [1, 0], [0, -2], [-2, 1], [2, 1], [0, 1], [0, 2], [0, 3], [-2, 3], [2, 3]];
 // The mouth of each house's chimney, in pixels from the stamp's top left. Houses not listed have none.
-const CHIMNEY: Record<string, [number, number]> = { "house-blue": [63, 11], "house-red": [15, 1], "house-orange": [15, 22], "house-orangelong": [63, 18], "house-bluesmall": [55, 7] };
-const SMOKE_W = 15;
-const SMOKE_H = 37;
+export const CHIMNEY: Record<string, [number, number]> = { "house-blue": [63, 11], "house-red": [15, 1], "house-orange": [15, 22], "house-orangelong": [63, 18], "house-bluesmall": [55, 7] };
 const READ_CHARS = 12; // a bubble stays long enough to read at this many characters a second
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
 export const NAME_MAX = 10;
@@ -52,11 +47,11 @@ export const OVERWORLD_MON = 20; // px: monsters in the overworld
 const WILD_PER_MEADOW = 3;
 const MEET_DIST = 1.0;
 const NPC_ROUTE_TILES = 120_000; // the NPCs may walk across the whole map
-const HOME_ART = "home-roof";
+export const HOME_ART = "home-roof";
 const HOUSE_ART = ["house-red", "house-orange", "house-green", "house-purple", "house-orangelong", "house-redsmall", "house-bluesmall", "house-greentall"];
-const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
+export const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
 // Farm stages 0-3 onto the pack's six growth pictures.
-const CROP_STAGE = [1, 2, 3, 4]; // the pack's stage 5 is the harvested item, not a plant
+export const CROP_STAGE = [1, 2, 3, 4]; // the pack's stage 5 is the harvested item, not a plant
 
 // Fixed buildings and big pieces on shared places: solid, and drawn with the people.
 interface Landmark {
@@ -95,36 +90,38 @@ export class Overworld {
   private readonly decorTiles = new Set<number>();
   private layoutIn: LayoutInput;
   houses: (Vec & { art: string })[] = []; // other players' houses (props only; yours is `house`)
-  private landmarks: Landmark[] = [];
-  private critters: { art: string; x: number; z: number; seed: number }[] = [];
-  private sunny!: SunnyWorld;
+  landmarks: Landmark[] = [];
+  critters: { art: string; x: number; z: number; seed: number }[] = [];
+  sunny!: SunnyWorld;
+  view: View = new PixelView(this); // what draws the frame
   ui = { names: true, map: true }; // the small buttons (main.ts)
   alwaysDay = false; // dev hook: screenshots at any hour
   player: Vec = { x: 0, z: 0 };
   pet: Vec = { x: 0, z: 0 };
-  private moving = false;
-  private readonly playerMotion = newHumanMotion(this.player);
-  private readonly npcMotions = new Map<Npc, HumanMotion>();
-  private readonly npcPets = new Map<Npc, Vec>();
-  private readonly npcPetImages = new SpriteImages();
+  moving = false;
+  readonly playerMotion = newHumanMotion(this.player);
+  readonly npcMotions = new Map<Npc, HumanMotion>();
+  readonly npcPets = new Map<Npc, Vec>();
+  readonly npcPetImages = new SpriteImages();
   private place = "";
   private bannerT = 0;
   private sprite: Sprite | null = null;
-  private get playerSprite(): Sprite {
+  get playerSprite(): Sprite {
     return (this.sprite ??= makePlayer()); // after loadArt: the ImageGen walk sheet
   }
   petSprite: HTMLCanvasElement;
+  petGenes: Genes;
   readonly wilds: Wild[] = [];
   private nextId = 1;
-  private residents: Resident[] = [];
+  residents: Resident[] = [];
   readonly life = newVillage();
   private lifeEnv: Env;
   bowl: Vec = { x: 0, z: 0 };
   minds: MindHub | null = null;
   npcs: NpcVillage | null = null; // Elder, Mo, Ama, Pip on the hub (their minds run on whoever hosts them)
   private npcSprites = new Map<Npc, Sprite>();
-  private signs: { x: number; z: number; text: string }[] = []; // owner's name at each ground's hub-side gate
-  private mini: HTMLCanvasElement | null = null; // the whole map, 1 px per tile (rebuilt on relayout)
+  signs: { x: number; z: number; text: string }[] = []; // owner's name at each ground's hub-side gate
+  mini: HTMLCanvasElement | null = null; // the whole map, 1 px per tile (rebuilt on relayout)
   private savedMinds: MindsSave | null = null;
   inspect: string | null = null; // the mind shown in the inspector (I)
   mindWhere = "this computer";
@@ -143,7 +140,7 @@ export class Overworld {
   elder: { pos: Vec; sprite: HTMLCanvasElement } | null = null;
   // The market stall on the market island: E there opens the same buy/sell menu as the crate at home.
   stall: Vec | null = null;
-  private noticeBoard: Vec | null = null;
+  noticeBoard: Vec | null = null;
   // The ghost stone on the event island: touch it to fight a random shared ghost.
   ghostStone: { pos: Vec; sprite: HTMLCanvasElement; cool: number } | null = null;
   // Other players online (live room): their walker and pet, eased toward the last position received.
@@ -156,6 +153,7 @@ export class Overworld {
 
   constructor(petGenes: Genes, groundSeed = 1) {
     this.layoutIn = { me: { seed: groundSeed, slot: 0 }, roomSeed: 1, day: worldDay() };
+    this.petGenes = petGenes;
     this.petSprite = drawMonster(petLook(petGenes), OVERWORLD_MON, "front");
     this.lifeEnv = { spots: { home: [], bowl: [], bed: [], lawn: [] }, canWalk: this.canWalk, rng: mulberry32(Date.now() % 1e9), route: (a, b) => findRoute(a, b, this.canWalk) };
     this.relayout();
@@ -420,61 +418,6 @@ export class Overworld {
     }
   }
 
-  // A house with its chimney smoke. Each stretch of wall sorts on its own foot (docs/visual/layers.md).
-  private pushHouse(items: { z: number; draw: () => void }[], g: CanvasRenderingContext2D, art: string, z: number, x: number, y: number, t: number): void {
-    for (const r of footRuns(art)) items.push({ z: z - r.foot / TILE, draw: () => standRun(g, art, r, x, y) });
-    const top = CHIMNEY[art];
-    if (!top) return;
-    const [w, h] = stampSize(art);
-    items.push({ z, draw: () => strip(g, "chimneysmoke_01_strip30", x - w / 2 + top[0] - SMOKE_W / 2, y - h + top[1] - SMOKE_H + 3, Math.floor(t * 10)) });
-  }
-
-  // A small name over every person, players and villagers alike.
-  private drawNames(g: CanvasRenderingContext2D, toScreen: (x: number, z: number) => [number, number], sw: number, sh: number): void {
-    const tag = (name: string, pos: Vec) => {
-      const [x, y] = toScreen(pos.x, pos.z);
-      if (x < -30 || y < 0 || x > sw + 30 || y > sh + 30) return;
-      drawTinyText(g, name, Math.round(x), y - 28);
-    };
-    tag(this.myName, this.player);
-    for (const p of this.peers.values()) tag(p.name, p.pos);
-    for (const a of this.npcs?.v.agents ?? []) tag(a.name, a.pos);
-  }
-
-  // Top-right map of the islands: land, paths and bridges, my ground, other players and me.
-  private drawMinimap(g: CanvasRenderingContext2D, sw: number): void {
-    const m = this.map;
-    if (!this.mini) {
-      const c = document.createElement("canvas");
-      [c.width, c.height] = [m.w, m.h];
-      const cg = c.getContext("2d")!;
-      const away = (k: number) => (m.look[k]! & AWAY) !== 0;
-      for (let k = 0; k < m.w * m.h; k++) {
-        const t = m.kind[k]!;
-        if (t === T.water) continue;
-        cg.fillStyle = t === T.path || t === T.bridge ? PAL.sand : away(k) ? PAL.stone : PAL.grass;
-        cg.fillRect(k % m.w, Math.floor(k / m.w), 1, 1);
-      }
-      this.mini = c;
-    }
-    const size = 52;
-    const k = size / Math.max(m.w, m.h);
-    const x0 = sw - size - 6;
-    const y0 = 18;
-    g.fillStyle = PAL.waterD;
-    g.fillRect(x0 - 2, y0 - 2, size + 4, size + 4);
-    g.imageSmoothingEnabled = true;
-    g.drawImage(this.mini, x0 + (size - m.w * k) / 2, y0 + (size - m.h * k) / 2, m.w * k, m.h * k);
-    g.imageSmoothingEnabled = false;
-    const dot = (x: number, z: number, c: string, r = 2) => {
-      g.fillStyle = c;
-      g.fillRect(Math.round(x0 + (size - m.w * k) / 2 + (x - m.ox) * k - r / 2), Math.round(y0 + (size - m.h * k) / 2 + (z - m.oz) * k - r / 2), r, r);
-    };
-    dot(this.house.x, this.house.z + 2, PAL.woodD, 4);
-    for (const p of this.peers.values()) dot(p.pos.x, p.pos.z, PAL.teal, 3);
-    dot(this.player.x, this.player.z, PAL.coral, 3);
-  }
-
   // Trees ring each island inside the sand, never on paths, plazas or bridges, and never in a 2-tile gap.
   private placeTrees(): void {
     const m = this.map;
@@ -593,7 +536,7 @@ export class Overworld {
 
   // Mo, Ama and Pip: their own sheets (npc-*.png) through the player's frame builder, else the player's
   // sheet hue-shifted.
-  private npcSprite(id: Npc): Sprite {
+  npcSprite(id: Npc): Sprite {
     let s = this.npcSprites.get(id);
     if (s) return s;
     const own = `npc-${id}` as ArtName;
@@ -614,6 +557,7 @@ export class Overworld {
   }
 
   setPet(g: Genes, arch?: ArchetypeId): void {
+    this.petGenes = g;
     this.petSprite = drawMonster(petLook(g), OVERWORLD_MON, "front", arch ? BUILDS[arch] : undefined);
   }
 
@@ -915,35 +859,7 @@ export class Overworld {
     return [w / 32, h / 32 + 0.6]; // half width, depth in tiles (the roof leans back over open ground)
   }
 
-  private drawBeds(g: CanvasRenderingContext2D, toScreen: (x: number, z: number) => [number, number], t: number): void {
-    for (const p of this.world.platforms) {
-      if (!p.ground || p.owner === "me") continue;
-      const farm = this.peerFarms.get(p.owner ?? "");
-      bedsAt(p).forEach((b, i) => {
-        const [sx, sy] = toScreen(b.x, b.z);
-        stand(g, "soil", sx + 8, sy + 14);
-        const [crop, stage] = farm?.[i] ?? ["", 0];
-        if (crop) drawCropArt(g, CROP_ART[crop] ?? "carrot", CROP_STAGE[Math.min(3, stage)]!, sx + 8, sy + 13);
-      });
-    }
-    this.beds.forEach((b, i) => {
-      const [sx, sy] = toScreen(b.x, b.z);
-      const p = this.farm?.plots[i];
-      stand(g, "soil", sx + 8, sy + 14);
-      if (p?.crop) drawCropArt(g, CROP_ART[p.crop] ?? "carrot", CROP_STAGE[Math.min(3, p.stage)]!, sx + 8, sy + 13);
-      if (p && p.wetUntil) {
-        g.fillStyle = PAL.teal; // wet soil: teal corner marker (STYLE.md farms)
-        g.fillRect(sx + 3, sy + 11, 2, 2);
-        g.fillRect(sx + 11, sy + 11, 2, 2);
-      } else if (p && needsWater(p) && Math.floor(t * 2) % 2) {
-        g.fillStyle = PAL.waterL;
-        g.fillRect(sx + 7, sy - 4, 2, 3);
-        g.fillRect(sx + 6, sy - 2, 4, 2);
-      }
-    });
-  }
-
-  private indoors = false; // drawing the world around the house: the house and I are on the interior's layer
+  indoors = false; // drawing the world around the house: the house and I are on the interior's layer
   underBubbles?: () => void; // the screen's own panels: speech draws over them
 
   readonly canWalk = (x: number, z: number): boolean => {
@@ -980,7 +896,7 @@ export class Overworld {
   }
 
   addPeer(id: string, name: string, genes: Genes, x: number, z: number, px: number, pz: number): void {
-    this.peers.set(id, { name, look: humanLook(liveName(genes)), pos: { x, z }, motion: newHumanMotion({ x, z }), pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front"), pose: null, flip: false });
+    this.peers.set(id, { name, genes, look: humanLook(liveName(genes)), pos: { x, z }, motion: newHumanMotion({ x, z }), pet: { x: px, z: pz }, to: { x, z, px, pz }, sprite: drawMonster(petLook(genes), OVERWORLD_MON, "front"), pose: null, flip: false });
   }
 
   posePeer(id: string, pose: Pose | null, flip: boolean): void {
@@ -1096,289 +1012,99 @@ export class Overworld {
   }
 
   draw(g: CanvasRenderingContext2D, sw: number, sh: number, t: number): void {
-    const m = this.map;
-    const camX = Math.round(this.cam.x * TILE - sw / 2);
-    const camY = Math.round(this.cam.z * TILE - sh / 2);
-    const toScreen = (x: number, z: number): [number, number] => [Math.round(x * TILE) - camX, Math.round(z * TILE) - camY];
-    drawSea(g, m, camX, camY, sw, sh, t);
-    drawLand(g, m, this.sunny, camX, camY, sw, sh, t);
-    drawSeaLife(g, this.sunny.seaLife, camX, camY, sw, sh, t);
-    this.drawBeds(g, toScreen, t);
-    const plaza = this.world.platforms.find((p) => p.kind === "plaza");
-    // Sprites sorted by their feet, so things lower on screen stand in front.
-    const items: { z: number; draw: () => void }[] = [];
-    if (this.noticeBoard) {
-      const board = this.noticeBoard;
-      const [sx, sy] = toScreen(board.x, board.z);
-      items.push({ z: board.z, draw: () => generatedSprites.draw(g, "notice-board-notes", sx, sy, () => {
-        g.fillStyle = PAL.woodD;
-        g.fillRect(sx - 10, sy - 18, 2, 18);
-        g.fillRect(sx + 8, sy - 18, 2, 18);
-        g.fillStyle = PAL.wood;
-        g.fillRect(sx - 13, sy - 29, 26, 23);
-        g.fillStyle = PAL.cream;
-        g.fillRect(sx - 9, sy - 25, 7, 10);
-        g.fillRect(sx + 2, sy - 23, 7, 11);
-      }) });
+    const scene = this.buildScene();
+    for (const [id, held] of this.view.draw(scene, g, sw, sh, t)) {
+      const b = this.bubbles.get(id);
+      if (b) b.held = held;
     }
-    const today = gameTime(this.life.t).day;
-    // Due promises remain open. The room shares promise memory only with that NPC's host.
-    const birthday = NPCS.some((id) => (this.npcs?.hub.minds.get(id)?.mem.promises ?? [])
-      .some((p) => p.state === "open" && p.day === today && /birthday/i.test(p.occasion)));
-    if (plaza && birthday) {
-      // Decorations sit just outside the dance floor; they do not obstruct the plaza routes.
-      const [bx, by] = toScreen(plaza.x, plaza.z - 2.5);
-      items.push({ z: plaza.z - 2.5, draw: () => generatedSprites.draw(g, "birthday-bunting", bx, by - 18) });
-      const balloons = ["birthday-balloon-red", "birthday-balloon-blue", "birthday-balloon-gold"] as const;
-      balloons.forEach((name, i) => {
-        const z = plaza.z + (i === 2 ? 1.5 : -1.5);
-        const [sx, sy] = toScreen(plaza.x + (i === 0 ? -3.5 : 3.5), z);
-        items.push({ z, draw: () => generatedSprites.draw(g, name, sx, sy) });
+    if (!scene.inspector) this.inspect = null;
+  }
+
+  // One frame's worth of plain data for a view (game/ports.ts).
+  buildScene(): Scene {
+    const now = gameTime(this.life.t);
+    const people: ScenePerson[] = [];
+    const pets: ScenePet[] = [];
+    if (!this.indoors) {
+      people.push({ id: "me", name: this.myName, kind: "me", x: this.player.x, z: this.player.z, dir: this.playerMotion.dir, walking: this.moving, pose: this.playerMotion.pose, look: this.myLook });
+      pets.push({ id: "pet", kind: "mine", x: this.pet.x, z: this.pet.z, genes: this.petGenes, pose: null });
+    }
+    for (const [id, p] of this.peers) {
+      people.push({ id: `p:${id}`, name: p.name, kind: "peer", x: p.pos.x, z: p.pos.z, dir: p.motion.dir, walking: p.motion.walking, pose: p.motion.pose, look: p.look });
+      pets.push({ id: `p:${id}`, kind: "peer", x: p.pet.x, z: p.pet.z, genes: p.genes, pose: null });
+    }
+    for (const a of this.npcs?.v.agents ?? []) {
+      const motion = this.npcMotions.get(a.id as Npc) ?? newHumanMotion(a.pos);
+      people.push({ id: a.id, name: a.name, kind: "npc", x: a.pos.x, z: a.pos.z, dir: motion.dir, walking: motion.walking, pose: motion.pose, look: NPC_LOOKS[a.id as Npc] });
+    }
+    for (const [id, pos] of this.npcPets) if (this.npcs?.hasPet[id]) pets.push({ id: `n:${id}`, kind: "npc", x: pos.x, z: pos.z, genes: null, pose: null });
+    for (const w of this.wilds) pets.push({ id: `w${w.id}`, kind: "wild", x: w.pos.x, z: w.pos.z, genes: w.genes, pose: null });
+    this.residents.forEach((r, k) => pets.push({ id: `r${k}`, kind: "resident", x: r.agent.pos.x, z: r.agent.pos.z, genes: r.genes, pose: r.agent.state === "do" ? ACTIVITY.get(r.agent.act!)!.pose : null }));
+    const props: SceneProp[] = [
+      ...this.trees.map((t) => ({ kind: "tree", x: t.x, z: t.z })),
+      ...this.decor.map((d) => ({ kind: d.kind, x: d.x, z: d.z })),
+      ...this.houses.map((h) => ({ kind: "house", x: h.x, z: h.z })),
+      ...this.signs.map((s) => ({ kind: "sign", x: s.x, z: s.z, text: s.text })),
+      ...this.world.platforms.flatMap((p) => Object.entries(p.spots ?? {}).map(([kind, at]) => ({ kind, x: at.x, z: at.z }))),
+      ...this.life.messes.map((m) => ({ kind: "mess", x: m.pos.x, z: m.pos.z })),
+      { kind: "bowl", x: this.bowl.x, z: this.bowl.z },
+    ];
+    if (!this.indoors) props.push({ kind: "home", x: this.house.x, z: this.house.z });
+    if (this.stall) props.push({ kind: "stall", x: this.stall.x, z: this.stall.z });
+    if (this.noticeBoard) props.push({ kind: "board", x: this.noticeBoard.x, z: this.noticeBoard.z });
+    const beds: SceneBed[] = this.beds.map((b, i) => {
+      const p = this.farm?.plots[i];
+      return { x: b.x, z: b.z, crop: p?.crop ?? "", stage: p?.stage ?? 0, wet: !!p?.wetUntil, dry: !!p && !p.wetUntil && needsWater(p) };
+    });
+    for (const p of this.world.platforms) {
+      if (!p.ground || p.owner === "me") continue;
+      const farm = this.peerFarms.get(p.owner ?? "");
+      bedsAt(p).forEach((b, i) => {
+        const [crop, stage] = farm?.[i] ?? ["", 0];
+        beds.push({ x: b.x, z: b.z, crop, stage, wet: false, dry: false });
       });
     }
-    {
-      const rail = this.sunny.rail;
-      const [i0, j0] = [Math.floor(camX / TILE) - m.ox, Math.floor(camY / TILE) - m.oz];
-      for (let j = Math.max(0, j0); j <= Math.min(m.h - 1, j0 + Math.ceil(sh / TILE) + 1); j++)
-        for (let i = Math.max(0, i0); i <= Math.min(m.w - 1, i0 + Math.ceil(sw / TILE) + 1); i++) {
-          const cell = rail[j * m.w + i];
-          if (!cell) continue;
-          const [x, y] = [(i + m.ox) * TILE - camX, (j + m.oz) * TILE - camY];
-          items.push({ z: m.oz + j + 0.5, draw: () => drawRail(g, cell, x, y) });
-        }
-    }
-    for (const tr of this.trees) {
-      const [sx, sy] = toScreen(tr.x, tr.z);
-      if (sx < -32 || sy < -48 || sx > sw + 32 || sy > sh + 48) continue;
-      const seed = Math.floor(hash2(Math.floor(tr.x), Math.floor(tr.z), 12) * 1000);
-      items.push({ z: tr.z, draw: () => drawTree(g, seed, sx, sy + 4, t, 0) });
-    }
-    const lit = gameTime(this.life.t).phase;
-    for (const d of this.decor) {
-      const [sx, sy] = toScreen(d.x, d.z);
-      if (sx < -40 || sy < -40 || sx > sw + 40 || sy > sh + 40) continue;
-      if (d.kind === "fence-v") {
-        // One item per tile, so people passing along it sort with each post (docs/visual/layers.md).
-        d.tiles.forEach((k, n) => {
-          const [ti, tj] = [m.ox + (k % m.w), m.oz + Math.floor(k / m.w)];
-          const [fx, fy] = toScreen(ti, tj);
-          const part = n === 0 ? tile(1, 40) : n === d.tiles.length - 1 ? tile(4, 40) : tile(3, 40);
-          items.push({ z: tj + 0.5, draw: () => drawRail(g, part, fx, fy) });
-        });
-        continue;
-      }
-      const look = lookAt(m, Math.floor(d.x), Math.floor(d.z));
-      items.push({ z: d.z - (d.kind === "lights" ? 0.2 : 0), draw: () => drawDecor(g, d.kind, sx, sy + 8, Math.max(1, d.tiles.length), look, lit === "evening" || lit === "night") });
-    }
-    {
-      const [hx, hy] = toScreen(this.house.x, this.house.z);
-      if (!this.indoors) this.pushHouse(items, g, HOME_ART, this.house.z, hx, hy, t);
-    }
-    for (const h of this.houses) {
-      const [hx, hy] = toScreen(h.x, h.z);
-      if (hx < -64 || hy < -16 || hx > sw + 64 || hy > sh + 110) continue;
-      this.pushHouse(items, g, h.art, h.z, hx, hy, t);
-    }
-    for (const l of this.landmarks) {
-      const [lx, ly] = toScreen(l.x, l.z);
-      if (lx < -60 || ly < -16 || lx > sw + 60 || ly > sh + 100) continue;
-      items.push({ z: l.z, draw: () => stand(g, l.art, lx, ly) });
-    }
-    for (const c of this.critters) {
-      const [cx, cy] = toScreen(c.x, c.z);
-      if (cx < -40 || cy < -40 || cx > sw + 40 || cy > sh + 40) continue;
-      items.push({ z: c.z, draw: () => strip(g, c.art, cx - 16, cy - 24, Math.floor(t * 3 + c.seed), c.seed % 2 === 1) });
-    }
-    for (const p of this.world.platforms) {
-      if (!p.spots) continue;
-      for (const [name, at] of Object.entries(p.spots)) {
-        const [sx, sy] = toScreen(at.x, at.z);
-        if (sx < -48 || sy < -48 || sx > sw + 48 || sy > sh + 48) continue;
-        items.push({ z: at.z - (name === "blanket" || name === "dock" ? 9 : 0), draw: () => drawSpotProp(g, name, sx, sy, t) });
-      }
-    }
-    const [px, py] = toScreen(this.player.x, this.player.z);
-    const pf = spriteFrame(this.playerSprite, this.moving, this.playerMotion.walkTime, t);
-    if (!this.indoors) items.push({ z: this.player.z, draw: () => (characterShadow(g, px, py), humanSprites.draw(g, this.myLook, this.playerMotion, px, py, t,
-      () => g.drawImage(this.playerSprite.img, pf * 16, this.playerMotion.dir * 24, 16, 24, px - 8, py - 22, 16, 24))) });
-    const half = OVERWORLD_MON / 2;
-    for (const p of this.peers.values()) {
-      const [ax, ay] = toScreen(p.pos.x, p.pos.z);
-      const [bx, by] = toScreen(p.pet.x, p.pet.z);
-      items.push({ z: p.pos.z, draw: () => {
-        characterShadow(g, ax, ay);
-        humanSprites.draw(g, p.look, p.motion, ax, ay, t,
-          () => g.drawImage(this.playerSprite.img, spriteFrame(this.playerSprite, p.motion.walking, p.motion.walkTime, t) * 16, p.motion.dir * 24, 16, 24, ax - 8, ay - 22, 16, 24));
-      } });
-      items.push({ z: p.pet.z, draw: () => g.drawImage(p.sprite, bx - half, by - OVERWORLD_MON + 2) });
-    }
-    if (this.stall) {
-      const [mx, my] = toScreen(this.stall.x, this.stall.z);
-      items.push({ z: this.stall.z, draw: () => stand(g, "stall-red", mx, my + 4) });
-    }
-    if (this.elder && !this.npcs?.v.agents.some(a => a.id === "elder")) {
-      // The Elder also uses the shared human path before the NPC sim is attached.
-      const [nx, ny] = toScreen(this.elder.pos.x, this.elder.pos.z);
-      items.push({ z: this.elder.pos.z, draw: () => humanSprites.draw(g, NPC_LOOKS.elder, newHumanMotion(this.elder!.pos), nx, ny, t, () => {
-        if (hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
-        else g.drawImage(this.elder!.sprite, nx - 12, ny - 22);
-      }) });
-    }
-    for (const npc of [this.boss, this.ghostStone]) {
-      if (!npc) continue;
-      const [nx, ny] = toScreen(npc.pos.x, npc.pos.z);
-      const s = npc.sprite;
-      items.push({ z: npc.pos.z, draw: () => g.drawImage(s, nx - s.width / 2, ny - s.height + 2 - (Math.floor(t * 1.5) % 2)) });
-    }
-    const [qx, qy] = toScreen(this.pet.x, this.pet.z);
-    const hop = Math.floor(t * 4) % 2;
-    if (!this.indoors) items.push({ z: this.pet.z, draw: () => g.drawImage(this.petSprite, qx - half, qy - OVERWORLD_MON + 2 - hop) });
-    for (const [id, pos] of this.npcPets) {
-      if (!this.npcs?.hasPet[id]) continue;
-      const [nx, ny] = toScreen(pos.x, pos.z);
-      if (nx < -24 || ny < -24 || nx > sw + 24 || ny > sh + 24) continue;
-      items.push({ z: pos.z, draw: () => {
-        const image = this.npcPetImages.get("/art/gen/wild/forest-sprig-16-front-idle.png");
-        if (image) g.drawImage(image, nx - 8, ny - 14 - hop);
-      } });
-    }
-    for (const w of this.wilds) {
-      const [wx, wy] = toScreen(w.pos.x, w.pos.z);
-      if (wx < -24 || wy < -24 || wx > sw + 24 || wy > sh + 24) continue;
-      const wh = w.wait <= 0 ? Math.floor(t * 5 + w.id) % 2 : 0;
-      items.push({ z: w.pos.z, draw: () => g.drawImage(w.sprite, wx - half, wy - OVERWORLD_MON + 2 - wh) });
-    }
-    {
-      const [bx, by] = toScreen(this.bowl.x, this.bowl.z);
-      items.push({ z: this.bowl.z, draw: () => drawBowl(g, bx, by) });
-    }
-    for (const m of this.life.messes) {
-      const [mx, my] = toScreen(m.pos.x, m.pos.z);
-      items.push({ z: m.pos.z - 0.3, draw: () => drawPoop(g, mx, my, t, m.id) });
-    }
-    this.residents.forEach((r, k) => {
-      const a = r.agent;
-      const [rx, ry] = toScreen(a.pos.x, a.pos.z);
-      if (rx < -24 || ry < -40 || rx > sw + 24 || ry > sh + 24) return;
-      const pose = a.state === "do" ? ACTIVITY.get(a.act!)!.pose : null;
-      items.push({ z: a.pos.z, draw: () => drawPetPose(g, r.sprite, rx, ry, pose, a.state === "walk", t, k) });
-    });
-    // Every villager, including the Elder, follows the same human drawing path as online players.
-    for (const a of this.npcs?.v.agents ?? []) {
-      const [nx, ny] = toScreen(a.pos.x, a.pos.z);
-      if (nx < -24 || ny < -40 || nx > sw + 24 || ny > sh + 24) continue;
-      const s = this.npcSprite(a.id as Npc);
-      const motion = this.npcMotions.get(a.id as Npc) ?? newHumanMotion(a.pos);
-      const { walking, dir } = motion;
-      const sit = a.state === "do" && (ACTIVITY.get(a.act!)!.pose === "sit" || ACTIVITY.get(a.act!)!.pose === "sleep");
-      const f = spriteFrame(s, walking, motion.walkTime, t);
-      const frame = sit ? sitFrame(s.img, (s.idle ?? 0) * 16, dir * 24, dir === 3) : null; // seated: still, legs bent
-      if (motion.pose === "sleep" && !walking) {
-        items.push({ z: a.pos.z, draw: () => {
-          stand(g, "f-bed", nx, ny + 3);
-          humanSprites.drawAsleep(g, NPC_LOOKS[a.id as Npc], nx, ny);
-          drawTinyText(g, "z".repeat(1 + Math.floor(t) % 3), nx + 9, ny - 24);
-        } });
-        continue;
-      }
-      items.push({ z: a.pos.z, draw: () => (characterShadow(g, nx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, nx, ny, t, () => {
-        if (a.id === "elder" && hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
-        else if (frame) g.drawImage(frame, nx - 8, ny - 22);
-        else g.drawImage(s.img, f * 16, dir * 24, 16, 24, nx - 8, ny - 22, 16, 24);
-      })) });
-    }
-    for (const sg of this.signs) {
-      const [sx, sy] = toScreen(sg.x, sg.z);
-      if (sx < -48 || sy < -48 || sx > sw + 48 || sy > sh + 48) continue;
-      const near = Math.hypot(sg.x - this.player.x, sg.z - this.player.z) < 7;
-      items.push({ z: sg.z, draw: () => {
-        drawSpotProp(g, "sign", sx, sy + 4, t);
-        if (near) drawTinyText(g, sg.text, Math.round(sx), sy - 16);
-      } });
-    }
-    // A picnic away from a picnic hill (the NPCs on the plaza) spreads its own blanket.
-    for (const gt of [...this.life.gatherings, ...(this.npcs?.v.gatherings ?? [])]) {
-      if (gt.act !== "picnic" || !gt.started) continue;
-      if (this.world.platforms.some((p) => p.spots?.blanket && Math.hypot(p.spots.blanket.x - gt.at.x, p.spots.blanket.z - gt.at.z) < 4)) continue;
-      const ps = [...this.life.agents, ...(this.npcs?.v.agents ?? [])].filter((a) => gt.members.includes(a.id) && a.gather === gt.id);
-      if (!ps.length) continue;
-      const cx = ps.reduce((sum, a) => sum + a.pos.x, 0) / ps.length; // under the group, wherever they sat down
-      const cz = ps.reduce((sum, a) => sum + a.pos.z, 0) / ps.length;
-      const [bx, by] = toScreen(cx, cz + 0.7);
-      items.push({ z: cz - 9, draw: () => drawSpotProp(g, "blanket", bx, by, t) });
-    }
-    // A ball bounces between pets playing together.
-    for (const gt of this.life.gatherings) {
-      if (gt.act !== "ball" || !gt.started) continue;
-      const ps = gt.members.map((id) => this.life.agents.find((a) => a.id === id)).filter((a): a is Agent => !!a && a.state === "do");
-      if (ps.length < 2) continue;
-      const ph = (t * 0.8 + gt.id) % 2;
-      const u = ph < 1 ? ph : 2 - ph;
-      const [a, b] = [ps[0]!.pos, ps[1]!.pos];
-      const [x, y] = toScreen(a.x + (b.x - a.x) * u, a.z + (b.z - a.z) * u);
-      items.push({ z: a.z + (b.z - a.z) * u, draw: () => drawBall(g, x, y - Math.round(Math.sin(u * Math.PI) * 8)) });
-    }
-    items.sort((a, b) => a.z - b.z);
-    for (const it of items) it.draw();
-    drawHighClouds(g, camX, camY, sw, sh, t);
-    const now = gameTime(this.life.t);
-    if (!this.alwaysDay) drawTint(g, now.hour, sw, sh);
-    {
-      const label = `${weekday(now.day)} ${clockLabel(now.hour)}`;
-      drawText(g, label, sw - label.length * GLYPH - 6, 6, PAL.panel);
-    }
-    if (this.ui.map) this.drawMinimap(g, sw);
-    if (this.ui.names) this.drawNames(g, toScreen, sw, sh);
-
-    this.underBubbles?.();
-    const shown: { b: Bubble; head: string; lines: string[]; cx: number; y: number; box: BubbleBox }[] = [];
+    const bubbles: SceneBubble[] = [];
     for (const [who, b] of this.bubbles) {
       const pos = who === "pet" ? this.pet : who === "me" ? this.player : who.startsWith("p:") ? this.peers.get(who.slice(2))?.pos : who === "elder" || who === "n:elder" ? this.elder?.pos : who.startsWith("n:") ? this.npcs?.v.agents.find((a) => a.id === who.slice(2))?.pos : who === "boss" ? this.boss?.pos : who.startsWith("r") ? this.residents[Number(who.slice(1))]?.agent.pos : this.wilds.find((w) => `w${w.id}` === who)?.pos;
       if (!pos) continue;
-      const [bx, by] = toScreen(pos.x, pos.z);
-      if (bx < -10 || by < -10 || bx > sw + 10 || by > sh + 40) continue; // someone out of sight stays out of sight
       const head = this.speaker(who);
-      const label = b.thought ? `${head} thinks` : head && b.to ? `${head} > ${b.to}` : head;
-      const lines = wrap(b.text, Math.min(180, sw - 24));
-      const w = Math.max(label.length, ...lines.map((l) => l.length)) * GLYPH + 12;
-      const bottom = by - OVERWORLD_MON - 12;
-      shown.push({ b, head: label, lines, cx: bx, y: bottom, box: { cx: bx, bottom, w, h: (lines.length + (label ? 1 : 0)) * 10 + 8, first: who === "me" || b.to === this.myName } });
+      bubbles.push({ id: who, x: pos.x, z: pos.z, head: b.thought ? `${head} thinks` : head && b.to ? `${head} > ${b.to}` : head, text: b.text, thought: !!b.thought, first: who === "me" || b.to === this.myName });
     }
-    const spots = layoutBubbles(shown.map((s) => s.box), sw, sh);
-    shown.forEach((s, i) => {
-      const spot = spots[i];
-      s.b.held = !spot;
-      if (spot) bubble(g, s.head, s.lines, s.cx, s.box.w, s.box.h, spot, s.b.thought);
-      else stand(g, "expression_chat", s.cx, s.y + 12); // their line waits its turn
-    });
+    return {
+      map: this.map,
+      cam: this.cam,
+      indoors: this.indoors,
+      clock: { day: now.day, hour: now.hour, phase: now.phase, label: `${weekday(now.day)} ${clockLabel(now.hour)}` },
+      day: this.alwaysDay,
+      showNames: this.ui.names,
+      showMap: this.ui.map,
+      people, pets, props, beds, bubbles,
+      hint: this.hintNow(),
+      banner: this.bannerT > 0 && this.place ? { text: this.place, left: this.bannerT } : null,
+      inspector: this.inspected(),
+    };
+  }
+
+  private hintNow(): string | null {
     const bed = this.bedNear();
-    const hint = this.indoors ? null : this.atDoor()
+    return this.indoors ? null : this.atDoor()
       ? "E: GO IN"
       : bed >= 0 && this.farm
         ? bedHint(this.farm, bed)
         : this.nearStall() ? "E: MARKET" : this.nearBoard() ? "E: BOARD" : this.npcNear() ? "E: TALK" : this.messNear() !== null ? "E: CLEAN" : this.peerNear() ? "E: SAY HI" : this.mindNear() && !this.inspect ? "I: MIND" : this.work ? "" : GATHER_HINT[this.gatherNear() ?? ""] ?? "";
-    if (hint) {
-      const w = hint.length * GLYPH + 12;
-      drawFrame(g, Math.round(px - w / 2), py + 6, w, 16);
-      drawText(g, hint, Math.round(px - w / 2) + 6, py + 10, PAL.wood);
-    }
+  }
+
+  private inspected(): SceneInspector | null {
     const npc = !!this.inspect && !!this.npcs?.hub.minds.has(this.inspect);
     const [hub, v] = npc ? [this.npcs!.hub, this.npcs!.v] : [this.minds, this.life];
-    const im = this.inspect ? hub?.minds.get(this.inspect) : undefined;
-    const ia = this.inspect ? v.agents.find((a) => a.id === this.inspect) : undefined;
-    if (im && ia) drawInspector(g, im, ia, v.rel, (id) => hub?.minds.get(id)?.persona.name ?? id, npc ? `${this.mindWhere}, for all` : this.mindWhere, sw, sh);
-    else this.inspect = null;
-    if (this.bannerT > 0 && this.place) {
-      const w = this.place.length * GLYPH + 16;
-      const x = Math.floor((sw - w) / 2);
-      const y = this.bannerT > 2.2 ? -16 + Math.round((2.5 - this.bannerT) * 70) : this.bannerT < 0.3 ? 5 - Math.round((0.3 - this.bannerT) * 70) : 5;
-      drawFrame(g, x, y, w, 17);
-      drawText(g, this.place, x + 8, y + 5, PAL.wood);
-    }
+    const mind = this.inspect ? hub?.minds.get(this.inspect) : undefined;
+    const agent = this.inspect ? v.agents.find((a) => a.id === this.inspect) : undefined;
+    return mind && agent ? { mind, agent, rel: v.rel, nameOf: (id) => hub?.minds.get(id)?.persona.name ?? id, where: npc ? `${this.mindWhere}, for all` : this.mindWhere } : null;
   }
 }
 
-const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) + 3 + Math.floor(i / 3) * 2 }));
+export const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) + 3 + Math.floor(i / 3) * 2 }));
 
 const GATHER_HINT: Record<string, string> = { fish: "E: FISH", chop: "E: CHOP", herbs: "E: PICK HERBS" };
 
@@ -1398,29 +1124,9 @@ interface Bubble {
   wait: number; // seconds spent held
 }
 
-// A speech bubble above a sprite: up to 3 wrapped lines, kept on screen, with a small tail.
-function bubble(g: CanvasRenderingContext2D, head: string, lines: readonly string[], cx: number, w: number, h: number, at: Placed, thought = false): void {
-  const { x, y } = at;
-  drawFrame(g, x, y, w, h);
-  if (thought) {
-    if (!at.moved) {
-      g.fillStyle = PAL.ink;
-      g.fillRect(cx - 1, y + h + 1, 3, 2);
-      g.fillRect(cx, y + h + 4, 1, 1);
-    }
-  } else if (!at.moved) {
-    g.fillStyle = PAL.panel;
-    g.fillRect(cx - 2, y + h - 1, 4, 2);
-    g.fillStyle = PAL.wood;
-    g.fillRect(cx - 1, y + h + 1, 2, 2);
-  }
-  if (head) drawText(g, head, x + 6, y + 5, PAL.teal);
-  const top = y + 5 + (head ? 10 : 0);
-  lines.forEach((l, i) => drawText(g, l, x + 6, top + i * 10));
-}
-
 interface Peer {
   name: string;
+  genes: Genes;
   pos: Vec;
   motion: HumanMotion;
   pet: Vec;
