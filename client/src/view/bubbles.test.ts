@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { layoutBubbles, type BubbleBox } from "./bubbles";
-import { tintAt } from "./life-draw";
+import { tintAt } from "../pixel/life-draw";
 
 const box = (cx: number, bottom: number): BubbleBox => ({ cx, bottom, w: 100, h: 28 });
 const overlap = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) < 100 && Math.abs(a.y - b.y) < 28;

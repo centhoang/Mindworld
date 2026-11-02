@@ -63,6 +63,7 @@ export interface SceneInspector {
   rel: Map<string, number>;
   nameOf: (id: string) => string;
   where: string;
+  lines: (wrapLine: (s: string) => string[]) => [string, string][]; // [line, colour], ready for any view
 }
 
 // A framed list on the plane: goals, a menu, a dialogue or a toast.

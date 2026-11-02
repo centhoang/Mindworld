@@ -17,6 +17,7 @@ import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from
 import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
 import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePanel, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
+import { inspectorLines } from "./inspector";
 import { PixelView } from "./pixel-view";
 import { compass, type Place } from "../mind/directions";
 import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/clock";
@@ -1104,7 +1105,9 @@ export class Overworld {
     const [hub, v] = npc ? [this.npcs!.hub, this.npcs!.v] : [this.minds, this.life];
     const mind = this.inspect ? hub?.minds.get(this.inspect) : undefined;
     const agent = this.inspect ? v.agents.find((a) => a.id === this.inspect) : undefined;
-    return mind && agent ? { mind, agent, rel: v.rel, nameOf: (id) => hub?.minds.get(id)?.persona.name ?? id, where: npc ? `${this.mindWhere}, for all` : this.mindWhere } : null;
+    if (!mind || !agent) return null;
+    const nameOf = (id: string) => hub?.minds.get(id)?.persona.name ?? id, where = npc ? `${this.mindWhere}, for all` : this.mindWhere;
+    return { mind, agent, rel: v.rel, nameOf, where, lines: (wrapLine) => inspectorLines(mind, agent, v.rel, nameOf, where, wrapLine) };
   }
 }
 

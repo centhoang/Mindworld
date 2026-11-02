@@ -8,7 +8,7 @@ import type { Vec } from "../world/movement";
 import { NPCS, type Npc } from "../world/live";
 import { AWAY, hash2, lookAt, T, TILE } from "../world/tilemap";
 import { hasArt, img, PAL, spriteFrame } from "./art";
-import { layoutBubbles, type BubbleBox, type Placed } from "./bubbles";
+import { layoutBubbles, type BubbleBox, type Placed } from "../view/bubbles";
 import { generatedSprites } from "./generated-sprites";
 import { drawDecor, drawSpotProp } from "./grounds-draw";
 import { humanSprites, newHumanMotion, NPC_LOOKS } from "./humans";

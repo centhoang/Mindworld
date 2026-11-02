@@ -1,11 +1,8 @@
 // The game's picture, as cells. This reads a Scene and writes one plane: no sprite, no overlay, nothing above or below.
 // Bands follow docs/visual/layers.md: ground, beds, things in foot order, night, then names, bubbles and panels.
 import type { BubbleFate, Scene, ScenePanel, ScenePerson, ScenePet, SceneProp } from "../../game/ports";
-import type { Pose } from "../../life/activities";
-import { layoutBubbles } from "../../pixel/bubbles";
-import { inspectorLines, SHOW_NEEDS } from "../../pixel/inspector";
-import { petRamp } from "../../pixel/pet-parts";
 import { T } from "../../world/tilemap";
+import { layoutBubbles } from "../bubbles";
 import { CELL, PAL, wrap } from "../glyph/atlas";
 import { KEEP, type CellGrid } from "./grid";
 
@@ -43,7 +40,10 @@ const HAIRS: Record<string, { rows: [string, string]; hair: number; sides?: bool
   spikeyhair: { rows: [" H H H ", "HHHHHHH"], hair: 0xf0b64a },
 };
 const SHIRT: Record<string, number> = { hands: C.plum, rod: 0xd9c27e, axe: C.berry, watering: C.leaf2 };
-const TOOL_POSES: Partial<Record<Pose, string>> = { fish: "/", chop: "T", water: "U", dig: "T", sweep: "/", cook: "~", serve: "o" };
+const TOOL_POSES: Record<string, string> = { fish: "/", chop: "T", water: "U", dig: "T", sweep: "/", cook: "~", serve: "o" };
+// Eight coats, by the hue gene.
+const COATS = [0xc87f5b, 0xe17276, 0xfeae34, 0x3e8948, 0x63b84d, 0x0099db, 0x8b9bb4, 0xc58a63];
+const SHOW_NEEDS = ["hunger", "energy", "fun", "social"] as const;
 const FACES = ["o.o", "^w^", "o_o", "owo"];
 
 export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
@@ -211,7 +211,8 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
     if (!near(x, y)) return;
     things.push({ foot: y, draw() {
       const g = p.genes;
-      const colour = rgb(petRamp(g?.hue ?? 0.07)[2]);
+      const hue = g?.hue ?? 0.07;
+      const colour = COATS[Math.floor((((hue % 1) + 1) % 1) * COATS.length)]!;
       const earGene = g?.ears ?? 0.5;
       const ears = earGene < 0.34 ? "^" : earGene < 0.67 ? "n" : "|";
       const face = p.pose === "sleep" ? "-w-" : FACES[Math.min(3, Math.floor((g?.build ?? 0.5) * 4))]!;
@@ -283,7 +284,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   const ins = scene.inspector;
   if (ins) {
     const width = Math.min(46, cols - 6);
-    const lines = inspectorLines(ins.mind, ins.agent, ins.rel, ins.nameOf, ins.where, (s) => wrap(s, width - 2));
+    const lines = ins.lines((s) => wrap(s, width - 2));
     const bar = (n: (typeof SHOW_NEEDS)[number]) => `${n.slice(0, 3)} ${"#".repeat(Math.round(Math.max(0, Math.min(100, ins.agent.needs[n])) / 12.5)).padEnd(8, "-")}`;
     const needs = SHOW_NEEDS.map(bar);
     const body = [...lines.slice(0, Math.max(1, rows - 9)), [`${needs[0]}  ${needs[1]}`, PAL.woodInk] as [string, string], [`${needs[2]}  ${needs[3]}`, PAL.woodInk] as [string, string]];
