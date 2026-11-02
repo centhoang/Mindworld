@@ -246,6 +246,10 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
       put(x, top + 2, face.charAt(1), C.ink, colour);
       put(x + 1, top + 1, face.charAt(2), C.ink, colour);
       if (!hop) { put(x - 1, y, "u", C.ink); put(x + 1, y, "u", C.ink); }
+      // More genes you can see: horns on the head, a tail behind, spots on the coat.
+      if ((g?.horns ?? 0) > 0.6) put(x, top, "v", C.paper, colour);
+      if ((g?.tail ?? 0) > 0.5) put(x + 4, top + 2, "~", mix(colour, C.ink, 0.45));
+      if ((g?.pattern ?? 0) > 0.6) for (const c of [-2, 2]) put(x + c, top + 2, ":", mix(colour, C.ink, 0.45), colour);
       if (p.kind === "wild") put(x, top - 1, "?", C.paper);
     } });
   };

@@ -1,6 +1,6 @@
 # Pet checks
 
-Lab: `/lab/pet`. It reads your save and never writes it.
+Lab: `/lab/pet`. It reads your save and never writes it. Proof so far: `proof/pet/5d.md`.
 
 - [ ] Hatching feels like a small moment, and each pet differs.
 - [ ] The pet follows you without getting stuck.

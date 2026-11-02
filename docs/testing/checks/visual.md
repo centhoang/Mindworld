@@ -1,6 +1,6 @@
 # Visual checks
 
-Lab: `/lab/visual` (the spike until 5c). Look: mosaic plane, Tile skin, decided. Lines marked for review are from the last pixel build.
+Lab: `/lab/visual`, keys 1-5 pick a scene, N night. Look: mosaic plane, Tile skin, decided. Lines marked for review are from the last pixel build.
 
 - [ ] The first screen feels small, cozy and cute, and you know where to look.
 - [ ] Everyone stands on the grid, and nothing looks cut off.

@@ -25,6 +25,9 @@ function fighter(grid: CellGrid, f: SceneFighter, cx: number, foot: number, back
     else if (c === "u") grid.put(x, y, " ", C.ink, mix(coat, C.ink, 0.45));
     else grid.put(x, y, " ", C.ink, r > 3 ? mix(coat, C.ink, 0.12) : coat);
   }));
+  if ((g?.horns ?? 0) > 0.6) grid.put(left + 6, top, "V", C.paper, coat);
+  if ((g?.tail ?? 0) > 0.5) grid.put(back ? left - 1 : left + 13, top + 3, "~", mix(coat, C.ink, 0.45));
+  if ((g?.pattern ?? 0) > 0.6) for (const [i, r] of [[3, 3], [9, 3], [5, 5], [7, 5]] as const) grid.put(left + i, top + r, ":", mix(coat, C.ink, 0.45), coat);
   if (f.shield) for (let r = 0; r < FOOT; r++) {
     grid.put(left - 1, top + r, "(", C.sky);
     grid.put(left + 13, top + r, ")", C.sky);
