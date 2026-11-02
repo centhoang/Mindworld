@@ -1,6 +1,6 @@
 # Visual checks
 
-Lab: `/lab/visual` (the spike until 5c). Look: glyph, decided. Lines marked for review are from the last pixel build.
+Lab: `/lab/visual` (the spike until 5c). Look: mosaic plane, Tile skin, decided. Lines marked for review are from the last pixel build.
 
 - [ ] The first screen feels small, cozy and cute, and you know where to look.
 - [ ] Everyone stands on the grid, and nothing looks cut off.
@@ -12,3 +12,4 @@ Lab: `/lab/visual` (the spike until 5c). Look: glyph, decided. Lines marked for 
 - [ ] Entering the house feels smooth.
 - [ ] Day and night look different, and stay readable.
 - [ ] Pixels stay even at any window size.
+- [ ] The whole screen is one grid of cells: nothing is drawn above or below it, in every screen.

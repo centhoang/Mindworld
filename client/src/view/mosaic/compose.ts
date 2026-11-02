@@ -283,7 +283,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   for (const p of scene.panels) panel(grid, p, t);
   const ins = scene.inspector;
   if (ins) {
-    const width = Math.min(46, cols - 6);
+    const width = Math.min(38, cols - 6);
     const lines = ins.lines((s) => wrap(s, width - 2));
     const bar = (n: (typeof SHOW_NEEDS)[number]) => `${n.slice(0, 3)} ${"#".repeat(Math.round(Math.max(0, Math.min(100, ins.agent.needs[n])) / 12.5)).padEnd(8, "-")}`;
     const needs = SHOW_NEEDS.map(bar);
