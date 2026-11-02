@@ -2,9 +2,9 @@
 
 Lab: `/lab/pet`. It reads your save and never writes it. Proof so far: `proof/pet/5d.md`.
 
-- [ ] Hatching feels like a small moment, and each pet differs.
-- [ ] The pet follows you without getting stuck.
-- [ ] It shows mood through what it does.
+- [x] Hatching feels like a small moment, and each pet differs. [proof](../proof/pet/hatch-mood.md)
+- [x] The pet follows you without getting stuck. [proof](../proof/pet/hatch-mood.md)
+- [x] It shows mood through what it does. [proof](../proof/pet/hatch-mood.md)
 - [x] A lesson in plain words becomes rules you can read. [proof](../proof/pet/teach-tuned.md)
 - [x] A bad lesson is refused with a clear reason. [proof](../proof/pet/teach-refused.png)
 - [x] A lesson that adds no rule says so, and the memo stays. [proof](../proof/pet/teach-unchanged.png)
