@@ -22,4 +22,6 @@ One fixed draw order, read off Room1 (`docs/visual/tile-rules.md`). Every visual
 - A long east-west fence is one standing item. A north-south fence is one item per tile, because people pass along it.
 - Everything standing sits on the tile grid: x and z on tile centres or whole tile edges. Only people, pets and critters move freely.
 - Indoors the house and the player are on the interior's layer, and the world is drawn around them (`drawAround`).
+- Outlines: every shape owns its cells. Where two owners meet, the later one's line runs on the grout, so the back shape's line stops at the front one. Smoke and sparks own nothing. The Grid chip hides only the faint grout.
+- Planes while moving: the world slides under the frame, you glide on your own plane (front things erase your hidden cells), panels stay fixed. At rest all three sit on one grid.
 - A new band needs a line here first.

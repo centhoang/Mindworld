@@ -276,6 +276,7 @@ const hidden = (name: string) => !!state.hide?.[name];
 function applyUi(): void {
   for (const b of document.querySelectorAll<HTMLButtonElement>("#ui [data-ui]")) b.classList.toggle("off", hidden(b.dataset.ui!));
   world.ui = { names: !hidden("names"), map: !hidden("map") };
+  if (world.view instanceof MosaicView) world.view.grout = !hidden("grid");
 }
 document.getElementById("ui")!.addEventListener("click", (e) => {
   const b = (e.target as HTMLElement).closest("button");

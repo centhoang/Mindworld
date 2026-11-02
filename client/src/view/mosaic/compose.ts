@@ -4,7 +4,7 @@ import type { BubbleFate, Scene, ScenePanel, ScenePerson, ScenePet, SceneProp } 
 import { T } from "../../world/tilemap";
 import { layoutBubbles } from "../bubbles";
 import { CELL, PAL, wrap } from "../glyph/atlas";
-import { KEEP, type CellGrid } from "./grid";
+import { KEEP, NO_EDGE, type CellGrid } from "./grid";
 
 export const CELLS_PER_TILE = 3;
 const rgb = (hex: string) => parseInt(hex.slice(1), 16);
@@ -20,6 +20,8 @@ const hash = (a: number, b: number, s = 0) => {
   return (h ^ (h >>> 16)) >>> 0;
 };
 const TAG = mix(C.ink, C.grass, 0.15);
+const GRASS_EDGE = mix(C.grassInk, C.ink, 0.4);
+const PATH_EDGE = mix(C.pathInk, C.ink, 0.4);
 const ROOF2 = 0xd96a53;
 const BLUE_ROOF = 0x6f93c4;
 
@@ -46,13 +48,29 @@ const COATS = [0xc87f5b, 0xe17276, 0xfeae34, 0x3e8948, 0x63b84d, 0x0099db, 0x8b9
 const SHOW_NEEDS = ["hunger", "energy", "fun", "social"] as const;
 const FACES = ["o.o", "^w^", "o_o", "owo"];
 
-export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
-  const cols = grid.cols, rows = grid.rows;
-  const camX = Math.round(scene.cam.x * CELLS_PER_TILE) - (cols >> 1);
-  const camY = Math.round(scene.cam.z * CELLS_PER_TILE) - (rows >> 1);
+// The view's other layers. Without them everything lands on the one grid, and the camera is the scene's.
+export type Layers = { me: CellGrid; top: CellGrid; camX: number; camY: number };
+
+export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers): BubbleFate[] {
+  const top = layers?.top ?? grid, mine = layers?.me ?? grid;
+  const cols = top.cols, rows = top.rows;
+  const camX = layers?.camX ?? Math.round(scene.cam.x * CELLS_PER_TILE) - (cols >> 1);
+  const camY = layers?.camY ?? Math.round(scene.cam.z * CELLS_PER_TILE) - (rows >> 1);
   const cellOf = (v: number) => Math.round(v * CELLS_PER_TILE);
   const wave = Math.floor(t * 2.5);
-  const put = (x: number, y: number, ch: string, ink: number, bg: number = KEEP) => grid.put(x - camX, y - camY, ch, ink, bg);
+  let onto = grid; // the layer things are drawn on: yours while you are drawn
+  let drawnMe = false;
+  const put = (x: number, y: number, ch: string, ink: number, bg: number = KEEP) => {
+    onto.put(x - camX, y - camY, ch, ink, bg);
+    if (drawnMe && onto !== mine && (bg !== KEEP || ch !== " ")) mine.erase(x - camX, y - camY); // what stands in front of you hides you
+  };
+  // Smoke, sparks and marks: they sit on the plane but are not a shape, so they get no outline.
+  const fx = (draw: () => void) => {
+    const id = onto.penId;
+    onto.penId = 0;
+    draw();
+    onto.penId = id;
+  };
   const write = (x: number, y: number, s: string, ink: number, bg: number = KEEP) => {
     for (let i = 0; i < s.length; i++) put(x + i, y, s.charAt(i), ink, bg);
   };
@@ -63,26 +81,34 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
 
   // Ground
   const m = scene.map;
-  for (let sy = 0; sy < rows; sy++) for (let sx = 0; sx < cols; sx++) {
+  grid.restart();
+  for (let sy = 0; sy < grid.rows; sy++) for (let sx = 0; sx < grid.cols; sx++) {
     const x = sx + camX, y = sy + camY;
     const i = Math.floor(x / CELLS_PER_TILE) - m.ox, j = Math.floor(y / CELLS_PER_TILE) - m.oz;
     const k = i >= 0 && j >= 0 && i < m.w && j < m.h ? j * m.w + i : -1;
     const kind = k < 0 ? T.water : m.kind[k]!;
     const h = hash(x, y), pick = h & 1;
     if (kind === T.water || kind === T.pool) {
+      grid.pen(1, NO_EDGE);
       const w = (((x + (y & 1) * 5 + wave * (1 + (y & 1))) % 11) + 11) % 11;
       grid.put(sx, sy, w === 0 ? "~" : w === 5 ? "-" : " ", C.waterInk, pick ? C.water : C.water2);
     } else if (kind === T.floor) {
+      grid.pen(6, C.woodInk);
       grid.put(sx, sy, y % 3 === 0 ? "_" : " ", C.woodInk, (y >> 1) & 1 ? C.wood : C.wood2);
     } else if (kind === T.wall) {
+      grid.pen(7, C.woodInk);
       grid.put(sx, sy, y % 3 === 0 ? "=" : " ", C.wallInk, C.wall);
     } else if (kind === T.bridge) {
+      grid.pen(5, C.woodInk);
       grid.put(sx, sy, x & 1 ? "|" : " ", C.woodInk, y & 1 ? C.wood : C.wood2);
     } else if (m.soil?.[k]) {
+      grid.pen(4, C.soilInk);
       grid.put(sx, sy, y % 3 === 1 ? "=" : " ", C.soilInk, pick ? C.soil : C.soil2);
     } else if (kind === T.path || kind === T.sand) {
+      grid.pen(3, PATH_EDGE);
       grid.put(sx, sy, h % 11 === 0 ? ":" : h % 7 === 0 ? "." : " ", C.pathInk, pick ? C.path : C.path2);
     } else {
+      grid.pen(2, GRASS_EDGE);
       const sway = h % 13 === 0 ? ((wave + (h >> 4)) % 6 === 0 ? '"' : "'") : h % 17 === 0 ? "," : h % 19 === 0 ? "." : " ";
       const flower = kind === T.flowers ? h % 5 === 0 : h % 149 === 0;
       const ch = flower ? "*" : kind === T.tall && h % 3 === 0 ? '"' : sway;
@@ -94,13 +120,14 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   for (const b of scene.beds) {
     const x = cellOf(b.x), y = cellOf(b.z);
     if (x < camX - 3 || y < camY - 3 || x > camX + cols || y > camY + rows) continue;
+    grid.fresh(C.soilInk);
     for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) put(x + c, y + r, r === 1 && c !== 1 ? "=" : " ", C.soilInk, b.wet ? C.soilInk : c === 0 || r === 0 ? mix(C.soil, C.soilInk, 0.5) : (c + r) & 1 ? C.soil : C.soil2);
     if (b.crop) {
       const stage = Math.min(3, b.stage);
       put(x + 1, y + 1, ".,Y@".charAt(stage), stage === 3 ? C.berry : C.sprout);
       if (stage === 3) put(x + 1, y, "Y", C.sprout);
     }
-    if (b.dry && Math.floor(t * 2) & 1) put(x + 2, y, "!", C.sky);
+    if (b.dry && Math.floor(t * 2) & 1) fx(() => put(x + 2, y, "!", C.sky));
   }
 
   // Things that stand, in foot order
@@ -119,7 +146,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   const house = (cx: number, foot: number, a: number, b: number, ink: number) => {
     const x = cx - 10, y = foot - 12;
     const smoke = Math.floor(t * 2);
-    for (let i = 0; i < 3; i++) put(x + 15 + ((smoke + i) & 1), y - 2 - i, "oO.".charAt((smoke + i) % 3), C.paper);
+    fx(() => { for (let i = 0; i < 3; i++) put(x + 15 + ((smoke + i) & 1), y - 2 - i, "oO.".charAt((smoke + i) % 3), C.paper); });
     put(x + 15, y - 1, "#", C.ink, C.wood2);
     put(x + 15, y, "#", C.ink, C.wood2);
     for (let r = 0; r < 7; r++) for (let c = 6 - r; c < 14 + r; c++) put(x + c, y + r, "^", ink, (c + r) & 1 ? a : b);
@@ -174,7 +201,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
     else if (kind === "plant") { write(x - 1, y - 2, "&%&", C.leafInk, C.leaf); put(x, y - 1, "|", C.leafInk); write(x - 1, y, "\\_/", C.woodInk, C.wood); }
     else if (kind === "shelf") for (let r = -4; r <= 0; r++) write(x - 3, y + r, r & 1 ? "#o#=#O#" : "=======", C.woodInk, C.wood);
     else if (kind === "cushion") write(x - 2, y, "(###)", C.plum, C.pink);
-    else if (kind === "cursor") { write(x - 4, y - 3, "+       +", C.berry); write(x - 4, y, "+       +", C.berry); }
+    else if (kind === "cursor") fx(() => { write(x - 4, y - 3, "+       +", C.berry); write(x - 4, y, "+       +", C.berry); });
     else if (kind === "bench") write(x - 3, y, "=======", C.woodInk, C.wood);
     else if (kind === "well") { write(x - 2, y - 3, "/===\\", C.roofInk, C.roof); put(x - 2, y - 2, "|", C.woodInk); put(x + 2, y - 2, "|", C.woodInk); write(x - 2, y - 1, "[ ~ ]", C.woodInk, 0xb9b2a4); write(x - 2, y, "[___]", C.woodInk, 0xb9b2a4); }
     else if (kind === "statue") { write(x - 1, y - 4, "(o)", C.ink, 0xb9b2a4); write(x - 1, y - 3, "/|\\", C.ink, 0xb9b2a4); write(x - 1, y - 2, " | ", C.ink, 0xb9b2a4); write(x - 2, y - 1, "#####", C.shadow, 0xb9b2a4); write(x - 2, y, "#####", C.shadow, 0x8f897d); }
@@ -191,6 +218,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
     const x = cellOf(p.x), y = cellOf(p.z);
     if (!near(x, y)) return;
     things.push({ foot: y, draw() {
+      onto = p.kind === "me" ? mine : grid;
       const look = HAIRS[p.look.hair] ?? HAIRS.bowlhair!;
       const shirt = SHIRT[p.look.tool] ?? C.sky;
       const step = p.walking ? Math.floor(t * 6) & 1 : 0;
@@ -199,6 +227,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
       const e = asleep || blink ? "-" : p.pose === "dance" ? "^" : "o";
       const d = p.dir === 1 ? -1 : p.dir === 2 ? 1 : 0, back = p.dir === 3;
       for (let c = -2; c <= 2; c++) shade(x + c, y);
+      onto.fresh(C.ink);
       look.rows.forEach((row, r) => [...row].forEach((c, i) => { if (c === "H") put(x - 3 + i, y - 5 + r, " ", C.ink, look.hair); }));
       for (let c = -3; c <= 3; c++) {
         const side = look.sides && Math.abs(c) === 3;
@@ -218,8 +247,10 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
       put(x + 1, y, " ", C.ink, step ? C.ink : KEEP);
       const tool = p.pose && TOOL_POSES[p.pose];
       if (tool) put(x + 3, y - 1, tool, C.ink);
-      if (asleep && Math.floor(t * 2) & 1) put(x + 4, y - 5, "z", C.paper);
-      if (p.pose === "dance" && Math.floor(t * 3) & 1) put(x - 4, y - 4, "♪", C.paper);
+      if (asleep && Math.floor(t * 2) & 1) fx(() => put(x + 4, y - 5, "z", C.paper));
+      if (p.pose === "dance" && Math.floor(t * 3) & 1) fx(() => put(x - 4, y - 4, "♪", C.paper));
+      if (p.kind === "me") drawnMe = true;
+      onto = grid;
     } });
   };
 
@@ -250,7 +281,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
       if ((g?.horns ?? 0) > 0.6) put(x, top, "v", C.paper, colour);
       if ((g?.tail ?? 0) > 0.5) put(x + 4, top + 2, "~", mix(colour, C.ink, 0.45));
       if ((g?.pattern ?? 0) > 0.6) for (const c of [-2, 2]) put(x + c, top + 2, ":", mix(colour, C.ink, 0.45), colour);
-      if (p.kind === "wild") put(x, top - 1, "?", C.paper);
+      if (p.kind === "wild") fx(() => put(x, top - 1, "?", C.paper));
     } });
   };
 
@@ -258,24 +289,33 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   scene.people.forEach(person);
   scene.pets.forEach(pet);
   things.sort((a, b) => a.foot - b.foot);
-  for (const s of things) s.draw();
+  for (const s of things) {
+    grid.fresh(C.ink);
+    s.draw();
+  }
 
   // Night: everything recoloured except the lit windows.
   const step = scene.day || scene.indoors ? 0 : nightStep(scene.clock.hour);
   if (step) {
     const k = step * 0.04, memo = new Map<number, number>();
-    grid.recolour((c) => {
+    const dusk = (c: number) => {
       if (c === C.glow) return c;
       let v = memo.get(c);
       if (v === undefined) memo.set(c, (v = mix(c, 0x2c2a58, k)));
       return v;
-    });
+    };
+    grid.recolour(dusk);
+    if (mine !== grid) mine.recolour(dusk);
   }
 
   // Names, under the feet.
   if (scene.showNames) for (const p of scene.people) {
     const x = cellOf(p.x), y = cellOf(p.z);
-    if (near(x, y)) write(x - (p.name.length >> 1), y + 1, p.name, C.paper, p.kind === "me" ? C.plum : TAG);
+    if (!near(x, y)) continue;
+    onto = p.kind === "me" ? mine : grid;
+    onto.fresh(C.ink);
+    write(x - (p.name.length >> 1), y + 1, p.name, C.paper, p.kind === "me" ? C.plum : TAG);
+    onto = grid;
   }
 
   // Bubbles go on the plane, so they never leave the screen.
@@ -288,23 +328,24 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
   const spots = layoutBubbles(shown.map((s) => ({ cx: s.sx * CELL, bottom: s.bottom * CELL, w: s.w * CELL, h: s.h * CELL, first: s.first })), cols * CELL, rows * CELL);
   const fates: BubbleFate[] = shown.map((s, i) => {
     const spot = spots[i];
-    if (spot) box(grid, Math.floor(spot.x / CELL), Math.floor(spot.y / CELL), s, spot.moved);
-    else grid.put(s.sx, s.bottom + 1, "*", C.ink, C.paper); // their line waits its turn
+    if (spot) box(top, Math.floor(spot.x / CELL), Math.floor(spot.y / CELL), s, spot.moved);
+    else top.put(s.sx, s.bottom + 1, "*", C.ink, C.paper); // their line waits its turn
     return [s.id, !spot];
   });
 
   // Panels
-  panelLine(grid, cols - scene.clock.label.length - 3, 1, scene.clock.label, C.ink);
-  if (scene.showMap) minimap(scene, grid);
+  panelLine(top, cols - scene.clock.label.length - 3, 1, scene.clock.label, C.ink);
+  if (scene.showMap) minimap(scene, top);
   const me = scene.people.find((p) => p.kind === "me");
   if (scene.hint) {
     const x = me ? cellOf(me.x) - camX : cols >> 1, y = me ? cellOf(me.z) - camY + 3 : rows - 6;
-    panelLine(grid, Math.max(0, Math.min(cols - scene.hint.length - 2, x - (scene.hint.length >> 1) - 1)), Math.min(rows - 3, y), scene.hint, C.woodInk);
+    panelLine(top, Math.max(0, Math.min(cols - scene.hint.length - 2, x - (scene.hint.length >> 1) - 1)), Math.min(rows - 3, y), scene.hint, C.woodInk);
   }
-  if (scene.banner) panelLine(grid, (cols - scene.banner.text.length - 2) >> 1, 1, scene.banner.text, C.woodInk);
-  for (const p of scene.panels) panel(grid, p, t);
+  if (scene.banner) panelLine(top, (cols - scene.banner.text.length - 2) >> 1, 1, scene.banner.text, C.woodInk);
+  for (const p of scene.panels) panel(top, p, t);
   if (scene.chips) chipSpots(scene.chips).forEach(({ x, label, off }) => {
-    for (let c = 0; c < label.length + 2; c++) grid.put(x + c, grid.rows - 1, c && c <= label.length ? label.charAt(c - 1) : " ", off ? C.woodInk : C.paper, off ? C.wood2 : C.woodInk);
+    top.fresh(C.ink);
+    for (let c = 0; c < label.length + 2; c++) top.put(x + c, rows - 1, c && c <= label.length ? label.charAt(c - 1) : " ", off ? C.woodInk : C.paper, off ? C.wood2 : C.woodInk);
   });
   const ins = scene.inspector;
   if (ins) {
@@ -313,13 +354,14 @@ export function compose(scene: Scene, grid: CellGrid, t: number): BubbleFate[] {
     const bar = (n: (typeof SHOW_NEEDS)[number]) => `${n.slice(0, 3)} ${"#".repeat(Math.round(Math.max(0, Math.min(100, ins.agent.needs[n])) / 12.5)).padEnd(8, "-")}`;
     const needs = SHOW_NEEDS.map(bar);
     const body = [...lines.slice(0, Math.max(1, rows - 9)), [`${needs[0]}  ${needs[1]}`, PAL.woodInk] as [string, string], [`${needs[2]}  ${needs[3]}`, PAL.woodInk] as [string, string]];
-    panel(grid, { place: "right", title: "", width, rows: body.map(([label, ink]) => ({ label, ink })) }, t);
+    panel(top, { place: "right", title: "", width, rows: body.map(([label, ink]) => ({ label, ink })) }, t);
   }
   return fates;
 }
 
 function box(grid: CellGrid, left: number, top: number, s: { lines: string[]; head: string; thought: boolean; sx: number; w: number; h: number }, moved: boolean): void {
   const ink = C.ink, paper = s.thought ? mix(C.sky, C.paper, 0.75) : C.paper;
+  grid.fresh(C.ink);
   for (let r = 0; r < s.h; r++) for (let c = 0; c < s.w; c++) {
     if ((r === 0 || r === s.h - 1) && (c === 0 || c === s.w - 1)) continue;
     grid.put(left + c, top + r, r === 0 || r === s.h - 1 ? "-" : c === 0 || c === s.w - 1 ? "|" : " ", ink, paper);
@@ -346,6 +388,7 @@ export function chipSpots<C extends { label: string }>(chips: readonly C[]): (C 
 }
 
 export function panelBox(grid: CellGrid, left: number, top: number, w: number, h: number): void {
+  grid.fresh(C.ink);
   for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
     if ((r === 0 || r === h - 1) && (c === 0 || c === w - 1)) continue;
     grid.put(left + c, top + r, r === 0 || r === h - 1 ? "-" : c === 0 || c === w - 1 ? "|" : " ", C.pathInk, C.paper);
@@ -353,6 +396,7 @@ export function panelBox(grid: CellGrid, left: number, top: number, w: number, h
 }
 
 function panelLine(grid: CellGrid, x: number, y: number, s: string, ink: number): void {
+  grid.fresh(C.ink);
   for (let c = 0; c < s.length + 2; c++) {
     grid.put(x + c, y - 1, "-", C.pathInk, C.paper);
     grid.put(x + c, y + 1, "-", C.pathInk, C.paper);
@@ -363,6 +407,7 @@ function panelLine(grid: CellGrid, x: number, y: number, s: string, ink: number)
 function minimap(scene: Scene, grid: CellGrid): void {
   const m = scene.map, step = Math.max(2, Math.ceil(m.w / 14));
   const w = Math.ceil(m.w / step), h = Math.ceil(m.h / step), left = grid.cols - w - 1, top = 4;
+  grid.fresh(C.ink);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const k = m.kind[Math.min(m.h - 1, y * step) * m.w + Math.min(m.w - 1, x * step)]!;
     grid.put(left + x, top + y, " ", C.ink, k === T.water || k === T.pool ? C.water : k === T.path || k === T.sand ? C.path : k === T.bridge ? C.wood : C.grass);
@@ -378,6 +423,7 @@ function panel(grid: CellGrid, p: ScenePanel, t: number): void {
   const rows = p.rows.flatMap((r, i) => wrap(r.label, inner - (r.note ? r.note.length + 2 : 0) - 2).map((label, n) => ({ label, note: n ? undefined : r.note, ink: r.ink, at: i })));
   const h = rows.length + 2 + (p.title ? 1 : 0) + (p.footer ? 1 : 0), w = inner + 2;
   const left = p.place === "corner" ? 1 : p.place === "right" ? grid.cols - w - 1 : (grid.cols - w) >> 1;
+  grid.fresh(C.ink);
   const top = p.place === "corner" ? 1 : p.place === "right" ? 4 : p.place === "bottom" ? grid.rows - h - 1 : Math.max(1, (grid.rows - h) >> 1);
   for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) {
     if ((r === 0 || r === h - 1) && (c === 0 || c === w - 1)) continue;

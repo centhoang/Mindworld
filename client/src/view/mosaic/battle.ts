@@ -15,6 +15,7 @@ function fighter(grid: CellGrid, f: SceneFighter, cx: number, foot: number, back
   const coat = COATS[Math.floor(((((g?.hue ?? 0.07) % 1) + 1) % 1) * COATS.length)]!;
   const ear = (g?.ears ?? 0.5) < 0.34 ? "^" : (g?.ears ?? 0.5) < 0.67 ? "n" : "|";
   const eye = "oo-^".charAt(Math.min(3, Math.floor((g?.build ?? 0.5) * 4)));
+  grid.fresh(C.ink);
   const left = cx - 6 + Math.round(f.dx), top = foot - FOOT + 1 + (Math.floor(t * 2 + cx) & 1) + Math.round(f.gone * 3);
   (back ? BACK : BODY).forEach((row, r) => [...row].forEach((c, i) => {
     if (c === " " || hash(left + i, r) < f.gone * 100) return;
@@ -35,6 +36,7 @@ function fighter(grid: CellGrid, f: SceneFighter, cx: number, foot: number, back
 }
 
 function hills(grid: CellGrid, base: number, amp: number, phase: number, bg: number, ink: number, off: number): void {
+  grid.fresh(ink);
   for (let x = 0; x < grid.cols; x++) {
     const top = Math.round(base - amp * (0.5 + 0.5 * Math.sin((x + off) / 9 + phase)));
     for (let y = Math.max(0, top); y < grid.rows; y++) grid.put(x, y, hash(x, y) % 19 === 0 ? "," : " ", ink, hash(x, y) & 1 ? bg : mix(bg, ink, 0.08));
@@ -42,6 +44,7 @@ function hills(grid: CellGrid, base: number, amp: number, phase: number, bg: num
 }
 
 function platform(grid: CellGrid, cx: number, cy: number, rx: number): void {
+  grid.fresh(C.pathInk);
   for (let y = -2; y <= 2; y++) {
     const w = Math.round(rx * Math.sqrt(1 - (y / 2.6) ** 2));
     for (let x = -w; x <= w; x++) grid.put(cx + x, cy + y, " ", C.ink, y > 0 ? mix(C.path, C.leaf, 0.35) : C.path);
@@ -67,6 +70,8 @@ export const MENU_W = 26, MENU_H = 4;
 
 export function composeBattle(b: SceneBattle, grid: CellGrid, t: number): void {
   const { cols, rows } = grid;
+  grid.restart();
+  grid.fresh(C.ink);
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) grid.put(x, y, " ", C.ink, y < rows * 0.2 ? mix(C.sky, C.paper, 0.45) : mix(C.sky, C.paper, 0.7));
   hills(grid, rows * 0.3, 4, 0, mix(C.grass, C.paper, 0.45), C.grassInk, 0);
   hills(grid, rows * 0.42, 3, 1.7, mix(C.grass, C.paper, 0.2), C.grassInk, 13);
@@ -78,6 +83,7 @@ export function composeBattle(b: SceneBattle, grid: CellGrid, t: number): void {
   platform(grid, myAt, myFoot, 13);
   if (b.foe) fighter(grid, b.foe, foeAt + slide, foeFoot, false, t);
   if (b.mine) fighter(grid, b.mine, myAt - slide, myFoot, true, t);
+  grid.penId = 0;
   if (b.hearts > 0) for (let i = 0; i < 3; i++) grid.put(myAt + (i - 1) * 4, myFoot - 9 - Math.round(b.hearts * 3) - i, "♥", C.berry, KEEP);
   const boxW = Math.min(30, cols - 4);
   if (b.foe) hpBox(grid, 2, 1, boxW, b.foe, false);

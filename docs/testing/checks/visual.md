@@ -12,4 +12,7 @@ Lab: `/lab/visual`, keys 1-5 pick a scene, N night. Look: mosaic plane, Tile ski
 - [ ] Entering the house feels smooth.
 - [ ] Day and night look different, and stay readable.
 - [ ] Pixels stay even at any window size.
-- [ ] The whole screen is one grid of cells: nothing is drawn above or below it, in every screen.
+- [ ] The whole screen is one grid of cells at rest: nothing is drawn above or below it, in every screen.
+- [ ] The Grid button turns the faint cell lines on and off, and it is remembered. Outlines stay.
+- [ ] Every thing has an outline (path, tree, person, pet, clock, map), and from the outlines you can tell which is in front.
+- [ ] Walking scrolls the view smoothly, with no cell-sized jumps, and your character glides. Other movers still step by cell.

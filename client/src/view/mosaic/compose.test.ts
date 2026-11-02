@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Scene, ScenePerson } from "../../game/ports";
 import { T, type TileMap } from "../../world/tilemap";
 import { C, compose, nightStep } from "./compose";
-import { CellGrid } from "./grid";
+import { CellGrid, CLEAR } from "./grid";
 
 const map: TileMap = { w: 40, h: 30, ox: 0, oz: 0, kind: new Uint8Array(1200).fill(T.grass), look: new Uint8Array(1200) };
 const person = (over: Partial<ScenePerson> = {}): ScenePerson => ({ id: "me", name: "Kai", kind: "me", x: 20, z: 15, dir: 0, walking: false, pose: null, look: { hair: "spikeyhair", tool: "hands" }, ...over });
@@ -72,6 +72,25 @@ describe("compose", () => {
     const front = new CellGrid(80, 45);
     compose(scene({ people: [a, b] }), front, 1);
     expect(screenText(grid)).toEqual(screenText(front));
+  });
+
+  it("outlines people in ink", () => {
+    const grid = new CellGrid(80, 45);
+    compose(scene(), grid, 1);
+    const lines = new Set<number>();
+    grid.flush((_x, _y, _c, _i, _b, right, bottom) => { lines.add(right); lines.add(bottom); });
+    expect(lines.has(C.ink)).toBe(true);
+  });
+
+  it("puts you on your layer and the panels on top, and hides you behind what stands in front", () => {
+    const world = new CellGrid(81, 46), me = new CellGrid(81, 46), top = new CellGrid(80, 45);
+    me.clear();
+    top.clear();
+    compose(scene({ props: [{ kind: "rock", x: 20, z: 15 + 1 / 3 }] }), world, 1, { me, top, camX: 20, camY: 22 });
+    expect(screenText(top)).toContain("Mon 12:00");
+    expect(screenText(world)).not.toContain("Mon 12:00");
+    expect(screenText(me)).toContain("Kai");
+    expect(me.background(40, 23)).toBe(CLEAR); // the rock's cell, in front of your feet
   });
 
   it("darkens the night in steps and keeps windows lit", () => {

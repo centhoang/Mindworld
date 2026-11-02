@@ -1,4 +1,4 @@
-// /lab/visual: the mosaic view on fixed scenes, with no model and no room. Keys 1-5 pick a preset, N toggles night.
+// /lab/visual: the mosaic view on fixed scenes, with no model and no room. Keys 1-5 pick a preset, N toggles night, L toggles grout lines.
 import type { Scene, SceneBattle } from "../game/ports";
 import { phaseOf } from "../life/clock";
 import { buildTileMap } from "../world/tilemap";
@@ -32,6 +32,7 @@ let preset = 1, night = false;
 addEventListener("keydown", (e) => {
   if (e.key >= "1" && e.key <= "5") preset = Number(e.key);
   if (e.key.toLowerCase() === "n") night = !night;
+  if (e.key.toLowerCase() === "l") view.grout = !view.grout;
 });
 
 function frame(ms: number): void {
