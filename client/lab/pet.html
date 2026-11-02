@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab: pet</title>
+    <link rel="stylesheet" href="./lab.css" />
+  </head>
+  <body>
+    <h1>Pet lab: Teach and Prove</h1>
+    <div class="row"><button id="load">Load the model</button><span id="status">Rules only</span></div>
+    <canvas id="screen"></canvas>
+    <form id="teach" autocomplete="off" class="row">
+      <input maxlength="300" placeholder="e.g. guard when it winds up a heavy hit" aria-label="Teach your pet" />
+      <button type="submit">Teach</button>
+      <button type="button" data-act="review">Review</button>
+      <button type="button" data-act="speak" hidden>Speak</button>
+      <button type="button" data-act="close" hidden>Close</button>
+    </form>
+    <script type="module" src="/src/lab/pet.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+body { margin: 0; padding: 16px; background: #3b2c35; color: #fbf0d4; font: 15px/1.45 ui-monospace, Consolas, monospace; }
+h1 { font-size: 18px; margin: 0 0 8px; }
+button, input { font: inherit; padding: 6px 10px; border: 2px solid #1f161c; background: #fbf0d4; color: #3b2c35; }
+button.on { background: #f7d774; }
+input { width: min(100%, 520px); box-sizing: border-box; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+#log { white-space: pre-wrap; background: #2b2027; padding: 10px; min-height: 240px; max-height: 50vh; overflow: auto; }
+table { border-collapse: collapse; margin: 8px 0; }
+td, th { padding: 2px 12px 2px 0; text-align: left; }
+canvas { image-rendering: pixelated; background: #79c2c6; max-width: 100%; }

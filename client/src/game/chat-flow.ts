@@ -12,21 +12,63 @@ export interface PeerChat { peer: string }
 export type ChatTarget = ChatWild | Npc | "room" | "name" | PeerChat;
 type ChatWild = Parameters<ChatWorld["wildScene"]>[0];
 
-export interface ChatDeps {
+export interface AnswerDeps {
   world: ChatWorld;
-  state: Save;
   live: () => Transport;
+  myName: () => string;
+  hostOf: (npc: Npc) => string | null | undefined;
+}
+
+export interface ChatDeps extends AnswerDeps {
+  state: Save;
   keys: Set<string>;
   babbler: Babbler;
-  myName: () => string;
   renamed: () => void;
-  hostOf: (npc: Npc) => string | null | undefined;
+}
+
+// Who answers a villager: its own mind wherever it runs (here, or relayed to the player hosting it, on that
+// machine's local model); if no local model can, Muse Spark in the cloud (event credits, server-capped); then
+// a scripted line.
+const ASK_WAIT_MS = 15_000;
+export function makeVillagerAnswer(d: AnswerDeps) {
+  const { world } = d;
+  const asking = new Map<Npc, (text: string | null) => void>();
+  // Nobody answers instantly: a reply takes as long as typing it would, however fast the mind was.
+  async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string; source?: string }> {
+    const t0 = performance.now();
+    const answer = await villagerMind(npc, line);
+    await new Promise((r) => setTimeout(r, typingMs(answer.text) - (performance.now() - t0)));
+    return answer;
+  }
+
+  async function villagerMind(npc: Npc, line: string): Promise<{ text: string; source?: string }> {
+    const scene = world.sceneWithMe(npc); // what we both see here, so "what's by the pond?" gets a real answer
+    const here = await world.npcs?.reply(npc, d.myName(), line, undefined, scene);
+    if (here) return here;
+    const hostedHere = !!world.npcs?.hosting(npc);
+    if (!hostedHere && d.live().status === "online" && d.hostOf(npc) && !asking.has(npc) && d.live().ask(npc, line, scene)) {
+      const text = await new Promise<string | null>((resolve) => {
+        const timer = setTimeout(() => done(null), ASK_WAIT_MS);
+        const done = (t: string | null) => {
+          clearTimeout(timer);
+          asking.delete(npc);
+          resolve(t);
+        };
+        asking.set(npc, done);
+      });
+      if (text) return { text };
+    }
+    if (LOCAL_ONLY) return { text: NO_LOCAL };
+    return askNpc(npc, line, "", undefined, undefined, scene);
+  }
+  return { answer: villagerAnswer, asking };
 }
 
 export type ChatFlow = ReturnType<typeof makeChatFlow>;
 
 export function makeChatFlow(d: ChatDeps) {
   const { world } = d;
+  const { answer: villagerAnswer, asking } = makeVillagerAnswer(d);
   // Talking to a wild pet (E when close): Muse Spark answers in character through the Worker (/api/chat,
   // capped and cached; scripted lines when offline). The pet stops wandering while you talk.
   const chatForm = document.getElementById("chat") as HTMLFormElement;
@@ -111,38 +153,5 @@ export function makeChatFlow(d: ChatDeps) {
   });
   chatForm.querySelector("[data-act=close]")!.addEventListener("click", closeChat);
 
-  // Who answers a villager: its own mind wherever it runs (here, or relayed to the player hosting it, on that
-  // machine's local model); if no local model can, Muse Spark in the cloud (event credits, server-capped); then
-  // a scripted line.
-  const ASK_WAIT_MS = 15_000;
-  const asking = new Map<Npc, (text: string | null) => void>();
-  // Nobody answers instantly: a reply takes as long as typing it would, however fast the mind was.
-  async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string }> {
-    const t0 = performance.now();
-    const answer = await villagerMind(npc, line);
-    await new Promise((r) => setTimeout(r, typingMs(answer.text) - (performance.now() - t0)));
-    return answer;
-  }
-
-  async function villagerMind(npc: Npc, line: string): Promise<{ text: string }> {
-    const scene = world.sceneWithMe(npc); // what we both see here, so "what's by the pond?" gets a real answer
-    const here = await world.npcs?.reply(npc, d.myName(), line, undefined, scene);
-    if (here) return here;
-    const hostedHere = !!world.npcs?.hosting(npc);
-    if (!hostedHere && d.live().status === "online" && d.hostOf(npc) && !asking.has(npc) && d.live().ask(npc, line, scene)) {
-      const text = await new Promise<string | null>((resolve) => {
-        const timer = setTimeout(() => done(null), ASK_WAIT_MS);
-        const done = (t: string | null) => {
-          clearTimeout(timer);
-          asking.delete(npc);
-          resolve(t);
-        };
-        asking.set(npc, done);
-      });
-      if (text) return { text };
-    }
-    if (LOCAL_ONLY) return { text: NO_LOCAL };
-    return askNpc(npc, line, "", undefined, undefined, scene);
-  }
   return { open: openChat, close: closeChat, target: () => chatWith, isPeerChat, talkTarget, talks, asking };
 }

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab: NPC</title>
+    <link rel="stylesheet" href="./lab.css" />
+  </head>
+  <body>
+    <h1>NPC lab: real minds on a tiny stage</h1>
+    <div class="row"><button id="load">Load the model</button><span id="status">No model yet</span></div>
+    <div class="row" id="who"></div>
+    <table id="stage"></table>
+    <div id="log"></div>
+    <form id="say" class="row" autocomplete="off"><input maxlength="140" placeholder="Say something..." aria-label="Talk" /><button>Say</button></form>
+    <script type="module" src="/src/lab/npc.ts"></script>
+  </body>
+</html>

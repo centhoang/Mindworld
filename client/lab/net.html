@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab: network</title>
+    <link rel="stylesheet" href="./lab.css" />
+  </head>
+  <body>
+    <h1>Network lab: the real room, drawn as dots</h1>
+    <p>WASD or arrows walk. Open a second tab with ?p=2 to be another player.</p>
+    <div class="row"><button id="wander">Wander</button><span id="status"></span></div>
+    <canvas id="dots" width="640" height="400"></canvas>
+    <table id="numbers"></table>
+    <script type="module" src="/src/lab/net.ts"></script>
+  </body>
+</html>
