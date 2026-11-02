@@ -11,6 +11,7 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 ## NPC
 11. **Free talk is weak on the 1B.** Cloud free talk now fixes this during the event (`proof/npc/5a-transcript.md`). Local fallback alone is still weak.
 28. **Small talk stays warm after insults.** Mo at fondness -12 still chats happily; only the direct questions turn cold. Needs prompt text, so not tonight. `proof/npc/5e-rude-gossip.md`.
+29. **Villagers never clean or feed.** Their sim has no pets or messes and no bowl spot, so those two activities cannot start. Players cannot sleep, cook or feed either. Fix needs a design call: wire them or cut them. `proof/game/activities.md`.
 - Fixed, waiting for review: 24 (asking for goods is buying; "how much?" means that good, unit test only). 12 (memory cut off invitations, unit test only). 10. Conversation continues: yes, no, later and "where?" act on offers.
 
 ## Pet

@@ -41,6 +41,12 @@ describe("compose", () => {
     expect(collect(grid)).toEqual([]);
   });
 
+  it("a birthday dresses the plaza", () => {
+    const grid = new CellGrid(80, 45);
+    compose(scene({ props: [{ kind: "bunting", x: 20, z: 12 }, { kind: "balloon", x: 16, z: 13 }] }), grid, 1);
+    expect(screenText(grid)).toContain("vvvvvvvvvvvvvvv");
+  });
+
   it("writes names and panels as characters on the plane", () => {
     const grid = new CellGrid(80, 45);
     compose(scene({ panels: [{ place: "corner", title: "Town board", rows: [{ label: "Corn 5c" }] }] }), grid, 1);

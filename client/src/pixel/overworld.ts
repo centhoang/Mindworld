@@ -1078,6 +1078,10 @@ export class Overworld {
     if (!this.indoors) props.push({ kind: "home", x: this.house.x, z: this.house.z });
     if (this.stall) props.push({ kind: "stall", x: this.stall.x, z: this.stall.z });
     if (this.noticeBoard) props.push({ kind: "board", x: this.noticeBoard.x, z: this.noticeBoard.z });
+    const plaza = this.world.platforms.find((p) => p.kind === "plaza");
+    // A birthday promised for today dresses the plaza, and stays up through the party.
+    const birthday = [...(this.npcs?.hub.minds.values() ?? [])].some((m) => m.mem.promises.some((c) => (c.state === "open" || c.state === "kept") && c.day === now.day && /birthday/i.test(c.occasion)));
+    if (plaza && birthday) props.push({ kind: "bunting", x: plaza.x, z: plaza.z - 2.5 }, { kind: "balloon", x: plaza.x - 3.5, z: plaza.z - 1.5 }, { kind: "balloon", x: plaza.x + 3.5, z: plaza.z - 1.5 }, { kind: "balloon", x: plaza.x + 3.5, z: plaza.z + 1.5 });
     const beds: SceneBed[] = this.beds.map((b, i) => {
       const p = this.farm?.plots[i];
       return { x: b.x, z: b.z, crop: p?.crop ?? "", stage: p?.stage ?? 0, wet: !!p?.wetUntil, dry: !!p && !p.wetUntil && needsWater(p) };

@@ -197,6 +197,8 @@ export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers
     else if (kind === "fence") write(x - 2, y, "+-+-+", C.woodInk);
     else if (kind === "fence-v") { put(x, y - 1, "|", C.woodInk); put(x, y, "+", C.woodInk); }
     else if (kind === "rod") put(x, y, "/", C.ink);
+    else if (kind === "bunting") for (let c = -7; c <= 7; c++) put(x + c, y, "v", C.paper, c & 1 ? C.berry : C.glow);
+    else if (kind === "balloon") { put(x, y - 3, " ", C.ink, x & 1 ? C.berry : C.sky); put(x, y - 2, "|", C.ink); put(x, y - 1, "|", C.ink); put(x, y, "|", C.ink); }
     else if (kind === "blanket") for (let r = 0; r < 3; r++) write(x - 3, y + r, "+ + + +", C.paper, C.flowerA);
     else if (kind === "basket") write(x - 1, y, "\\_/", C.woodInk, C.wood);
     else if (kind === "rug") for (let r = -2; r <= 0; r++) write(x - 4, y + r, "%%%%%%%%%", C.roofInk, C.pink);
