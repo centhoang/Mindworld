@@ -1,7 +1,7 @@
 # Gen art angle audit (bugs 30, 31)
 
 Rule: top-down, front side only, never iso or three-quarter (`docs/visual/visual.md`).
-Files: 654. Failed: 1 (`soccer-goal.png`, reworked once, now passes). The 30 spots layers were deleted by bug 33. Sheets: `.scratch/audit/sheet-props-before.png`, `sheet-pets-before.png`, after: `*-after.png`.
+Files: 654 audited, plus the new `playground-slide.png`. Failed: 1 (`soccer-goal.png`, reworked once, now passes). The 30 spots layers were deleted by bug 33. Sheets: `.scratch/audit/sheet-props-before.png`, `sheet-pets-before.png`, after: `*-after.png`.
 Pet layers were judged at 48, 32 and 16, front and back, for all five builds.
 
 | File | Verdict | Why |
@@ -631,6 +631,7 @@ Pet layers were judged at 48, 32 and 16, front and back, for all five builds.
 | pets/pet-turtle-tail-puff-32-front-idle.png | pass | part of a front or back pet |
 | pets/pet-turtle-tail-puff-48-back-idle.png | pass | part of a front or back pet |
 | pets/pet-turtle-tail-puff-48-front-idle.png | pass | part of a front or back pet |
+| playground-slide.png | pass | new, straight-on, replaces the side view in the props sheet (bug 35) |
 | plan-bubble-icon.png | pass | flat icon or front view |
 | soccer-ball.png | pass | round, no angle to read |
 | soccer-goal.png | pass after rework | was three-quarter; Codex redrew it straight-on, re-audited on `.scratch/audit/goal-8x.png` and in the game |

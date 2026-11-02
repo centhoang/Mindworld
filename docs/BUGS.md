@@ -3,14 +3,20 @@
 Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove when proven fixed. Fixed lines wait for the user's review.
 
 ## Visual
-None open.
+34. **A speech box can cover the Goals panel.** A bubble of someone in the top left draws over it, on purpose today (`underBubbles`). Reads as an overlap. Shot: `proof/visual/sunny-bubble-over-goals.jpg`. User's call.
+
+36. **Brain panel replaces the hatch line.** On a new save "Something is wiggling inside your egg" is gone after about 1 s. The panel also names the model to a stranger.
 
 ### Fixed, waiting for review
 1-9, 13-23: ground tiles, pond edge, windmill, house entry, placement, farm art, beaches, fishing rules, coast corners, grid, cut-off tiles, road fences, bridge posts, world edge, road bulge, layering, pond pier, clouds, layer rule. Detail: git history of this file.
+35: playground slide redrawn straight-on (`proof/visual/slide-live.jpg`).
 30, 31: soccer goal redrawn straight-on, all 654 gen files audited, only the goal failed (`proof/visual/gen-art-audit.md`, `proof/visual/goal-live.png`).
 
 ## Movement
 - Fixed, waiting for review: 25 (own character jumped back while holding a direction; `proof/game/walk-steady.md`).
+
+## Game
+37. **Dance, chop and clean not seen unforced on Sunnyside.** 200 s sample only; forced shots proved no pose. Needs a longer live watch.
 
 ## NPC
 11. **Free talk is weak on the 1B.** Cloud free talk now fixes this during the event (`proof/npc/5a-transcript.md`). Local fallback alone is still weak.

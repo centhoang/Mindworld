@@ -6,6 +6,7 @@ const ROOTS = {
   "dance-floor-active": [0, 0],
   "soccer-goal": [24, 30],
   "soccer-ball": [8, 13],
+  "playground-slide": [16, 30],
   "birthday-bunting": [16, 4],
   "birthday-balloon-red": [8, 23],
   "birthday-balloon-blue": [8, 23],

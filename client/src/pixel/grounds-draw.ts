@@ -24,6 +24,7 @@ export function drawSpotProp(g: Ctx, name: string, x: number, y: number, t: numb
     generatedSprites.draw(g, name === "goal" ? "soccer-goal" : "soccer-ball", x, y - (name === "ball" ? Math.round(Math.abs(Math.sin(t * 3)) * 3) : 0), () => drawOldSpotProp(g, name, x, y, t));
     return;
   }
+  if (name === "slide") return generatedSprites.draw(g, "playground-slide", x, y, () => drawOldSpotProp(g, name, x, y, t));
   if (name === "bench") return stand(g, "bench", x, y);
   if (name === "sign") return stand(g, "sign", x, y);
   drawOldSpotProp(g, name, x, y, t);
