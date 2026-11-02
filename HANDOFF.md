@@ -6,7 +6,7 @@
 - Branch `rework/fresh-look`, not pushed. `main` = the last pixel build, live at https://pets.uryto.dev/ (Worker 7f8d45b9).
 - Tests: client 633, worker 192, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs reorganised: index `docs/README.md`, plan `docs/RESTRUCTURE.md`. No game code changed for the rework yet.
-- The user has not reviewed the bug 13-23 fixes. Not proven with 2 players. They may be dropped by the look decision.
+- The user has not reviewed the bug 13-23 fixes. Not proven with 2 players. The glyph spike may replace them.
 - Tuned 3B trained, on the Modal volume with a GGUF: `llama32-3b-n4-e2-r16`. Not benched, not converted.
 
 ## Decisions
@@ -15,15 +15,14 @@
 - The user reviews scope by scope in labs, not by playing the whole game (`docs/testing/testing.md`).
 - Submission day (user): make GitHub and the 4 HF repos public, remove Access. Remove `/api/chatlog`, its client call and the KV rows.
 
-## Pending decisions (user)
-1. Look: glyph spike or Sunnyside (`docs/visual/visual.md`).
-2. Chat: tiers with cloud during the event, or local only (`docs/ai/npc.md`).
-3. World: one compact village, and which cut candidates go (`docs/game/design.md`).
+## Decisions from the user (2026-11-02)
+- Look: glyph spike first. Chat: tiers, with cloud free talk during the event. World: one compact village that shows NPC and pet minds.
+- Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-1. Bench tuned 3B vs tuned 1B on `docs/testing/checks/npc.md`, native GGUF, free. Put numbers in `docs/ai/npc.md`.
-2. Get the 3 decisions, then follow the work order in `docs/RESTRUCTURE.md`, starting with step 1 (seams).
-3. One session, one scope. Use the `scope-check` and `scope-publish` skills.
+1. Execute `docs/RESTRUCTURE.md` from step 0, in order. Stop at the glyph spike gate for the user's judgement.
+2. Nov 2: steps 0-3. Nov 3: 4, 5a, 5b. Nov 4: 5c, 5d, 6. Nov 5 morning: 7 only.
+3. Step 0 includes changing the `LOCAL_ONLY` rule in CLAUDE.md to allow cloud free talk.
 
 ## Gotchas
 - Chat log: from `worker/`, `npx wrangler kv key list --binding GHOSTS --remote --prefix chat:`, then `kv key get`.

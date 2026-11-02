@@ -1,33 +1,88 @@
-# Restructure plan
+# Restructure plan (approved 2026-11-02)
 
-**Branch:** `rework/fresh-look`. **Submission:** Nov 4, 9 PM ET. About 2 days left, so the order below ships a working game at every step. `main` stays the fallback.
+Branch: `rework/fresh-look`. One session, one scope. Project skills: `scope-check`, `scope-publish`.
 
-## Decisions needed first (user)
-1. **Look:** glyph spike, or stay on Sunnyside? (`visual/visual.md`) Recommended: half-day spike.
-2. **Chat:** tiers with cloud during the event, or local only? (`ai/npc.md`) Recommended: tiers, after the 3B bench.
-3. **World:** one compact village? And which cut candidates go? (`game/design.md`)
+## Context
+You chose: a glyph spike, chat tiers with cloud during the event, and a compact world that shows off NPC and pet minds. Everything else goes to the backlog. The deadline is Nov 4, 9 PM ET, which is **Nov 5, 9 AM in Vietnam**, so just under 3 days (`docs/RESTRUCTURE.md` says 2; fix it). Goal: at every step the game still runs, and you review one scope at a time without playing the whole game. Fallback: `main`, the current live build.
+
+Findings that shape the plan:
+- **Clean:** `mind/`, `life/`, `sim/`, `world/` import only `pixel/tiles` from the drawing code, so `TileMap` can just move.
+- **Tangled:** `pixel/overworld.ts` (1,444 lines) mixes state with `draw()`. `pixel/main.ts` (1,056 lines) is module-level singletons: chat, fights, room wiring.
+- **Labs are easy to serve:** add HTML entries to Vite's `rollupOptions.input`. The Worker's assets folder serves them behind Access.
+
+## Scope after cuts
+- **Keep:** villagers, chat, promises, memory, bonds, jobs, economy; market stall; pet hatch, follow, moods, Teach, Prove; wild pets with varieties, taming; player duel; farm, fishing, coins; dance, soccer, picnic activities; a minimal house: outside, one room, bed; 2+ players.
+- **Backlog, removed from play:** boss, ghosts and the ghost stone, furniture editing, windmills, decorative fields, sea life, terraces, streams, beaches, cliffs, clouds, in-between grounds, ghost grounds, themes, voice teaching, babble, soccer as a mini-game. Delete with a list in `docs/game/design.md`, so git keeps them. Wait until step 6, so cuts can't break earlier work.
+- **World:** one hand-authored village map, about 64 x 44 tiles, as text rows in a new `client/src/world/village-map.ts`. Places: plaza, stall, dance floor, pond, wild meadow, board. Player plots (house + farm) sit along a street, 12 slots. Extra players are guests with no plot. Stretch: street grows by repeating a strip.
 
 ## Work order
-| # | Task | Done when |
+| # | Task | Gate |
 |---|---|---|
-| 0 | Tuned 3B vs 1B bench on the NPC cases, native | Numbers and transcripts in `ai/npc.md` |
-| 1 | **Seams:** split game state from `pixel/main.ts` and `overworld.ts`. Interfaces: `View`, `Transport`, `MindBackend` | Game plays the same, tests pass |
-| 2 | **Labs:** `/lab/npc`, `/lab/visual`, `/lab/net`, `/lab/pet`, each with a fake for the rest | Each opens alone behind Access |
-| 3 | **NPC scope:** chosen chat tier, shorter replies, typing feel | `checks/npc.md` clear |
-| 4 | **Network scope:** `aoi.ts`, near routing, tick batching, snapshots, bots | `checks/network.md` clear |
-| 5 | **Visual scope:** spike, decide, build only the must-draw list, compact world | `checks/visual.md` clear |
-| 6 | **Wire and cut:** full game, remove cut systems, chat log, dead code | `checks/game.md` clear |
-| 7 | **Submission:** demo script update, README, repos public (user) | `ops/demo.md`, `ops/event.md` |
+| 0 | **Docs:** fix the deadline, record decisions in `RESTRUCTURE.md`, `design.md`, `npc.md`, `visual.md`. Change the `LOCAL_ONLY` rule in `CLAUDE.md` to allow cloud free talk | Done |
+| 1 | **3B bench:** tuned 3B vs tuned 1B on `checks/npc.md`, native GGUF, free | Numbers in `ai/npc.md`; 3B tier in only if clearly better |
+| 2 | **Glyph spike:** one screen (villager, pet, farm, chat bubble), reading a fake scene. Standalone, no game wiring | **You judge an image and a clip.** Yes: step 5. No: compact Sunnyside. Time box: half a day |
+| 3 | **Seams:** mechanical moves only | Tests pass, game plays the same, deployed |
+| 4 | **Labs:** `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual` | Each opens alone behind Access |
+| 5a | **NPC:** chat tiers, bugs 11-12 | `checks/npc.md` clear |
+| 5b | **Network:** AOI | `checks/network.md` clear |
+| 5c | **Visual:** glyph view, compact village | `checks/visual.md` clear |
+| 5d | **Pet:** Teach, Prove and varieties in the lab | `checks/pet.md` clear |
+| 6 | **Wire and cut:** full game, deletions, drop `/api/chatlog` and its KV rows | `checks/game.md` clear, 2+ players |
+| 7 | **Submission prep:** demo script, README, numbers | You record, publish and submit |
 
-Steps 3, 4 and 5 run in parallel sessions after 1 and 2, since they touch separate folders.
+Do 5a first: NPCs matter most. 5b, 5c and 5d touch separate folders, so you can open one session each. Order: Nov 2: 0-3. Nov 3: 4, 5a, 5b. Nov 4: 5c, 5d, 6. Nov 5 morning (VN): 7 only, no features.
 
-## If time runs out
-Skip the look change: ship Sunnyside, compact. Keep AOI grid and batching. Keep labs that exist. Chat quality comes before all else: NPCs are the star, and Demo plus Impact are 55% of the score.
+## Step 3: seams
+- Move `TileMap`, `T` and `tileAt` from `pixel/tiles.ts` to `world/tilemap.ts`. Leave a re-export until the imports are fixed.
+- Add `client/src/game/ports.ts` with three interfaces:
+  - `View`: `draw(scene, g, w, h, t)`.
+  - `Transport`: the part of `LiveLink` used by `main.ts`.
+  - `MindBackend`: reuse the scheduler's existing backend shape.
+- Add a `Scene` type: plain read-only data, covering map, people, pets, props, bubbles and tags.
+- Split `Overworld.draw()`: a `buildScene()` that stays with the state, and a `PixelView` that takes the drawing code.
+- Move chat, fights and room wiring out of `main.ts` into `game/chat-flow.ts`, `game/fight-flow.ts`, `world/room-flow.ts`, taking dependencies as arguments. `main.ts` becomes wiring.
+- No behaviour changes. One move per commit. Reuse `world/live.ts` as the real `Transport`.
 
-**Risk:** step 1 touches the two largest files just before a deadline. Keep it mechanical: move code, change no behaviour, commit in small steps.
+## Step 4: labs
+- `client/lab/{npc,pet,net,visual}.html`, added to `rollupOptions.input`. Each starts one scope with fakes from `client/src/lab/`.
+- `lab/npc`: real scheduler and `WebLlmVoice`, a tiny stage, a fake `Transport`.
+- `lab/visual`: fixed scene presets, no model or room.
+- `lab/net`: real room, dots for a view, a live readout of messages and bytes per second.
+- `lab/pet`: `pixel/teach.ts` flow with a fake world.
+- Use `scope-publish` and `scope-check`. Add a rule check that a scope imports only `ports.ts`, never another scope.
 
-## Workflow from now on
-- One session, one scope. Start with `HANDOFF.md`.
-- Project skills: `scope-publish` puts one scope live; `scope-check` runs its list with proof.
-- See progress at a glance: `docs/testing/checks/`.
-- Bugs go to `docs/BUGS.md` under their scope.
+## Step 5a: chat tiers
+Add a `chatTier()` in `game/npc-chat.ts`, used by `villagerAnswer` / `villagerMind` in `main.ts` (around lines 271-295):
+1. Sim answers (`directions.ts`, `offers.ts`, `scene.ts`).
+2. Cloud Muse Spark for free talk through the existing `/api/chat`, `askNpc` and the ledger cap.
+3. Local tuned 1B when the cap is hit or the network fails, or a tuned 3B if step 1 and a speed probe pass.
+
+- Add `CLOUD_CHAT` beside `LOCAL_ONLY` in `game/test-mode.ts`, so minds stay local and only free talk goes to the cloud. Off leaves the game working.
+- Cloud prompts aren't frozen, so give them memories and persona. Local prompts stay frozen at af455c4.
+- Keep the replies short, with the typing delay from `mind/human.ts`.
+- Bug 12: drop memory lines from invitations in `cleanReply`.
+
+## Step 5b: AOI
+- New `worker/src/aoi.ts`: pure, per `docs/network/network.md`. 16-tile cells, 3 x 3 subscription, 4-tile margin. Unit tested.
+- `room.ts`: add out target `to: "near"`, and send `pos`, `pose`, `npcs`, `farm`, `emote`, `say`, `mind` through it. Join, leave and host changes stay global.
+- 200 ms per-peer tick batching, keeping only the newest position per entity.
+- Snapshot on entering a cell, drop on leaving. Client handles enter and leave in `world/live.ts`.
+- Raise `ROOM_MAX_PEERS` only after the load test. New `scripts/net-bots.mjs`, N sockets with a hard limit, reporting bytes per peer. Check Cloudflare's Durable Object limits first.
+- A compact village means crowding at the plaza, so lower the rate for far entities past ~16 in view.
+
+## Step 5c: glyph view
+- `client/src/view/glyph/`: code-drawn glyph atlas, palette, `GlyphView` implementing `View`. Keep `layers.md` bands, foot sort and whole-pixel scaling, reusing `lowSize`.
+- Must-draw list only (`docs/visual/visual.md`). Genes map to a pet's glyph face and colour.
+- Author the village map here and switch `generateWorld` over. Check NPC routes, `directions.ts` and hosting against it.
+- Then archive `tile-rules.md` and `style.md`, write a one-page glyph sheet, and remove pack art from the build.
+
+## Verification
+- Every step: `npm --prefix client test`, `npm --prefix worker test`, tsc, secrets scan, local commit.
+- Scope gates run on the deployed build through `scope-check`, with proof in `docs/testing/proof/<scope>/`: images and clips for visual, transcripts read by me for chat, numbers for network.
+- You judge the lists. Whole-game play-test comes last, with 2+ players.
+
+## Fallbacks
+- Spike fails or 5c runs late: keep Sunnyside, `PixelView`, compact map.
+- AOI late: ship cells and batching without snapshots, peers capped at 24.
+- Step 3 runs past a day: stop splitting `main.ts`; labs use only what's split.
+- Chat quality comes first if time is short.
