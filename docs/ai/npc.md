@@ -29,10 +29,12 @@ Elder (herbs), Mo (fishing), Ama (market stall), Pip (wood). Each has a persona,
 
 The 3B is ~2.7x slower. The tuned 3B is trained (`llama32-3b-n4-e2-r16`, on the Modal volume, GGUF ready) but its reply quality has not been benched.
 
-## Options for chat (user decides)
+## Options for chat
+**Decided (user, 2026-11-02):** A, tiers: sim, then cloud Muse Spark for free talk with a cap, then local. Plus D. Build: `../RESTRUCTURE.md` step 5a.
+
 | | Idea | Good | Bad |
 |---|---|---|---|
-| **A (recommended)** | Tiers: sim answers first, then 1B or a cloud Meta model for free talk during the event, with a cap | Fast, best talk for judges, strong Meta tooling story | Free talk gets weaker when the cap ends |
+| **A (chosen)** | Tiers: sim answers first, then 1B or a cloud Meta model for free talk during the event, with a cap | Fast, best talk for judges, strong Meta tooling story | Free talk gets weaker when the cap ends |
 | B | Tuned 3B only on GPUs that pass a speed probe; 1B otherwise | Free forever, better talk if the bench proves it | Slow on weak GPUs; two weight sets to host |
 | C | 3B everywhere | One model | 30 s replies on a 1050, 2.95 GB VRAM shuts out many players |
 | D | Better 1B: shorter prompts, 15-20 word replies, intent routing to line banks | Cheapest, helps all options | Won't fix open-ended talk alone |
@@ -41,6 +43,6 @@ Whichever wins, do D. A short reply (20 tokens, 150 in) takes ~6 s on the 1B and
 
 **Next step:** bench the tuned 3B against the tuned 1B on `../testing/checks/npc.md`, using native GGUF so it costs nothing. Decide from reply quality.
 
-Rule to settle: the game must still work free after the event. A cloud tier is fine under that rule only if turning it off leaves the game playable.
+Rule: the game must still work free after the event, so turning the cloud tier off must leave the game playable.
 
 Design backlog and research sources: `archive/NPC-PLAN.md`.

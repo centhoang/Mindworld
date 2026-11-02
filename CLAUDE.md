@@ -45,7 +45,7 @@ Everything lives in this folder; temp files in `.scratch/` (gitignored). No proj
 ## Rules from the user
 - **Nothing goes public before submission day:** game stays behind Access, GitHub and HF stay private until the user opens them.
 - **Proven = deployed build.** Review scope by scope: `docs/testing/testing.md`, skills `scope-check` and `scope-publish`. Whole-game play-test needs 2+ players and every list clear.
-- **`LOCAL_ONLY` stays on** (client/src/game/test-mode.ts) until near submission: no cloud, no scripted lines.
+- **`LOCAL_ONLY` stays on** (client/src/game/test-mode.ts) until near submission: minds stay local, no scripted lines. Only exception: cloud free talk behind `CLOUD_CHAT`.
 - **Codex is for new visual assets only**, matching the pack and docs/visual/style.md. Claude does everything else. Run: `powershell -NoProfile -File scripts/codex.ps1 -Prompt "Read .scratch/brief-x.md and carry it out exactly." [-Sandbox workspace-write] [-Effort max] [-Out .scratch/x.md]`. Briefs name files and checks; no secrets, no git commit.
 - Public posts: never reveal idea, mechanics or architecture.
 

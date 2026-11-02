@@ -3,7 +3,7 @@
 Branch: `rework/fresh-look`. One session, one scope. Project skills: `scope-check`, `scope-publish`.
 
 ## Context
-You chose: a glyph spike, chat tiers with cloud during the event, and a compact world that shows off NPC and pet minds. Everything else goes to the backlog. The deadline is Nov 4, 9 PM ET, which is **Nov 5, 9 AM in Vietnam**, so just under 3 days (`docs/RESTRUCTURE.md` says 2; fix it). Goal: at every step the game still runs, and you review one scope at a time without playing the whole game. Fallback: `main`, the current live build.
+You chose: a glyph spike, chat tiers with cloud during the event, and a compact world that shows off NPC and pet minds. Everything else goes to the backlog. The deadline is Nov 4, 9 PM ET, which is **Nov 5, 9 AM in Vietnam**, so just under 3 days. Goal: at every step the game still runs, and you review one scope at a time without playing the whole game. Fallback: `main`, the current live build.
 
 Findings that shape the plan:
 - **Clean:** `mind/`, `life/`, `sim/`, `world/` import only `pixel/tiles` from the drawing code, so `TileMap` can just move.
