@@ -4,15 +4,17 @@ DIRECTOR MODE ACTIVE since 2026-11-02 (user asleep). Procedure: `docs/ops/direct
 **Starting prompt:** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md."
 
 ## Morning report
-Night started. Nothing done yet.
+Done: bug 25 fixed and proven on live (`proof/game/walk-steady.md`). Live scope checks, NPC rude and gossip, 2-player game run.
+Bug 26 was machine load, closed. Bug 27 explained, images retry. Three new `game.md` lines ticked.
+Decision for the user: bug 28, small talk stays warm after insults; a fix needs prompt text and a retrain (frozen prompts).
 
 ## State
 - Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/ (see `wrangler deployments`). Fallback: `main`, the last pixel build.
-- Tests: client 591, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
+- Tests: client 599, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
-- User has not reviewed bugs 13-23. Not proven with 2 players. Steps 0-5d deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B stays out (`docs/ai/npc.md`).
-- 5a: cloud free talk works (`proof/npc/`). Open: rude and gossip checks not run. 5b: AOI live (`proof/network/`), 89 bots held; 100 not proven.
-- 5c, 5d built: village, one plane on every screen, as built in `docs/RESTRUCTURE.md`. Seen on localhost; `scope-check` on live not run. Bug 24 fixed, unit test only.
+- User has not reviewed bugs 13-23. Two tabs driven on live (`proof/game/2-players.md`); no 2-person play yet. Steps 0-5d deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B stays out (`docs/ai/npc.md`).
+- 5a: cloud free talk works (`proof/npc/`). 5b: AOI live (`proof/network/`), 89 bots held; 100 not proven.
+- 5c, 5d built: village, one plane on every screen, as built in `docs/RESTRUCTURE.md`. Live scope-check done. Bug 24 fixed, unit test only.
 
 ## Decisions
 - NPCs are the star: a player cannot tell them from a human. The sim reasons; the model picks among valid options and speaks.
@@ -25,11 +27,8 @@ Night started. Nothing done yet.
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Queue (Director; next actions)
-1. Bug 25: fix the glitch; done = unit test, deployed, proven on live while holding one direction.
-2. `scope-check` on live for the 5c/5d village and one plane (visual, pet, network lists).
-3. `npc.md` rude and gossip checks, done = results recorded in `proof/npc/`.
-4. `checks/game.md` with 2 players (two tabs, `?p=2`); record what a bot cannot prove.
-5. Verify: build, tests, secrets scan, commit. `/api/chatlog` stays until step 7 (user-play logs still needed).
+1. `game.md` birthday promise line and the full human activity list, driven on live.
+2. Verify: build, tests, secrets scan, commit. `/api/chatlog` stays until step 7 (user-play logs still needed).
 Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off.
 
 ## Gotchas

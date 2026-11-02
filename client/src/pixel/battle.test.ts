@@ -16,6 +16,17 @@ async function runUntil(v: BattleView, p: Promise<void>, maxSeconds: number): Pr
 }
 
 describe("battle view script", () => {
+  it("a wild pet appears, but a friend's pet in a duel is not wild", () => {
+    const wild = new BattleView();
+    void wild.open(side("Foe"), side("Mochi"));
+    const duel = new BattleView();
+    void duel.open(side("Kai"), side("Mochi"), "Kai is ready to duel!");
+    for (const v of [wild, duel]) for (let t = 0; t < 2; t += 0.05) v.update(0.05);
+    const said = (v: BattleView) => (v as unknown as { text: string }).text;
+    expect(said(wild)).toBe("A wild Foe appears!");
+    expect(said(duel)).toBe("Kai is ready to duel!");
+  });
+
   it("open, a turn and the end each finish in a few seconds", async () => {
     const v = new BattleView();
     expect(await runUntil(v, v.open(side("Foe"), side("Mochi")), 10)).toBeLessThan(4);

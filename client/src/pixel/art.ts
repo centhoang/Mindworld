@@ -42,14 +42,22 @@ export function img(name: ArtName): HTMLImageElement {
   return i;
 }
 
+// A static file can fail once right after a deploy (a 502 on live): try again before giving up on it.
+export function loadImage(src: string, tries = 3): Promise<HTMLImageElement | null> {
+  return new Promise((res) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => (tries > 1 ? void setTimeout(() => void loadImage(src, tries - 1).then(res), 400) : res(null));
+    i.src = src;
+  });
+}
+
 export function loadArt(base = "/art/"): Promise<void> {
-  const one = (f: ArtName, must: boolean) =>
-    new Promise<void>((res, rej) => {
-      const i = new Image();
-      i.onload = () => { art.set(f, i); res(); };
-      i.onerror = () => (must ? rej(new Error(`art ${f}`)) : res());
-      i.src = `${base}${f}.png`;
-    });
+  const one = async (f: ArtName, must: boolean) => {
+    const i = await loadImage(`${base}${f}.png`);
+    if (i) art.set(f, i);
+    else if (must) throw new Error(`art ${f}`);
+  };
   const seasons = SEASONAL.flatMap((f) => [1, 2].map((th) => seasonName(f, th) as ArtName));
   return Promise.all([...FILES.map((f) => one(f, true)), ...[...OPTIONAL, ...seasons].map((f) => one(f, false))]).then(() => undefined);
 }

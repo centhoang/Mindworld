@@ -1,7 +1,7 @@
 // The Sunnyside world on screen: sea, terrain, bridges, clouds and the pack's sprites. Rules for which tile goes
 // where are in sunny-terrain.ts; art comes from scripts/art-sunny.py (client/public/art/sunny).
 
-import { recoloured } from "./art";
+import { loadImage, recoloured } from "./art";
 import { mulberry32 } from "../sim/rng";
 import { bridgeLayers, buildTerrain, CELL_ID, FLIP, MIRROR, tile, type Terrain } from "./sunny-terrain";
 import { AWAY, hash2, T, TILE, type TileMap } from "../world/tilemap";
@@ -25,16 +25,21 @@ export const CROPS_ART = ["wheat", "carrot", "beetroot", "cabbage", "cauliflower
 export const sunnyReady = (): boolean => images.has("tiles");
 export const stampSize = (name: string): [number, number] => data.stamps[name] ?? [16, 16];
 
+// Without this one file there is no game, so it gets the same second chances as an image.
+async function sheetData(tries = 3): Promise<typeof data> {
+  const res = await fetch(`${BASE}sunny.json`);
+  if (res.ok || tries <= 1) return res.json();
+  await new Promise((r) => setTimeout(r, 400));
+  return sheetData(tries - 1);
+}
+
 export async function loadSunny(): Promise<void> {
-  data = await (await fetch(`${BASE}sunny.json`)).json();
+  data = await sheetData();
   for (const frames of data.anims) animOf.set(frames[0]!, [frames[0]!, frames[frames.length - 1]!]);
-  const one = (name: string) =>
-    new Promise<void>((res) => {
-      const i = new Image();
-      i.onload = () => (images.set(name, i), res());
-      i.onerror = () => res(); // a missing sprite leaves a gap, not a dead game
-      i.src = `${BASE}${name}.png`;
-    });
+  const one = async (name: string) => {
+    const i = await loadImage(`${BASE}${name}.png`);
+    if (i) images.set(name, i); // a missing sprite leaves a gap, not a dead game
+  };
   const crops = CROPS_ART.flatMap((c) => [0, 1, 2, 3, 4, 5].map((n) => `crop-${c}-${n}`));
   await Promise.all([...SINGLES, ...Object.keys(STRIPS), ...Object.keys(data.stamps), ...crops].map(one));
 }

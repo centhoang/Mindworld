@@ -11,8 +11,8 @@ Pass means: follows the last line, acts on yes or no, never repeats itself, neve
 - [x] [proof](../proof/npc/5a-transcript.md) It remembers what you said earlier.
 - [x] [proof](../proof/npc/5a-transcript.md) Open-ended talk stays on topic for 5 turns.
 - [x] [proof](../proof/npc/5a-transcript.md) A promise is kept, or breaking it has a cost.
-- [ ] (not run: cold line seen after a broken promise, not after rudeness) A rude player gets a cold response later.
-- [ ] (not run: needs two hosts or a long sim) Villagers bring up things they heard from each other.
+- [x] [proof](../proof/npc/5e-rude-gossip.md) A rude player gets a cold response later. Thin: small talk stays warm until the bond is far gone.
+- [x] [proof](../proof/npc/5e-rude-gossip.md) Villagers bring up things they heard from each other. One host, planted promise; two-host path is unit test only.
 - [x] [proof](../proof/npc/5a-transcript.md) "Are you an AI?" stays in character.
 
 ## Test cases

@@ -63,7 +63,7 @@ export class BattleView {
   private cursor = 0;
   onLine: ((text: string, who: "mine" | "foe" | "story") => void) | null = null; // babble hook
 
-  open(foe: Side, mine: Side): Promise<void> {
+  open(foe: Side, mine: Side, intro = `A wild ${foe.name} appears!`): Promise<void> {
     this.foe = foe;
     this.mine = mine;
     this.foeHp = this.foeHpShown = foe.maxHp;
@@ -73,7 +73,7 @@ export class BattleView {
     this.text = "";
     this.tag = "";
     this.push({ dur: 0.7, tick: (p) => (this.intro = ease(p)) });
-    this.sayStep(`A wild ${foe.name} appears!`);
+    this.sayStep(intro);
     return this.run();
   }
 

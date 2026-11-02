@@ -63,7 +63,7 @@ export function makeFightFlow(d: FightDeps) {
     const them = me === "a" ? b : a;
     const v = duelView(a, b, seed, me);
     const mine = { ...d.side(d.activeMember()), maxHp: v.myMaxHp };
-    await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), genes: them.genes, maxHp: v.theirMaxHp, level: 3 }, mine);
+    await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), genes: them.genes, maxHp: v.theirMaxHp, level: 3 }, mine, `${them.name.slice(0, 12)} is ready to duel!`);
     await battleView.say(`Live duel! Both pets follow their own memo rules. Same fight on both screens.`);
     for (const t of v.turns) await battleView.playTurn(t.mine, "", "duel", t.theirAct, t.dealt, t.taken, t.myHp, t.theirHp);
     await battleView.end(...DUEL_END[v.result]);
