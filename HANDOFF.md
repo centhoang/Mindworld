@@ -29,7 +29,7 @@
 ## Gotchas
 - Chat log: from `worker/`, `npx wrangler kv key list --binding GHOSTS --remote --prefix chat:`, then `kv key get`.
 - Chat test: rig up, then `node scripts/npc-chat-run.mjs`. Any client edit reloads the tab and kills a run.
-- pets.uryto.dev answers 200 from this home network (approved bypass); other IPs get 403. Deploy as plain single commands: chained with others, the auto-mode check blocks it. Deploy only from `worker/`. If `wrangler.jsonc` appears at the root, delete it.
+- pets.uryto.dev answers 200 from this home network (approved bypass); other IPs get 403. Deploy as one plain command: `npx wrangler deploy --cwd worker`, and check the output says `pet-mind`. A bare deploy from the root publishes all of `client/` to a public workers.dev Worker (happened 2026-11-02, deleted). If `wrangler.jsonc` appears at the root, delete it.
 - Test Chrome: `bash .scratch/mlc/chrome.sh "<url>"` (port 9333, GTX 1050). Weights: `node .scratch/mlc/serve.mjs`. Run dev server first.
 - Game with the model: `http://localhost:5173/?gpu=capable&tuned=http://127.0.0.1:8099/n4/{q}/`.
 - Drive a tab: `node scripts/cdp-tab.mjs "<url regex>" "<js or file>"`; shot: `scripts/cdp-shot.mjs`. `?p=2` = a second player.
