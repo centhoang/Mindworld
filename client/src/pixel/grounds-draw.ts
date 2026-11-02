@@ -5,7 +5,7 @@ import { hasArt, img, PAL } from "./art";
 import { drawBall } from "./life-draw";
 import { GROUND_PLANTS, GROUND_PROPS } from "./grounds-props";
 import type { DecorKind } from "./grounds-decor";
-import { AWAY } from "./tiles";
+import { AWAY } from "../world/tilemap";
 import { generatedSprites } from "./generated-sprites";
 import { drawCropArt, stand, stampSize, strip } from "./sunny";
 

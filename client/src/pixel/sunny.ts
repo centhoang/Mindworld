@@ -4,7 +4,7 @@
 import { recoloured } from "./art";
 import { mulberry32 } from "../sim/rng";
 import { bridgeLayers, buildTerrain, CELL_ID, FLIP, MIRROR, tile, type Terrain } from "./sunny-terrain";
-import { AWAY, hash2, T, TILE, type TileMap } from "./tiles";
+import { AWAY, hash2, T, TILE, type TileMap } from "../world/tilemap";
 
 type Ctx = CanvasRenderingContext2D;
 const BASE = "/art/sunny/";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AWAY, buildTileMap, T } from "../pixel/tiles";
+import { AWAY, buildTileMap, T } from "./tilemap";
 import { CELL, generateWorld, platformAt, rollBetween, SLOT_COUNT, SLOTS, walkable } from "./layout";
 import { followStep, FOLLOW_GAP, keyDir, slide, stepToward } from "./movement";
 

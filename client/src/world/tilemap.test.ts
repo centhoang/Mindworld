@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateWorld } from "../world/layout";
-import { buildTileMap, T, tileAt, tileWalkable } from "./tiles";
+import { buildTileMap, T, tileAt, tileWalkable } from "./tilemap";
 
 describe("tile map", () => {
   const world = generateWorld({ me: { seed: 3, slot: 0 }, others: [{ id: "a", name: "A", seed: 4, slot: 1 }], roomSeed: 2, day: 1 });

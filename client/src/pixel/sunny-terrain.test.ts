@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { railBlocks } from "./sunny-terrain";
-import { T, type TileMap } from "./tiles";
+import { T, type TileMap } from "../world/tilemap";
 
 // A bridge running east, three tiles deep (rows 1..3), columns 0..5.
 function bridge(): TileMap {

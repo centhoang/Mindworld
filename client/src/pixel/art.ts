@@ -1,7 +1,7 @@
 // Pixel art: the approved art bible (docs/visual/style.md) PNGs under /art, plus the few sprites still drawn in code.
 // Every color below is one of the 28 canonical palette entries; scenes ask for tiles and sprites by name.
 
-import { AWAY, hash2, lookAt, T, TILE, type TileKind, type TileMap } from "./tiles";
+import { AWAY, hash2, lookAt, T, TILE, type TileKind, type TileMap } from "../world/tilemap";
 import { THEMES } from "../world/ground";
 
 // Old key names kept so scenes didn't need renaming; values are the STYLE.md palette.

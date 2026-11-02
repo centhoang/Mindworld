@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { generateWorld } from "../world/layout";
 import { drawTree, loadSunny, placeSeaLife } from "./sunny";
 import { drawDecor } from "./grounds-draw";
-import { buildTileMap, T, tileAt, type TileMap } from "./tiles";
+import { buildTileMap, T, tileAt, type TileMap } from "../world/tilemap";
 import { bridgeLayers } from "./sunny-terrain";
 
 describe("seeded pack sea life", () => {

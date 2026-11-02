@@ -8,7 +8,7 @@
 
 import { mulberry32 } from "../sim/rng";
 import { groundOrigin, type Platform, type WorldMap } from "../world/layout";
-import { T, type TileMap } from "./tiles";
+import { T, type TileMap } from "../world/tilemap";
 
 export const DECOR_KINDS = ["bush", "bush-big", "rock", "rock-big", "fence", "fence-v", "stump", "jar", "crates", "lights", "grass", "flowers", "windmill", "crop-wheat", "crop-carrot"] as const;
 export type DecorKind = (typeof DECOR_KINDS)[number];

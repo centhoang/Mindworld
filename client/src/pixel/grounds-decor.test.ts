@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { generateWorld, groundOrigin, type LayoutInput } from "../world/layout";
 import { placeDecor } from "./grounds-decor";
-import { buildTileMap, T, type TileMap } from "./tiles";
+import { buildTileMap, T, type TileMap } from "../world/tilemap";
 import { Overworld } from "./overworld";
 
 const input: LayoutInput = {

@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { generateWorld, groundOrigin, type WorldMap } from "../world/layout";
 import { placeDecor, type DecorPiece } from "./grounds-decor";
 import { Overworld } from "./overworld";
-import { buildTileMap, T, type TileMap } from "./tiles";
+import { buildTileMap, T, type TileMap } from "../world/tilemap";
 
 type Scene = { placeTrees(): void; placeDecor(): void; trees: { x: number; z: number }[]; treeTiles: Set<number>; decor: DecorPiece[]; map: TileMap };
 function sceneFor(world: WorldMap): Scene {

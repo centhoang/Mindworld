@@ -2,7 +2,7 @@
 // Land edges are one tile family and roads a matching one; a south edge drops two rows of cliff and ends in foam.
 // Pure, so a shape can be checked without a canvas.
 
-import { hash2, T, type TileMap } from "./tiles";
+import { hash2, T, type TileMap } from "../world/tilemap";
 
 // A cell = tile index in tiles.png (row * 64 + col) | flags. 0 = nothing.
 export const MIRROR = 1 << 16;

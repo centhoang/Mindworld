@@ -13,7 +13,7 @@ import { placeDecor, type DecorPiece } from "./grounds-decor";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
 import { BUILDS, drawMonster } from "./monster";
 import { drawFrame, drawText, drawTinyText, GLYPH, wrap } from "./text";
-import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "./tiles";
+import { AWAY, buildTileMap, hash2, lookAt, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
 import { buildSunny, characterShadow, footRuns, standRun, drawCropArt, drawHighClouds, drawLand, drawRail, drawSea, drawSeaLife, drawTree, stampSize, stand, strip, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
 import { compass, type Place } from "../mind/directions";
