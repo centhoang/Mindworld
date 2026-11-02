@@ -7,6 +7,7 @@ Lab: `/lab/pet`. It reads your save and never writes it. Proof so far: `proof/pe
 - [ ] It shows mood through what it does.
 - [x] A lesson in plain words becomes rules you can read. [proof](../proof/pet/teach-tuned.md)
 - [x] A bad lesson is refused with a clear reason. [proof](../proof/pet/teach-refused.png)
+- [ ] A lesson that adds no rule says so, and the memo stays. Unit test only.
 - [x] Prove shows a real change, for or against. [proof](../proof/pet/teach-tuned.md)
 - [x] A taught pet fights differently from before. [proof](../proof/pet/teach-tuned.md)
 - [ ] Teach works with no setup, and doesn't stall. Took 12-30 s per lesson on a GTX 1050.

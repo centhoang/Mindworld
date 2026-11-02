@@ -17,8 +17,13 @@ export const COACH_LABEL: Record<CortexSource, string> = {
 const FIGHT_WORDS = /\b(attack|hit|strike|bite|punch|guard|block|defend|shield|dodge|heal|rest|befriend|friend|pal|emote|enemy|enemies|foe|opponent|hp|health|hurt|turn|weak|strong|heavy|fight|battle|wind|charge|run|flee|win|lose)/i;
 export const isFightLesson = (text: string) => FIGHT_WORDS.test(text);
 
+// Same rules in any order: new wording in a rule's "why" or the summary changes nothing in a fight.
+const ruleKeys = (m: Memo) => m.rules.map((r) => JSON.stringify([r.if, r.do])).sort().join();
+export const sameRules = (a: Memo, b: Memo) => ruleKeys(a) === ruleKeys(b);
+
 export interface CoachOutcome {
   memo: Memo | null; // the memo to keep, or null when nothing changes
+  unchanged?: boolean; // the coach answered with the rules the pet already has
   res: CortexResult | null;
   note: string; // what happened, for the status line
   failed: string[]; // coaches that could not answer, with the reason
@@ -44,6 +49,7 @@ export async function runCoach(
   if (!res) return { memo: null, res: null, failed, note: "No coach answered. Memo unchanged." };
   const used = COACH_LABEL[res.source];
   const prefix = failed.length ? `${failed.join("; ")}. Used the ${used}. ` : "";
+  if (sameRules(current, res.memo)) return { memo: null, unchanged: true, res, failed, note: `${prefix}The ${used} found nothing to change, so the memo stays as it was.` };
   if (opts.gated && !passesGate(current, res.memo)) {
     return { memo: null, res, failed, note: `${prefix}The revision did worse in practice fights, so your pet keeps its current memo.` };
   }

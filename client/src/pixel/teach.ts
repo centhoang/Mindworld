@@ -121,7 +121,10 @@ export class TeachScreen {
       if (out.failed.length) console.info("[coach]", out.note);
       const who = out.res ? COACH_LABEL[out.res.source] : "";
       const helped = out.failed.length && out.res ? `Muse Spark is busy right now, so the ${who} helped. ` : "";
-      this.status = !out.res ? out.note : out.memo ? `${helped}Memo updated by the ${who}.` : `${helped}The new plan did worse in practice fights, so ${this.host.petName()} keeps its memo.`;
+      const kept = out.unchanged
+        ? `${this.host.petName()} did not get a new rule from that, so its memo is the same. Try saying when and what: guard when it winds up a heavy hit.`
+        : `The new plan did worse in practice fights, so ${this.host.petName()} keeps its memo.`;
+      this.status = !out.res ? out.note : out.memo ? `${helped}Memo updated by the ${who}.` : `${helped}${kept}`;
       if (out.memo) {
         this.host.setMemo(out.memo);
         this.proof = prove(before.rules.length ? before : null, out.memo);

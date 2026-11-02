@@ -32,6 +32,19 @@ describe("coach chain", () => {
     expect(out.note).toMatch(/Memo unchanged/);
   });
 
+  it("says so when a lesson leaves the rules as they were", async () => {
+    const good = (await new ScriptedCortex().teach(EMPTY_MEMO, "guard when it winds up a heavy hit")).memo;
+    const reworded = { summary: "new words", rules: good.rules.map((r) => ({ ...r, why: "new words" })).reverse() };
+    const same: Cortex = {
+      teach: async (): Promise<CortexResult> => ({ memo: reworded, dropped: [], source: "local-llama", costUsd: 0, latencyMs: 1 }),
+      reflect: () => Promise.reject(new Error("unused")),
+    };
+    const out = await runCoach([same], (c) => c.teach(good, "use your strongest attack when the enemy is weak"), good);
+    expect(out.memo).toBeNull();
+    expect(out.unchanged).toBe(true);
+    expect(out.note).toMatch(/nothing to change/);
+  });
+
   it("gated reviews keep the old memo when the new one is worse", async () => {
     const good = (await new ScriptedCortex().teach(EMPTY_MEMO, "guard when it winds up a heavy hit")).memo;
     const worse: Cortex = {
