@@ -4,7 +4,7 @@
 
 ## State
 - Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/ (see `wrangler deployments`). Fallback: `main`, the last pixel build.
-- Tests: client 677, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
+- Tests: client 685, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
 - User has not reviewed bugs 13-23. Not proven with 2 players. Steps 0-5d deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B stays out (`docs/ai/npc.md`).
 - 5a: cloud free talk works (`proof/npc/`). Open: rude and gossip checks not run. 5b: AOI live (`proof/network/`), 89 bots held; 100 not proven.
@@ -21,15 +21,15 @@
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-1. Run `scope-check` on visual and pet on the deployed build, with proof images. A Teach lesson through the tuned model is still unproven.
-2. Step 6: wire and cut. Remove boss, ghosts, furniture editing, `generateWorld` and its tests, goal "Outsmart The Reader". `checks/game.md`, 2+ players, drop `/api/chatlog`.
-3. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off.
+1. See the Teach refusal on live (`.scratch/pet-lesson.js`): bug 25. Home network was slow, TCP over 1 s to every host. Then bug 26.
+2. Visual left: house entry, window sizes, pet genes. Pet left: hatch, follow, mood. Walking outlines and slide: `docs/visual/layers.md`.
+3. Step 6: wire and cut. Remove boss, ghosts, furniture editing, `generateWorld` and its tests, goal "Outsmart The Reader". `checks/game.md`, 2+ players, drop `/api/chatlog`.
+4. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off.
 
 ## Gotchas
 - Chat log: from `worker/`, `npx wrangler kv key list --binding GHOSTS --remote --prefix chat:`, then `kv key get`.
 - Chat test: rig up, then `node scripts/npc-chat-run.mjs`. Any client edit reloads the tab and kills a run.
-- pets.uryto.dev answers 200 from this home network (approved bypass); other IPs get 403. Not a leak.
-- Deploy as plain single commands: chained with others, the auto-mode check blocks it. Deploy only from `worker/`. If `wrangler.jsonc` appears at the root, delete it.
+- pets.uryto.dev answers 200 from this home network (approved bypass); other IPs get 403. Deploy as plain single commands: chained with others, the auto-mode check blocks it. Deploy only from `worker/`. If `wrangler.jsonc` appears at the root, delete it.
 - Test Chrome: `bash .scratch/mlc/chrome.sh "<url>"` (port 9333, GTX 1050). Weights: `node .scratch/mlc/serve.mjs`. Run dev server first.
 - Game with the model: `http://localhost:5173/?gpu=capable&tuned=http://127.0.0.1:8099/n4/{q}/`.
 - Drive a tab: `node scripts/cdp-tab.mjs "<url regex>" "<js or file>"`; shot: `scripts/cdp-shot.mjs`. `?p=2` = a second player.
