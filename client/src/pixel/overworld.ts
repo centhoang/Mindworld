@@ -944,6 +944,13 @@ export class Overworld {
     this.petHeld = free.held;
   }
 
+  // The egg sits in the open in front of you, where you will see it.
+  startHatch(): void {
+    this.hatchLeft = HATCH_TIME;
+    const spot = [3, 4, -3].map((dz) => ({ x: this.player.x, z: this.player.z + dz })).find((v) => this.canWalk(v.x, v.z));
+    if (spot) this.pet = spot;
+  }
+
   cheerPet(): void {
     this.petGlad = GLAD_TIME;
   }

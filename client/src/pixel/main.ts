@@ -277,7 +277,7 @@ let toast: { text: string; who?: string; t: number } | null = { text: "WASD: wal
 // First visit: the hatch line, then the control hints one after another (each 6 s, Esc skips), once.
 const hintQueue: { text: string; who?: string; t: number }[] = [];
 if (!state.onboard?.seen) {
-  world.hatchLeft = HATCH_TIME;
+  world.startHatch();
   toast = { text: "Something is wiggling inside your egg...", who: "Hint", t: HATCH_TIME };
   hintQueue.push({ text: `Your egg hatched! Meet ${pet.name}. It learns to fight from what you teach it.`, who: pet.name, t: 6 });
   hintQueue.push(...PIXEL_HINTS.map((text) => ({ text, who: "Hint", t: 6 })));

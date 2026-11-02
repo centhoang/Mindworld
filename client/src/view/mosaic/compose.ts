@@ -274,7 +274,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers
       const face = p.pose === "sleep" ? "-w-" : p.pose === "sit" ? "-_-" : FACES[Math.min(3, Math.floor((g?.build ?? 0.5) * 4))]!;
       const hop = p.pose === "dance" ? Math.floor(t * 6) & 1 : p.pose ? 0 : Math.floor(t * 4 + x) % 7 === 0 ? 1 : 0;
       for (let c = -2; c <= 2; c++) shade(x + c, y);
-      const top = y - 3 - hop;
+      const top = y - 3 - hop + (p.pose === "sit" ? 1 : 0);
       [-2, 2].forEach((c) => put(x + c, top, ears, C.ink, colour));
       for (let c = -3; c <= 3; c++) {
         put(x + c, top + 1, " ", C.ink, colour);
@@ -283,7 +283,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers
       put(x - 1, top + 1, face.charAt(0), C.ink, colour);
       put(x, top + 2, face.charAt(1), C.ink, colour);
       put(x + 1, top + 1, face.charAt(2), C.ink, colour);
-      if (!hop) { put(x - 1, y, "u", C.ink); put(x + 1, y, "u", C.ink); }
+      if (!hop && p.pose !== "sit") { put(x - 1, y, "u", C.ink); put(x + 1, y, "u", C.ink); }
       // More genes you can see: horns on the head, a tail behind, spots on the coat.
       if ((g?.horns ?? 0) > 0.6) put(x, top, "v", C.paper, colour);
       if ((g?.tail ?? 0) > 0.5) put(x + 4, top + 2, "~", mix(colour, C.ink, 0.45));
@@ -301,6 +301,7 @@ export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers
     [1, 2, 2, 1].forEach((half, row) => {
       for (let c = -half; c <= half; c++) put(x + c, y - 3 + row, " ", C.ink, C.paper);
     });
+    for (const [dx, dy] of [[1, -2], [-1, -1], [0, -3]] as const) put(x + dx, y + dy, ".", C.ink, C.paper);
     if (hatch > 0.55) put(x - 1, y - 2, "/", C.ink, C.paper);
     if (hatch > 0.75) { put(x, y - 1, "v", C.ink, C.paper); put(x + 1, y - 3, "\\", C.ink, C.paper); }
     if (hatch > 0.9) fx(() => [[-4, -3], [4, -3], [-3, -5], [3, -5], [0, -6]].forEach(([dx, dy]) => put(x0 + dx!, y + dy!, "*", C.paper)));
