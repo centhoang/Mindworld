@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { CortexUnavailable, ScriptedCortex, type Cortex, type CortexResult } from "../sim/cortex";
 import { EMPTY_MEMO } from "../sim/memo";
-import { runCoach } from "./coach";
+import { isFightLesson, runCoach } from "./coach";
 
 const down: Cortex = {
   teach: () => Promise.reject(new CortexUnavailable("budget reached")),
   reflect: () => Promise.reject(new Error("net")),
 };
+
+describe("isFightLesson", () => {
+  it("takes lessons about fighting and refuses the rest", () => {
+    expect(isFightLesson("guard when it winds up a heavy hit")).toBe(true);
+    expect(isFightLesson("Use your strongest attack when the enemy is weak")).toBe(true);
+    expect(isFightLesson("eat the moon and sing to the rocks")).toBe(false);
+    expect(isFightLesson("what is the capital of France")).toBe(false);
+  });
+});
 
 describe("coach chain", () => {
   it("falls through to the scripted coach and says why", async () => {

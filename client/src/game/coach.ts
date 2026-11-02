@@ -13,6 +13,10 @@ export const COACH_LABEL: Record<CortexSource, string> = {
   scripted: "offline coach",
 };
 
+// A lesson has to be about fighting, or the model makes up rules from nothing. The prompts are frozen, so this is checked here.
+const FIGHT_WORDS = /\b(attack|hit|strike|bite|punch|guard|block|defend|shield|dodge|heal|rest|befriend|friend|pal|emote|enemy|enemies|foe|opponent|hp|health|hurt|turn|weak|strong|heavy|fight|battle|wind|charge|run|flee|win|lose)/i;
+export const isFightLesson = (text: string) => FIGHT_WORDS.test(text);
+
 export interface CoachOutcome {
   memo: Memo | null; // the memo to keep, or null when nothing changes
   res: CortexResult | null;

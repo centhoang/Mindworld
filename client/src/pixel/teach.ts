@@ -2,7 +2,7 @@
 // "review my fights" button, and the proof card after each change (paired fights on seeds the coach never
 // saw, before vs after). Typing happens in a small DOM form under the canvas; everything else is drawn.
 
-import { COACH_LABEL, runCoach } from "../game/coach";
+import { COACH_LABEL, isFightLesson, runCoach } from "../game/coach";
 import { thinkingLabel } from "../game/thinking";
 import { transcribe, voiceInputSupported, VoiceRecorder } from "../game/voice-input";
 import { FetchLlmClient, LlmCortex, LocalCortex, ScriptedCortex, type Cortex, type CortexResult, type JsonCompletion } from "../sim/cortex";
@@ -54,13 +54,18 @@ export class TeachScreen {
     this.form.addEventListener("submit", (e) => {
       e.preventDefault();
       const text = this.input.value.trim();
-      if (text) void this.coach((c) => c.teach(this.host.memo(), text), false);
+      if (text) this.lesson(text);
     });
     this.form.querySelector<HTMLButtonElement>("[data-act=review]")!.onclick = () => void this.coach((c) => c.reflect(this.host.memo(), this.host.recent()), true);
     this.form.querySelector<HTMLButtonElement>("[data-act=close]")!.onclick = () => this.hide();
     const speak = this.form.querySelector<HTMLButtonElement>("[data-act=speak]")!;
     speak.hidden = !voiceInputSupported();
     speak.onclick = () => void this.toggleVoice(speak);
+  }
+
+  private lesson(text: string): void {
+    if (isFightLesson(text)) void this.coach((c) => c.teach(this.host.memo(), text), false);
+    else this.status = `${this.host.petName()} only learns about fights. Try: guard when it winds up a heavy hit.`;
   }
 
   // Speak a lesson: record (press again or 20 s to stop), transcribe on the Worker, then teach it.
@@ -83,7 +88,7 @@ export class TeachScreen {
       const text = transcript.trim();
       if (!text) return void (this.status = "I didn't catch any words. Try again a little closer to the mic.");
       this.input.value = text.slice(0, 300);
-      await this.coach((c) => c.teach(this.host.memo(), this.input.value), false);
+      this.lesson(this.input.value);
     } catch (e) {
       this.status = `Could not transcribe (${(e as Error).message}). Type the lesson instead.`;
     }
