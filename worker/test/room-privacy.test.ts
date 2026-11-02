@@ -45,7 +45,7 @@ describe("chat privacy", () => {
 
   it("keeps plain room chat public", () => {
     const r = room();
-    expect(send(r, "a", { t: "say", text: "hello all" }).out[0]!.to).toBe("others");
+    expect(send(r, "a", { t: "say", text: "hello all" }).out[0]!.to).toBe("near");
   });
 
   it("sends a player's private line to the other side only, and needs an open chat", () => {

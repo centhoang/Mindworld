@@ -113,6 +113,11 @@ export function makeRoomFlow(d: RoomDeps) {
       world.peers.delete(id);
       if (grounds.delete(id)) setTimeout(relayoutGrounds, 500); // an `away` usually follows and keeps the ground
     },
+    enter: (p, plots) => {
+      addPeer(p);
+      if (plots) world.peerFarms.set(p.id, plots);
+    },
+    exit: (id) => void world.peers.delete(id), // the ground stays: they are only out of view
     mind: (from, l) => {
       world.hearMind(from, l);
       if (l.say && l.to && l.to === world.npcs?.me && isNpc(l.who)) chat.asking.get(l.who)?.(l.say); // my relayed question's answer

@@ -29,14 +29,18 @@ const player = new URLSearchParams(location.search).get("p") ?? "1";
 const me = { x: 0, z: 0, px: 0, pz: 0 };
 const peers = new Map<string, { name: string; x: number; z: number }>();
 const addPeer = (p: LivePeer) => void peers.set(p.id, { name: p.name, x: p.x, z: p.z });
+let roomSize = 1;
 const statusEl = document.getElementById("status")!;
 const live = new LiveLink(roomUrl(location), () => ({ name: `Lab ${player}`, genes: randomGenes(Number(player) * 101), ...me }), {
   welcome: (_id, _corner, list) => {
     peers.clear();
     list.forEach(addPeer);
+    roomSize = list.length + 1;
   },
-  join: addPeer,
-  leave: (id) => void peers.delete(id),
+  join: (p) => (roomSize++, addPeer(p)),
+  leave: (id) => (roomSize--, void peers.delete(id)),
+  enter: addPeer,
+  exit: (id) => void peers.delete(id),
   pos: (id, x, z) => {
     const p = peers.get(id);
     if (p) [p.x, p.z] = [x, z];
@@ -83,6 +87,6 @@ setInterval(() => {
 
 const numbers = document.getElementById("numbers")!;
 setInterval(() => {
-  numbers.innerHTML = `<tr><th>Players seen</th><td>${peers.size + 1}</td></tr><tr><th>In</th><td>${seen.inN} msg/s, ${seen.inB} B/s</td></tr><tr><th>Out</th><td>${seen.outN} msg/s, ${seen.outB} B/s</td></tr>`;
+  numbers.innerHTML = `<tr><th>Players seen</th><td>${peers.size + 1}</td></tr><tr><th>Players in the room</th><td>${roomSize}</td></tr><tr><th>In</th><td>${seen.inN} msg/s, ${seen.inB} B/s</td></tr><tr><th>Out</th><td>${seen.outN} msg/s, ${seen.outB} B/s</td></tr>`;
   seen.inN = seen.inB = seen.outN = seen.outB = 0;
 }, 1000);

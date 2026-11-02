@@ -71,6 +71,8 @@ export interface LiveHandlers {
   away?(a: LiveAway): void;
   join(p: LivePeer): void;
   leave(id: string): void;
+  enter?(p: LivePeer, plots?: FarmPlot[]): void; // came into view; `join` means new in the room
+  exit?(id: string): void; // out of view, still in the room
   pos(id: string, x: number, z: number, px: number, pz: number): void;
   pose(id: string, pose: string | null, flip: boolean): void;
   npcs?(list: NpcSpot[]): void; // where the host of each villager has it
@@ -85,6 +87,8 @@ export interface LiveHandlers {
 }
 
 export const SAY_MAX = 80;
+const BATCH_MAX = 256;
+const PEERS_MAX = 128;
 export const NAME_MAX = 10;
 
 export interface Me {
@@ -159,12 +163,23 @@ export function parseMind(o: Record<string, unknown>): MindLine | null {
 export function dispatch(raw: unknown, h: LiveHandlers): void {
   let m: Record<string, unknown>;
   try {
-    m = typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    m = typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>) ?? {};
   } catch {
     return;
   }
   if (!m || typeof m !== "object") return;
   switch (m.t) {
+    case "b": // one tick of messages
+      if (Array.isArray(m.m)) for (const one of m.m.slice(0, BATCH_MAX)) dispatch(typeof one === "object" ? one : null, h);
+      return;
+    case "enter": {
+      const p = parsePeer(m.peer);
+      return p ? h.enter?.(p, Array.isArray(m.plots) ? (m.plots as FarmPlot[]) : undefined) : undefined;
+    }
+    case "exit": {
+      const id = str(m.id, 16);
+      return id ? h.exit?.(id) : undefined;
+    }
     case "welcome": {
       const id = str(m.id, 16);
       if (!id || !Array.isArray(m.peers)) return;
@@ -173,7 +188,7 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
         const [a, b] = Array.isArray(t) ? [str(t[0], 16), str(t[1], 16)] : [null, null];
         return a && b ? [[a, b]] : [];
       });
-      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, 32), aways, parseNpcs(m.npcs), talks);
+      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, PEERS_MAX), aways, parseNpcs(m.npcs), talks);
     }
     case "talking": {
       const id = str(m.id, 16), w = str(m.with, 16);

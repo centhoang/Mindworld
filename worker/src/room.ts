@@ -1,3 +1,4 @@
+import { Grid } from "./aoi";
 import { cleanScene } from "./chat";
 import { parseGhostMemo, type GhostMemo } from "./memo-dsl";
 import { cleanCap, cleanMem, isNpc, MIND_ACTS, NPCS, NpcBoard, type Cap, type HostChange, type Npc } from "./npc";
@@ -26,7 +27,7 @@ import { cleanCap, cleanMem, isNpc, MIND_ACTS, NPCS, NpcBoard, type Cap, type Ho
 // Billing note (Cloudflare free plan): incoming WebSocket messages count 20:1 as requests, so clients send
 // positions at <= 10 Hz and only while moving; the server drops anything faster.
 
-export const ROOM_MAX_PEERS = 24;
+export const ROOM_MAX_PEERS = 100;
 export const ROOM_MAX_MSG_BYTES = 4096; // a duel carries a memo (<= 8 rules); positions are ~60 bytes
 export const SAY_MAX = 80;
 export const SAY_GAP_MS = 1500;
@@ -73,6 +74,7 @@ export function cleanSay(v: unknown): string | null {
 }
 
 export interface Peer {
+  plots?: FarmPlot[]; // the latest farm, for whoever comes into view
   id: string;
   name: string;
   genes: Record<string, number>;
@@ -124,6 +126,8 @@ export type ServerMsg =
   | { t: "farm"; id: string; plots: FarmPlot[] }
   | { t: "emote"; id: string; e: Emote }
   | { t: "full" }
+  | { t: "enter"; peer: PublicPeer; plots?: FarmPlot[] } // came into view
+  | { t: "exit"; id: string } // out of view; a global `leave` is the one that means gone
   | { t: "say"; id: string; text: string }
   | { t: "notice"; text: string }
   | { t: "duel"; duel: string; from: string; name: string }
@@ -131,8 +135,9 @@ export type ServerMsg =
   | { t: "duelEnd"; duel: string; reason: "declined" | "gone" };
 
 export interface Out {
-  to: "others" | "self" | { id: string };
+  to: "others" | "near" | "self" | { id: string };
   msg: ServerMsg;
+  key?: string; // waits for the tick, and only the newest with this key goes (aoi.ts Batcher)
 }
 
 export interface MessageResult {
@@ -163,6 +168,8 @@ const coord = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= WORLD_LIMIT ? Math.round(v * 100) / 100 : null;
 
 export class Room {
+  private readonly grid = new Grid();
+  private readonly npcSpots = new Map<Npc, NpcSpot>(); // the last place of each villager
   readonly peers = new Map<string, Peer>();
   readonly board = new NpcBoard();
   private readonly mindSayAt = new Map<string, number>(); // "peer:who" -> last line, ms
@@ -185,6 +192,32 @@ export class Room {
   restore(p: Peer) {
     p.cap ??= { webgpu: false, tps: 0 }; // attachments from before minds
     this.peers.set(p.id, p);
+    this.grid.move(p.id, p.x, p.z);
+  }
+
+  near(id: string): string[] {
+    return this.grid.near(id);
+  }
+
+  // Was this queued entity (`pos:id`) further off than the peer's own cell?
+  far(peer: string, key: string): boolean {
+    return !this.grid.sameCell(peer, key.slice(key.indexOf(":") + 1));
+  }
+
+  private enter(to: string, who: string): Out {
+    const p = this.peers.get(who)!;
+    return { to: { id: to }, msg: p.plots ? { t: "enter", peer: publicPeer(p), plots: p.plots } : { t: "enter", peer: publicPeer(p) } };
+  }
+
+  // Each side of a change of view hears of the other; a new cell also brings the villagers now in view.
+  private sight(id: string, x: number, z: number): Out[] {
+    const { entered, left, moved } = this.grid.move(id, x, z);
+    const out: Out[] = [];
+    for (const o of entered) out.push(this.enter(id, o), this.enter(o, id));
+    for (const o of left) out.push({ to: { id }, msg: { t: "exit", id: o } }, { to: { id: o }, msg: { t: "exit", id } });
+    const list = moved ? [...this.npcSpots.values()].filter((s) => this.grid.covers(id, s[1], s[2])) : [];
+    if (list.length) out.push({ to: { id }, msg: { t: "npcs", list } });
+    return out;
   }
 
   private busy(who: string): boolean {
@@ -302,12 +335,16 @@ export class Room {
     };
     const others = [...this.peers.values()].map(publicPeer);
     this.peers.set(id, peer);
+    const sight = this.sight(id, peer.x, peer.z);
+    const hidden = others.filter((o) => !this.grid.sees(id, o.id)); // the ground stays, the person is not in view
     const elected = this.board.elect(this.peers, now, true);
     return {
       peer,
       out: [
         { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)), npcs: this.board.hostsMap(), talks: [...this.talks].map(([a, t]) => [a, t.with]) } },
         { to: "others", msg: { t: "join", peer: publicPeer(peer) } },
+        ...hidden.flatMap((o): Out[] => [{ to: "self", msg: { t: "exit", id: o.id } }, { to: { id: o.id }, msg: { t: "exit", id } }]),
+        ...sight.filter((o) => o.msg.t === "npcs"),
         ...this.hostOuts(elected, true),
       ],
     };
@@ -317,6 +354,7 @@ export class Room {
     const me = this.peers.get(id);
     if (!me) return [];
     this.peers.delete(id);
+    this.grid.remove(id);
     const out: Out[] = [{ to: "others", msg: { t: "leave", id } }, ...this.endTalks(id)];
     if (me.corner !== null) {
       const away: Away = { slot: me.corner, name: me.name, seed: me.seed, until: now + AWAY_MS };
@@ -366,11 +404,11 @@ export class Room {
       const x = coord(o.x), z = coord(o.z), px = coord(o.px), pz = coord(o.pz);
       if (x === null || z === null || px === null || pz === null) return this.strike(peer);
       Object.assign(peer, { x, z, px, pz });
-      return { out: [{ to: "others", msg: { t: "pos", id, x, z, px, pz } }], changed: true };
+      return { out: [...this.sight(id, x, z), { to: "near", msg: { t: "pos", id, x, z, px, pz }, key: `pos:${id}` }], changed: true };
     }
     if (o.t === "pose") {
       const pose = typeof o.pose === "string" && /^[a-z]{1,12}$/.test(o.pose) ? o.pose : null;
-      return { out: [{ to: "others", msg: { t: "pose", id, pose, flip: o.flip === true } }] };
+      return { out: [{ to: "near", msg: { t: "pose", id, pose, flip: o.flip === true }, key: `pose:${id}` }] };
     }
     if (o.t === "npcs" && Array.isArray(o.list)) {
       // Only an NPC's host says where it is.
@@ -379,21 +417,23 @@ export class Room {
         const x = coord(v[1]), z = coord(v[2]);
         return x === null || z === null || typeof v[3] !== "string" || typeof v[4] !== "string" ? [] : [[v[0], x, z, v[3].slice(0, 8), v[4].slice(0, 16)]];
       });
-      return { out: list.length ? [{ to: "others", msg: { t: "npcs", list } }] : [] };
+      for (const s of list) this.npcSpots.set(s[0] as Npc, s);
+      return { out: this.npcOuts(id, list) };
     }
     if (o.t === "farm" && Array.isArray(o.plots)) {
       const plots = o.plots.slice(0, 12).map((p): FarmPlot => (Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "number" ? [p[0].slice(0, 12), Math.max(0, Math.min(9, Math.floor(p[1])))] : ["", 0]));
-      return { out: [{ to: "others", msg: { t: "farm", id, plots } }] };
+      peer.plots = plots;
+      return { out: [{ to: "near", msg: { t: "farm", id, plots } }], changed: true };
     }
     if (o.t === "emote" && (EMOTES as readonly unknown[]).includes(o.e)) {
-      return { out: [{ to: "others", msg: { t: "emote", id, e: o.e as Emote } }], changed: true };
+      return { out: [{ to: "near", msg: { t: "emote", id, e: o.e as Emote } }], changed: true };
     }
     if (o.t === "say") {
       if (peer.sayAt !== undefined && now - peer.sayAt < SAY_GAP_MS) return { out: [{ to: "self", msg: { t: "notice", text: "Slow down a little." } }], changed: true };
       const text = cleanSay(o.text);
       if (text === null) return { out: [{ to: "self", msg: { t: "notice", text: "Links are not allowed in chat." } }], changed: true };
       peer.sayAt = now;
-      if (o.to === undefined) return { out: [{ to: "others", msg: { t: "say", id, text } }], changed: true };
+      if (o.to === undefined) return { out: [{ to: "near", msg: { t: "say", id, text } }], changed: true };
       // A private line needs an open chat between the two; it renews that chat.
       const to = typeof o.to === "string" ? o.to : "";
       const chat = this.talks.get(id)?.with === to ? this.talks.get(id) : this.talks.get(to)?.with === id ? this.talks.get(to) : undefined;
@@ -492,6 +532,16 @@ export class Room {
       const hears = toPeer ? p.id === toPeer : p.id === toHost || Math.hypot(p.x - x, p.z - z) <= HEAR_DIST;
       if (hears) out.push({ to: { id: p.id }, msg });
       else if (others) out.push({ to: { id: p.id }, msg: others });
+    }
+    return out;
+  }
+
+  // Villagers reach only those who can see them. Each host's newest list wins the tick.
+  private npcOuts(host: string, list: NpcSpot[]): Out[] {
+    const out: Out[] = [];
+    for (const p of this.peers.keys()) {
+      const seen = p === host ? [] : list.filter((s) => this.grid.covers(p, s[1], s[2]));
+      if (seen.length) out.push({ to: { id: p }, msg: { t: "npcs", list: seen }, key: `npcs:${host}` });
     }
     return out;
   }

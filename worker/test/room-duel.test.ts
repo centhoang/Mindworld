@@ -71,9 +71,9 @@ describe("duels", () => {
 describe("room chat", () => {
   it("relays short clean lines to the others, one per 1.5 s", () => {
     const r = room();
-    expect(send(r, "a", { t: "say", text: "  hi   all!  " }, 0).out).toEqual([{ to: "others", msg: { t: "say", id: "a", text: "hi all!" } }]);
+    expect(send(r, "a", { t: "say", text: "  hi   all!  " }, 0).out).toEqual([{ to: "near", msg: { t: "say", id: "a", text: "hi all!" } }]);
     expect(send(r, "a", { t: "say", text: "again" }, 100).out[0]).toMatchObject({ to: "self", msg: { t: "notice" } });
-    expect(send(r, "a", { t: "say", text: "again" }, SAY_GAP_MS).out[0]!.to).toBe("others");
+    expect(send(r, "a", { t: "say", text: "again" }, SAY_GAP_MS).out[0]!.to).toBe("near");
   });
 
   it("caps length, refuses links, masks bad words, drops junk", () => {

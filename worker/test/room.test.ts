@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AWAY_MS, cleanGenes, CORNERS, Room, ROOM_MAX_PEERS } from "../src/room";
+import { NPCS } from "../src/npc";
 import { harness } from "./helpers";
 
 const pos = (x: number, z: number) => JSON.stringify({ t: "pos", x, z, px: x - 1, pz: z + 1 });
@@ -71,7 +72,7 @@ describe("live room", () => {
     const r = new Room();
     r.join("a", {}, 0);
     const m = r.message("a", pos(3.14159, -2), 10);
-    expect(m.out).toEqual([{ to: "others", msg: { t: "pos", id: "a", x: 3.14, z: -2, px: 2.14, pz: -1 } }]);
+    expect(m.out).toEqual([{ to: "near", msg: { t: "pos", id: "a", x: 3.14, z: -2, px: 2.14, pz: -1 }, key: "pos:a" }]);
     expect(r.peers.get("a")).toMatchObject({ x: 3.14, z: -2 });
     expect(r.message("a", JSON.stringify({ t: "emote", e: "heart" }), 20).out[0]!.msg).toEqual({ t: "emote", id: "a", e: "heart" });
   });
@@ -134,5 +135,56 @@ describe("room route", () => {
     h.deps.room = { fetch: async () => (hit++, new Response("ok")) };
     await h.call("/api/room", { headers: { upgrade: "websocket" } });
     expect(hit).toBe(1);
+  });
+});
+
+describe("area of interest", () => {
+  const two = () => {
+    const r = new Room();
+    r.join("a", { x: 0, z: 0 }, 0);
+    r.join("b", { x: 1, z: 0 }, 0);
+    return r;
+  };
+  const kinds = (out: { msg: { t: string } }[]) => out.map((o) => o.msg.t);
+
+  it("hides a newcomer from those too far to see it, each way", () => {
+    const r = new Room();
+    r.join("a", { x: 0, z: 0 }, 0);
+    const j = r.join("far", { x: 100, z: 0 }, 0)!;
+    expect(j.out.filter((o) => o.msg.t === "exit").map((o) => o.to)).toEqual(["self", { id: "a" }]);
+    expect(j.out.find((o) => o.msg.t === "join")!.to).toBe("others");
+  });
+
+  it("walking away and back swaps exit and enter, with the farm", () => {
+    const r = two();
+    r.message("b", JSON.stringify({ t: "farm", plots: [["wheat", 2]] }), 10);
+    const away = r.message("a", pos(100, 0), 2000).out;
+    expect(away.filter((o) => o.msg.t === "exit").map((o) => o.to)).toEqual([{ id: "a" }, { id: "b" }]);
+    const back = r.message("a", pos(1, 0), 4000).out;
+    expect(back.find((o) => o.msg.t === "enter" && JSON.stringify(o.to) === '{"id":"a"}')!.msg).toMatchObject({ peer: { id: "b" }, plots: [["wheat", 2]] });
+  });
+
+  it("sends villagers only to those who can see them, and on entering a cell", () => {
+    const r = new Room();
+    r.join("a", { x: 0, z: 0, cap: { webgpu: true, tps: 50 } }, 0);
+    r.join("far", { x: 100, z: 0 }, 0);
+    const host = r.board.hostOf("mo")!;
+    const list = NPCS.map((n) => [n, 2, 2, "idle", ""]);
+    const out = r.message(host, JSON.stringify({ t: "npcs", list }), 10).out;
+    expect(out.filter((o) => o.msg.t === "npcs").map((o) => o.to)).toEqual([]); // only "far" could get it, and it is too far
+    expect(kinds(r.message("far", pos(1, 1), 2000).out)).toContain("npcs");
+  });
+
+  it("forgets a leaver", () => {
+    const r = two();
+    r.leave("b", 10);
+    expect(r.near("a")).toEqual([]);
+  });
+
+  it("keeps the crowd's far traffic apart by cell", () => {
+    const r = two();
+    expect(r.far("a", "pos:b")).toBe(false);
+    r.message("b", pos(20, 0), 10);
+    expect(r.far("a", "pos:b")).toBe(true);
   });
 });

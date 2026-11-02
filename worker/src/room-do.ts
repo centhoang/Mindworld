@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
-import { Room, ROOM_MAX_MSG_BYTES, type Out, type Peer } from "./room";
+import { Batcher, TICK_MS } from "./aoi";
+import { Room, ROOM_MAX_MSG_BYTES, type Out, type Peer, type ServerMsg } from "./room";
 
 // One Durable Object per world (idFromName("main")) holding the live sockets. It uses the WebSocket
 // Hibernation API, so an idle room costs no duration: peer state lives in each socket's attachment and
@@ -13,6 +14,9 @@ interface Attachment {
 
 export class WorldRoom extends DurableObject<Env> {
   private readonly room = new Room();
+  private readonly batch = new Batcher<ServerMsg>();
+  private tick = 0;
+  private armed = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -80,7 +84,10 @@ export class WorldRoom extends DurableObject<Env> {
 
   private drop(ws: WebSocket) {
     const a = ws.deserializeAttachment() as Attachment | null;
-    if (a) this.deliver(ws, this.room.leave(a.id));
+    if (a) {
+      this.batch.drop(a.id);
+      this.deliver(ws, this.room.leave(a.id));
+    }
     this.persistDirty();
   }
 
@@ -107,20 +114,49 @@ export class WorldRoom extends DurableObject<Env> {
     }
   }
 
+  private sockets(): Map<string, WebSocket> {
+    const all = new Map<string, WebSocket>();
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment() as Attachment | null;
+      if (a?.peer) all.set(a.id, ws);
+    }
+    return all;
+  }
+
   private deliver(from: WebSocket, out: Out[]) {
+    if (!out.length) return;
+    const me = (from.deserializeAttachment() as Attachment | null)?.id ?? "";
+    const all = this.sockets();
     for (const o of out) {
-      const text = JSON.stringify(o.msg);
-      if (o.to === "self") {
-        safeSend(from, text);
+      const targets = o.to === "self" ? [me] : o.to === "near" ? this.room.near(me) : o.to === "others" ? [...all.keys()].filter((id) => id !== me) : [o.to.id];
+      if (o.key) {
+        for (const id of targets) this.batch.add(id, o.key, o.msg);
         continue;
       }
-      const target = typeof o.to === "object" ? o.to.id : null;
-      for (const ws of this.ctx.getWebSockets()) {
-        const a = ws.deserializeAttachment() as Attachment | null;
-        if (!a?.peer) continue;
-        if (target ? a.id === target : ws !== from) safeSend(ws, text);
+      const text = JSON.stringify(o.msg);
+      for (const id of targets) {
+        const ws = id === me ? from : all.get(id);
+        if (ws) safeSend(ws, text);
       }
     }
+    this.arm();
+  }
+
+  private arm() {
+    if (this.armed || !this.batch.pending) return;
+    this.armed = true;
+    setTimeout(() => this.flush(), TICK_MS);
+  }
+
+  // One tick: a socket's waiting messages travel together.
+  private flush() {
+    this.armed = false;
+    const all = this.sockets();
+    for (const [id, msgs] of this.batch.take(this.tick++, (peer, key) => this.room.far(peer, key))) {
+      const ws = all.get(id);
+      if (ws) safeSend(ws, JSON.stringify({ t: "b", m: msgs }));
+    }
+    this.arm();
   }
 }
 
