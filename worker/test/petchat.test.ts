@@ -5,8 +5,8 @@ import { basetenReply, harness, postJson } from "./helpers";
 type Res = { lines: [string, string]; source: string; why?: string };
 const A = { name: "Mochi", trait: "bold" };
 const B = { name: "Pip", trait: "friendly" };
-function h0() {
-  const h = harness();
+function h0(limits = {}) {
+  const h = harness({ limits });
   h.deps.chatCache = new OpenerCache();
   return h;
 }
@@ -38,13 +38,13 @@ describe("pet-to-pet chat", () => {
   });
 
   it("falls back to scripted lines on bad input, quota or upstream errors", async () => {
-    const h = h0();
+    const h = h0({ clientPerMinute: 1000 });
     expect((await pet(h, { a: A })).status).toBe(400);
     h.upstream.respond = async () => new Response("down", { status: 500 });
     expect((await pet(h, { a: A, b: B })).body).toMatchObject({ source: "scripted", why: "upstream" });
     h.upstream.respond = async () => basetenReply("A: hi\nB: yo");
     const T = ["bold", "careful", "cautious", "cheerful", "friendly", "curious"] as const;
-    for (let i = 0; i < CHAT_QUOTA.perClient; i++) await pet(h, { a: { ...A, trait: T[i % 6] }, b: { ...B, trait: T[Math.floor(i / 6)] } }, "9.9.9.9");
+    for (let i = 0; i < CHAT_QUOTA.perClient; i++) h.deps.chatCache = new OpenerCache(), await pet(h, { a: { ...A, trait: T[i % 6] }, b: { ...B, trait: T[Math.floor(i / 6) % 6] } }, "9.9.9.9");
     const over = await pet(h, { a: { name: "Z", trait: "curious" }, b: { name: "Y", trait: "curious" } }, "9.9.9.9");
     expect(over.body).toMatchObject({ source: "scripted", why: "client_cap" });
   });

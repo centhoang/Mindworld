@@ -488,3 +488,38 @@ describe("open offers", () => {
     expect(answerTo("what bait?")).toBeNull();
   });
 });
+
+describe("free talk tiers", () => {
+  const village = (lm: { label: string; ready: () => boolean; complete: () => Promise<string> } | null) => {
+    const nv = new NpcVillage(new MindScheduler(() => lm, { duty: 1 }), () => !!lm, { line: () => {}, say: () => {} }, HOMES, SPOTS, () => true);
+    nv.me = "me";
+    nv.setHost("mo", "me");
+    return nv;
+  };
+  const local = { label: "fake 1B", ready: () => true, complete: async () => "The local line." };
+
+  it("asks the cloud first, with no local model needed, and it sees the talk so far", async () => {
+    const nv = village(null);
+    const minds: string[] = [];
+    nv.cloud = async (_n, _l, _s, mind) => (minds.push(mind), { text: "A big fish, nice.", source: "model" });
+    expect((await nv.reply("mo", "Kai", "I caught a big fish today"))?.source).toBe("model");
+    await nv.reply("mo", "Kai", "what do you think of it?");
+    expect(minds[1]).toContain("Kai: I caught a big fish today");
+    expect(minds[1]).toContain("A big fish, nice.");
+  });
+
+  it("drops to the local model when the cloud gives nothing", async () => {
+    const nv = village(local);
+    nv.cloud = async () => null;
+    expect((await nv.reply("mo", "Kai", "nice weather"))?.text).toContain("local line");
+  });
+
+  it("never asks the cloud what the sim knows", async () => {
+    const nv = village(local);
+    let asked = 0;
+    nv.cloud = async () => (asked++, null);
+    await nv.reply("mo", "Kai", "My name is Kai");
+    await nv.reply("mo", "Kai", "what is my name?");
+    expect(asked).toBe(1);
+  });
+});

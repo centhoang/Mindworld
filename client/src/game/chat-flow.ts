@@ -1,10 +1,10 @@
 // Every conversation the player opens: the chat box, private-talk status, and who answers a villager.
 import type { Babbler } from "./babble";
 import { voiceFor } from "./chatter";
-import { askNpc, chatWhoFor } from "./npc-chat";
+import { askNpc, chatWhoFor, cloudLine, type ChatWho } from "./npc-chat";
 import type { ChatWorld, Transport } from "./ports";
 import { save, type Save } from "./save";
-import { LOCAL_ONLY, NO_LOCAL } from "./test-mode";
+import { CLOUD_CHAT, LOCAL_ONLY, NO_LOCAL } from "./test-mode";
 import { typingMs } from "../mind/human";
 import { isNpc, NAME_MAX, SAY_MAX, type Npc } from "../world/live";
 
@@ -26,9 +26,9 @@ export interface ChatDeps extends AnswerDeps {
   renamed: () => void;
 }
 
-// Who answers a villager: its own mind wherever it runs (here, or relayed to the player hosting it, on that
-// machine's local model); if no local model can, Muse Spark in the cloud (event credits, server-capped); then
-// a scripted line.
+// Who answers a villager, in tiers: the sim when one answer is true; free talk from Muse Spark with the villager's
+// memories (CLOUD_CHAT, event credits, server-capped); then the local model. Wherever the mind runs: here, or relayed
+// to the player hosting it. With no mind reachable, a bare cloud line; last a scripted one.
 const ASK_WAIT_MS = 15_000;
 export function makeVillagerAnswer(d: AnswerDeps) {
   const { world } = d;
@@ -58,11 +58,18 @@ export function makeVillagerAnswer(d: AnswerDeps) {
       });
       if (text) return { text };
     }
+    const cloud = CLOUD_CHAT ? await cloudLine(npc, line, scene) : null;
+    if (cloud) return cloud;
     if (LOCAL_ONLY) return { text: NO_LOCAL };
     return askNpc(npc, line, "", undefined, undefined, scene);
   }
   return { answer: villagerAnswer, asking };
 }
+
+const wildAnswer = async (who: ChatWho, line: string, scene: string): Promise<{ text: string; source?: string }> => {
+  const cloud = CLOUD_CHAT ? await cloudLine(who, line, scene) : null;
+  return cloud ?? (LOCAL_ONLY ? { text: NO_LOCAL } : askNpc(who, line, "", undefined, undefined, scene));
+};
 
 export type ChatFlow = ReturnType<typeof makeChatFlow>;
 
@@ -142,7 +149,7 @@ export function makeChatFlow(d: ChatDeps) {
     if (!w || !who || !line) return;
     chatInput.value = "";
     world.say(chatKey(w), "...", 20);
-    const answer = typeof w === "string" ? villagerAnswer(w as Npc, line) : LOCAL_ONLY ? Promise.resolve({ text: NO_LOCAL }) : askNpc(who, line, "", undefined, undefined, world.wildScene(w));
+    const answer = typeof w === "string" ? villagerAnswer(w as Npc, line) : wildAnswer(who, line, world.wildScene(w));
     void answer.then((r) => {
       world.say(chatKey(w), r.text, 6);
       if (!d.state.muted) {

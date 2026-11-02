@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAT_QUOTA, chatPrompt, cleanLine, isOpener, OpenerCache, tidyReply } from "../src/chat";
+import { CHAT_QUOTA, chatPrompt, cleanLine, cleanMind, isOpener, MIND_MAX, OpenerCache, tidyReply } from "../src/chat";
 import { basetenReply, harness, postJson } from "./helpers";
 
 type ChatRes = { text: string; source: string; why?: string; costUsd?: number };
@@ -48,7 +48,7 @@ describe("NPC chat", () => {
   });
 
   it("falls back to a scripted line over the per-client quota, and other clients still get the model", async () => {
-    const h = chatHarness();
+    const h = chatHarness({ clientPerMinute: 1000 });
     h.upstream.respond = async () => basetenReply("Zip zip, more questions!");
     for (let i = 0; i < CHAT_QUOTA.perClient; i++) await chat(h, { who: "skitter", line: `question ${i}` });
     const over = await chat(h, { who: "skitter", line: "one more?" });
@@ -105,5 +105,21 @@ describe("chat helpers", () => {
     expect(chatPrompt("bully", "yo").system).toContain("Bully");
     expect(chatPrompt("mo", "what's that?").prompt).not.toContain("Around you");
     expect(chatPrompt("mo", "what's that?", "In view: a bench, east.").prompt).toContain("Around you right now: In view: a bench, east.");
+  });
+
+  it("gives a villager with a mind its own prompt", () => {
+    const p = chatPrompt("mo", "why?", "", "Mo the fisher.\nThe talk so far:\nKai: I like Ama");
+    expect(p.prompt).toContain("The talk so far");
+    expect(p.system).not.toContain("floating islands");
+    expect(cleanMind("x".repeat(MIND_MAX + 9)).length).toBe(MIND_MAX);
+    expect(cleanMind("<b>a\nb").split("\n")).toHaveLength(2);
+  });
+
+  it("never serves a villager with a mind from the opener cache", async () => {
+    const h = chatHarness();
+    h.deps.chatCache!.add("mo", "Cached hello.");
+    h.deps.chatCache!.add("mo", "Cached hello.");
+    h.deps.chatCache!.add("mo", "Cached hello.");
+    expect((await chat(h, { who: "mo", line: "hi", mind: "Mo the fisher." })).body.source).not.toBe("cache");
   });
 });

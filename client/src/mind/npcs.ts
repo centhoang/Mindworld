@@ -11,7 +11,7 @@ import { addAgent, newVillage, stepVillage, type Agent, type Choice, type Env, t
 import type { Vec } from "../world/movement";
 import { NPCS, type MindLine, type Npc } from "../world/live";
 import { MindHub, type Mind } from "./hub";
-import { linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
+import { cloudMindText, linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
 import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, gossipFrom, gossipLine, holdsGrudge, hurt, parseBeliefLine, parseBondLine, parseGossip, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
@@ -33,6 +33,8 @@ export interface NpcOut {
 
 // Everybody on the islands knows everybody; the model cannot guess that.
 const NEIGHBOURS = "Neighbours here are Elder the herbalist, Mo the fisher, Ama of the market, Pip the wood-cutter";
+const TALK_KEEP = 8; // lines of a talk the cloud tier sees
+export type CloudTalk = (npc: Npc, line: string, scene: string, mind: string) => Promise<{ text: string; source: string } | null>;
 const personaOf = (id: string): Persona | undefined => VILLAGERS.find((p) => p.id === id);
 const SPOT_NAME: Record<string, string> = { lawn: "the lawn", picnic: "the picnic spot", playground: "the playground", pond: "the pond" }; // places told to a guest
 
@@ -95,6 +97,8 @@ export class NpcVillage {
   private myId: string | null = null;
   people: () => Person[] = () => []; // players around (me + online peers), for greetings
   onChat: ((e: { npc: string; player: string; line: string; reply: string; source: string }) => void) | null = null; // every line said to a player, for the chat log
+  cloud: CloudTalk | null = null; // free talk, tier 2 (game/npc-chat.ts); null keeps every line local
+  private readonly talks = new Map<string, string[]>(); // "npc:player" -> the talk so far, for the cloud tier
   private readonly greeted = new Map<string, number>(); // "npc:player" -> sim time of the greeting
   pets: () => PetSeen[] = () => []; // pets around, for a passing word
   private readonly petted = new Map<string, number>(); // "npc:pet" (and "npc" for its last pet line) -> sim time
@@ -421,15 +425,19 @@ export class NpcVillage {
     // Grounded answers come straight from the sim: a free model line could contradict what was decided.
     const answer = whyAnswer(line, bondOf(m.mem, player), player) ?? this.coldShoulder(m, player, line) ?? known ?? this.quote(npc, line) ?? goalAnswer(line, goalOf(npc, this.purseOf(npc)), this.purseOf(npc)) ?? await this.traded(npc, m, player, line, to) ?? this.tookUp(npc, m, player, to ?? this.myId ?? "me", line) ?? await this.invited(npc, m, player, to ?? this.myId ?? "me", line);
     this.ageOffer(npc, player);
-    if (!this.hasModel() && !answer) return null;
-    const ans = answer ? { value: answer, source: "rules" }
-      : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, scene ?? this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
+    const seen = scene ?? this.hub.sceneOf?.(npc) ?? "";
+    const heard = this.talks.get(key) ?? [];
+    const free = answer ? null : await this.cloud?.(npc, line, seen, cloudMindText(m.persona, m.mem, player, line, heard)) ?? null;
+    if (!answer && !free && !this.hasModel()) return null;
+    const ans = answer ? { value: answer as string | null, source: "rules" } : free ? { value: free.text as string | null, source: free.source }
+      : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, seen), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
     if (!ans.value) return null;
     const g = gameTime(this.v.t);
     remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);
     const wait = this.quiet.get(key) ?? 0;
     const say = answer ? ans.value : humanize(cleanReply(ans.value, !wait && !this.asked.has(key)), m.persona); // the sim's answers stay exact
     this.quiet.set(key, Math.max(0, wait - 1));
+    this.talks.set(key, [...heard, `${player}: ${line.slice(0, 80)}`, `${m.persona.name}: ${say.slice(0, 80)}`].slice(-TALK_KEEP));
     if (!answer) {
       if (offerIn(say, g.day, g.phase)) this.quiet.set(key, QUIET_LINES);
       this.noteOffer(npc, m, player, say);

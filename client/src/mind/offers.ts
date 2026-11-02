@@ -51,9 +51,14 @@ export function answerTo(line: string): Answer {
 const LEAK = /\bneutral\b|\byou were (?:kind|rude)\b|\bi feel(?:ing)? (?:wary|warm|calm|gentle)\b/i; // the tuned model reads its bond notes out loud
 const ASKING = (t: string) => t.includes("?") && (ASKS.test(t.toLowerCase()) || URGES.test(t.toLowerCase()));
 
-// What the villager really says of a model line: no notes read aloud, and no second invitation while one was just made.
+// A memory trailing an invitation: "want to join me for a picnic but nobody showed?" keeps only the invitation.
+const STALE_TAIL = /,?\s+(?:but|since|after|because|like|when)\s+(?:nobody|no one|you|they|i|we)\b[^.!?]*\b(?:showed|came|come|left|forgot|missed|said|asked|told|didn't|never|was|were)\b[^.!?]*([.!?]+)$/i;
+const dropStale = (t: string) => (ASKING(t) || URGES.test(t.toLowerCase()) ? t.replace(STALE_TAIL, "$1") : t);
+
+// What the villager really says of a model line: no notes read aloud, no memory stuck on an invitation, and no second
+// invitation while one was just made.
 export function cleanReply(text: string, mayAsk: boolean): string {
-  const parts = text.split(/(?<=[.!?])\s+/);
+  const parts = text.split(/(?<=[.!?])\s+/).map(dropStale);
   const kept = parts.filter((t) => !LEAK.test(t) && (mayAsk || !ASKING(t)));
   return kept.join(" ") || parts.filter((t) => !LEAK.test(t)).join(" ") || text;
 }

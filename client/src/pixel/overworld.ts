@@ -10,6 +10,8 @@ import { ARCHETYPES, type ArchetypeId } from "../sim/types";
 import { hasArt, img, makePlayer, PAL, type ArtName, type Sprite } from "./art";
 import { placeDecor, type DecorPiece } from "./grounds-decor";
 import { needsWater, PLOTS, type Farm } from "../game/farm";
+import { cloudLine } from "../game/npc-chat";
+import { CLOUD_CHAT } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
 import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
@@ -591,6 +593,7 @@ export class Overworld {
     this.lifeEnv.bias = this.minds.bias;
     this.syncMinds();
     this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text, to) => this.say(`n:${id}`, text, text === "..." ? 25 : 5, to), think: (id, text) => this.think(`n:${id}`, text) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
+    if (CLOUD_CHAT) this.npcs.cloud = (npc, line, scene, mind) => cloudLine(npc, line, scene, mind);
     this.npcs.people = () => [{ id: this.npcs?.me ?? "me", name: this.myName, pos: this.player }, ...[...this.peers].map(([id, p]) => ({ id, name: p.name, pos: p.pos }))];
     this.npcs.pets = () => [
       { id: "pet", name: this.petName, pos: this.pet, busy: this.moving },

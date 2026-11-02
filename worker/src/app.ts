@@ -1,4 +1,4 @@
-import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, cleanScene, isChatWho, isOpener, OpenerCache, parsePetSide, petsPrompt, scriptedLine, scriptedPair, tidyPair, tidyReply } from "./chat";
+import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, cleanMind, cleanScene, isChatWho, isOpener, OpenerCache, parsePetSide, petsPrompt, scriptedLine, scriptedPair, tidyPair, tidyReply } from "./chat";
 import { geoOf, isRestricted } from "./geo";
 import {
   allowGhostPost,
@@ -257,23 +257,24 @@ async function handleLlm(request: Request, deps: Deps): Promise<Response> {
 // Always answers 200 with a line: `source` says whether it came from the model, the opener cache or the
 // scripted fallback (over cap, provider down, unusable reply), so the NPC never goes silent.
 async function handleChat(request: Request, deps: Deps): Promise<Response> {
-  const body = await readJson(request, 1000);
+  const body = await readJson(request, 2400);
   if (!body || typeof body !== "object") return fail(400, "bad_json");
   const b = body as Record<string, unknown>;
   if (!isChatWho(b.who)) return fail(400, "bad_request", { message: "unknown who" });
   const who = b.who;
   const line = cleanLine(b.line);
   const scene = cleanScene(b.scene);
+  const mind = cleanMind(b.mind);
   const cache = deps.chatCache ?? sharedChatCache;
   const scripted = (why: string) => json({ text: scriptedLine(who, deps.random), source: "scripted", why });
 
-  const opener = isOpener(line);
+  const opener = !mind && isOpener(line); // a villager with a mind answers this very talk, so nothing is cached
   if (opener && cache.full(who)) return json({ text: cache.pick(who, deps.random), source: "cache" });
 
   const { cfg } = deps;
   const provider = cfg.defaultProvider;
   if (!cfg.mock && !providerConfigured(cfg.providers, provider)) return scripted("unconfigured");
-  const p = chatPrompt(who, line, scene);
+  const p = chatPrompt(who, line, scene, mind);
   const worst = worstCaseCostUsd(provider, estimateInputTokens(p.system + p.prompt), CHAT_MAX_TOKENS);
   const id = deps.newId();
   const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");

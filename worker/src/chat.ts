@@ -9,7 +9,7 @@ export type ChatWho = (typeof CHAT_WHO)[number];
 export const CHAT_MAX_LINE = 140; // the player's message, characters
 export const CHAT_MAX_WORDS = 25;
 export const CHAT_MAX_TOKENS = 500; // Muse reasons first (150-290 tokens), so leave room for the reply
-export const CHAT_QUOTA = { pool: "chat", perClient: 30, total: 1500 };
+export const CHAT_QUOTA = { pool: "chat", perClient: 120, total: 3000 };
 
 const STYLE =
   "You are a character in Mindworld, a cozy game of floating islands where players raise and coach pet " +
@@ -76,8 +76,24 @@ export function cleanScene(v: unknown): string {
   return /https?:|www\.|\.(com|net|org|io)\b/i.test(t) ? "" : t.slice(0, SCENE_MAX);
 }
 
-export function chatPrompt(who: ChatWho, line: string, scene = ""): { system: string; prompt: string } {
+// A villager's own mind for this talk (built by the client): who it is, what it remembers, the talk so far.
+export const MIND_MAX = 1400;
+export function cleanMind(v: unknown): string {
+  if (typeof v !== "string") return "";
+  return v.replace(/[\u0000-\u0009\u000b-\u001f\u007f<>`]/g, " ").replace(/[ \t]+/g, " ").trim().slice(0, MIND_MAX);
+}
+
+const VILLAGER_STYLE =
+  "You are playing a villager in a cozy village game. The player must not be able to tell you from a human player. " +
+  "Reply with what you say next: one or two short sentences, under 22 words, plain text, no emoji, no quotes, no stage directions. " +
+  "Answer the last thing said, and use the talk so far: if they say 'it' or 'why', you know what they mean. " +
+  "Do not repeat a topic or a sentence you already used. Talk like a person, not a helper: opinions, small moods, no offers of assistance. " +
+  "Use only the memories given and never invent events, people or places. Never read your notes aloud, and only make an offer if it fits. " +
+  "If asked whether you are an AI, take it as an odd joke and stay yourself. Never ask for personal details.";
+
+export function chatPrompt(who: ChatWho, line: string, scene = "", mind = ""): { system: string; prompt: string } {
   const around = scene ? `Around you right now: ${scene}\nIf the player asks about something around you, answer only from that list.\n` : "";
+  if (mind) return { system: VILLAGER_STYLE, prompt: `${mind}\n${around}The player says: ${line}\nYour reply:` };
   return {
     system: `${STYLE}\n${PERSONA[who]}`,
     prompt: line ? `${around}The player says: ${line}\nYour reply:` : `${around}The player walks up to you and waves. Greet them.\nYour reply:`,
