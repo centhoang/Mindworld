@@ -4,7 +4,7 @@
 import type { BubbleFate, Scene, SceneBattle, View } from "../../game/ports";
 import { CELL, cell } from "../glyph/atlas";
 import { composeBattle } from "./battle";
-import { CELLS_PER_TILE, compose } from "./compose";
+import { CELLS_PER_TILE, compose, iris } from "./compose";
 import { CLEAR, CellGrid, NO_EDGE } from "./grid";
 
 const TICK = 24; // plane updates per second
@@ -65,6 +65,7 @@ class Plane {
 }
 
 export class MosaicView implements View {
+  wipe = 0;
   grout = true;
   private shownGrout = true;
   private world = new Plane(false, () => this.grout);
@@ -98,12 +99,13 @@ export class MosaicView implements View {
     const youX = you ? Math.round(you.x * CELLS_PER_TILE) : 0, youY = you ? Math.round(you.z * CELLS_PER_TILE) : 0;
     this.me = you && this.me ? { x: glide(this.me.x, youX, dt), y: glide(this.me.y, youY, dt) } : { x: youX, y: youY };
     const camX = Math.floor(this.cam.x), camY = Math.floor(this.cam.y);
-    const key = `${Math.floor(t * TICK)},${camX},${camY}`;
+    const key = `${Math.floor(t * TICK)},${camX},${camY},${this.wipe}`;
     if (key !== this.last) {
       this.last = key;
       this.mine.grid.clear();
       this.top.grid.clear();
       this.fates = compose(scene, this.world.grid, t, { me: this.mine.grid, top: this.top.grid, camX, camY });
+      if (this.wipe > 0) iris(this.top.grid, this.wipe);
       this.painted = this.world.flush() + this.mine.flush() + this.top.flush();
     }
     const sx = -Math.round((this.cam.x - camX) * CELL), sy = -Math.round((this.cam.y - camY) * CELL);

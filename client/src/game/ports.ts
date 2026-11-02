@@ -29,6 +29,7 @@ export interface ScenePet {
   z: number;
   genes: Genes | null; // null: an NPC's pet, which has no genes
   pose: Pose | null;
+  hatch?: number; // still an egg: how far along it is, 0 to 1
 }
 
 export interface SceneProp {
@@ -126,6 +127,7 @@ export interface SceneBattle {
 export interface View {
   draw(scene: Scene, g: CanvasRenderingContext2D, w: number, h: number, t: number): BubbleFate[];
   battle?(b: SceneBattle, g: CanvasRenderingContext2D, w: number, h: number, t: number): void;
+  wipe?: number; // how far a door has closed the picture, 0 to 1
 }
 
 // The part of the live room the game uses. `LiveLink` is the real one; labs pass a fake.
@@ -136,4 +138,4 @@ export type MindBackend = MindLM;
 // What each flow may touch of the world.
 export type ChatWorld = Pick<Overworld, "npcs" | "say" | "sceneWithMe" | "wildScene">;
 export type RoomWorld = Pick<Overworld, "npcs" | "peers" | "peerFarms" | "me" | "day" | "relayout" | "addPeer" | "movePeer" | "posePeer" | "hearMind" | "say" | "speakerAt" | "onPose" | "onMind">;
-export type FightWorld = Pick<Overworld, "world" | "removeWild" | "spawnWild">;
+export type FightWorld = Pick<Overworld, "world" | "removeWild" | "spawnWild" | "cheerPet">;

@@ -51,6 +51,12 @@ const FACES = ["o.o", "^w^", "o_o", "owo"];
 // The view's other layers. Without them everything lands on the one grid, and the camera is the scene's.
 export type Layers = { me: CellGrid; top: CellGrid; camX: number; camY: number };
 
+// A door closes the picture to a shrinking circle of cells, on the same grid as everything else.
+export function iris(grid: CellGrid, closed: number): void {
+  const cx = grid.cols / 2, cy = grid.rows / 2, r = Math.hypot(cx, cy) * (1 - closed);
+  for (let y = 0; y < grid.rows; y++) for (let x = 0; x < grid.cols; x++) if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) >= r) grid.put(x, y, " ", C.ink, C.ink);
+}
+
 export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers): BubbleFate[] {
   const top = layers?.top ?? grid, mine = layers?.me ?? grid;
   const cols = top.cols, rows = top.rows;
@@ -256,16 +262,17 @@ export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers
 
   // Genes pick the colour, the ears and the face.
   const pet = (p: ScenePet) => {
-    const x = cellOf(p.x), y = cellOf(p.z);
+    const x = cellOf(p.x) + (p.pose === "wiggle" && Math.floor(t * 4) & 1 ? 1 : 0), y = cellOf(p.z);
     if (!near(x, y)) return;
+    if (p.hatch !== undefined) return void things.push({ foot: y, draw: () => egg(x, y, p.hatch!) });
     things.push({ foot: y, draw() {
       const g = p.genes;
       const hue = g?.hue ?? 0.07;
       const colour = COATS[Math.floor((((hue % 1) + 1) % 1) * COATS.length)]!;
       const earGene = g?.ears ?? 0.5;
       const ears = earGene < 0.34 ? "^" : earGene < 0.67 ? "n" : "|";
-      const face = p.pose === "sleep" ? "-w-" : FACES[Math.min(3, Math.floor((g?.build ?? 0.5) * 4))]!;
-      const hop = p.pose ? 0 : Math.floor(t * 4 + x) % 7 === 0 ? 1 : 0;
+      const face = p.pose === "sleep" ? "-w-" : p.pose === "sit" ? "-_-" : FACES[Math.min(3, Math.floor((g?.build ?? 0.5) * 4))]!;
+      const hop = p.pose === "dance" ? Math.floor(t * 6) & 1 : p.pose ? 0 : Math.floor(t * 4 + x) % 7 === 0 ? 1 : 0;
       for (let c = -2; c <= 2; c++) shade(x + c, y);
       const top = y - 3 - hop;
       [-2, 2].forEach((c) => put(x + c, top, ears, C.ink, colour));
@@ -282,7 +289,21 @@ export function compose(scene: Scene, grid: CellGrid, t: number, layers?: Layers
       if ((g?.tail ?? 0) > 0.5) put(x + 4, top + 2, "~", mix(colour, C.ink, 0.45));
       if ((g?.pattern ?? 0) > 0.6) for (const c of [-2, 2]) put(x + c, top + 2, ":", mix(colour, C.ink, 0.45), colour);
       if (p.kind === "wild") fx(() => put(x, top - 1, "?", C.paper));
+      if (p.pose === "dance") fx(() => put(x + 3, top - 1, "♪", C.paper));
     } });
+  };
+
+  // It rocks harder as it goes, cracks, then bursts.
+  const egg = (x0: number, y: number, hatch: number) => {
+    const rock = hatch > 0.25 ? [0, 1, 0, -1][Math.floor(t * (hatch > 0.6 ? 10 : 5)) % 4]! : 0;
+    const x = x0 + rock;
+    for (let c = -2; c <= 2; c++) shade(x0 + c, y);
+    [1, 2, 2, 1].forEach((half, row) => {
+      for (let c = -half; c <= half; c++) put(x + c, y - 3 + row, " ", C.ink, C.paper);
+    });
+    if (hatch > 0.55) put(x - 1, y - 2, "/", C.ink, C.paper);
+    if (hatch > 0.75) { put(x, y - 1, "v", C.ink, C.paper); put(x + 1, y - 3, "\\", C.ink, C.paper); }
+    if (hatch > 0.9) fx(() => [[-4, -3], [4, -3], [-3, -5], [3, -5], [0, -6]].forEach(([dx, dy]) => put(x0 + dx!, y + dy!, "*", C.paper)));
   };
 
   scene.props.forEach(addProp);

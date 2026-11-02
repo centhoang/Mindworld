@@ -3,7 +3,8 @@
 // what is where on screen.
 
 import { groundOrigin, onGround, platformAt, worldDay, type LayoutInput, type Platform, type WorldMap } from "../world/layout";
-import { followStep, keyDir, slide, stepToward, WALK_SPEED, type Vec } from "../world/movement";
+import { GLAD_TIME, HATCH_TIME, petMood } from "../game/pet-mood";
+import { followStep, keyDir, slide, stepToward, unstick, WALK_SPEED, type Vec } from "../world/movement";
 import { petLook, randomGenes } from "../game/genes";
 import type { Genes } from "../sim/ghost";
 import { ARCHETYPES, type ArchetypeId } from "../sim/types";
@@ -133,6 +134,10 @@ export class Overworld {
   mindWhere = "this computer";
   myName = "a visitor"; // set by main.ts (the live name), so villagers can greet me by name
   myLook: HumanLook = humanLook("a visitor"); // from my pet's genes, so renaming keeps my hair
+  hatchLeft = 0; // seconds until the egg opens, first visit only
+  private petStill = 0; // seconds you have stood still
+  private petGlad = 0; // seconds of cheering left, after a win
+  private petHeld = 0; // seconds it has been pushing against something
   petName = "your pet"; // the pet following me (main.ts), so villagers can talk to it by name
   cam: Vec = { x: 0, z: 0 };
   house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
@@ -928,6 +933,21 @@ export class Overworld {
     return { x: this.player.x, z: this.player.z, px: this.pet.x, pz: this.pet.z };
   }
 
+  // The pet stays put as an egg. Afterwards it follows, and what it does when you stop shows its mood.
+  private stepPet(dt: number): void {
+    this.petStill = this.moving ? 0 : this.petStill + dt;
+    this.petGlad = Math.max(0, this.petGlad - dt);
+    if (this.hatchLeft > 0) return void (this.hatchLeft -= dt);
+    const moved = followStep(this.pet, this.player, dt, this.canWalk);
+    const free = unstick(this.pet, moved, this.player, this.petHeld, dt, this.canWalk);
+    this.pet = free.pet;
+    this.petHeld = free.held;
+  }
+
+  cheerPet(): void {
+    this.petGlad = GLAD_TIME;
+  }
+
   update(dt: number, keys: ReadonlySet<string>): Wild | "boss" | "ghost" | null {
     const d = keyDir(keys);
     this.moving = d.x !== 0 || d.z !== 0;
@@ -938,7 +958,7 @@ export class Overworld {
     this.stepWork(dt);
     stepHumanMotion(this.playerMotion, this.player, dt, this.work?.pose ?? null);
     this.moving = this.playerMotion.walking;
-    this.pet = followStep(this.pet, this.player, dt, this.canWalk);
+    this.stepPet(dt);
     // Camera eases toward the player; drawing snaps it to whole pixels.
     const k = 1 - Math.exp(-dt * 8);
     this.cam = { x: this.cam.x + (this.player.x - this.cam.x) * k, z: this.cam.z + (this.player.z - this.cam.z) * k };
@@ -1042,7 +1062,8 @@ export class Overworld {
     const pets: ScenePet[] = [];
     if (!this.indoors) {
       people.push({ id: "me", name: this.myName, kind: "me", x: this.player.x, z: this.player.z, dir: this.playerMotion.dir, walking: this.moving, pose: this.playerMotion.pose, look: this.myLook });
-      pets.push({ id: "pet", kind: "mine", x: this.pet.x, z: this.pet.z, genes: this.petGenes, pose: null });
+      const hatching = this.hatchLeft > 0;
+      pets.push({ id: "pet", kind: "mine", x: this.pet.x, z: this.pet.z, genes: this.petGenes, pose: hatching ? null : petMood(this.petStill, now.phase === "night", this.petGlad), ...(hatching ? { hatch: 1 - this.hatchLeft / HATCH_TIME } : {}) });
     }
     for (const [id, p] of this.peers) {
       people.push({ id: `p:${id}`, name: p.name, kind: "peer", x: p.pos.x, z: p.pos.z, dir: p.motion.dir, walking: p.motion.walking, pose: p.motion.pose, look: p.look });

@@ -32,6 +32,7 @@ import { MindScheduler } from "../mind/scheduler";
 import { chatWhoFor } from "../game/npc-chat";
 import { askPets, traitOf } from "../game/pet-chat";
 import { Interior } from "./interior";
+import { HATCH_TIME } from "../game/pet-mood";
 import { defaultRoom } from "../game/room";
 import type { Good } from "../mind/economy";
 import type { Pocket } from "../mind/npcs";
@@ -149,6 +150,24 @@ let wildMemos: WildMemos = {};
 void fetchWildMemos().then((m) => (wildMemos = m)).catch(() => undefined);
 const keys = new Set<string>();
 let mode: "world" | "battle" | "home" = "world";
+
+// A door closes the picture, swaps the place behind it, and opens again, with the keys let go.
+const DOOR_TIME = 0.24; // seconds each way
+let door: { t: number; swap: (() => void) | null } | null = null;
+function throughDoor(swap: () => void): void {
+  door ??= { t: 0, swap };
+}
+function stepDoor(dt: number): void {
+  if (!door) return;
+  keys.clear();
+  door.t += dt;
+  if (door.swap && door.t >= DOOR_TIME) {
+    door.swap();
+    door.swap = null;
+  }
+  world.view.wipe = Math.max(0, 1 - Math.abs(door.t / DOOR_TIME - 1));
+  if (door.t >= 2 * DOOR_TIME) door = null;
+}
 state.room ??= defaultRoom();
 const interior = new Interior({
   room: () => state.room!,
@@ -166,10 +185,10 @@ const interior = new Interior({
     if (no) toast = { text: no, t: 4 };
     else crate = { cursor: 0 };
   },
-  leave: () => {
+  leave: () => throughDoor(() => {
     mode = "world";
     world.exitHouse();
-  },
+  }),
   around: (g, sw, sh, t, x, y) => world.drawAround(g, sw, sh, t, x, y),
 });
 
@@ -258,7 +277,9 @@ let toast: { text: string; who?: string; t: number } | null = { text: "WASD: wal
 // First visit: the hatch line, then the control hints one after another (each 6 s, Esc skips), once.
 const hintQueue: { text: string; who?: string; t: number }[] = [];
 if (!state.onboard?.seen) {
-  toast = { text: `Your egg hatched! Meet ${pet.name}. It learns to fight from what you teach it.`, who: pet.name, t: 6 };
+  world.hatchLeft = HATCH_TIME;
+  toast = { text: "Something is wiggling inside your egg...", who: "Hint", t: HATCH_TIME };
+  hintQueue.push({ text: `Your egg hatched! Meet ${pet.name}. It learns to fight from what you teach it.`, who: pet.name, t: 6 });
   hintQueue.push(...PIXEL_HINTS.map((text) => ({ text, who: "Hint", t: 6 })));
 }
 function nextToast(): void {
@@ -434,10 +455,11 @@ function menuKey(k: string): void {
       // Same order as the hint over your head (overworld.ts): door, bed, Elder, stall, poop, player, wild pet.
       const bed = world.bedNear();
       if (world.atDoor()) {
-        mode = "home";
-        keys.clear();
-        toast = null;
-        interior.enter();
+        throughDoor(() => {
+          mode = "home";
+          toast = null;
+          interior.enter();
+        });
       } else if (bed >= 0) useBed(bed);
       else if (world.nearStall()) openStall();
       else if (world.nearBoard() && world.npcs) board = { cursor: 0 };
@@ -642,6 +664,7 @@ const fight = fights.fight;
 let last = performance.now();
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
+  stepDoor(dt);
   last = now;
   update(dt, now / 1000);
   requestAnimationFrame(frame);

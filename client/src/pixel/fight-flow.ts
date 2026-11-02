@@ -148,6 +148,7 @@ export function makeFightFlow(d: FightDeps) {
     const replay = battle.replay();
     await battleView.end(replay.outcome, replay.how);
     if (replay.outcome === "win") {
+      world.cheerPet();
       const earned = coinsFor(replay.outcome, replay.how);
       state.coins = addCoins(state.coins ?? 0, earned);
       let msg = `+${earned} coins.`;

@@ -40,10 +40,26 @@ export function keyDir(keys: ReadonlySet<string>): Vec {
 }
 
 // The pet trails its player: it catches up faster the further behind it is, and waits when close.
+// A walkable spot beside the leader, so a hop never lands in a wall.
+export function hopTo(leader: Vec, ok: (x: number, z: number) => boolean): Vec {
+  for (const [dx, dz] of [[0.8, 0.8], [-0.8, 0.8], [0.8, -0.8], [-0.8, -0.8]] as const) if (ok(leader.x + dx, leader.z + dz)) return { x: leader.x + dx, z: leader.z + dz };
+  return { ...leader };
+}
+
+const STUCK_AFTER = 1.2; // seconds of pushing against something before the pet hops over
+
+// Pushing against a wall gets nowhere, and walking would never free it: after a moment it hops to you.
+export function unstick(before: Vec, after: Vec, leader: Vec, held: number, dt: number, ok: (x: number, z: number) => boolean): { pet: Vec; held: number } {
+  const wants = Math.hypot(leader.x - after.x, leader.z - after.z) > FOLLOW_GAP + 0.3;
+  const moved = Math.hypot(after.x - before.x, after.z - before.z);
+  if (!wants || moved > WALK_SPEED * dt * 0.25) return { pet: after, held: 0 };
+  return held + dt >= STUCK_AFTER ? { pet: hopTo(leader, ok), held: 0 } : { pet: after, held: held + dt };
+}
+
 export function followStep(pet: Vec, leader: Vec, dt: number, ok: (x: number, z: number) => boolean): Vec {
   const d = Math.hypot(leader.x - pet.x, leader.z - pet.z);
   if (d <= FOLLOW_GAP) return pet;
-  if (d > 12) return { x: leader.x + 0.8, z: leader.z + 0.8 }; // left far behind (e.g. after a fight): hop over
+  if (d > 12) return hopTo(leader, ok); // left far behind (e.g. after a fight): hop over
   const speed = WALK_SPEED * Math.min(1.6, 0.6 + (d - FOLLOW_GAP) / 2);
   const s = stepToward(pet, leader, Math.min(speed * dt, d - FOLLOW_GAP));
   return slide(pet, s.dx, s.dz, ok);
