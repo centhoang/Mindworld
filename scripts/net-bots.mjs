@@ -27,10 +27,11 @@ for (let i = 0; i < bots; i++) {
     if (s.last) s.gaps.push(now - s.last);
     s.last = now;
   };
-  ws.onerror = () => (s.failed = true);
+  ws.onerror = (e) => { s.failed = true; s.why = String(e.error?.cause?.message ?? e.error?.message ?? e.message ?? "error").slice(0, 60) || "error"; };
+  ws.onclose = (e) => { s.closed = `${e.code} ${e.reason}`.slice(0, 40); };
   stats.push(s);
   socks.push(ws);
-  await wait(60); // no thundering join
+  await wait(Number(process.env.JOIN_MS ?? 60)); // no thundering join
 }
 await wait(1000);
 started = performance.now();
@@ -48,15 +49,18 @@ await wait(seconds * 1000);
 clearInterval(walk);
 const spent = (performance.now() - started) / 1000;
 const live = socks.filter((w) => w.readyState === 1).length;
+const whys = {};
+for (const s of stats) { const k = s.why ?? s.closed; if (k) whys[k] = (whys[k] ?? 0) + 1; }
 socks.forEach((w) => w.close());
 const sorted = (a) => [...a].sort((x, y) => x - y);
 const mid = (a) => sorted(a)[Math.floor(a.length / 2)] ?? 0;
 const gaps = sorted(stats.flatMap((s) => s.gaps));
 console.log(JSON.stringify({
-  bots, mode, seconds, connected: live, full, failed: stats.filter((s) => s.failed).length,
+  bots, mode, seconds, connected: live, full, whys, failed: stats.filter((s) => s.failed).length,
   msgPerBotPerS: +(mid(stats.map((s) => s.n)) / spent).toFixed(1),
   bytesPerBotPerS: Math.round(mid(stats.map((s) => s.bytes)) / spent),
   maxBytesPerBotPerS: Math.round(Math.max(...stats.map((s) => s.bytes)) / spent),
   batchGapMs: { p50: Math.round(gaps[Math.floor(gaps.length * 0.5)] ?? 0), p95: Math.round(gaps[Math.floor(gaps.length * 0.95)] ?? 0), max: Math.round(gaps.at(-1) ?? 0) },
 }));
+await wait(3000); // let the closes land, or the next run finds the room full
 process.exit(0);

@@ -45,6 +45,11 @@ Do 5a first: NPCs matter most. 5b, 5c and 5d touch separate folders, so you can 
 - Worker quota: 120 per client, 3000 a day. `MIND_MAX_TOKENS` 800, since 500 cut off a reply.
 - With no local model, `LOCAL_ONLY` still shows "[local model gave no line]" on greetings: step 7 must turn it off.
 
+## As built (5b)
+- `npcs` keep their last spot on a client once out of view, and refresh on entering a cell.
+- `scripts/net-bots.mjs` and `scripts/net-check.mjs` run on the live room. Close a run cleanly: leftover sockets fill the room for 90 s.
+- 5c: cells assume 1 unit = 1 tile. A 64 x 44 village is about 4 x 3 cells, so most players share a view there.
+
 ## Step 3: seams
 - Move `TileMap`, `T` and `tileAt` from `pixel/tiles.ts` to `world/tilemap.ts`. Leave a re-export until the imports are fixed.
 - Add `client/src/game/ports.ts` with three interfaces:

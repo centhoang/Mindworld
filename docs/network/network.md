@@ -3,10 +3,12 @@
 **Goal:** many players at once. Each peer gets only what is near it. Delay is acceptable; waste is not.
 
 ## Today
-- All traffic goes through one room Durable Object, up to 24 peers. No peer-to-peer.
-- `pos`, `pose`, `npcs`, `farm`, `emote`, `say`, `mind` all go `to: "others"`: every peer gets every message.
-- So traffic grows with the square of players: 24 walkers at 10 Hz is ~5,500 messages a second out of one object.
-- Messages are JSON. Positions are ~60 bytes.
+- All traffic goes through one room Durable Object, up to 100 peers. No peer-to-peer.
+- AOI is live (`worker/src/aoi.ts`): `pos`, `pose`, `npcs`, `farm`, `emote` and public `say` reach only those in view. Numbers: `testing/proof/network/5b-numbers.md`.
+- Still global: join, leave, away, host changes, and `mind` lines' act, invite and trade parts (rare). Spoken `mind` lines keep their 14-tile reach.
+- Everyone hears `join`; then `exit` hides those out of view, and `enter` brings them back with their farm. Grounds stay on `exit`.
+- A socket that dies silently is removed after 90 s, on any join or every 20 s of traffic.
+- Messages are JSON. Positions are ~60 bytes, sent in `{t:"b",m:[...]}` once per 200 ms.
 - NPC minds run on an elected player's tab; only the room routes for them.
 
 ## AOI design

@@ -7,6 +7,9 @@ import { Room, ROOM_MAX_MSG_BYTES, type Out, type Peer, type ServerMsg } from ".
 // Hibernation API, so an idle room costs no duration: peer state lives in each socket's attachment and
 // is restored when the object wakes. Keepalive "ping" is answered by the runtime without waking it.
 
+const SILENT_MS = 90_000;
+const REAP_TICKS = 100;
+
 interface Attachment {
   id: string;
   peer?: Peer; // set after the socket's hello
@@ -52,6 +55,7 @@ export class WorldRoom extends DurableObject<Env> {
         /* not JSON */
       }
       if (!hello || hello.t !== "hello") return ws.close(1008, "hello first");
+      this.reap(now);
       const joined = this.room.join(a.id, hello, now);
       if (!joined) {
         ws.send(JSON.stringify({ t: "full" }));
@@ -87,8 +91,40 @@ export class WorldRoom extends DurableObject<Env> {
     if (a) {
       this.batch.drop(a.id);
       this.deliver(ws, this.room.leave(a.id));
+      ws.serializeAttachment({ id: a.id } satisfies Attachment); // no peer: a wake-up must not bring it back
+    }
+    try {
+      ws.close(1000); // the runtime keeps a socket until this side closes it too
+    } catch {
+      /* already closed */
     }
     this.persistDirty();
+  }
+
+  // A socket can die with no close ever arriving, and it would hold a place for good. Clients ping every 30 s.
+  private reap(now: number) {
+    const all = this.sockets();
+    for (const [id, peer] of [...this.room.peers]) {
+      const ws = all.get(id);
+      const pinged = ws ? this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0 : 0;
+      if (ws && now - Math.max(peer.at, pinged) < SILENT_MS) continue;
+      this.batch.drop(id);
+      if (ws) this.drop(ws);
+      else this.deliverAll(this.room.leave(id));
+    }
+  }
+
+  // What a peer with no socket leaves behind still reaches everyone else.
+  private deliverAll(out: Out[]) {
+    const all = this.sockets();
+    for (const o of out) {
+      const text = JSON.stringify(o.msg);
+      const targets = o.to === "others" ? [...all.keys()] : typeof o.to === "object" ? [o.to.id] : [];
+      for (const id of targets) {
+        const ws = all.get(id);
+        if (ws) safeSend(ws, text);
+      }
+    }
   }
 
   // Ghost grounds outlive the sockets, so they go to storage (tiny: <= 24 entries).
@@ -151,6 +187,7 @@ export class WorldRoom extends DurableObject<Env> {
   // One tick: a socket's waiting messages travel together.
   private flush() {
     this.armed = false;
+    if (this.tick % REAP_TICKS === 0) this.reap(Date.now());
     const all = this.sockets();
     for (const [id, msgs] of this.batch.take(this.tick++, (peer, key) => this.room.far(peer, key))) {
       const ws = all.get(id);
