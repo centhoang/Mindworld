@@ -523,3 +523,16 @@ describe("free talk tiers", () => {
     expect(asked).toBe(1);
   });
 });
+
+describe("a player's own offer", () => {
+  it("is an invitation, and it replaces what the villager had asked", async () => {
+    const nv = new NpcVillage(new MindScheduler(() => null, { duty: 1 }), () => false, { line: () => {}, say: () => {} }, HOMES, SPOTS, () => true);
+    nv.me = "me";
+    nv.setHost("pip", "me");
+    nv.noteOffer("pip", nv.hub.minds.get("pip")!, "Kai", "Wanna play soccer?");
+    const r = await nv.reply("pip", "Kai", "Wanna dance?");
+    expect(r?.source).toBe("rules");
+    expect(r?.text).toMatch(/danc/i);
+    expect(nv.hub.minds.get("pip")!.mem.promises.map((c) => c.act)).toEqual(["dance"]);
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { askedPlace, compass, directions, doingAnswer, topicOf, whoAnswer, type Place } from "./directions";
+import { askedPlace, compass, directions, doingAnswer, topicOf, farAnswer, whoAnswer, type Place } from "./directions";
 
 const places: Place[] = [
   { name: "the pond", words: ["pond", "lake"], x: 30, z: -30 },
@@ -45,5 +45,16 @@ describe("directions from the real map", () => {
     expect(doingAnswer("what are you doing?", "fishes", false)).toBe("Right now? I fish.");
     expect(doingAnswer("what are you up to", "has a picnic", true)).toBe("Off to have a picnic.");
     expect(doingAnswer("nice weather", "fishes", false)).toBeNull();
+  });
+});
+
+describe("farAnswer", () => {
+  const way = "The pond is far off to the north-west, about 53 steps, over the bridges.";
+  it("gives the distance, not the way again", () => {
+    expect(farAnswer("is it far?", way)).toBe("Yes, quite a walk, about 53 steps.");
+    expect(farAnswer("how close is it", "Just east, about 9 steps.")).toBe("No, it is close, about 9 steps.");
+  });
+  it("leaves a question about the way alone", () => {
+    expect(farAnswer("where is the pond?", way)).toBe(way);
   });
 });

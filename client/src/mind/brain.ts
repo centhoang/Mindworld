@@ -117,7 +117,8 @@ Write ${p.name}'s answer: one or two short sentences, under 25 words, in charact
 
 // The same mind for the cloud tier, whose prompts are not frozen: the whole card, more memories, the talk so far.
 export function cloudMindText(p: Persona, m: MindMemory, player: string, line: string, talk: readonly string[]): string {
-  return `${personaCard(p)}\n${memoryText(m, line, 5, player)}\n${talk.length ? `The talk so far:\n${talk.join("\n")}` : `${player} just walked up to you.`}`;
+  return `${personaCard(p)}\n${memoryText(m, line, 5, player)}\n${talk.length ? `The talk so far:\n${talk.join("\n")}` : `${player} just walked up to you.`}
+You are talking to ${player}. What others told you is about them, not ${player}.`;
 }
 
 export function parseLine(text: string, name: string): string | null {

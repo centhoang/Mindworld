@@ -49,12 +49,19 @@ const ASKS_WHO = /\bwho\b.*\b(lives?|live here|else|around|here|neighbou?rs?)\b|
 
 // `people` = "Mo the fisher" style names of everyone who lives here.
 export function whoAnswer(line: string, people: readonly { name: string; title?: string }[], self: string): string | null {
-  const knows = /\b(?:know|heard of|met|friends? with|think (?:of|about)|like)\s+(\w+)/i.exec(line)?.[1]?.toLowerCase();
+  const knows = /\b(?:know|heard of|met|friends? with)\s+(\w+)/i.exec(line)?.[1]?.toLowerCase();
   const other = people.find((p) => p.name.toLowerCase() === knows && p.name !== self);
   if (other) return `Of course I know ${other.name}${other.title ? `, our ${other.title}` : ""}.`;
   if (!ASKS_WHO.test(line)) return null;
   const list = people.filter((p) => p.name !== self).map((p) => (p.title ? `${p.name} the ${p.title}` : p.name));
   return `Me, ${list.slice(0, -1).join(", ")} and ${list.at(-1)}. Plus visitors like you.`;
+}
+
+// "Is it far?" wants the distance, not the whole way again.
+export function farAnswer(line: string, way: string): string {
+  const steps = Number(/about (\d+) steps/.exec(way)?.[1]);
+  if (!steps || !/\b(?:far|close|near)\b/i.test(line) || /\bwhere\b/i.test(line)) return way;
+  return `${steps < 15 ? "No, it is close" : steps < 40 ? "Not too far" : "Yes, quite a walk"}, about ${steps} steps.`;
 }
 
 export function doingAnswer(line: string, label: string | null | undefined, walking: boolean): string | null {

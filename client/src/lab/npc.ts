@@ -16,6 +16,14 @@ world.attachMinds(sched, () => loaded, null);
 const offline = { status: "offline" } as Transport; // no room: every villager's mind runs here
 const { answer } = makeVillagerAnswer({ world, live: () => offline, hostOf: () => null, myName: () => world.myName });
 
+// Villagers also speak up by themselves, and "yes" may answer that, so their bubbles go in the log too.
+const heard: string[] = [];
+const bubble = world.say.bind(world);
+world.say = (key, text, secs, ...rest) => {
+  if (key.startsWith("n:") && text !== "...") heard.push(`${key.slice(2)}: ${text}`), log(`(bubble) ${key.slice(2)}: ${text}`);
+  bubble(key, text, secs, ...rest);
+};
+
 const none = new Set<string>();
 setInterval(() => world.update(0.05, none), 50);
 
@@ -71,4 +79,4 @@ setInterval(() => {
     .map((a) => `<tr><td>${a.name}</td><td>${a.state}${a.act ? `: ${a.act}` : ""}</td></tr>`)
     .join("")}`;
 }, 1000);
-(window as unknown as { __lab: unknown }).__lab = { world, answer, sched };
+(window as unknown as { __lab: unknown }).__lab = { world, answer, sched, heard };

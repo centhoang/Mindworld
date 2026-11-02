@@ -39,6 +39,12 @@ Do 5a first: NPCs matter most. 5b, 5c and 5d touch separate folders, so you can 
 - 5a goes in `makeVillagerAnswer` (`game/chat-flow.ts`), which `/lab/npc` already uses. 5b reads its numbers from `/lab/net`.
 - `/lab/visual` shows the spike until 5c adds scene presets.
 
+## As built (5a)
+- Cloud tier lives in `NpcVillage.reply` through the `cloud` hook, set in `attachMinds`, so relayed questions use it too. Wild pets use it through `wildAnswer`.
+- A player's "Wanna dance?" is now an invitation and replaces an open offer. `/lab/npc` logs bubbles: a pitch may be what "yes" answers.
+- Worker quota: 120 per client, 3000 a day. `MIND_MAX_TOKENS` 800, since 500 cut off a reply.
+- With no local model, `LOCAL_ONLY` still shows "[local model gave no line]" on greetings: step 7 must turn it off.
+
 ## Step 3: seams
 - Move `TileMap`, `T` and `tileAt` from `pixel/tiles.ts` to `world/tilemap.ts`. Leave a re-export until the imports are fixed.
 - Add `client/src/game/ports.ts` with three interfaces:

@@ -9,6 +9,7 @@ export type ChatWho = (typeof CHAT_WHO)[number];
 export const CHAT_MAX_LINE = 140; // the player's message, characters
 export const CHAT_MAX_WORDS = 25;
 export const CHAT_MAX_TOKENS = 500; // Muse reasons first (150-290 tokens), so leave room for the reply
+export const MIND_MAX_TOKENS = 800; // a villager's prompt is longer, and so is the reasoning
 export const CHAT_QUOTA = { pool: "chat", perClient: 120, total: 3000 };
 
 const STYLE =
@@ -86,9 +87,9 @@ export function cleanMind(v: unknown): string {
 const VILLAGER_STYLE =
   "You are playing a villager in a cozy village game. The player must not be able to tell you from a human player. " +
   "Reply with what you say next: one or two short sentences, under 22 words, plain text, no emoji, no quotes, no stage directions. " +
-  "Answer the last thing said, and use the talk so far: if they say 'it' or 'why', you know what they mean. " +
-  "Do not repeat a topic or a sentence you already used. Talk like a person, not a helper: opinions, small moods, no offers of assistance. " +
-  "Use only the memories given and never invent events, people or places. Never read your notes aloud, and only make an offer if it fits. " +
+  "Answer the last thing said, and use the talk so far: if they say 'it' or 'why', you know what they mean, so never ask them to explain. " +
+  "Do not repeat a topic or a sentence you already used, and do not describe where you are unless asked. Talk like a person, not a helper: opinions, small moods, no offers of assistance. " +
+  "Never invent things that happened in the village: use only the memories given. A tale you are asked for is fine, and carry on with it when they ask what happened next. Never read your notes aloud, and only make an offer if it fits. " +
   "If asked whether you are an AI, take it as an odd joke and stay yourself. Never ask for personal details.";
 
 export function chatPrompt(who: ChatWho, line: string, scene = "", mind = ""): { system: string; prompt: string } {

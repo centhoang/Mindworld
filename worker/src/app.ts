@@ -1,4 +1,4 @@
-import { CHAT_MAX_TOKENS, CHAT_QUOTA, chatPrompt, cleanLine, cleanMind, cleanScene, isChatWho, isOpener, OpenerCache, parsePetSide, petsPrompt, scriptedLine, scriptedPair, tidyPair, tidyReply } from "./chat";
+import { CHAT_MAX_TOKENS, CHAT_QUOTA, MIND_MAX_TOKENS, chatPrompt, cleanLine, cleanMind, cleanScene, isChatWho, isOpener, OpenerCache, parsePetSide, petsPrompt, scriptedLine, scriptedPair, tidyPair, tidyReply } from "./chat";
 import { geoOf, isRestricted } from "./geo";
 import {
   allowGhostPost,
@@ -275,7 +275,8 @@ async function handleChat(request: Request, deps: Deps): Promise<Response> {
   const provider = cfg.defaultProvider;
   if (!cfg.mock && !providerConfigured(cfg.providers, provider)) return scripted("unconfigured");
   const p = chatPrompt(who, line, scene, mind);
-  const worst = worstCaseCostUsd(provider, estimateInputTokens(p.system + p.prompt), CHAT_MAX_TOKENS);
+  const maxTokens = mind ? MIND_MAX_TOKENS : CHAT_MAX_TOKENS;
+  const worst = worstCaseCostUsd(provider, estimateInputTokens(p.system + p.prompt), maxTokens);
   const id = deps.newId();
   const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
   const reserved = await deps.spend.reserve({ id, provider, worstCaseUsd: cfg.mock ? 0 : worst, clientKey, quota: CHAT_QUOTA });
@@ -285,7 +286,7 @@ async function handleChat(request: Request, deps: Deps): Promise<Response> {
   try {
     completion = cfg.mock
       ? mockCompletion("chat", p.system, p.prompt)
-      : await complete(provider, cfg.providers, { ...p, maxTokens: CHAT_MAX_TOKENS, effort: "low" }, deps.fetch);
+      : await complete(provider, cfg.providers, { ...p, maxTokens, effort: "low" }, deps.fetch);
   } catch (e) {
     if (e instanceof UpstreamError) await deps.spend.release(id);
     else await deps.spend.settle(id, worst); // may have been billed

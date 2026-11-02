@@ -16,7 +16,7 @@ import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, go
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
 import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
-import { askedPlace, directions, doingAnswer, type Place, talkAnswer, topicOf, whoAnswer, whyPerson } from "./directions";
+import { askedPlace, directions, doingAnswer, type Place, talkAnswer, topicOf, farAnswer, whoAnswer, whyPerson } from "./directions";
 import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
 import { humanize } from "./human";
 import { answerTo, cleanReply, goodOfferedIn, offerIn } from "./offers";
@@ -396,7 +396,7 @@ export class NpcVillage {
     // Where we are meeting may be a spot no map name covers, like the square doing for a pitch.
     const spot = this.meeting.get(npc);
     const place = askedPlace(line, [...(this.hub.placesOf?.() ?? []), ...(spot ? [spot] : [])], this.topics.get(npc) ?? null);
-    if (place) return directions(a.pos, place, personaOf(npc)?.name);
+    if (place) return farAnswer(line, directions(a.pos, place, personaOf(npc)?.name));
     return whoAnswer(line, VILLAGERS.map((p) => ({ name: p.name, title: p.job?.title })), personaOf(npc)?.name ?? "") ?? doingAnswer(line, a.act && a.act !== "wander" ? ACTIVITY.get(a.act)?.label : null, a.state === "walk");
   }
 
@@ -664,9 +664,11 @@ export class NpcVillage {
   // Is this line an invitation? If so the NPC decides from who it is and how it feels about the player, and an
   // accepted one becomes a promise. Returns the plain answer, for when no model words it.
   private async invited(npc: Npc, m: Mind, player: string, playerId: string, line: string): Promise<string | null> {
-    if (!INVITE_HINT.test(line)) return null;
-    const today = gameTime(this.v.t).day;
-    const rules = extractRules(line, today);
+    const now = gameTime(this.v.t);
+    const today = now.day;
+    const asks = offerIn(line, today, now.phase); // "Wanna dance?" from the player is an invitation too
+    if (!INVITE_HINT.test(line) && !asks) return null;
+    const rules = extractRules(line, today) ?? asks;
     m.thinking = "whether to go";
     this.out.think?.(npc, `Should I go with ${player}?`);
     try {
@@ -674,6 +676,7 @@ export class NpcVillage {
         ? (await this.sched.ask({ prio: PRIO.talk, timeoutMs: 15000, req: extractPrompt(line), parse: (t) => parseExtract(t, today), fallback: () => rules })).value
         : rules;
       if (!said) return null;
+      this.asked.delete(`${npc}:${player}`); // the player moved on to their own idea
       const invite = { ...said, occasion: rules?.occasion ?? "" };
       if (!this.env.spots[ACTIVITY.get(invite.act)!.place]?.length) {
         remember(m.mem, today, clockLabel(gameTime(this.v.t).hour), `${player} asked me to ${invite.act}, but there is nowhere for it here`);

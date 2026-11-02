@@ -15,7 +15,8 @@ Elder (herbs), Mo (fishing), Ama (market stall), Pip (wood). Each has a persona,
 ## Chat today
 - Offers work: yes, no, later and "where?" all act on the offer.
 - True answers work.
-- **Free talk on the 1B is weak** (bug 11): it drifts, and repeats topics.
+- **Free talk tiers:** sim, then Muse Spark with card, memories and the last 8 lines (`CLOUD_CHAT`), then the local 1B. The cloud prompt is `VILLAGER_STYLE` in `worker/src/chat.ts`, not frozen.
+- **Free talk on the 1B alone is weak** (bug 11): it drifts, and repeats topics.
 - `cleanReply` strips bond notes and repeat invitations.
 - Prompts are frozen at af455c4: a text change needs a retrain.
 
