@@ -126,18 +126,12 @@ function drawProcedural(look: PetLook, size: number, facing: Facing, build: Buil
     tri(ax + sgn * k * 0.02, headTop - k * 0.06, ax + sgn * k * 0.03, headTop - k * 0.04, ax + sgn * k * 0.12, headTop - k * 0.09, L.horn);
   }
 
-  // Pattern on the body (the back view shows stripes/spots too, the belly only from the front).
+  // Pattern on the body (the back view shows stripes too, the belly only from the front).
   const bodyCells = (fn: (x: number, y: number) => boolean, v: L) => {
     for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (m[y * n + x] === L.body && fn(x, y)) m[y * n + x] = v;
   };
   if (look.pattern === "belly" && !back) bodyCells((x, y) => ((x + 0.5 - cx) / (bw * 0.55)) ** 2 + ((y + 0.5 - by - bh * 0.25) / (bh * 0.6)) ** 2 <= 1, L.belly);
   if (look.pattern === "stripes") bodyCells((x, y) => y > headY + hr * 0.5 && Math.floor((x - cx + n) / Math.max(2, k * 0.08)) % 3 === 0, L.accent);
-  if (look.pattern === "spots") bodyCells((x, y) => {
-    const s = Math.max(3, Math.round(k * 0.14));
-    const gx = Math.floor(x / s), gy = Math.floor(y / s);
-    const ox = (gx * 7 + gy * 3) % s, oy = (gx * 5 + gy * 11) % s;
-    return (x % s - ox) ** 2 + (y % s - oy) ** 2 <= (s * 0.22) ** 2 && y > headY;
-  }, L.accent);
 
   // Face (front only): eyes, cheeks.
   if (!back && hr > 0) {

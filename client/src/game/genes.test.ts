@@ -34,7 +34,13 @@ describe("pet genes", () => {
     expect(seen.ears.size).toBe(EARS.length);
     expect(seen.tail.size).toBe(TAILS.length);
     expect(seen.horns.size).toBe(new Set(HORNS).size);
-    expect(seen.pattern.size).toBe(PATTERNS.length);
+    expect(seen.pattern.size).toBe(new Set(PATTERNS).size);
+  });
+
+  it("shows the old spots genes as plain, and other patterns as before", () => {
+    expect(petLook({ hue: 0.5, pattern: 0.6 }).pattern).toBe("plain");
+    expect(petLook({ hue: 0.5, pattern: 0.3 }).pattern).toBe("belly");
+    expect(petLook({ hue: 0.5, pattern: 0.9 }).pattern).toBe("stripes");
   });
 
   it("round-trips through JSON and the ghost payload/record", () => {

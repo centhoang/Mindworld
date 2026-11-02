@@ -1,4 +1,4 @@
-# HANDOFF: Mindworld rework (2026-11-03)
+DIRECTOR MODE ACTIVE since 2026-11-03 03:10 (Vietnam). HANDOFF: Mindworld rework. API spend tonight: $0 of $3.
 
 **Starting prompt:** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md."
 
@@ -23,12 +23,13 @@ Open: bugs 30-33 (Codex rework, Next action 1). Report of dropped activities: `p
 - Chat: tiers, with cloud free talk during the event. World: one compact village. Deadline in Vietnam: Nov 5, 9 AM. Steps: `docs/RESTRUCTURE.md`.
 - Pack rules (user): a human activity with no matching pack animation is dropped. Everything is top-down, front side only, never iso (`docs/visual/visual.md`).
 
-## Next actions
+## Next actions (director Queue; done = proof on the deployed build, tests pass)
 1. Codex rework, bugs 30-33: audit every file in `client/public/art/gen/` against the angle rule, send failures back, redo pet head shade and remove spots.
 2. `scope-check` visual, pet, game on Sunnyside live, including night, door wipe, chat box, walking in the first hold after a teleport.
 3. Confirm "want a picnic?" on live once the chat cap resets (120 lines a day per client, used up 2026-11-03).
-4. Left in `game.md`: stranger test (a person), Teach and no-GPU (need step 7).
-5. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off. `/api/chatlog` goes last.
+4. Verification pass: build, client and worker tests, tsc, secrets scan, commit.
+5. Not tonight. Left in `game.md`: stranger test (a person), Teach and no-GPU (need step 7).
+6. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off. `/api/chatlog` goes last.
 
 ## Gotchas
 - A deploy can take from minutes to 15+ min to show on the site, while wrangler says it is active. Check the `main-` file in `/`; do not redeploy for that.

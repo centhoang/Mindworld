@@ -27,6 +27,10 @@ describe("pet layer selection", () => {
     }
   });
 
+  it("draws a look still naming spots as plain", () => {
+    expect(petStates({ ...look, pattern: "spots" } as unknown as PetLook).pattern).toBe("plain");
+  });
+
   it("uses safe nearby states for future genes and unknown builds", () => {
     const future = { ...look, ears: "bear", tail: "long", horns: "crown", pattern: "diamonds" } as unknown as PetLook;
     expect(petStates(future)).toEqual({ ears: "round", tail: "none", horns: "none", pattern: "plain" });

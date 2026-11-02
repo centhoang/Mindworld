@@ -338,7 +338,7 @@ or the brief's 16/32/48 size contract.
 | Ears | `pointy`, `round`, `floppy`, `bunny`, `tuft`, attached at common head landmarks. |
 | Tail | `puff`, `nub`, `curl`, `fox`; root behind the body. The absent state adds no pixels. |
 | Horns | `nubs`, `unicorn`, `antlers`; absent state does not alter head placement. |
-| Pattern | Unpatterned state, `belly`, `stripes`, `spots`; belly only in front, stripes/spots on the back too. |
+| Pattern | Unpatterned state, `belly`, `stripes`; belly only in front, stripes on the back too. `spots` removed (bug 33); its genes show plain. |
 | Face | Front only: eyes, optional cheeks and a catchlight only if the eye has space. Back has no second face. Simplify at 16 px. |
 
 Code proportions are relative to `k = cell size * look.size`: full body

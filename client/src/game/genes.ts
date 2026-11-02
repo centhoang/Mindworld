@@ -7,7 +7,7 @@ import type { Genes } from "../sim/ghost";
 export const EARS = ["pointy", "round", "floppy", "bunny", "tuft"] as const;
 export const TAILS = ["none", "nub", "puff", "curl", "fox"] as const;
 export const HORNS = ["none", "none", "nubs", "unicorn", "antlers"] as const; // "none" twice: most pets have none
-export const PATTERNS = ["plain", "belly", "spots", "stripes"] as const;
+export const PATTERNS = ["plain", "belly", "plain", "stripes"] as const; // "plain" twice: the old spots genes stay valid and now show plain
 
 export type Ears = (typeof EARS)[number];
 export type Tail = (typeof TAILS)[number];

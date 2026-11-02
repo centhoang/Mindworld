@@ -16,3 +16,4 @@ Lab: `/lab/visual`, keys 1-5 pick a scene, N night. Look: mosaic plane, Tile ski
 - [x] The Grid button turns the faint cell lines on and off, and it is remembered. Outlines stay. [proof](../proof/visual/outlines-grid-off.jpg)
 - [x] Every thing has an outline (path, tree, person, pet, clock, map), and from the outlines you can tell which is in front. [proof](../proof/visual/outlines-lab.jpg)
 - [x] Walking scrolls the view smoothly, with no cell-sized jumps, and your character glides. Other movers still step by cell. [proof](../proof/game/walk-steady.md)
+- [x] Every generated art file is top-down, front side only, never at an angle. [audit](../proof/visual/gen-art-audit.md)

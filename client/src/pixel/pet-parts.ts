@@ -26,7 +26,7 @@ const STATES = {
   tail: ["none", "nub", "puff", "curl", "fox"],
   ears: ["pointy", "round", "floppy", "bunny", "tuft"],
   horns: ["none", "nubs", "unicorn", "antlers"],
-  pattern: ["plain", "belly", "spots", "stripes"],
+  pattern: ["plain", "belly", "stripes"],
 } as const;
 
 export function petStates(look: PetLook) {
