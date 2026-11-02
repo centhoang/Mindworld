@@ -37,15 +37,20 @@ import type { Good } from "../mind/economy";
 import type { Pocket } from "../mind/npcs";
 import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water, type CropId } from "../game/farm";
 import { drawMenu, type MenuRow } from "./menu";
+import { MosaicView } from "../view/mosaic/mosaic-view";
+import type { ScenePanel } from "../game/ports";
 import { runSetup, storeSetup } from "./setup";
 import { TeachScreen } from "./teach";
 
 export const LOW_H = 216;
+// The mosaic plane wants about 45 rows of 8-pixel cells. ?look=pixel is the old Sunnyside view.
+const pixelLook = new URLSearchParams(location.search).get("look") === "pixel";
+const lowRows = pixelLook ? LOW_H : 360;
 
 // One art pixel is always a whole number of screen pixels, or pixels come out in different sizes. The scale that
 // shows at least LOW_H rows wins, and the low-res picture takes whatever size fills the screen at that scale.
-export function lowSize(devW: number, devH: number): { w: number; h: number; scale: number } {
-  const scale = Math.max(1, Math.floor(Math.max(1, devH) / LOW_H));
+export function lowSize(devW: number, devH: number, rows = LOW_H): { w: number; h: number; scale: number } {
+  const scale = Math.max(1, Math.floor(Math.max(1, devH) / rows));
   return { w: Math.max(1, Math.ceil(devW / scale)), h: Math.max(1, Math.ceil(devH / scale)), scale };
 }
 
@@ -61,6 +66,7 @@ if (!state.groundSeed) {
   save(state);
 }
 const world = new Overworld(state.genes, state.groundSeed);
+if (!pixelLook) world.view = new MosaicView();
 
 // Who is out with you: 0 = the hatched pet, i = party[i - 1]. Everyone else lives at your corner.
 interface Member { name: string; genes: Genes; arch?: PartyMon["arch"] }
@@ -277,11 +283,22 @@ document.getElementById("ui")!.addEventListener("click", (e) => {
 });
 applyUi();
 
+// What goes on the plane next frame, in place of menus drawn over it.
+let nextPanels: ScenePanel[] = [];
+function showMenu(title: string, rows: readonly MenuRow[], cursor: number, t: number, footer: string): void {
+  if (pixelLook) drawMenu(g, low.width, low.height, title, rows, cursor, t, footer);
+  else nextPanels.push({ place: "middle", title, rows: rows.map((r) => ({ label: r.label, note: r.note })), cursor, footer });
+}
+
 // The goals card (top left, G hides it): what a first visit should try. Gone once all four are done.
 function drawGoals(): void {
   if (hidden("goals") || state.onboard?.goalsHidden || world.inspect) return;
   const list = pixelGoals({ taught: !!state.steps?.proved, party: (state.party ?? []).length, shipped: !!state.steps?.shipped, boss: !!state.steps?.boss });
   if (list.every((x) => x.done)) return;
+  if (!pixelLook) {
+    nextPanels.push({ place: "corner", title: "GOALS  (G)", rows: list.map((x) => ({ label: `${x.done ? "+" : "-"} ${x.label}`.slice(0, 26), ink: x.done ? "#7A8F89" : "#39463F" })) });
+    return;
+  }
   const w = 150;
   drawFrame(g, 4, 4, w, 18 + list.length * 10);
   drawText(g, "GOALS  (G)", 10, 9, "#795849");
@@ -307,7 +324,7 @@ setCrt(crt);
 // that at 125% or 150% Windows scaling. The low-res picture runs a little past the edge when the size does not divide.
 let lowScale = 1;
 function resize(devW = Math.round(window.innerWidth * (window.devicePixelRatio || 1)), devH = Math.round(window.innerHeight * (window.devicePixelRatio || 1))): void {
-  const s = lowSize(devW, devH);
+  const s = lowSize(devW, devH, lowRows);
   lowScale = s.scale;
   low.width = s.w;
   low.height = s.h;
@@ -640,26 +657,33 @@ function update(dt: number, t: number): void {
     world.underBubbles = () => {
       if (!menu && !crate && !board && !peerMenu && !duelIn) drawGoals();
     };
+    world.panels = nextPanels;
+    nextPanels = [];
+    if (!pixelLook && !menu && !crate && !board && !peerMenu && !duelIn) drawGoals();
     world.draw(g, low.width, low.height, t);
     if (world.npcs) world.npcs.pocket = pocket;
     if (met) void fight(met);
     if (menu) {
       const a = state.active ?? 0;
       const rows: MenuRow[] = members().map((m, i) => ({ label: m.name, note: i === a ? "with you" : "at home", icon: icon(m) }));
-      drawMenu(g, low.width, low.height, "Your pets", rows, menu.cursor, t, "Enter: take along  P: close");
-    } else if (duelIn) drawMenu(g, low.width, low.height, `${duelIn.name} wants a duel!`, [{ label: "Accept" }, { label: "Decline" }], duelIn.cursor, t, "Your pet fights with its memo rules");
-    else if (peerMenu) drawMenu(g, low.width, low.height, world.peers.get(peerMenu.id)?.name ?? "Player", PEER_ROWS.map((label) => ({ label })), peerMenu.cursor, t, "Enter: pick  Esc: close  1-4: emotes");
-    else if (crate) drawMenu(g, low.width, low.height, `Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
-    else if (board) drawMenu(g, low.width, low.height, "Town board", world.npcs?.board() ?? [], -1, t, "Prices move with real trades. Esc: close");
+      showMenu("Your pets", rows, menu.cursor, t, "Enter: take along  P: close");
+    } else if (duelIn) showMenu(`${duelIn.name} wants a duel!`, [{ label: "Accept" }, { label: "Decline" }], duelIn.cursor, t, "Your pet fights with its memo rules");
+    else if (peerMenu) showMenu(world.peers.get(peerMenu.id)?.name ?? "Player", PEER_ROWS.map((label) => ({ label })), peerMenu.cursor, t, "Enter: pick  Esc: close  1-4: emotes");
+    else if (crate) showMenu(`Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
+    else if (board) showMenu("Town board", world.npcs?.board() ?? [], -1, t, "Prices move with real trades. Esc: close");
     else if (toast) {
       toast.t -= dt;
-      if (!hidden("hints")) drawToast(g, low.width, low.height, toast.text, toast.who === "Hint" ? undefined : toast.who);
+      if (!hidden("hints")) {
+        const who = toast.who === "Hint" ? undefined : toast.who;
+        if (pixelLook) drawToast(g, low.width, low.height, toast.text, who);
+        else nextPanels.push({ place: "bottom", title: who ?? "", rows: [{ label: toast.text }], width: 60 });
+      }
       if (toast.t <= 0) nextToast();
     }
   } else if (mode === "home") {
     interior.update(dt, crate || interior.deco ? new Set<string>() : keys);
     interior.draw(g, low.width, low.height, t);
-    if (crate) drawMenu(g, low.width, low.height, `Crate  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
+    if (crate) showMenu(`Crate  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
   } else {
     battleView.update(dt);
     battleView.draw(g, low.width, low.height, t);

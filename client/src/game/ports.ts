@@ -65,6 +65,16 @@ export interface SceneInspector {
   where: string;
 }
 
+// A framed list on the plane: goals, a menu, a dialogue or a toast.
+export interface ScenePanel {
+  place: "corner" | "middle" | "bottom" | "right";
+  title: string;
+  rows: readonly { label: string; note?: string; ink?: string }[];
+  cursor?: number;
+  footer?: string;
+  width?: number;
+}
+
 // What a view needs to draw one frame. A view reads this and never changes the game.
 export interface Scene {
   map: TileMap;
@@ -82,6 +92,7 @@ export interface Scene {
   hint: string | null;
   banner: { text: string; left: number } | null;
   inspector: SceneInspector | null;
+  panels: readonly ScenePanel[];
 }
 
 // Whether a bubble found room this frame: a held one keeps its time on screen.

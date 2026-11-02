@@ -17,11 +17,10 @@
 - Submission day (user): make GitHub and the 4 HF repos public, remove Access. Remove `/api/chatlog`, its client call and the KV rows.
 
 ## Decisions from the user (2026-11-02)
-- Look: glyph spike first. Chat: tiers, with cloud free talk during the event. World: one compact village that shows NPC and pet minds.
+- Look: mosaic plane, Tile skin (not the glyph spike). Chat: tiers, with cloud free talk during the event. World: one compact village that shows NPC and pet minds.
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-0. User picks the look: A glyph or a B mosaic variant (`client/spike-compare.html`, keys 1-6). Step 5c follows the pick.
 1. Execute `docs/RESTRUCTURE.md` from step 5c (read its "As built" notes first), in order.
 2. A day ahead of plan: Nov 3: 5c, 5d, bug 24. Nov 4: 6. Nov 5 morning: 7 only. Step 7 must turn `LOCAL_ONLY` off.
 

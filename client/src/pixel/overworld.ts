@@ -16,7 +16,7 @@ import { BUILDS, drawMonster } from "./monster";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
 import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
-import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
+import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePanel, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
 import { PixelView } from "./pixel-view";
 import { compass, type Place } from "../mind/directions";
 import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/clock";
@@ -95,6 +95,7 @@ export class Overworld {
   critters: { art: string; x: number; z: number; seed: number }[] = [];
   sunny!: SunnyWorld;
   view: View = new PixelView(this); // what draws the frame
+  panels: ScenePanel[] = []; // set by the game each frame
   ui = { names: true, map: true }; // the small buttons (main.ts)
   alwaysDay = false; // dev hook: screenshots at any hour
   player: Vec = { x: 0, z: 0 };
@@ -1085,6 +1086,7 @@ export class Overworld {
       hint: this.hintNow(),
       banner: this.bannerT > 0 && this.place ? { text: this.place, left: this.bannerT } : null,
       inspector: this.inspected(),
+      panels: this.panels,
     };
   }
 

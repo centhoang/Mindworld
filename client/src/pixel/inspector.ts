@@ -14,16 +14,13 @@ import { PAL } from "./art";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
 
 type Ctx = CanvasRenderingContext2D;
-const SHOW_NEEDS = ["hunger", "energy", "fun", "social"] as const;
+export const SHOW_NEEDS = ["hunger", "energy", "fun", "social"] as const;
 const SHORT: Record<string, string> = { morning: "AM", noon: "NOON", evening: "PM" };
 
-export function drawInspector(g: Ctx, m: Mind, a: Agent, rel: Map<string, number>, names: (id: string) => string, where: string, sw: number, sh: number): void {
-  const w = Math.min(232, sw - 12);
-  const x = sw - w - 6;
-  const y = 18;
-  const tw = w - 14;
+// The inspector's text, one [line, colour] each, for any view.
+export function inspectorLines(m: Mind, a: Agent, rel: Map<string, number>, names: (id: string) => string, where: string, wrapLine: (s: string) => string[]): [string, string][] {
   const lines: [string, string][] = []; // [text, colour]
-  const add = (s: string, col: string = PAL.ink) => wrap(s, tw).forEach((l) => lines.push([l, col]));
+  const add = (s: string, col: string = PAL.ink) => wrapLine(s).forEach((l) => lines.push([l, col]));
   const p = m.persona;
   add(`${p.name}  (${p.kind === "pet" ? "PET" : "VILLAGER"})`, PAL.coral);
   add(`MIND: ${m.source === "rules" ? "RULES (B: LOAD LLAMA)" : m.source}`, PAL.teal);
@@ -48,6 +45,15 @@ export function drawInspector(g: Ctx, m: Mind, a: Agent, rel: Map<string, number
   if (m.mem.facts.length) add(`KNOWS: ${m.mem.facts[m.mem.facts.length - 1]}`, PAL.woodD);
   add("REMEMBERS:", PAL.coral);
   for (const e of m.mem.log.slice(-4).reverse()) add(` ${e.time} ${e.text}`);
+  return lines;
+}
+
+export function drawInspector(g: Ctx, m: Mind, a: Agent, rel: Map<string, number>, names: (id: string) => string, where: string, sw: number, sh: number): void {
+  const w = Math.min(232, sw - 12);
+  const x = sw - w - 6;
+  const y = 18;
+  const tw = w - 14;
+  const lines = inspectorLines(m, a, rel, names, where, (s) => wrap(s, tw));
   const barsH = 12;
   const h = Math.min(sh - y - 6, lines.length * 9 + barsH + 14);
   drawFrame(g, x, y, w, h);
