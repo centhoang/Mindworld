@@ -22,6 +22,7 @@
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
+0. User picks the look: A glyph or B mosaic plane (`client/spike-compare.html`, Tab flips). Step 5c follows the pick.
 1. Execute `docs/RESTRUCTURE.md` from step 5c (read its "As built" notes first), in order.
 2. A day ahead of plan: Nov 3: 5c, 5d, bug 24. Nov 4: 6. Nov 5 morning: 7 only. Step 7 must turn `LOCAL_ONLY` off.
 
