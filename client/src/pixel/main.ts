@@ -1,31 +1,25 @@
 // The game's entry (index.html): a low-res canvas, the scene stack (overworld, battle, interior, teach) and
 // the CRT presenter, wired to the save, the pet brain, Meta-model chat/coach and the live room.
 
-import { typingMs } from "../mind/human";
-import { parseGenes, petLook, randomGenes } from "../game/genes";
-import { fetchRandomGhost, shareGhost } from "../game/ghost-api";
-import { GHOST_ARCHETYPE, ghostEnemyDef, type Ghost } from "../sim/ghost";
-import { EMOTES, isNpc, LiveLink, liveName, NPCS, roomUrl, SAY_MAX, type Emote, type LivePeer, type Npc } from "../world/live";
-import { SLOT_COUNT, worldDay, type GroundOwner } from "../world/layout";
+import { petLook } from "../game/genes";
+import { EMOTES, liveName, type Emote } from "../world/live";
 import { newGroundSeed } from "../world/ground";
-import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
-import { addCoins, coinsFor } from "../game/shop";
-import { load, MAX_TAMED, save } from "../game/save";
-import { addToParty, type PartyMon } from "../game/party";
+import { addCoins } from "../game/shop";
+import { load, save } from "../game/save";
+import { type PartyMon } from "../game/party";
 import type { Genes } from "../sim/ghost";
-import { Battle } from "../sim/battle";
-import { allowedMoves, cannedLine } from "../game/instinct";
-import { fetchWildMemos, withTactics, type WildMemos } from "../sim/tactics";
-import { ENEMIES } from "../sim/enemies";
-import { DEFAULT_PET, type Intent, type Outcome } from "../sim/types";
+import { fetchWildMemos, type WildMemos } from "../sim/tactics";
+import { DEFAULT_PET } from "../sim/types";
 import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
-import { LOCAL_ONLY, NO_LOCAL } from "../game/test-mode";
+import { makeFightFlow } from "./fight-flow";
+import { makeChatFlow } from "../game/chat-flow";
+import { EMOTE_TEXT, makeRoomFlow } from "../world/room-flow";
+import { LOCAL_ONLY } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
-import { NAME_MAX, Overworld, type Wild } from "./overworld";
-import { drawDialogue, drawFrame, drawText, drawToast } from "./text";
+import { Overworld, type Wild } from "./overworld";
+import { drawFrame, drawText, drawToast } from "./text";
 import { humanLook, workSeconds } from "./humans";
-import type { Pose } from "../life/activities";
 import { PIXEL_HINTS, pixelGoals } from "../game/onboard";
 import { loadArt } from "./art";
 import { loadSunny } from "./sunny";
@@ -35,8 +29,7 @@ import { Instinct } from "../game/instinct";
 import { CloudMind, CloudVoice, WebLlmVoice } from "../game/voices";
 import { MINDS_KEY, parseMindsSave } from "../mind/hub";
 import { MindScheduler } from "../mind/scheduler";
-import { BOSS_ARCHETYPE, BOSS_FOCUS, BOSS_STATS, BOSS_TURNS, makeBoss, type Boss } from "../sim/boss";
-import { askNpc, chatWhoFor } from "../game/npc-chat";
+import { chatWhoFor } from "../game/npc-chat";
 import { askPets, traitOf } from "../game/pet-chat";
 import { Interior } from "./interior";
 import { defaultRoom } from "../game/room";
@@ -56,13 +49,6 @@ export function lowSize(devW: number, devH: number): { w: number; h: number; sca
   return { w: Math.max(1, Math.ceil(devW / scale)), h: Math.max(1, Math.ceil(devH / scale)), scale };
 }
 
-const TELL: Record<Intent, string> = {
-  idle: "is watching you.",
-  heavy: "winds up a HEAVY hit!",
-  guarding: "hides behind its guard.",
-  calm: "looks calm.",
-  scared: "looks hurt and scared.",
-};
 
 const state = load();
 const pet = DEFAULT_PET;
@@ -175,126 +161,17 @@ const interior = new Interior({
   around: (g, sw, sh, t, x, y) => world.drawAround(g, sw, sh, t, x, y),
 });
 
-// Talking to a wild pet (E when close): Muse Spark answers in character through the Worker (/api/chat,
-// capped and cached; scripted lines when offline). The pet stops wandering while you talk.
-const chatForm = document.getElementById("chat") as HTMLFormElement;
-const chatInput = chatForm.querySelector("input")!;
-interface PeerChat { peer: string }
-type ChatTarget = Wild | Npc | "room" | "name" | PeerChat;
-let chatWith: ChatTarget | null = null;
-const isPeerChat = (w: ChatTarget | null): w is PeerChat => typeof w === "object" && w !== null && "peer" in w;
-const chatKey = (w: ChatTarget) => (w === "room" || w === "name" || isPeerChat(w) ? "me" : typeof w === "string" ? `n:${w}` : `w${w.id}`);
-const talkTarget = (w: ChatTarget | null) => (isPeerChat(w) ? w.peer : typeof w === "string" && w !== "room" && w !== "name" ? (w as Npc) : null);
-// Private chats: others see a talking status and can't start a chat with those in one (the room enforces it).
-const talks = new Map<string, string>(); // who opened the chat -> who it is with
-const talkKey = (who: string) => (isNpc(who) ? `n:${who}` : `p:${who}`);
-const inMyTalk = (a: string, b: string) => !!world.npcs?.me && (a === world.npcs.me || b === world.npcs.me);
-setInterval(() => {
-  for (const [a, b] of talks) {
-    if (!inMyTalk(a, b)) for (const who of [a, b]) world.say(talkKey(who), "talking...", 3);
-    if (isNpc(b) && world.npcs?.hosting(b)) world.npcs.hold(b); // a villager in a chat stays, whoever hosts it
-  }
-  if (typeof chatWith === "string" && isNpc(chatWith)) world.npcs?.hold(chatWith);
-}, 2000);
-setInterval(() => {
-  const to = talkTarget(chatWith);
-  if (to && live.status === "online") live.talk(to); // renewal: a silent chat ends on the room's timeout
-}, 15_000);
-const GREET: Record<Npc, string> = { elder: "Ah, a visitor. Ask me anything.", mo: "Shh... the fish are listening. Hello!", ama: "Oh, hello dear! Hungry?", pip: "Hi! Wanna play?" };
-function openChat(w: ChatTarget): void {
-  const to = talkTarget(w);
-  if (to && live.status === "online") live.talk(to);
-  chatWith = w;
-  if (typeof w !== "string" && !isPeerChat(w)) w.wait = 999;
-  keys.clear();
-  chatForm.hidden = false;
-  chatInput.value = w === "name" ? myName() : "";
-  chatInput.maxLength = w === "name" ? NAME_MAX : 140;
-  chatInput.placeholder = w === "name" ? "Your name..." : "Say something...";
-  chatInput.focus();
-  if (w === "name") return void chatInput.select();
-  if (w !== "room" && !isPeerChat(w)) world.say(chatKey(w), typeof w === "string" ? GREET[w] : "?", 3);
-  if (typeof w === "string" && w !== "room") world.npcs?.hold(w);
-}
-function closeChat(): void {
-  if (talkTarget(chatWith) && live.status === "online") live.talk();
-  if (chatWith && typeof chatWith !== "string" && !isPeerChat(chatWith)) chatWith.wait = 1;
-  chatWith = null;
-  chatForm.hidden = true;
-  chatInput.blur();
-}
-chatForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  const w = chatWith;
-  const line = chatInput.value.trim();
-  if (w === "name") {
-    const name = line.replace(/[^\p{L}\p{N} _'-]+/gu, "").slice(0, NAME_MAX).trim();
-    if (name) state.name = name;
-    else delete state.name;
-    save(state);
-    closeChat();
+const chat = makeChatFlow({
+  world, state, keys, babbler, myName,
+  live: () => live,
+  hostOf: (npc) => room.hostOf(npc),
+  renamed: () => {
     showName();
     live.rejoin();
-    return;
-  }
-  if (w === "room") {
-    if (line && live.say(line.slice(0, SAY_MAX))) world.say("me", line.slice(0, SAY_MAX), 5);
-    chatInput.value = "";
-    return;
-  }
-  if (isPeerChat(w)) {
-    if (line && live.say(line.slice(0, SAY_MAX), w.peer)) world.say("me", line.slice(0, SAY_MAX), 5);
-    chatInput.value = "";
-    return;
-  }
-  const who = typeof w === "string" ? (w as Npc) : w && chatWhoFor("wild", w.arch);
-  if (!w || !who || !line) return;
-  chatInput.value = "";
-  world.say(chatKey(w), "...", 20);
-  const answer = typeof w === "string" ? villagerAnswer(w as Npc, line) : LOCAL_ONLY ? Promise.resolve({ text: NO_LOCAL }) : askNpc(who, line, "", undefined, undefined, world.wildScene(w));
-  void answer.then((r) => {
-    world.say(chatKey(w), r.text, 6);
-    if (!state.muted) {
-      const v = voiceFor(typeof w === "string" ? (w as Npc) : w.arch);
-      babbler.say(r.text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: "triangle" });
-    }
-  });
+  },
 });
-chatForm.querySelector("[data-act=close]")!.addEventListener("click", closeChat);
-
-// Who answers a villager: its own mind wherever it runs (here, or relayed to the player hosting it, on that
-// machine's local model); if no local model can, Muse Spark in the cloud (event credits, server-capped); then
-// a scripted line.
-const ASK_WAIT_MS = 15_000;
-const asking = new Map<Npc, (text: string | null) => void>();
-// Nobody answers instantly: a reply takes as long as typing it would, however fast the mind was.
-async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string }> {
-  const t0 = performance.now();
-  const answer = await villagerMind(npc, line);
-  await new Promise((r) => setTimeout(r, typingMs(answer.text) - (performance.now() - t0)));
-  return answer;
-}
-
-async function villagerMind(npc: Npc, line: string): Promise<{ text: string }> {
-  const scene = world.sceneWithMe(npc); // what we both see here, so "what's by the pond?" gets a real answer
-  const here = await world.npcs?.reply(npc, myName(), line, undefined, scene);
-  if (here) return here;
-  const hostedHere = !!world.npcs?.hosting(npc);
-  if (!hostedHere && live.status === "online" && npcHosts.get(npc) && !asking.has(npc) && live.ask(npc, line, scene)) {
-    const text = await new Promise<string | null>((resolve) => {
-      const timer = setTimeout(() => done(null), ASK_WAIT_MS);
-      const done = (t: string | null) => {
-        clearTimeout(timer);
-        asking.delete(npc);
-        resolve(t);
-      };
-      asking.set(npc, done);
-    });
-    if (text) return { text };
-  }
-  if (LOCAL_ONLY) return { text: NO_LOCAL };
-  return askNpc(npc, line, "", undefined, undefined, scene);
-}
+const { open: openChat, close: closeChat } = chat;
+const say = (text: string, t: number) => void (toast = { text, t });
 
 // Pets chat with each other at home now and then (Muse Spark via /api/petchat, scripted when offline).
 let petChatT = 15;
@@ -304,7 +181,7 @@ function petChatter(dt: number): void {
   const all = members();
   const a = state.active ?? 0;
   const others = all.filter((_, i) => i !== a);
-  if (!others.length || !world.nearHome() || chatWith || localBrain()) return; // with a local model the pets' minds do the talking
+  if (!others.length || !world.nearHome() || chat.target() || localBrain()) return; // with a local model the pets' minds do the talking
   const r = Math.floor(Math.random() * others.length);
   const them = others[r]!;
   void askPets({ name: all[a]!.name, trait: traitOf(state.memo) }, { name: them.name, trait: "curious" }).then(({ lines: [mine, theirs] }) => {
@@ -390,7 +267,7 @@ document.getElementById("ui")!.addEventListener("click", (e) => {
   const b = (e.target as HTMLElement).closest("button");
   if (!b) return;
   b.blur();
-  if (b.dataset.ui === "rename") return void (mode === "world" && !chatWith && openChat("name"));
+  if (b.dataset.ui === "rename") return void (mode === "world" && !chat.target() && openChat("name"));
   if (b.dataset.dev) return fakeIsle(b.dataset.dev === "add");
   const name = b.dataset.ui!;
   state.hide = { ...state.hide, [name]: !hidden(name) };
@@ -454,13 +331,13 @@ window.addEventListener("keydown", (e) => {
     if (k === "escape") teach.hide();
     return; // typing in the teach box
   }
-  if (chatWith) {
+  if (chat.target()) {
     if (k === "escape") closeChat();
     return; // typing in the chat box
   }
   if (k === "b" && !e.repeat && mode === "world" && !menu) void switchBrain();
   if (k === "i" && !e.repeat && mode === "world" && !menu && !crate) world.toggleInspect();
-  if (k === "g" && !e.repeat && mode === "world" && !chatWith) {
+  if (k === "g" && !e.repeat && mode === "world" && !chat.target()) {
     state.onboard = { ...state.onboard, goalsHidden: !state.onboard?.goalsHidden };
     save(state);
   }
@@ -640,157 +517,18 @@ const myGenes = () => activeMember().genes;
 function myName(): string {
   return state.name || liveName(myGenes());
 }
-const sameSave = (g: Genes) => JSON.stringify(g) === JSON.stringify(myGenes());
-const addPeer = (p: LivePeer) => {
-  if (!sameSave(p.genes)) world.addPeer(p.id, p.name, p.genes, p.x, p.z, p.px, p.pz);
-};
-// Grounds: every player in the room holds a slot on the ring; their ground is drawn from the seed in their
-// hello. A player who leaves leaves a ghost ground for 10 min. Any change rebuilds the map (same on every
-// client); so does the shared day (in-between grounds) and a ghost ground expiring.
-const grounds = new Map<string, GroundOwner>(); // live id -> ground
-const aways = new Map<number, { g: GroundOwner; until: number }>(); // slot -> ghost ground
-let mySlot = 0;
-let slotKnown = false; // the room told me my slot: a reconnect asks for it back
-// Testing: pop in a stand-in player's island (the buttons show on localhost or with ?dev).
-const fakes: GroundOwner[] = [];
-function fakeIsle(add: boolean): void {
-  if (!add) fakes.pop();
-  else {
-    const used = new Set([mySlot, ...[...grounds.values()].map((o) => o.slot), ...aways.keys(), ...fakes.map((o) => o.slot)]);
-    const slot = Array.from({ length: SLOT_COUNT }, (_, n) => n).find((n) => !used.has(n));
-    if (slot !== undefined) fakes.push({ id: `fake${slot}`, name: `Test ${slot}`, seed: slot * 7919 + 13, slot });
-  }
-  relayoutGrounds();
-}
-if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || new URLSearchParams(location.search).has("dev"))
-  for (const b of document.querySelectorAll<HTMLButtonElement>("#ui [data-dev]")) b.hidden = false;
-const ROOM_SEED = [...roomUrl(location)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7);
-const relayoutGrounds = () => {
-  const now = Date.now();
-  for (const [slot, a] of aways) if (a.until <= now) aways.delete(slot);
-  world.relayout({ me: { seed: state.groundSeed!, slot: mySlot }, others: [...grounds.values(), ...[...aways.values()].map((a) => a.g), ...fakes], roomSeed: ROOM_SEED, day: worldDay(now) });
-};
-const trackGround = (p: LivePeer) => {
-  if (p.corner === null || sameSave(p.genes)) return;
-  aways.delete(p.corner);
-  grounds.set(p.id, { id: p.id, name: p.name, seed: p.seed || ([...p.id].reduce((h, c) => h * 33 + c.charCodeAt(0), 5) % 2 ** 31) + 1, slot: p.corner });
-};
-setInterval(() => {
-  const due = [...aways.values()].some((a) => a.until <= Date.now());
-  if (due || worldDay() !== world.day) relayoutGrounds();
-}, 5000);
 const showName = () => {
   world.myName = myName();
   world.myLook = humanLook(liveName(myGenes()));
 };
 showName();
-const npcHosts = new Map<Npc, string | null>(); // who runs each NPC's mind (me: it runs in this tab)
-function setNpcHost(npc: Npc, host: string | null): void {
-  npcHosts.set(npc, host);
-  world.npcs?.setHost(npc, host);
-}
-const DROP_GRACE_MS = 20_000;
-// What every machine must see the same: where the villagers I host are, and what grows on my ground.
-const SHARE_MS = 500;
-let sharedAt = 0;
-let sharedNpcs = "";
-let sharedFarm = "";
-function shareState(now: number): void {
-  if (now - sharedAt < SHARE_MS || live.status !== "online") return;
-  sharedAt = now;
-  const spots = world.npcs?.spots() ?? [];
-  const key = JSON.stringify(spots);
-  if (spots.length && key !== sharedNpcs && live.npcs(spots)) sharedNpcs = key;
-  const plots = (state.farm?.plots ?? []).map((p): [string, number] => [p.crop ?? "", p.stage]);
-  const farm = JSON.stringify(plots);
-  if (farm !== sharedFarm && live.farm(plots)) sharedFarm = farm;
-}
-const live = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: state.groundSeed, slot: slotKnown ? mySlot : undefined, ...world.me }), {
-  welcome: (id, corner, peers, awayList, npcs = {}, open = []) => {
-    talks.clear();
-    for (const [a, b] of open) talks.set(a, b);
-    npcHosts.clear();
-    if (world.npcs) world.npcs.me = id;
-    for (const n of NPCS) setNpcHost(n, npcs[n] ?? null);
-    world.peers.clear();
-    grounds.clear();
-    aways.clear();
-    mySlot = corner ?? 0;
-    slotKnown = corner !== null;
-    for (const a of awayList) aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
-    for (const p of peers) (addPeer(p), trackGround(p));
-    relayoutGrounds();
-  },
-  join: (p) => {
-    sharedFarm = sharedNpcs = ""; // the newcomer has not seen them
-    addPeer(p);
-    trackGround(p);
-    relayoutGrounds();
-  },
-  leave: (id) => {
-    world.peers.delete(id);
-    if (grounds.delete(id)) setTimeout(relayoutGrounds, 500); // an `away` usually follows and keeps the ground
-  },
-  mind: (from, l) => {
-    world.hearMind(from, l);
-    if (l.say && l.to && l.to === world.npcs?.me && isNpc(l.who)) asking.get(l.who)?.(l.say); // my relayed question's answer
-  },
-  talking: (id, withWho, on) => {
-    const me = world.npcs?.me;
-    if (on) talks.set(id, withWho);
-    else talks.delete(id);
-    if (!me) return;
-    if (on && withWho === me && (!chatWith || chatWith === "room")) {
-      toast = { text: `${world.peers.get(id)?.name ?? "Someone"} is talking to you. Esc ends the chat.`, t: 4 };
-      openChat({ peer: id });
-    }
-    if (!on && (id === me || withWho === me) && isPeerChat(chatWith)) closeChat();
-  },
-  talkNo: (withWho) => {
-    if (talkTarget(chatWith) !== withWho) return;
-    closeChat();
-    toast = { text: "They are talking with someone right now. Try again soon.", t: 3 };
-  },
-  ask: (npc, from, name, text, scene) => void world.npcs?.reply(npc, name, text, from, scene),
-  askNo: (npc) => asking.get(npc)?.(null),
-  npcHost: (npc, host) => setNpcHost(npc, host),
-  npcState: (npc, log) => world.npcs?.setMemory(npc, log),
-  away: (a) => {
-    aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
-    relayoutGrounds();
-  },
-  pos: (id, x, z, px, pz) => world.movePeer(id, x, z, px, pz),
-  pose: (id, pose, flip) => world.posePeer(id, pose as Pose | null, flip),
-  npcs: (list) => world.npcs?.shadow(list),
-  farm: (id, plots) => void world.peerFarms.set(id, plots),
-  emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
-  status: (s) => {
-    if (s === "online") return;
-    for (const n of NPCS) setNpcHost(n, null);
-    if (world.npcs) world.npcs.me = null; // offline: the NPCs' minds run here
-    world.peers.clear();
-    // A short drop must not pull the islands from under a visitor's feet.
-    setTimeout(() => {
-      if (live.status === "online" || (!grounds.size && !aways.size)) return;
-      grounds.clear();
-      aways.clear();
-      relayoutGrounds();
-    }, DROP_GRACE_MS);
-  },
-  say: (id, text) => world.say(`p:${id}`, text, 5),
-  duel: (duel, from, name) => duelInvited(duel, from, name),
-  duelStart: (_duel, seed, a, b) => void duelStarted(seed, a, b),
-  duelEnd: (_duel, reason) => duelEnded(reason),
+const room = makeRoomFlow({
+  world, state, chat, myName, myGenes, toast: say,
+  speed: () => (localBrain() ? mindSched.tps(12) : 0),
+  duel: { invited: duelInvited, started: (seed, a, b) => fights.duel(seed, a, b), ended: duelEnded },
 });
-live.connect();
-// Minds online: my pets' activity starts and lines go to the room; others' come back as bubbles. The cap
-// heartbeat tells the room how fast my local model is, so it can pick me to host village NPCs.
-world.onPose = (pose, flip) => void (live.status === "online" && live.pose(pose, flip));
-world.onMind = (l) => void (live.status === "online" && live.mind(l.say ? { ...l, ...world.speakerAt(l.who) } : l));
-setInterval(() => {
-  const brain = localBrain();
-  if (live.status === "online") live.cap(brain ? mindSched.tps(12) : 0, "gpu" in navigator);
-}, 10_000);
+const live = room.live;
+const { fakeIsle, shareState } = room;
 onPetChange = () => {
   showName();
   live.rejoin();
@@ -798,7 +536,6 @@ onPetChange = () => {
 
 // ---- live room extras: emotes (1-4 or the peer menu) and duels. A duel is pet vs pet, both following their
 // own memo rules on a shared seed (sim/duel.ts), so both players watch the same fight.
-const EMOTE_TEXT: Record<Emote, string> = { wave: "*waves*", heart: "<3 <3", dance: "*dances*", laugh: "haha!" };
 function sendEmote(e: Emote): void {
   if (live.emote(e)) world.say("me", EMOTE_TEXT[e], 3);
 }
@@ -851,134 +588,20 @@ function duelEnded(reason: "declined" | "gone"): void {
   toast = { text: reason === "declined" ? `${duelOut.name} said no thanks.` : `${duelOut.name} did not answer.`, t: 3 };
   duelOut = null;
 }
-const DUEL_END: Record<DuelResult, [Outcome, string]> = { win: ["win", "ko"], loss: ["loss", "ko"], draw: ["timeout", ""], friends: ["win", "befriended"] };
-async function duelStarted(seed: number, a: Fighter, b: Fighter): Promise<void> {
-  const me = live.myId === a.id ? "a" : live.myId === b.id ? "b" : null;
-  if (!me || mode !== "world") return; // not ours, or busy (the other side still sees the whole duel)
-  if (duelOut) clearTimeout(duelOut.timer);
-  duelOut = null;
-  mode = "battle";
-  keys.clear();
-  const them = me === "a" ? b : a;
-  const v = duelView(a, b, seed, me);
-  const mine = { ...side(activeMember()), maxHp: v.myMaxHp };
-  await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), maxHp: v.theirMaxHp, level: 3 }, mine);
-  await battleView.say(`Live duel! Both pets follow their own memo rules. Same fight on both screens.`);
-  for (const t of v.turns) await battleView.playTurn(t.mine, "", "duel", t.theirAct, t.dealt, t.taken, t.myHp, t.theirHp);
-  await battleView.end(...DUEL_END[v.result]);
-  const earned = duelCoins(v.result);
-  if (earned) {
-    state.coins = addCoins(state.coins ?? 0, earned);
-    await battleView.say(`+${earned} coins.`);
-  }
-  save(state);
-  mode = "world";
-}
-
-async function fight(foe: Wild | "boss" | "ghost"): Promise<void> {
-  mode = "battle";
-  keys.clear();
-  const w = typeof foe === "string" ? null : foe;
-  const boss: Boss | null = foe === "boss" ? makeBoss(state.memo, pet) : null;
-  // A ghost: another player's shared pet (looks + memo rules) from the Worker, or a bundled one offline.
-  const ghost: Ghost | null = foe === "ghost" ? (await fetchRandomGhost()).ghost : null;
-  const arch = w ? w.arch : ghost ? GHOST_ARCHETYPE : BOSS_ARCHETYPE;
-  const tactic = w ? wildMemos[w.arch] : undefined;
-  foeVoice = ghost ? "ghost" : arch;
-  const def = boss ? boss.def : ghost ? ghostEnemyDef(ghost, pet) : withTactics(ENEMIES[arch], tactic);
-  const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def, ...(boss ? { maxTurns: BOSS_TURNS } : {}) });
-  const foeName = boss ? BOSS_STATS.label : ghost ? ghost.name.slice(0, 12) : arch[0]!.toUpperCase() + arch.slice(1);
-  const foeSprite = boss
-    ? drawMonster(petLook(randomGenes(4242)), 80, "front", BUILDS.bully)
-    : ghost
-      ? drawMonster(petLook(parseGenes(ghost.genes) ?? randomGenes(1)), 64, "front")
-      : drawMonster(petLook(w!.genes), 64, "front", BUILDS[arch]);
-  await battleView.open({ name: foeName, sprite: foeSprite, maxHp: def.maxHp, level: boss ? 9 : ghost ? 5 : 2 + (w!.id % 3) }, side(activeMember()));
-  if (ghost) await battleView.say(`${ghost.name}'s ghost fights with its owner's memo: ${ghost.memo.rules.length} rule${ghost.memo.rules.length === 1 ? "" : "s"}.`);
-  if (boss) {
-    await battleView.say(wildMemos.boss?.summary ? `"${wildMemos.boss.summary}"` : `"I can read your pet's memo. Every rule. Surprise me."`);
-    await battleView.say(`It loses focus after ${BOSS_FOCUS} reads. A dazed boss might make friends.`);
-  }
-  // Fight = watch the pet play its memo; Teach = change the memo first; Swap = next party member; Run = leave.
-  for (;;) {
-    const c = await battleView.choose();
-    if (c === "fight") break;
-    if (c === "teach") {
-      keys.clear();
-      teach.show();
-      while (teach.open) await new Promise((r) => setTimeout(r, 100));
-    } else if (c === "swap") {
-      const n = members().length;
-      if (n < 2) await battleView.say("No one else is with you yet. Befriend a wild pet!");
-      else {
-        state.active = ((state.active ?? 0) + 1) % n;
-        save(state);
-        refreshParty();
-        await battleView.swapMine(side(activeMember()));
-      }
-    } else {
-      await battleView.say("You slip away safely.");
-      coolFoe(foe);
-      mode = "world";
-      return;
-    }
-  }
-  // The pet's brain: a firing memo rule decides at once; otherwise a local Llama (if loaded) picks among
-  // the moves the memo allows and gives the line, with the reflex as fallback. The next pick is prefetched
-  // while the current turn animates.
-  const name = activeMember().name;
-  let next = instinct.decide(name, state.memo, battle.observe());
-  while (!battle.done) {
-    const obs = battle.observe();
-    await battleView.say(`${foeName} ${TELL[obs.intent]}`);
-    const choice = await next;
-    const tag = choice.source === "rule" ? `memo #${choice.rule! + 1}` : choice.source === "model" ? brainTag() : "instinct";
-    const rec = battle.step(choice.action);
-    if (!battle.done) next = instinct.decide(name, state.memo, battle.observe());
-    await battleView.playTurn(choice.action, choice.line, tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp);
-    const read = boss?.reads.find((r) => r.turn === obs.turn);
-    if (read) await battleView.say(`It read memo #${read.rule + 1}! ${read.did === "idle" ? "It faked the tell." : "It hit hard anyway."}`, "boss read");
-    else if (boss?.dazedTurns.includes(obs.turn)) await battleView.say(`${foeName} is dazed: it can't read you now.`, "dazed");
-  }
-  const replay = battle.replay();
-  await battleView.end(replay.outcome, replay.how);
-  if (replay.outcome === "win") {
-    const earned = coinsFor(replay.outcome, replay.how);
-    state.coins = addCoins(state.coins ?? 0, earned);
-    let msg = `+${earned} coins.`;
-    if (replay.how === "befriended" && w) {
-      state.tamed = [...(state.tamed ?? []), w.arch].slice(-MAX_TAMED); // v1 readers
-      state.party = addToParty(state.party ?? [], w.arch, w.genes);
-      state.active = Math.min(state.active ?? 0, state.party.length);
-      refreshParty();
-      msg = `${state.party.at(-1)!.name} the ${w.arch} is yours now! It waits at your corner. ${msg}`;
-    }
-    if (boss) msg = `You outsmarted The Reader! ${msg}`;
-    await battleView.say(msg);
-    if (w) {
-      world.removeWild(w.id);
-      const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
-      if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
-    } else coolFoe(foe);
-  } else {
-    if (boss) await battleView.say("Tip: it reads your rules. Teach a plan it can't predict, then come back.");
-    coolFoe(foe); // give the player time to walk away
-  }
-  if (w) state.recent = [...state.recent, replay].slice(-8);
-  // Winning wild fights with a taught memo shares your pet as a ghost others can fight (rules only).
-  if (w && replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== memoKey()) {
-    void shareGhost(pet.name, state.genes, state.memo, state.home).then((r) => {
-      if (!r.ok) return;
-      state.shared = memoKey();
-      state.mine = [...(state.mine ?? []), r.id].slice(-20);
-      save(state);
-      toast = { text: `${pet.name}'s ghost is out there now: other players can fight its memo.`, t: 4 };
-    });
-  }
-  state.steps = { ...state.steps, fought: true, ...(boss && replay.outcome === "win" ? { boss: true } : {}) };
-  save(state);
-  mode = "world";
-}
+const fights = makeFightFlow({
+  world, state, pet, live: () => live, keys, battleView, teach, instinct,
+  mode: () => mode,
+  setMode: (m) => void (mode = m),
+  setFoeVoice: (v) => void (foeVoice = v),
+  wildMemos: () => wildMemos,
+  members, activeMember, side, refreshParty, coolFoe, memoKey, brainTag,
+  duelBegun: () => {
+    if (duelOut) clearTimeout(duelOut.timer);
+    duelOut = null;
+  },
+  toast: say,
+});
+const fight = fights.fight;
 
 let last = performance.now();
 function frame(now: number): void {

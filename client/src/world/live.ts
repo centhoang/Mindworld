@@ -85,6 +85,7 @@ export interface LiveHandlers {
 }
 
 export const SAY_MAX = 80;
+export const NAME_MAX = 10;
 
 export interface Me {
   x: number;

@@ -39,7 +39,6 @@ const SHORE: readonly (readonly [number, number])[] = [[-2, 0], [2, 0], [-1, 0],
 export const CHIMNEY: Record<string, [number, number]> = { "house-blue": [63, 11], "house-red": [15, 1], "house-orange": [15, 22], "house-orangelong": [63, 18], "house-bluesmall": [55, 7] };
 const READ_CHARS = 12; // a bubble stays long enough to read at this many characters a second
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
-export const NAME_MAX = 10;
 const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", "fence-v": "a fence", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
 const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "the lawn", playground: "the playground slide and goal", picnic: "the picnic blanket", pond: "the fishing pond", plaza: "the village square" };
 

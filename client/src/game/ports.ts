@@ -6,6 +6,7 @@ import type { MindLM } from "../mind/scheduler";
 import type { Agent } from "../life/village";
 import type { Genes } from "../sim/ghost";
 import type { HumanLook } from "../pixel/humans";
+import type { Overworld } from "../pixel/overworld";
 import type { LiveLink } from "../world/live";
 import type { TileMap } from "../world/tilemap";
 
@@ -94,3 +95,8 @@ export interface View {
 export type Transport = Pick<LiveLink, "status" | "talk" | "tick" | "say" | "rejoin" | "myId" | "decline" | "pose" | "npcs" | "mind" | "farm" | "emote" | "connect" | "challenge" | "cap" | "ask" | "accept">;
 
 export type MindBackend = MindLM;
+
+// What each flow may touch of the world.
+export type ChatWorld = Pick<Overworld, "npcs" | "say" | "sceneWithMe" | "wildScene">;
+export type RoomWorld = Pick<Overworld, "npcs" | "peers" | "peerFarms" | "me" | "day" | "relayout" | "addPeer" | "movePeer" | "posePeer" | "hearMind" | "say" | "speakerAt" | "onPose" | "onMind">;
+export type FightWorld = Pick<Overworld, "world" | "removeWild" | "spawnWild">;
