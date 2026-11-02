@@ -14,7 +14,7 @@
 ## Decisions
 - NPCs are the star: a player cannot tell them from a human. The sim reasons; the model picks among valid options and speaks.
 - The game must still work free after the event. Prompts are frozen at af455c4: a text change needs a retrain.
-- The user reviews scope by scope in labs, not by playing the whole game (`docs/testing/testing.md`).
+- The user tests only once the whole plan is executed (2026-11-02). Until then, run the checks and record proof; do not stop for review.
 - Submission day (user): make GitHub and the 4 HF repos public, remove Access. Remove `/api/chatlog`, its client call and the KV rows.
 
 ## Decisions from the user (2026-11-02)
