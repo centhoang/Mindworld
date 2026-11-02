@@ -67,8 +67,8 @@ form.addEventListener("submit", (e) => {
 
 const stage = document.getElementById("stage")!;
 setInterval(() => {
-  stage.innerHTML = `<tr><th>Villager</th><th>Doing</th><th>Coins</th></tr>${(world.npcs?.v.agents ?? [])
-    .map((a) => `<tr><td>${a.name}</td><td>${a.state}${a.act ? `: ${a.act}` : ""}</td><td>${world.npcs!.hub.minds.get(a.id)?.mem.purse?.coins ?? ""}</td></tr>`)
+  stage.innerHTML = `<tr><th>Villager</th><th>Doing</th></tr>${(world.npcs?.v.agents ?? [])
+    .map((a) => `<tr><td>${a.name}</td><td>${a.state}${a.act ? `: ${a.act}` : ""}</td></tr>`)
     .join("")}`;
 }, 1000);
 (window as unknown as { __lab: unknown }).__lab = { world, answer, sched };

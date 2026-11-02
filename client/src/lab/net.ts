@@ -64,7 +64,9 @@ const dot = (x: number, z: number, colour: string, name: string) => {
   g.fillText(name, sx + 6, sz + 4);
 };
 let last = performance.now();
-function frame(now: number): void {
+// A timer, not animation frames: a background tab keeps playing, so two tabs can test each other.
+setInterval(() => {
+  const now = performance.now();
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   const go = (a: string, b: string) => (keys.has(a) || keys.has(b) ? 1 : 0);
@@ -77,9 +79,7 @@ function frame(now: number): void {
   g.fillRect(0, 0, canvas.width, canvas.height);
   for (const p of peers.values()) dot(p.x, p.z, "#3b2c35", p.name);
   dot(me.x, me.z, "#e8505b", "me");
-  requestAnimationFrame(frame);
-}
-requestAnimationFrame(frame);
+}, 50);
 
 const numbers = document.getElementById("numbers")!;
 setInterval(() => {

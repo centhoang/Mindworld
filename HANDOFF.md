@@ -3,11 +3,11 @@
 **Starting prompt:** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md."
 
 ## State
-- Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/ (Worker 1a977eaf). Fallback: `main`, the last pixel build.
-- Tests: client 636, worker 192, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
+- Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/ (see `wrangler deployments`). Fallback: `main`, the last pixel build.
+- Tests: client 641, worker 192, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
 - The user has not reviewed the bug 13-23 fixes. Not proven with 2 players. The glyph spike may replace them.
-- Steps 0-3 done, deployed. Tuned 3B benched: not clearly better, stays out (`docs/ai/npc.md`).
+- Steps 0-4 done, deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B benched: not clearly better, stays out (`docs/ai/npc.md`).
 - Glyph spike approved by the user: `client/glyph-spike.html`, proof in `docs/testing/proof/visual/`.
 
 ## Decisions
@@ -21,8 +21,8 @@
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-1. Execute `docs/RESTRUCTURE.md` from step 4, in order.
-2. Nov 3: 4, 5a, 5b. Nov 4: 5c, 5d, 6. Nov 5 morning: 7 only.
+1. Execute `docs/RESTRUCTURE.md` from step 5a (read its "As built" notes first), in order.
+2. Nov 3: 5a, 5b. Nov 4: 5c, 5d, 6. Nov 5 morning: 7 only.
 
 ## Gotchas
 - Chat log: from `worker/`, `npx wrangler kv key list --binding GHOSTS --remote --prefix chat:`, then `kv key get`.

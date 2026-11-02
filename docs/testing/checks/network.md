@@ -1,6 +1,6 @@
 # Network checks
 
-Lab: `/lab/net` (not built yet).
+Lab: `/lab/net`. Second player: `?p=2`.
 
 - [ ] Two players see each other move, with no jumps.
 - [ ] Walking away makes the other player vanish cleanly; coming back brings them back.

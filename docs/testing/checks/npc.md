@@ -1,6 +1,6 @@
 # NPC checks
 
-Lab: `/lab/npc` (not built yet). Today's runner: `node scripts/npc-chat-run.mjs`, results in `.scratch/chat-runs/`.
+Lab: `/lab/npc`. Scripted runner: `node scripts/npc-chat-run.mjs`, results in `.scratch/chat-runs/`.
 Pass means: follows the last line, acts on yes or no, never repeats itself, never contradicts the sim, sounds like that villager.
 
 ## What you should feel

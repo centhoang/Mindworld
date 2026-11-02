@@ -32,6 +32,13 @@ Findings that shape the plan:
 
 Do 5a first: NPCs matter most. 5b, 5c and 5d touch separate folders, so you can open one session each. Order: Nov 2: 0-3. Nov 3: 4, 5a, 5b. Nov 4: 5c, 5d, 6. Nov 5 morning (VN): 7 only, no features.
 
+## As built (steps 3-4)
+- `PixelView` still reads the Overworld for its sprites. Only `GlyphView` needs to read `Scene` alone; PixelView is the fallback.
+- `View.draw` returns which bubbles were held, because a bubble's time on screen depends on that.
+- `fight-flow.ts` lives in `pixel/`: it is battle-screen code.
+- 5a goes in `makeVillagerAnswer` (`game/chat-flow.ts`), which `/lab/npc` already uses. 5b reads its numbers from `/lab/net`.
+- `/lab/visual` shows the spike until 5c adds scene presets.
+
 ## Step 3: seams
 - Move `TileMap`, `T` and `tileAt` from `pixel/tiles.ts` to `world/tilemap.ts`. Leave a re-export until the imports are fixed.
 - Add `client/src/game/ports.ts` with three interfaces:
