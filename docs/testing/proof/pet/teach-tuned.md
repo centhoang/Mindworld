@@ -9,3 +9,5 @@ Deployed `/lab/pet`, test Chrome on the GTX 1050, tuned Llama 3.2 1B (`/mlc/n4/`
 | eat the moon and sing to the rocks | 17 s | Accepted: four junk "enemy is a pal" rules added. Failed, so `isFightLesson` now refuses it in code (prompts are frozen) |
 
 Seen on live after the fix: refused in 1 s with no rule added, `teach-refused.png`.
+
+Bug 26, deployed `/lab/pet`, same model: "use your strongest attack when the enemy is weak" took 19 s, the rules stayed the same, and the player is told so with an example. `teach-unchanged.png`. The proof card still shows the last real change.

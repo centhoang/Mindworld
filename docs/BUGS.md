@@ -10,7 +10,6 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 - Fixed, waiting for review: 24 (asking for goods is buying; "how much?" means that good, unit test only). 12 (memory cut off invitations, unit test only). 10. Conversation continues: yes, no, later and "where?" act on offers.
 
 ## Pet
-26. **A valid lesson can change nothing:** "use your strongest attack when the enemy is weak" left the memo as it was, and the player is not told.
 
 ## Network
 None open. AOI is new work: `network/network.md`.

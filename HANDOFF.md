@@ -4,7 +4,7 @@
 
 ## State
 - Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/ (see `wrangler deployments`). Fallback: `main`, the last pixel build.
-- Tests: client 685, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
+- Tests: client 686, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
 - User has not reviewed bugs 13-23. Not proven with 2 players. Steps 0-5d deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B stays out (`docs/ai/npc.md`).
 - 5a: cloud free talk works (`proof/npc/`). Open: rude and gossip checks not run. 5b: AOI live (`proof/network/`), 89 bots held; 100 not proven.
@@ -21,10 +21,9 @@
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-1. Bug 26: a valid lesson can leave the memo unchanged, and the player is not told.
-2. Visual left: house entry, window sizes, pet genes. Pet left: hatch, follow, mood. Walking outlines and slide: `docs/visual/layers.md`.
-3. Step 6: wire and cut. Remove boss, ghosts, furniture editing, `generateWorld` and its tests, goal "Outsmart The Reader". `checks/game.md`, 2+ players, drop `/api/chatlog`.
-4. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off.
+1. Visual left: house entry, window sizes, pet genes. Pet left: hatch, follow, mood. Walking outlines and slide: `docs/visual/layers.md`.
+2. Step 6: wire and cut. Remove boss, ghosts, furniture editing, `generateWorld` and its tests, goal "Outsmart The Reader". `checks/game.md`, 2+ players, drop `/api/chatlog`.
+3. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off.
 
 ## Gotchas
 - Chat log: from `worker/`, `npx wrangler kv key list --binding GHOSTS --remote --prefix chat:`, then `kv key get`.
