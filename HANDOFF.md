@@ -6,7 +6,7 @@
 - Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/ (see `wrangler deployments`). Fallback: `main`, the last pixel build.
 - Tests: client 652, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
-- The user has not reviewed the bug 13-23 fixes. Not proven with 2 players. Steps 0-4, 5a, 5b deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B stays out (`docs/ai/npc.md`).
+- User has not reviewed bugs 13-23. Not proven with 2 players. Steps 0-4, 5a, 5b deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B stays out (`docs/ai/npc.md`).
 - 5a: cloud free talk works (`proof/npc/`). Open: bug 24 (Ama's goods), rude and gossip checks not run. 5b: AOI live (`proof/network/`), 89 bots held; 100 not proven.
 - Glyph spike approved by the user: `client/glyph-spike.html`, proof in `docs/testing/proof/visual/`.
 
