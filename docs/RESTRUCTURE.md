@@ -88,14 +88,13 @@ Add a `chatTier()` in `game/npc-chat.ts`, used by `villagerAnswer` / `villagerMi
 - Raise `ROOM_MAX_PEERS` only after the load test. New `scripts/net-bots.mjs`, N sockets with a hard limit, reporting bytes per peer. Check Cloudflare's Durable Object limits first.
 - A compact village means crowding at the plaza, so lower the rate for far entities past ~16 in view.
 
-## As built (5c so far): the look is now the mosaic plane, Tile skin
-- `client/src/view/mosaic/`: `grid.ts` (plane, repaints changed cells), `compose.ts` (Scene to cells, pure, tested), `mosaic-view.ts` (canvas). 3 cells per tile, 24 updates a second.
-- Default in the game; `?look=pixel` is the old view. Low-res target is 360 rows, about 45 rows of cells. Goals, menus, toasts and the inspector are cells, through `Scene.panels`.
-- Still breaks the one-plane rule: battle and house screens (pixel art), DOM chips (Goals, Map...), DOM chat box. Chat box plan: keep the input hidden, show its text in a panel.
-- House not checked at the new size: the tour stopped short of the door. Battle draws fine, in the old look.
-- Scene gained nothing the view may not read: inspector text comes as `lines()`, bubbles moved to `view/bubbles.ts`.
-- Next, the village: `generateWorld` has about 45 uses in `overworld.ts`, grounds need `p.ground` (36x28, too big for a street plot). Plan: keep platform ids, place them on one map from `world/village-map.ts`, skip islands and bridges.
-- Delete at the end of 5c: `view/glyph/spike.ts`, `view/mosaic/{spike,skins}.ts`, `glyph-spike.html`, `mosaic-spike.html`, `spike-compare.html`. Keep `glyph/atlas.ts`. Point `/lab/visual` at MosaicView presets.
+## As built (5c, 5d)
+- Look: `client/src/view/mosaic/`. `compose.ts` draws a Scene, `battle.ts` the fight, 3 cells per tile, about 45 rows. `?look=pixel` is the old view.
+- Village: `world/village-map.ts`, 66 x 47, used through `villageWorld`. Old `generateWorld` stays for its tests until step 6. 12 plots, slot 12 = shared Guest yard. Worker `CORNERS` 12.
+- Places have `rect`; trees, bushes, rocks come from the rows (`world.things`). Plot: house at x + 4, beds right of its door. `HOME_BLOCKS`, `HOME_DOOR_DX` fit the cell house.
+- House: `Interior.scene()` is a normal Scene on a small map (`T.floor`, `T.wall`). Furniture editing still works; cut it in step 6.
+- Chat, Teach: hidden forms only catch typing (`body.cells`). Chips: a click on the bottom row presses the hidden `#ui` button. Teach: Tab reviews fights.
+- Labs: `/lab/visual` presets, `/lab/pet` plane plus varieties. Pet numbers: `testing/proof/pet/5d.md`.
 
 ## Step 5c: glyph view (original plan, read as mosaic)
 - `client/src/view/glyph/`: code-drawn glyph atlas, palette, `GlyphView` implementing `View`. Keep `layers.md` bands, foot sort and whole-pixel scaling, reusing `lowSize`.
