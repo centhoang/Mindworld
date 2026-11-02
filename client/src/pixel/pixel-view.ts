@@ -14,9 +14,21 @@ import { drawDecor, drawSpotProp } from "./grounds-draw";
 import { humanSprites, newHumanMotion, NPC_LOOKS } from "./humans";
 import { drawInspector } from "./inspector";
 import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint, sitFrame } from "./life-draw";
-import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_ART, OVERWORLD_MON, type Overworld } from "./overworld";
-import { characterShadow, drawCropArt, drawHighClouds, drawLand, drawRail, drawSea, drawSeaLife, drawTree, footRuns, stampSize, stand, standRun, strip } from "./sunny";
+import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_SMALL, OVERWORLD_MON, type Overworld } from "./overworld";
+import { characterShadow, drawCropArt, drawLand, drawRail, drawSea, drawTree, footRuns, stampSize, stand, standRun, strip } from "./sunny";
 import { tile } from "./sunny-terrain";
+
+const SOIL = tile(7, 1); // the pack's earth, one whole tile, so beds side by side read as one field
+
+// Dug earth: the pack's tile, darkened so a bed never reads as road, with two furrows.
+function drawSoil(g: CanvasRenderingContext2D, x: number, y: number): void {
+  drawRail(g, SOIL, x, y);
+  g.fillStyle = "rgba(96,52,32,0.55)";
+  g.fillRect(x, y, TILE, TILE);
+  g.fillStyle = "rgba(60,32,24,0.5)";
+  g.fillRect(x, y + 5, TILE, 1);
+  g.fillRect(x, y + 11, TILE, 1);
+}
 import { drawFrame, drawText, drawTinyText, GLYPH, wrap } from "./text";
 
 const SMOKE_W = 15;
@@ -89,7 +101,7 @@ export class PixelView implements View {
       const farm = o.peerFarms.get(p.owner ?? "");
       bedsAt(p).forEach((b, i) => {
         const [sx, sy] = toScreen(b.x, b.z);
-        stand(g, "soil", sx + 8, sy + 14);
+        drawSoil(g, sx, sy);
         const [crop, stage] = farm?.[i] ?? ["", 0];
         if (crop) drawCropArt(g, CROP_ART[crop] ?? "carrot", CROP_STAGE[Math.min(3, stage)]!, sx + 8, sy + 13);
       });
@@ -97,7 +109,7 @@ export class PixelView implements View {
     o.beds.forEach((b, i) => {
       const [sx, sy] = toScreen(b.x, b.z);
       const p = o.farm?.plots[i];
-      stand(g, "soil", sx + 8, sy + 14);
+      drawSoil(g, sx, sy);
       if (p?.crop) drawCropArt(g, CROP_ART[p.crop] ?? "carrot", CROP_STAGE[Math.min(3, p.stage)]!, sx + 8, sy + 13);
       if (p && p.wetUntil) {
         g.fillStyle = PAL.teal; // wet soil: teal corner marker (STYLE.md farms)
@@ -119,7 +131,6 @@ export class PixelView implements View {
     const toScreen = (x: number, z: number): [number, number] => [Math.round(x * TILE) - camX, Math.round(z * TILE) - camY];
     drawSea(g, m, camX, camY, sw, sh, t);
     drawLand(g, m, o.sunny, camX, camY, sw, sh, t);
-    drawSeaLife(g, o.sunny.seaLife, camX, camY, sw, sh, t);
     this.drawBeds(g, toScreen, t);
     const plaza = o.world.platforms.find((p) => p.kind === "plaza");
     // Sprites sorted by their feet, so things lower on screen stand in front.
@@ -189,7 +200,7 @@ export class PixelView implements View {
     }
     {
       const [hx, hy] = toScreen(o.house.x, o.house.z);
-      if (!scene.indoors) this.pushHouse(items, g, HOME_ART, o.house.z, hx, hy, t);
+      if (!scene.indoors) this.pushHouse(items, g, HOME_SMALL, o.house.z, hx, hy, t);
     }
     for (const h of o.houses) {
       const [hx, hy] = toScreen(h.x, h.z);
@@ -200,11 +211,6 @@ export class PixelView implements View {
       const [lx, ly] = toScreen(l.x, l.z);
       if (lx < -60 || ly < -16 || lx > sw + 60 || ly > sh + 100) continue;
       items.push({ z: l.z, draw: () => stand(g, l.art, lx, ly) });
-    }
-    for (const c of o.critters) {
-      const [cx, cy] = toScreen(c.x, c.z);
-      if (cx < -40 || cy < -40 || cx > sw + 40 || cy > sh + 40) continue;
-      items.push({ z: c.z, draw: () => strip(g, c.art, cx - 16, cy - 24, Math.floor(t * 3 + c.seed), c.seed % 2 === 1) });
     }
     for (const p of o.world.platforms) {
       if (!p.spots) continue;
@@ -331,7 +337,6 @@ export class PixelView implements View {
     }
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
-    drawHighClouds(g, camX, camY, sw, sh, t);
     const now = scene.clock;
     if (!scene.day) drawTint(g, now.hour, sw, sh);
     {

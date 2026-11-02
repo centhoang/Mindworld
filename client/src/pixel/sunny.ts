@@ -12,15 +12,14 @@ const images = new Map<string, HTMLImageElement>();
 let data: { stamps: Record<string, [number, number]>; clouds: [number, number, number][][]; anims: number[][] } = { stamps: {}, clouds: [], anims: [] };
 const animOf = new Map<number, number[]>();
 
+// Only what docs/visual/visual.md needs: the rest of the pack stays in the art folder and is never fetched.
 const STRIPS: Record<string, { frames: number }> = {
-  spr_deco_tree_01_strip4: { frames: 4 }, spr_deco_tree_02_strip4: { frames: 4 }, spr_deco_glint_01_strip6: { frames: 6 }, spr_deco_glint_02_strip4: { frames: 4 },
-  spr_deco_mushroom_red_01_strip4: { frames: 4 }, spr_deco_mushroom_blue_01_strip4: { frames: 4 }, chimneysmoke_01_strip30: { frames: 30 },
-  spr_deco_duck_01_strip4: { frames: 4 }, spr_deco_chicken_01_strip4: { frames: 4 }, spr_deco_sheep_01_strip4: { frames: 4 }, spr_deco_pig_01_strip4: { frames: 4 }, spr_deco_cow_strip4: { frames: 4 },
-  spr_deco_bird_01_strip4: { frames: 4 }, spr_deco_windmill_withshadow_strip9: { frames: 9 }, spr_deco_fire_01_strip4: { frames: 4 }, spr_deco_coracle_strip4: { frames: 4 },
+  spr_deco_tree_01_strip4: { frames: 4 }, spr_deco_tree_02_strip4: { frames: 4 }, spr_deco_glint_01_strip6: { frames: 6 }, spr_deco_glint_02_strip4: { frames: 4 }, chimneysmoke_01_strip30: { frames: 30 },
 };
-const SINGLES = ["tiles", "f-isle-sand", "f-isle-green", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "label_left", "label_middle", "label_right", "itemdisc_01", "itemdisc_02", "interior", "interior-roof", "home-roof", "home-open", "spr_deco_rug_01",
+const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "expression_chat", "interior", "interior-roof", "home-roof", "home-open",
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture"];
-export const CROPS_ART = ["wheat", "carrot", "beetroot", "cabbage", "cauliflower", "kale", "parsnip", "potato", "pumpkin", "radish"] as const;
+const STAMPS = ["house-blue", "house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "statue", "jar", "crates", "crate", "soil", "bench"];
+export const CROPS_ART = ["wheat", "carrot", "radish"] as const;
 
 export const sunnyReady = (): boolean => images.has("tiles");
 export const stampSize = (name: string): [number, number] => data.stamps[name] ?? [16, 16];
@@ -41,7 +40,7 @@ export async function loadSunny(): Promise<void> {
     if (i) images.set(name, i); // a missing sprite leaves a gap, not a dead game
   };
   const crops = CROPS_ART.flatMap((c) => [0, 1, 2, 3, 4, 5].map((n) => `crop-${c}-${n}`));
-  await Promise.all([...SINGLES, ...Object.keys(STRIPS), ...Object.keys(data.stamps), ...crops].map(one));
+  await Promise.all([...SINGLES, ...Object.keys(STRIPS), ...STAMPS, ...crops].map(one));
 }
 
 // Mirrored and flipped tiles are cut once into their own little canvas.

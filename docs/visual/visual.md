@@ -14,6 +14,8 @@ Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams, decor de
 ## Look options
 **Decided (user, 2026-11-02):** B, the mosaic plane, Tile skin: the whole screen is one grid of cells and only changed cells repaint. Replaces A below. Spike and other skins: `client/spike-compare.html`, proof `../testing/proof/visual/mosaic-*`.
 
+**Open again (user, 2026-11-03):** compact Sunnyside is built to compare, behind `?look=pixel` and the `Look` chip. It loads 59 of the 141 art files and draws no clouds, sea life or farm animals. Compare: `../testing/proof/visual/looks-compare.jpg`.
+
 Earlier pick, replaced: A, glyph look, after judging the spike's image and clip. If 5c runs late: B, compact Sunnyside. Spike: `client/glyph-spike.html`, proof in `../testing/proof/visual/glyph-spike*`.
 
 | | Option | Good | Bad |

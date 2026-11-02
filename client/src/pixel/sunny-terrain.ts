@@ -65,7 +65,10 @@ export function buildTerrain(m: TileMap): Terrain {
   // Ponds and streams are coast like any other: same grass edge, same cliff and the same moving foam.
   const dry = (i: number, j: number) => at(i, j) !== T.water && at(i, j) !== T.bridge && at(i, j) !== T.pool;
   const isSoil = (i: number, j: number) => m.soil?.[j * m.w + i] === 1;
-  const isRoad = (i: number, j: number) => at(i, j) === T.path && !isSoil(i, j);
+  const onPath = (i: number, j: number) => at(i, j) === T.path && !isSoil(i, j);
+  // A road's edge tiles are mostly grass, so the shape is one tile wider than the walkable path: the dirt then shows
+  // at the path's real width, and a two-tile street stays a street.
+  const isRoad = (i: number, j: number) => onPath(i, j) || (dry(i, j) && (onPath(i + 1, j) || onPath(i - 1, j) || onPath(i, j + 1) || onPath(i, j - 1)));
   const high = (i: number, j: number) => m.high?.[j * m.w + i] === 1;
   const isPool = (i: number, j: number) => at(i, j) === T.pool;
   const free = (i: number, j: number) => i >= 0 && j >= 0 && i < m.w && j < m.h && !dry(i, j);

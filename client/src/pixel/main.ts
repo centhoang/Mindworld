@@ -300,6 +300,12 @@ document.getElementById("ui")!.addEventListener("click", (e) => {
   if (!b) return;
   b.blur();
   if (b.dataset.ui === "rename") return void (mode === "world" && !chat.target() && openChat("name"));
+  if (b.dataset.ui === "look") {
+    const url = new URL(location.href);
+    if (pixelLook) url.searchParams.delete("look");
+    else url.searchParams.set("look", "pixel");
+    return location.assign(url);
+  }
   if (b.dataset.dev) return fakeIsle(b.dataset.dev === "add");
   const name = b.dataset.ui!;
   state.hide = { ...state.hide, [name]: !hidden(name) };

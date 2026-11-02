@@ -28,6 +28,7 @@ Bug 29: villagers never clean or feed, so the activities line stays failed (`pro
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
+0. User picks the look: mosaic or compact Sunnyside (`?look=pixel`, `Look` chip, live on b2b8821f). The winner stays, then drop the chip.
 1. User plays the live build; read the chat log after, add failures to `checks/npc.md`. User decides bugs 28 and 29.
 2. Left in `game.md`: stranger test (a person), Teach and no-GPU (need step 7).
 3. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off. `/api/chatlog` goes last.

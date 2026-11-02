@@ -53,7 +53,8 @@ const WILD_PER_MEADOW = 3;
 const MEET_DIST = 1.0;
 const NPC_ROUTE_TILES = 120_000; // the NPCs may walk across the whole map
 export const HOME_ART = "home-roof";
-const HOUSE_ART = ["house-red", "house-orange", "house-green", "house-purple", "house-orangelong", "house-redsmall", "house-bluesmall", "house-greentall"];
+export const HOME_SMALL = "house-blue"; // the home as the Sunnyside look shows it outside: home-roof is wider than the plot
+const HOUSE_ART = ["house-red", "house-green", "house-redsmall", "house-bluesmall"];
 export const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
 // Farm stages 0-3 onto the pack's six growth pictures.
 export const CROP_STAGE = [1, 2, 3, 4]; // the pack's stage 5 is the harvested item, not a plant
@@ -175,7 +176,7 @@ export class Overworld {
     const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
     if (npcIsle) this.elder = { pos: this.elder?.pos ?? { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: this.elder?.sprite ?? drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
     this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, { art: "statue", x: plaza.x - 6.5, z: plaza.z + 4 }];
-    if (npcIsle) this.landmarks.push({ art: "house-purple", x: npcIsle.x, z: npcIsle.z - 3.5 });
+    if (npcIsle) this.landmarks.push({ art: "house-bluesmall", x: npcIsle.x, z: npcIsle.z - 2.5 });
     this.critters = [];
     for (const p of this.world.platforms) {
       if (p.kind === "plaza" || p.kind === "islet") continue;
