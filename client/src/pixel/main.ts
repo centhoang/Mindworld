@@ -171,10 +171,6 @@ function stepDoor(dt: number): void {
 state.room ??= defaultRoom();
 const interior = new Interior({
   room: () => state.room!,
-  setRoom: (r) => {
-    state.room = r;
-    save(state);
-  },
   petSprite: () => world.petSprite,
   residents: () => world.residentSprites(),
   look: () => world.myLook,
@@ -725,7 +721,7 @@ function update(dt: number, t: number): void {
       if (toast.t <= 0) nextToast();
     }
   } else if (mode === "home") {
-    interior.update(dt, crate || interior.deco ? new Set<string>() : keys);
+    interior.update(dt, crate ? new Set<string>() : keys);
     if (pixelLook) interior.draw(g, low.width, low.height, t);
     else {
       world.panels = nextPanels;

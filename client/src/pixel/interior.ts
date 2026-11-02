@@ -1,5 +1,5 @@
 // Inside your house: the pack's demo house with its roof lifted (scripts/art-interior.py). Walk around with your pets,
-// add furniture (Tab: decorate) and use the shipping crate by the door (sell the harvest, buy seeds). The floor plan
+// and use the shipping crate by the door (sell the harvest, buy seeds). The floor plan
 // is in ../game/house.ts and the furniture rules in ../game/room.ts; this file draws and walks them.
 
 import { BUILT_IN_PIECES, HOME_FOOT, HOME_ROOF, HOUSE_DOOR, HOUSE_EXIT_Y, onFloor } from "../game/house";
@@ -26,7 +26,6 @@ type Ctx = CanvasRenderingContext2D;
 
 export interface InteriorHost {
   room(): Piece[];
-  setRoom(r: Piece[]): void;
   petSprite(): HTMLCanvasElement;
   residents(): HTMLCanvasElement[];
   look(): HumanLook;
@@ -49,8 +48,6 @@ export class Interior {
     return (this.sprite ??= makePlayer());
   }
   private readonly motion = newHumanMotion(this.player);
-  // Decorate mode: a cell cursor and the piece kind to place.
-  deco: { x: number; y: number; kind: number } | null = null;
   private sitters: Vec[] = [{ x: 5, z: 3.9 }, { x: 6.6, z: 4.2 }, { x: 8.5, z: 3.4 }, { x: 10.2, z: 2.9 }, { x: 13, z: 3.1 }];
 
   constructor(private readonly host: InteriorHost) {}
@@ -60,7 +57,6 @@ export class Interior {
     this.pet = { ...DOOR_AT };
     this.entered = -1;
     this.dir = 3;
-    this.deco = null;
     this.motion.pos = { ...this.player };
     this.motion.dir = 3;
   }
@@ -90,36 +86,10 @@ export class Interior {
   }
 
   key(k: string): void {
-    const d = this.deco;
-    if (d) {
-      const kinds = PIECE_KINDS;
-      if (k === "arrowleft" || k === "a") d.x = Math.max(0, d.x - 1);
-      if (k === "arrowright" || k === "d") d.x = Math.min(COLS - 1, d.x + 1);
-      if (k === "arrowup" || k === "w") d.y = Math.max(0, d.y - 1);
-      if (k === "arrowdown" || k === "s") d.y = Math.min(ROWS - 1, d.y + 1);
-      if (k === "q" || k === "[") d.kind = (d.kind + kinds.length - 1) % kinds.length;
-      if (k === "e" || k === "]") d.kind = (d.kind + 1) % kinds.length;
-      if (k === "enter" || k === " " || k === "z") {
-        const p = { kind: kinds[d.kind]!, x: d.x, y: d.y };
-        const r = this.host.room();
-        // Never trap the player: refuse a piece over where they stand.
-        const [fx, fz] = [Math.floor(this.player.x - GX), Math.floor(this.player.z - GY)];
-        const onPlayer = !FURNITURE[p.kind].rug && fx >= p.x && fx < p.x + FURNITURE[p.kind].w && fz >= p.y && fz < p.y + FURNITURE[p.kind].h;
-        if (!onPlayer && cellsOnFloor(p) && canPlace(r, p)) this.host.setRoom(place(r, p));
-      }
-      if (k === "x" || k === "backspace" || k === "delete") this.host.setRoom(removeAt(this.host.room(), d.x, d.y));
-      if (k === "escape" || k === "tab") this.deco = null;
-      return;
-    }
-    if (k === "tab") {
-      const f = this.facing();
-      this.deco = { x: Math.max(0, Math.min(COLS - 1, f.x)), y: Math.max(0, Math.min(ROWS - 1, f.y)), kind: 0 };
-    }
     if ((k === "e" || k === "enter") && this.nearCrate()) this.host.useCrate();
   }
 
   update(dt: number, keys: ReadonlySet<string>): void {
-    if (this.deco) return;
     const d = keyDir(keys);
     this.moving = d.x !== 0 || d.z !== 0;
     if (this.moving) {
@@ -141,14 +111,11 @@ export class Interior {
       props.push({ kind: p.kind, x: p.x + GX + f.w / 2, z: p.y + GY + f.h });
     }
     props.push({ kind: "crates", x: CRATE.x + GX + 0.5, z: CRATE.y + GY + 1 });
-    const d = this.deco;
-    if (d) props.push({ kind: "cursor", x: d.x + GX + 0.5, z: d.y + GY + 1 });
     const pets = this.host.residentGenes().slice(0, this.sitters.length).flatMap((genes, i) => {
       const pos = this.sitters[i]!;
       return this.walk(pos.x, pos.z) ? [{ id: `r${i}`, kind: "resident" as const, x: pos.x, z: pos.z, genes, pose: null }] : [];
     });
     pets.push({ id: "pet", kind: "resident" as const, x: this.pet.x, z: this.pet.z, genes: this.host.genes(), pose: null });
-    const kind = d ? PIECE_KINDS[d.kind]! : null;
     return {
       ...base,
       map: roomMap(),
@@ -157,8 +124,8 @@ export class Interior {
       showMap: false,
       people: [{ id: "me", name: "", kind: "me", x: this.player.x, z: this.player.z, dir: this.dir as 0 | 1 | 2 | 3, walking: this.moving, pose: null, look: this.host.look() }],
       pets, props, beds: [], bubbles: [], banner: null, inspector: null,
-      hint: d ? null : this.nearCrate() ? "E: CRATE" : "TAB: DECORATE",
-      panels: kind ? [{ place: "corner", title: `Place: ${FURNITURE[kind].label} (Q/E)`, rows: [{ label: `Enter put  X ${pieceAt(this.pieces(), d!.x, d!.y) >= 0 ? "take" : "-"}  Esc done` }] }] : base.panels,
+      hint: this.nearCrate() ? "E: CRATE" : null,
+      panels: base.panels,
     };
   }
 
@@ -198,28 +165,8 @@ export class Interior {
     for (const it of items) it.draw();
     drawFaded(g, "home-roof", fx - Math.floor(HOME_ROOF.w / 2), fy - HOME_ROOF.h, 1 - (t - this.entered) / ROOF_FADE);
 
-    if (this.deco) {
-      const d = this.deco;
-      const kind = PIECE_KINDS[d.kind]!;
-      const f = FURNITURE[kind];
-      const ok = cellsOnFloor({ kind, x: d.x, y: d.y }) && canPlace(room, { kind, x: d.x, y: d.y });
-      const [cx, cy] = at(d.x, d.y);
-      if (Math.floor(t * 4) % 2) {
-        g.globalAlpha = 0.6;
-        drawPiece(g, kind, cx, cy);
-        g.globalAlpha = 1;
-      }
-      g.strokeStyle = ok ? PAL.panel : PAL.coral;
-      g.strokeRect(cx + 0.5, cy + 0.5, f.w * C - 1, f.h * C - 1);
-      const under = pieceAt(room, d.x, d.y);
-      const line1 = `PLACE: ${f.label.toUpperCase()}  (Q/E)`;
-      const line2 = `ENTER PUT  X ${under >= 0 ? "TAKE" : "-"}  ESC DONE`;
-      const w = Math.max(line1.length, line2.length) * GLYPH + 16;
-      drawFrame(g, Math.floor((sw - w) / 2), 6, w, 30);
-      drawText(g, line1, Math.floor((sw - w) / 2) + 8, 12, PAL.wood);
-      drawText(g, line2, Math.floor((sw - w) / 2) + 8, 22);
-    } else {
-      const hint = this.nearCrate() ? "E: CRATE" : "TAB: DECORATE";
+    if (this.nearCrate()) {
+      const hint = "E: CRATE";
       const w = hint.length * GLYPH + 12;
       drawFrame(g, sw - w - 6, 6, w, 16);
       drawText(g, hint, sw - w, 10, PAL.wood);

@@ -4,7 +4,7 @@
 
 ## State
 - Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/ (see `wrangler deployments`). Fallback: `main`, the last pixel build.
-- Tests: client 690, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
+- Tests: client 591, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
 - User has not reviewed bugs 13-23. Not proven with 2 players. Steps 0-5d deployed. Labs live: `/lab/npc`, `/lab/pet`, `/lab/net`, `/lab/visual`. Tuned 3B stays out (`docs/ai/npc.md`).
 - 5a: cloud free talk works (`proof/npc/`). Open: rude and gossip checks not run. 5b: AOI live (`proof/network/`), 89 bots held; 100 not proven.
@@ -21,7 +21,7 @@
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-1. Step 6: wire and cut. Remove boss, ghosts, furniture editing, `generateWorld` and its tests, goal "Outsmart The Reader". `checks/game.md`, 2+ players, drop `/api/chatlog`.
+1. Step 6: boss, ghost stone, furniture editing, `generateWorld` are cut (rule upload stays: the cron teaches wild pets from it). Left: `checks/game.md` with 2+ players, `npc.md` rude and gossip, drop `/api/chatlog` last.
 2. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off.
 
 ## Gotchas
