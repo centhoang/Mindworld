@@ -27,7 +27,16 @@ Elder (herbs), Mo (fishing), Ama (market stall), Pip (wood). Each has a persona,
 | Prefill | 60-70 tok/s | 20-32 tok/s |
 | 48 tokens out, 330 tokens in | 11.7 s | 29.9 s |
 
-The 3B is ~2.7x slower. The tuned 3B is trained (`llama32-3b-n4-e2-r16`, on the Modal volume, GGUF ready) but its reply quality has not been benched.
+The 3B is ~2.7x slower.
+
+## Tuned 3B vs tuned 1B (2026-11-02, native GGUF, `finetune/chat-bench.ts`, read by Claude)
+| | Tuned 1B | Tuned 3B |
+|---|---|---|
+| Valid, 300 held-out cases | 97.0% | 97.3% |
+| `reply` valid | 65/73 | 65/73 |
+| 5-turn talks that stayed on topic | 0 of 10 | 0 of 10 |
+
+**Result: 3B stays out.** It knows the village better (the 1B says it has no idea who Mo is) and takes rudeness better, but it still loops and pushes soccer. That is not clearly better for 2.7x the wait and 3x the VRAM. Free talk needs the cloud tier; local tier is the 1B.
 
 ## Options for chat
 **Decided (user, 2026-11-02):** A, tiers: sim, then cloud Muse Spark for free talk with a cap, then local. Plus D. Build: `../RESTRUCTURE.md` step 5a.
@@ -40,8 +49,6 @@ The 3B is ~2.7x slower. The tuned 3B is trained (`llama32-3b-n4-e2-r16`, on the 
 | D | Better 1B: shorter prompts, 15-20 word replies, intent routing to line banks | Cheapest, helps all options | Won't fix open-ended talk alone |
 
 Whichever wins, do D. A short reply (20 tokens, 150 in) takes ~6 s on the 1B and ~14 s on the 3B. A "typing..." bubble makes that feel like a person.
-
-**Next step:** bench the tuned 3B against the tuned 1B on `../testing/checks/npc.md`, using native GGUF so it costs nothing. Decide from reply quality.
 
 Rule: the game must still work free after the event, so turning the cloud tier off must leave the game playable.
 

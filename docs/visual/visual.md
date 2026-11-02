@@ -12,7 +12,7 @@
 Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams, decor density, fences. Each is a cost in rules and bugs.
 
 ## Look options
-**Decided (user, 2026-11-02):** spike A first. The user judges an image and a clip (`../RESTRUCTURE.md` step 2). No: B, compact Sunnyside.
+**Decided (user, 2026-11-02):** spike A first. The user judges an image and a clip (`../RESTRUCTURE.md` step 2). No: B, compact Sunnyside. Spike: `client/glyph-spike.html`, proof in `../testing/proof/visual/glyph-spike*`.
 
 | | Option | Good | Bad |
 |---|---|---|---|

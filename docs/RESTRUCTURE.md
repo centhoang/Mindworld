@@ -55,7 +55,7 @@ Do 5a first: NPCs matter most. 5b, 5c and 5d touch separate folders, so you can 
 Add a `chatTier()` in `game/npc-chat.ts`, used by `villagerAnswer` / `villagerMind` in `main.ts` (around lines 271-295):
 1. Sim answers (`directions.ts`, `offers.ts`, `scene.ts`).
 2. Cloud Muse Spark for free talk through the existing `/api/chat`, `askNpc` and the ledger cap.
-3. Local tuned 1B when the cap is hit or the network fails, or a tuned 3B if step 1 and a speed probe pass.
+3. Local tuned 1B when the cap is hit or the network fails. Step 1 kept the 3B out.
 
 - Add `CLOUD_CHAT` beside `LOCAL_ONLY` in `game/test-mode.ts`, so minds stay local and only free talk goes to the cloud. Off leaves the game working.
 - Cloud prompts aren't frozen, so give them memories and persona. Local prompts stay frozen at af455c4.

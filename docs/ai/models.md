@@ -4,7 +4,7 @@
 |---|---|---|---|
 | Muse Spark Open (`meta-models/muse-spark-open-1026`) | Baseten, Modal | Teacher for training data, Teach, cloud fallback | Off in `LOCAL_ONLY` |
 | Tuned Llama 3.2 1B (N4, `llama32-1b-n4-e3-r16`) | Browser, WebLLM | All minds | Live, 97.0% valid on 300 held-out cases |
-| Tuned Llama 3.2 3B (`llama32-3b-n4-e2-r16`) | Modal volume | Candidate for chat | Trained, not benched, not converted |
+| Tuned Llama 3.2 3B (`llama32-3b-n4-e2-r16`) | Modal volume | Not used | Benched 2026-11-02, not clearly better than the 1B (`npc.md`) |
 | Meta transcriber | Meta API | Voice teaching | Live |
 
 ## Pipeline

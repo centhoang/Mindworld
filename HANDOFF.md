@@ -7,7 +7,8 @@
 - Tests: client 633, worker 192, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs reorganised: index `docs/README.md`, plan `docs/RESTRUCTURE.md`. No game code changed for the rework yet.
 - The user has not reviewed the bug 13-23 fixes. Not proven with 2 players. The glyph spike may replace them.
-- Tuned 3B trained, on the Modal volume with a GGUF: `llama32-3b-n4-e2-r16`. Not benched, not converted.
+- Steps 0-2 done. Tuned 3B benched: not clearly better, stays out (`docs/ai/npc.md`).
+- Glyph spike built: `client/glyph-spike.html`, proof in `docs/testing/proof/visual/`. Waiting on the user's verdict.
 
 ## Decisions
 - NPCs are the star: a player cannot tell them from a human. The sim reasons; the model picks among valid options and speaks.
@@ -20,9 +21,9 @@
 - Deadline in Vietnam: Nov 5, 9 AM. Cut list and all steps: `docs/RESTRUCTURE.md`.
 
 ## Next actions
-1. Execute `docs/RESTRUCTURE.md` from step 0, in order. Stop at the glyph spike gate for the user's judgement.
-2. Nov 2: steps 0-3. Nov 3: 4, 5a, 5b. Nov 4: 5c, 5d, 6. Nov 5 morning: 7 only.
-3. Step 0 includes changing the `LOCAL_ONLY` rule in CLAUDE.md to allow cloud free talk.
+1. Get the user's yes or no on the glyph spike, and record it in `docs/visual/visual.md`.
+2. Execute `docs/RESTRUCTURE.md` from step 3, in order.
+3. Nov 2: step 3. Nov 3: 4, 5a, 5b. Nov 4: 5c, 5d, 6. Nov 5 morning: 7 only.
 
 ## Gotchas
 - Chat log: from `worker/`, `npx wrangler kv key list --binding GHOSTS --remote --prefix chat:`, then `kv key get`.
