@@ -7,7 +7,7 @@ import type { Agent } from "../life/village";
 import type { Vec } from "../world/movement";
 import { NPCS, type Npc } from "../world/live";
 import { AWAY, hash2, lookAt, T, TILE } from "../world/tilemap";
-import { hasArt, img, PAL, spriteFrame } from "./art";
+import { PAL } from "./art";
 import { layoutBubbles, type BubbleBox, type Placed } from "../view/bubbles";
 import { generatedSprites } from "./generated-sprites";
 import { drawDecor, drawSpotProp } from "./grounds-draw";
@@ -217,17 +217,14 @@ export class PixelView implements View {
       }
     }
     const [px, py] = toScreen(o.player.x, o.player.z);
-    const pf = spriteFrame(o.playerSprite, o.moving, o.playerMotion.walkTime, t);
-    if (!scene.indoors) items.push({ z: o.player.z, draw: () => (characterShadow(g, px, py), humanSprites.draw(g, o.myLook, o.playerMotion, px, py, t,
-      () => g.drawImage(o.playerSprite.img, pf * 16, o.playerMotion.dir * 24, 16, 24, px - 8, py - 22, 16, 24))) });
+    if (!scene.indoors) items.push({ z: o.player.z, draw: () => (characterShadow(g, px, py), humanSprites.draw(g, o.myLook, o.playerMotion, px, py, t)) });
     const half = OVERWORLD_MON / 2;
     for (const p of o.peers.values()) {
       const [ax, ay] = toScreen(p.pos.x, p.pos.z);
       const [bx, by] = toScreen(p.pet.x, p.pet.z);
       items.push({ z: p.pos.z, draw: () => {
         characterShadow(g, ax, ay);
-        humanSprites.draw(g, p.look, p.motion, ax, ay, t,
-          () => g.drawImage(o.playerSprite.img, spriteFrame(o.playerSprite, p.motion.walking, p.motion.walkTime, t) * 16, p.motion.dir * 24, 16, 24, ax - 8, ay - 22, 16, 24));
+        humanSprites.draw(g, p.look, p.motion, ax, ay, t);
       } });
       items.push({ z: p.pet.z, draw: () => g.drawImage(p.sprite, bx - half, by - OVERWORLD_MON + 2) });
     }
@@ -238,10 +235,7 @@ export class PixelView implements View {
     if (o.elder && !o.npcs?.v.agents.some(a => a.id === "elder")) {
       // The Elder also uses the shared human path before the NPC sim is attached.
       const [nx, ny] = toScreen(o.elder.pos.x, o.elder.pos.z);
-      items.push({ z: o.elder.pos.z, draw: () => humanSprites.draw(g, NPC_LOOKS.elder, newHumanMotion(o.elder!.pos), nx, ny, t, () => {
-        if (hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
-        else g.drawImage(o.elder!.sprite, nx - 12, ny - 22);
-      }) });
+      items.push({ z: o.elder.pos.z, draw: () => humanSprites.draw(g, NPC_LOOKS.elder, newHumanMotion(o.elder!.pos), nx, ny, t) });
     }
     const [qx, qy] = toScreen(o.pet.x, o.pet.z);
     const hop = Math.floor(t * 4) % 2;
@@ -280,22 +274,17 @@ export class PixelView implements View {
     for (const a of o.npcs?.v.agents ?? []) {
       const [nx, ny] = toScreen(a.pos.x, a.pos.z);
       if (nx < -24 || ny < -40 || nx > sw + 24 || ny > sh + 24) continue;
-      const s = o.npcSprite(a.id as Npc);
       const motion = o.npcMotions.get(a.id as Npc) ?? newHumanMotion(a.pos);
-      const { walking, dir } = motion;
-      const f = spriteFrame(s, walking, motion.walkTime, t);
+      const { walking } = motion;
       if (a.state === "do" && ACTIVITY.get(a.act!)?.indoors) continue; // home to sleep or eat: inside, out of sight
       if (motion.pose === "kick" && !walking) {
         // Soccer: up and down the pitch after the ball, on the pack's run.
         const phase = t * 0.9 + a.id.length * 1.7;
         const sx = nx + Math.round(Math.sin(phase) * 2.4 * TILE);
-        items.push({ z: a.pos.z, draw: () => (characterShadow(g, sx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], { ...motion, flip: Math.cos(phase) < 0 }, sx, ny, t, () => {})) });
+        items.push({ z: a.pos.z, draw: () => (characterShadow(g, sx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], { ...motion, flip: Math.cos(phase) < 0 }, sx, ny, t)) });
         continue;
       }
-      items.push({ z: a.pos.z, draw: () => (characterShadow(g, nx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, nx, ny, t, () => {
-        if (a.id === "elder" && hasArt("elder-npc")) g.drawImage(img("elder-npc"), (Math.floor(t * 2) % 2) * 16, 0, 16, 24, nx - 8, ny - 22, 16, 24);
-        else g.drawImage(s.img, f * 16, dir * 24, 16, 24, nx - 8, ny - 22, 16, 24);
-      })) });
+      items.push({ z: a.pos.z, draw: () => (characterShadow(g, nx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, nx, ny, t)) });
     }
     for (const sg of o.signs) {
       const [sx, sy] = toScreen(sg.x, sg.z);

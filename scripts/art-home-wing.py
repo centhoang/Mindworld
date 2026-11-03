@@ -22,6 +22,29 @@ SHADE = {(45, 132, 127), (61, 159, 164), (41, 181, 152), (75, 142, 160), (104, 1
          (84, 67, 81), (140, 156, 181), (82, 107, 140), (109, 131, 163), (134, 143, 139)}  # shingles and planks in shadow
 DARK = (29, 47, 71)  # the roof's outline colour, also what the shadow made of the darkest shingle
 EAVE = {(234, 165, 108), (239, 214, 165), (198, 131, 100), (189, 108, 74), (198, 66, 33), (118, 59, 54)}
+# The wide lower roof, and the dormers' own little shingle roofs on it (two small, the front one), in wing pixels.
+LOWER = (4, 57, 119, 117)
+STANDING = [(22, 58, 39, 75), (85, 58, 102, 75), (48, 48, 77, 81)]
+PLAIN_BLUE = (12, 16)  # the pack's plain blue shingle, row.col, as Room1 lays it on blue roofs
+
+
+def relay_lower_roof(wing):
+    """Bug 38, second pass: the demo shaded the lower roof by hand round the dormers, which read as dark blotches, and
+    its rows did not match the pack's. Lay the pack's plain blue shingle tile over the lower roof in even rows, ending
+    on the wall top, and keep everything that is not shingle: the gable, the dormers, the eave posts."""
+    sheet = Image.open(f"{ART}tiles.png").convert("RGBA")
+    r, c = PLAIN_BLUE
+    t = sheet.crop((c * 16, r * 16, c * 16 + 16, r * 16 + 16)).load()
+    px = wing.load()
+    x0, y0, x1, y1 = LOWER
+    was = wing.copy().load()
+    # Shingle joints are dark too, like window glass: a dark pixel is roof only when it touches a shingle.
+    joint = lambda x, y: was[x, y][:3] in (DARK, (53, 69, 109)) and any(was[x + dx, y + dy][:3] in SHINGLE for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            if any(a <= x < b and c0 <= y < d for a, c0, b, d in STANDING): continue
+            if px[x, y][3] and (was[x, y][:3] in SHINGLE or joint(x, y)):
+                px[x, y] = t[(x - x0) % 16, (y - y1) % 16]
 
 
 def clean_roof(wing):
@@ -75,5 +98,6 @@ for src, out in (("home-roof", "home-wing-roof"), ("home-open", "home-wing-open"
                 px[x, y] = px[x, top - 1]
     if src == "home-roof":
         clean_roof(wing)
+        relay_lower_roof(wing)
     wing.save(f"{ART}{out}.png")
     print(out, wing.size)

@@ -16,9 +16,11 @@ Run on `/`, Sunnyside (decided). `/lab/visual` is still the mosaic. Live proof: 
 - [x] Mosaic only, Sunnyside has no Grid chip: the Grid button turns the faint cell lines on and off, and it is remembered. Outlines stay. [proof](../proof/visual/outlines-grid-off.jpg)
 - [x] Mosaic only: every thing has an outline (path, tree, person, pet, clock, map), and from the outlines you can tell which is in front. [proof](../proof/visual/outlines-lab.jpg)
 - [x] Walking scrolls the view smoothly, with no cell-sized jumps, and your character glides. Other movers still step by cell. [proof](../proof/game/walk-steady.md) [first hold](../proof/game/sunny-live.md)
-- [x] Every roof is whole pack roof: no smoke, rocks or branches cut in, no patched shingle blocks, no grey shadow blocks (bug 38). [live](../proof/visual/roof-38-live.png) [all houses](../proof/visual/roof-38-art.png)
+- [x] Every roof is whole pack roof: no smoke, rocks or branches cut in, no patched shingle blocks, no shadow blotches; the lower roof is even rows of the pack's blue shingle (bug 38). [live](../proof/visual/roof-38-live.png) [all houses](../proof/visual/roof-38-art.png)
 - [x] A fishing rod shows only in a fisher's hands, never lying on the pier (bug 39). [live](../proof/visual/pond-39-40-live.png)
 - [x] Paths join cleanly: every road is 3+ tiles across with square ends, stays off the coast's edge tiles, and the pond lane meets the pier's whole foot (bug 40). [live](../proof/visual/pond-39-40-live.png) Unit test: `village-look.test.ts`.
+- [x] Nobody walks on the pond or the sea: only the pier and land are ground. Unit test: `village-walk.test.ts`, which also proves every bed can be reached and faced.
+- [x] Only the pack's Sunnyside people are drawn, for you, other players and villagers, in every pose, activity and direction, even while art loads or after a failed load (bug 44). Unit test: `humans.test.ts`. [live day](../proof/visual/old-sprite-44.md)
 - [x] No land a tile wide, so no loose cliff piece on the coast. Unit test: `village-look.test.ts`.
 - [x] A farm is the pack's field: light dirt with an edge all round, one tilled mound per bed, each crop growing out of its mound at every stage; the field stays inside its plot and off the road's edge (bug 41). [live](../proof/visual/farm-41-live.png)
 - [x] Every generated art file is top-down, front side only, never at an angle. [audit](../proof/visual/gen-art-audit.md)

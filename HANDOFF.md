@@ -3,15 +3,15 @@
 **Starting prompt:** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md."
 
 ## Morning report
-Done overnight, live as `main-Dp6B-Vqo`, committed locally, API spend $0: bugs 30-33 (goal and slide redrawn front-on, round head shade, spots gone).
-Hatch line stays through the hatch. All 654 gen art files audited: `proof/visual/gen-art-audit.md`.
-Scope checks visual, pet, game ran on live Sunnyside: `proof/game/sunny-live.md`. Picnic is no longer offered; chop proven.
-Still open: dance never started in 28 min of watching (bug 37, no defect found); the chat cap reset itself was not tested.
-Needs you: bug 34 (speech box over Goals panel), bug 36 (Brain panel names the model to a stranger). A 2-person play is still not done.
+2026-11-03 day, live `main-CaH4vzcS`, committed locally, not pushed. API spend today about $0.10.
+Chat: Muse Spark answers villagers on live, per-client cap gone, $30/day cap kept; chat-log failures fixed (`proof/npc/chatlog-2026-11-03.md`).
+Visual: roof relaid, no loose rod, paths clean, tilled farm soil, no walking on water, old sprites gone (bugs 38-41, 44).
+Earlier: bugs 30-33, 35, hatch line. Open: 37 (dance never seen). User's call: 34 (speech box over Goals), 36 (Brain panel names model).
+Ready for the user's play-test.
 
 ## State
 - Branch `rework/fresh-look`, not pushed, live at https://pets.uryto.dev/, see `wrangler deployments`. Fallback: `main`, the last pixel build.
-- Tests: client 594, worker 207, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
+- Tests: client 609, worker 209, tsc clean. `LOCAL_ONLY` is on. Credits: Meta ~$149.9, Modal ~$100.
 - Docs index `docs/README.md`, plan `docs/RESTRUCTURE.md`. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`, chat, room and fight flows.
 - User has not reviewed bugs 13-23. Two tabs driven on live (`proof/game/2-players.md`); no 2-person play yet. Labs still use the mosaic. Tuned 3B stays out.
 - 5b: AOI live, 89 bots held; 100 not proven.
@@ -24,12 +24,11 @@ Needs you: bug 34 (speech box over Goals panel), bug 36 (Brain panel names the m
 - Chat: tiers, with cloud free talk during the event. World: one compact village. Deadline in Vietnam: Nov 5, 9 AM. Steps: `docs/RESTRUCTURE.md`.
 - Pack rules (user): a human activity with no matching pack animation is dropped. Everything is top-down, front side only, never iso (`docs/visual/visual.md`).
 
-## Next actions (director Queue; user play-tests only when all are done)
-1. Chat, bugs 42-43: per-client cap off, Muse Spark answers on live, read the chat log, make talk make sense.
-2. Visual, bugs 38-41: house roof, rod on pier, path piece, farm ground. Then verification pass and commit.
-3. User: decide bugs 34 and 36, review fixed bugs, play with a second person. Bug 37 (dance) if time allows.
+## Next actions
+1. User play-test now. After it, read the chat log unasked and add failures to `checks/npc.md`; log new bugs.
+2. User: decide bugs 34 and 36, review fixed bugs, play with a second person. Bug 37 (dance) if time allows.
 3. Left in `game.md`: stranger test (a person), Teach and no-GPU (need step 7).
-4. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off. `/api/chatlog` goes last.
+4. Nov 5 morning: step 7 only. `LOCAL_ONLY` off for the rest. `/api/chatlog` goes last.
 
 ## Gotchas
 - A deploy can take from minutes to 15+ min to show on the site, while wrangler says it is active. Check the `main-` file in `/`; do not redeploy for that.

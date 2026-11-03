@@ -79,7 +79,7 @@ The ends lie one tile up on the land.
 - The sea repeat runs on past the map edge: no sky, no edge line.
 
 ## Buildings, props, crops, furniture
-- Roofs: the room's patched shingles (red 34.20, blue 10.20) export as plain 36.16 / 12.16 (`PLAIN` in art-sunny.py). The home wing's roof is cleaned in art-home-wing.py: nothing above the eaves, east terrace mirrored from the west, dormer shadows refilled from the 16 px shingle repeat (bug 38).
+- Roofs: the room's patched shingles (red 34.20, blue 10.20) export as plain 36.16 / 12.16 (`PLAIN` in art-sunny.py). The home wing's roof is cleaned in art-home-wing.py: nothing above the eaves, east terrace mirrored from the west, dormer shadows refilled, and the lower roof relaid with the plain blue shingle 12.16 in even rows ending on the wall top, keeping only the dormers' own roofs (`relay_lower_roof`, bug 38).
 - Stamps are cut from room rects in `STAMPS` in art-sunny.py and keep only the largest connected blob, because rects catch neighbours. Add a name to `LOOSE` when the stamp has several pieces on purpose.
 - Tile rects are easy to misread on a labelled sheet: column = first + (x - 24) / cell width. Check the output on a review sheet.
 - Anchor: bottom centre at the foot (`stand`). Draw with people, sorted by foot z. Solid area comes from `footprint`: half width, depth about half the height plus 0.6.

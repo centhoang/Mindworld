@@ -16,7 +16,7 @@ Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams, decor de
 
 **Angle (user, every asset, every Codex brief):** the pack is top-down, showing the front side only. Never iso or three-quarter. New art that breaks this goes back for rework.
 
-**Humans:** only the pack's own strips. A dance is its jump, soccer its run. Villagers sleep and eat at home, unseen. An activity with no matching strip is dropped.
+**Humans:** only the pack's own strips. A dance is its jump, soccer its run. Villagers sleep and eat at home, unseen. An activity with no matching strip is dropped. No other person art is ever drawn: while a strip loads or retries, the same look stands in its idle strip, else nothing (bug 44).
 
 **Pets:** shading follows the shape, round on a round head. No marks too small to read at pet size.
 

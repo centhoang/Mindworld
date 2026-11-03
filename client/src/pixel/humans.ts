@@ -101,15 +101,31 @@ export function stepHumanMotion(m: HumanMotion, pos: Vec, dt: number, pose: Pose
   m.pos = { ...pos };
 }
 
+// Every strip any look can need, in any pose, walking or not: the whole set, loaded up front.
+export const ALL_HUMAN_FILES: readonly string[] = (Object.keys(HUMAN_ACTIONS) as Action[]).flatMap((action) =>
+  ["base", "tools", ...HAIR].filter((layer) => !(layer === "tools" && action === "jump")).map((layer) => `${layer}_${action}_strip${HUMAN_ACTIONS[action]}.png`));
+
 export class HumanSprites {
   private readonly images = new SpriteImages();
+  private loading = false;
 
-  draw(g: CanvasRenderingContext2D, look: HumanLook, motion: HumanMotion, x: number, y: number, t: number, fallback: () => void): void {
+  // The pack's humans are the only people on this look (bug 44): while a strip is still loading, or retrying after a
+  // failed load, the same look stands in its idle strip, and before that nothing is drawn. Never another art set.
+  draw(g: CanvasRenderingContext2D, look: HumanLook, motion: HumanMotion, x: number, y: number, t: number): void {
+    if (!this.loading) {
+      this.loading = true;
+      for (const file of ALL_HUMAN_FILES) this.images.get(`/art/humans/${file}`);
+    }
     const clock = motion.walking ? motion.walkTime : motion.pose ? motion.poseTime : t;
-    const { action, frame: step, files } = humanLayers(look, motion.pose, motion.walking, motion.running, clock);
-    // Request all layers together, and fall back atomically so partial bodies never appear.
-    const images = files.map(file => this.images.get(`/art/humans/${file}`));
-    if (images.some(image => !image)) return fallback();
+    let { action, frame: step, files } = humanLayers(look, motion.pose, motion.walking, motion.running, clock);
+    // All layers together, so partial bodies never appear.
+    let images = files.map(file => this.images.get(`/art/humans/${file}`));
+    if (images.some(image => !image)) {
+      ({ action, files } = humanLayers(look, null, false));
+      step = undefined;
+      images = files.map(file => this.images.get(`/art/humans/${file}`));
+      if (images.some(image => !image)) return;
+    }
     const count = HUMAN_ACTIONS[action];
     const frame = step ?? Math.floor(clock / FRAME_SECONDS) % count;
     g.save();

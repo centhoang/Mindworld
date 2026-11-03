@@ -17,6 +17,7 @@ export type GeneratedSprite = keyof typeof ROOTS;
 // Shared by props and layered humans. A failed request is cached just like a pending one.
 export class SpriteImages {
   private readonly images = new Map<string, { image: HTMLImageElement; ready: boolean }>();
+  private readonly tries = new Map<string, number>();
 
   get(src: string): HTMLImageElement | null {
     let entry = this.images.get(src);
@@ -25,7 +26,13 @@ export class SpriteImages {
       const loading = { image, ready: false };
       this.images.set(src, loading);
       image.onload = () => { loading.ready = true; };
-      image.onerror = () => { loading.ready = false; };
+      // A failed load (a blip right after a deploy, bug 27) is asked for again a little later, a few times at most.
+      const tries = (this.tries.get(src) ?? 0) + 1;
+      this.tries.set(src, tries);
+      image.onerror = () => {
+        loading.ready = false;
+        if (tries < 6) setTimeout(() => this.images.delete(src), 1000 * tries);
+      };
       image.src = src;
       entry = loading;
     }

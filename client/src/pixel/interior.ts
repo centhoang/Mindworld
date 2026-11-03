@@ -8,7 +8,7 @@ import type { Genes } from "../sim/ghost";
 import { T, type TileMap } from "../world/tilemap";
 import { CRATE, COLS, FURNITURE, PIECE_KINDS, ROWS, blocked, canPlace, pieceAt, place, removeAt, type Piece, type PieceKind } from "../game/room";
 import { followStep, keyDir, slide, type Vec } from "../world/movement";
-import { makePlayer, PAL, spriteFrame, type Sprite } from "./art";
+import { PAL } from "./art";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanSprites, newHumanMotion, stepHumanMotion, type HumanLook } from "./humans";
 import { characterShadow, drawFaded, stand } from "./sunny";
 import { drawFrame, drawText, GLYPH } from "./text";
@@ -43,10 +43,6 @@ export class Interior {
   private dir = 3;
   private moving = false;
   private walkT = 0;
-  private sprite: Sprite | null = null;
-  private get playerSprite(): Sprite {
-    return (this.sprite ??= makePlayer());
-  }
   private readonly motion = newHumanMotion(this.player);
   private sitters: Vec[] = [{ x: 13, z: 5.2 }, { x: 14.5, z: 5.2 }, { x: 10.5, z: 5.2 }, { x: 9.5, z: 4.8 }, { x: 10.5, z: 3.2 }];
 
@@ -156,10 +152,9 @@ export class Interior {
     const [qx, qy] = free(this.pet.x, this.pet.z);
     items.push({ z: this.pet.z, draw: () => g.drawImage(pet, qx - pet.width / 2, qy - pet.height + 2 - (Math.floor(t * 4) % 2)) });
     const [px0, py0] = free(this.player.x, this.player.z);
-    const pf = spriteFrame(this.playerSprite, this.moving, this.walkT, t);
     items.push({ z: this.player.z, draw: () => {
       characterShadow(g, px0, py0);
-      humanSprites.draw(g, this.host.look(), this.motion, px0, py0, t, () => g.drawImage(this.playerSprite.img, pf * 16, this.dir * 24, 16, 24, px0 - 8, py0 - 22, 16, 24));
+      humanSprites.draw(g, this.host.look(), this.motion, px0, py0, t);
     } });
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
