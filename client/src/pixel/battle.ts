@@ -11,6 +11,7 @@ import { wrap } from "../view/glyph/atlas";
 import type { SceneBattle, SceneFighter } from "../game/ports";
 import type { Genes } from "../sim/ghost";
 import { HUMAN_ACTIONS, humanSprites, type HumanAction, type HumanLook } from "./humans";
+import { BAR_H, packBar, strip } from "./sunny";
 
 export interface Side {
   name: string;
@@ -53,6 +54,8 @@ interface Step {
 
 const ease = (p: number) => 1 - (1 - p) ** 2;
 const TRAINER_FRAME = 0.1; // seconds per strip frame
+const GLINT_SECONDS = 0.7;
+const GLINT_SPOTS: readonly [number, number][] = [[-18, -14], [16, -6], [-6, 14]]; // around the pet's middle
 const TRAINER_SCALE = 2; // a trainer stands about half its pet's height
 
 // What a trainer is doing: a strip played once (then idle again), or looped.
@@ -87,6 +90,7 @@ export class BattleView {
   private hearts = 0;
   private charge = 0; // my pet's signature charge, shown as pips
   private pops: { side: "foe" | "me"; text: string; ink: string; t: number }[] = []; // damage numbers rising
+  private glints: { side: "foe" | "me"; t: number }[] = []; // the pack's glint around a pet a crit or signature hit
   private shoutsLeft = 0;
   private shoutNext: Action | null = null;
   private cmd: { cursor: number; labels: readonly string[]; face: boolean; pick: (i: number) => void } | null = null;
@@ -103,6 +107,7 @@ export class BattleView {
     this.foeShield = this.myShield = false;
     this.charge = 0;
     this.pops = [];
+    this.glints = [];
     this.shoutsLeft = 0;
     this.shoutNext = null;
     this.text = "";
@@ -243,7 +248,10 @@ export class BattleView {
       this.push({ dur: 0.25, tick: (p) => (this.myDx = Math.sin(p * Math.PI) * 14) });
       if (dealt) {
         this.hit("foe", () => (this.foeHp = foeHp), fx.has("signature") || fx.has("crit"));
-        this.push({ dur: 0, start: () => this.pop("foe", `-${dealt}`, fx.has("crit") || fx.has("signature") ? PAL.flowerY : PAL.coral) });
+        this.push({ dur: 0, start: () => {
+          this.pop("foe", `-${dealt}`, fx.has("crit") || fx.has("signature") ? PAL.flowerY : PAL.coral);
+          if (fx.has("crit") || fx.has("signature")) this.glints.push({ side: "foe", t: 0 });
+        } });
         if (fx.has("crit")) this.sayStep("A critical hit!");
       }
     } else if (action === "befriend" || action === "emote") {
@@ -257,7 +265,10 @@ export class BattleView {
       this.push({ dur: 0.25, tick: (p) => (this.foeDx = -Math.sin(p * Math.PI) * 14) });
       if (taken) {
         this.hit("me", () => (this.myHp = myHp), enemyAct === "heavy" || fx.has("foe-crit"));
-        this.push({ dur: 0, start: () => this.pop("me", `-${taken}`, fx.has("foe-crit") ? PAL.flowerY : PAL.coral) });
+        this.push({ dur: 0, start: () => {
+          this.pop("me", `-${taken}`, fx.has("foe-crit") ? PAL.flowerY : PAL.coral);
+          if (fx.has("foe-crit")) this.glints.push({ side: "me", t: 0 });
+        } });
         if (fx.has("foe-crit")) this.sayStep("A critical hit!");
       } else this.sayStep(`${me} shrugs it off.`);
       if (fx.has("block")) this.sayStep(extra.charge === CHARGE_MAX ? `${me} blocks it! ${signatureName(this.mine!)} is charged!` : `${me} blocks it!`);
@@ -369,6 +380,8 @@ export class BattleView {
       if (!tr.loop && tr.t >= HUMAN_ACTIONS[tr.action] * TRAINER_FRAME) this.trainers[side] = idlePose();
     }
     this.pops = this.pops.filter((p) => p.t < 1);
+    for (const s of this.glints) s.t += dt;
+    this.glints = this.glints.filter((s) => s.t < GLINT_SECONDS);
     let budget = dt;
     while (budget > 0 && this.script.length) {
       const s = this.script[0]!;
@@ -441,6 +454,20 @@ export class BattleView {
       hpBox(g, sw - 154, 108, 146, this.mine, this.myHpShown, true);
       chargePips(g, sw - 146, 136, this.charge);
     }
+    // Three pack glints pop in turn around the pet, at 2x.
+    for (const s of this.glints) {
+      const base = s.side === "foe" ? foeBase : myBase;
+      const h = s.side === "foe" ? (this.foe?.sprite.height ?? 64) : (this.mine?.sprite.height ?? 48);
+      GLINT_SPOTS.forEach(([dx, dy], i) => {
+        const f = Math.floor((s.t - i * 0.12) / 0.06);
+        if (f < 0 || f >= 6) return;
+        g.save();
+        g.translate(base.x + dx - 7, base.y - h / 2 + dy - 7);
+        g.scale(2, 2);
+        strip(g, "spr_deco_glint_01_strip6", 0, 0, f);
+        g.restore();
+      });
+    }
     for (const p of this.pops) {
       const base = p.side === "foe" ? foeBase : myBase;
       const w = p.text.length * GLYPH;
@@ -476,6 +503,7 @@ export class BattleView {
 
 // The signature charge under my HP: one pip per blocked hit, all lit = the next attack is the signature move.
 function chargePips(g: CanvasRenderingContext2D, x: number, y: number, charge: number): void {
+  if (packBar(g, "blue", x, y - 2, 32, charge / CHARGE_MAX)) return;
   for (let i = 0; i < CHARGE_MAX; i++) {
     g.fillStyle = i < charge ? PAL.flowerY : PAL.stoneM;
     g.fillRect(x + i * 6, y, 4, 3);
@@ -552,11 +580,14 @@ function hpBox(g: CanvasRenderingContext2D, x: number, y: number, w: number, sid
   const by = y + 20;
   const bw = w - 30;
   drawText(g, "HP", x + 8, by - 3, PAL.wood);
-  g.fillStyle = PAL.stoneM;
-  g.fillRect(bx, by, bw, 3);
   const f = Math.max(0, Math.min(1, hp / max));
-  g.fillStyle = f > 0.5 ? PAL.grassD : f > 0.2 ? PAL.flowerY : PAL.coral;
-  g.fillRect(bx, by, Math.round(bw * f), 3);
+  // The pack bar: green, red once at or under 40% (a hurt pet: befriending works far better).
+  if (!packBar(g, f > 0.4 ? "green" : "red", bx, by - Math.floor((BAR_H - 3) / 2), bw, f)) {
+    g.fillStyle = PAL.stoneM;
+    g.fillRect(bx, by, bw, 3);
+    g.fillStyle = f > 0.5 ? PAL.grassD : f > 0.2 ? PAL.flowerY : PAL.coral;
+    g.fillRect(bx, by, Math.round(bw * f), 3);
+  }
   if (showNum) {
     const n = `${Math.max(0, Math.round(hp))}/${max}`;
     drawText(g, n, x + w - 8 - n.length * GLYPH, y + 28);

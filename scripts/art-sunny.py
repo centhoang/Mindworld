@@ -146,7 +146,8 @@ for c in ['beetroot', 'cabbage', 'carrot', 'cauliflower', 'kale', 'parsnip', 'po
         copy(f'Elements/Crops/{c}_0{i}.png', f'crop-{c}-{i}.png')
 for i in range(6):
     shutil.copy(G + f'sprites/wheat_0{i}/' + sorted(f for f in os.listdir(G + f'sprites/wheat_0{i}') if f.endswith('.png'))[0], OUT + f'crop-wheat-{i}.png')
-for u in ['expression_chat.png', 'expression_love.png', 'expression_alerted.png', 'label_left.png', 'label_middle.png', 'label_right.png', 'itemdisc_01.png', 'itemdisc_02.png']:
+for u in ['expression_chat.png', 'expression_love.png', 'expression_alerted.png', 'label_left.png', 'label_middle.png', 'label_right.png', 'itemdisc_01.png', 'itemdisc_02.png',
+          'redbar_00.png', 'redbar_06.png', 'greenbar_00.png', 'greenbar_06.png', 'bluebar_00.png', 'bluebar_05.png']:  # battle bars: empty + full
     copy('UI/' + u)
 for s in ['spr_deco_charactershadow', 'spr_deco_shadow', 'spr_deco_well', 'spr_deco_campfire', 'spr_deco_firepit', 'spr_deco_chair_01', 'spr_deco_sidetable_01', 'spr_deco_rug_01', 'spr_deco_barrel_water', 'spr_deco_crate_01', 'spr_deco_flowers_house_01']:
     d = G + 'sprites/' + s + '/'

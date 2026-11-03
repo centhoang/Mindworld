@@ -16,8 +16,9 @@ const animOf = new Map<number, number[]>();
 const STRIPS: Record<string, { frames: number }> = {
   spr_deco_tree_01_strip4: { frames: 4 }, spr_deco_tree_02_strip4: { frames: 4 }, spr_deco_glint_01_strip6: { frames: 6 }, spr_deco_glint_02_strip4: { frames: 4 }, chimneysmoke_01_strip30: { frames: 30 },
 };
+const BARS = ["redbar_00", "redbar_06", "greenbar_00", "greenbar_06", "bluebar_00", "bluebar_05"];
 const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "expression_chat", "home-wing-roof", "home-wing-open",
-  "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture"];
+  "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture", ...BARS];
 const STAMPS = ["house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "jar", "crates", "crate", "soil", "bench"];
 export const CROPS_ART = ["wheat", "carrot", "radish"] as const;
 
@@ -208,6 +209,23 @@ function glint(g: Ctx, x: number, y: number, i: number, j: number, t: number): v
   const name = "spr_deco_glint_01_strip6";
   const f = Math.floor(t * 6 + hash2(i, j, 32) * 40) % 40;
   if (f < 6) strip(g, name, x, y, f);
+}
+
+// A pack UI bar (UI/<colour>bar_*.png, 15x7) stretched to `w`: its two caps, its middle column repeated, and the
+// 11x2 trough filled to `frac` with the full bar's own colour. False while the art is missing.
+export const BAR_H = 7;
+export function packBar(g: Ctx, colour: "red" | "green" | "blue", x: number, y: number, w: number, frac: number): boolean {
+  const empty = images.get(`${colour}bar_00`);
+  const full = images.get(colour === "blue" ? "bluebar_05" : `${colour}bar_06`);
+  if (!empty || !full) return false;
+  x = Math.round(x);
+  y = Math.round(y);
+  g.drawImage(empty, 0, 0, 2, BAR_H, x, y, 2, BAR_H);
+  g.drawImage(empty, 2, 0, 1, BAR_H, x + 2, y, w - 4, BAR_H);
+  g.drawImage(empty, 13, 0, 2, BAR_H, x + w - 2, y, 2, BAR_H);
+  const fill = Math.round((w - 4) * Math.max(0, Math.min(1, frac)));
+  if (fill > 0) g.drawImage(full, 2, 2, 1, 2, x + 2, y + 2, fill, 2);
+  return true;
 }
 
 // One frame of a horizontal strip at its top-left.
