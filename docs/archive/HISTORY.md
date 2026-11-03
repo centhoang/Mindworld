@@ -100,3 +100,19 @@ docs/{TILE-RULES,NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/
   crits 8% both sides, foe counter. Brute HP 48. Bench and numbers in `docs/ai/pet.md`.
 - P1 screen (`pixel/battle.ts`, `fight-flow.ts`, `sim/duel.ts`): shouts on keys 1-5 (2 per wild fight), damage pops,
   charge pips, signature names from genes, counter/crit/block lines. Proof: `docs/testing/proof/pet/combat-live.md`.
+
+## 2026-11-03 session: P1 NPC rivals (moved from HANDOFF)
+- `client/src/sim/rivals.ts` (pure): 4 villager pets (Sage, Ripple, Honey, Zip) with fixed genes and persona memos;
+  `duelAsked`, `duelRefusal` (no pet, grudge, night, work, 3 a day); `rehearse` spars plans against the player's memo
+  and aims for a 40% player chance (`FAIR`), taking the cloud plan when within `CLOUD_SLACK` 0.1; `rivalDef` logs the rule
+  per turn; `whyLost` + `nextLesson` (guard heavy -> befriend below 40% -> emote at a guard -> use shouts).
+- `mind/npcs.ts`: Elder/Mo/Ama `hasPet` from day 1; `duelTalk` (runs before the hosting check, settles on the asker's
+  machine), `challenge` (bored villager, 35%, once a day), `duelDone` (memory, `outfought`/`sparred` beats in
+  `mind/bonds.ts`, belief to every other hosted mind). `reply()` returns `duel` -> `chat-flow` -> `main.startRival`.
+- `pixel/fight-flow.ts`: shared `play()` loop for wild and rival fights; `rival()` waits up to 10 s for the cloud plan.
+  `pixel/battle.ts` `end(..., "friends")` says "X and Y are friends now!" (live duels too). Villager pets drawn from genes.
+- Worker `src/rival.ts`, `POST /api/rival`: Muse Spark counter-rules, KV cache per (villager, memo hash), $1/day,
+  quota 20/client 400/day, 3200 max tokens, "think briefly" (without it the model ran past 2400 tokens and was cut).
+  Client `game/rival-api.ts` asks when a chat with a villager who has a pet opens.
+- Docs: `docs/ai/pet.md` "Village rivals" (design + bench), `checks/pet.md` (rival line ticked, 3 new open lines),
+  proof `docs/testing/proof/pet/rivals-live.md`.
