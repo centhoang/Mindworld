@@ -12,3 +12,13 @@ Lab: `/lab/net`. Second player: `?p=2`.
 - [x] [proof](../proof/network/5b-numbers.md) Traffic per player stays flat as players are added far away.
 - [!] [proof](../proof/network/5b-numbers.md) 100 bots asked, 89 held by one machine: smooth, but 100 itself is not proven.
 - [x] [proof](../proof/network/5b-numbers.md) A dropped connection reconnects with no duplicates.
+
+Many players join live without issue (user, 2026-11-03; plan P3):
+- [ ] Open the link and you are in the village, online, within about 10 s, with no setup.
+- [ ] 20 players joining in the same second all get in: none lost, none twice, none stuck "connecting".
+- [ ] When the village is full, the next player still plays with others (a second village), not alone.
+- [ ] The first 12 players get a plot; later ones join the Guest yard and are told so. A refresh gives you your plot back.
+- [ ] Someone who joins late sees the ball, a dance or a game in progress, the villagers and the farms as they are now.
+- [ ] Joining while others fight, dance, sit inside or host the villagers breaks nothing for anyone.
+- [ ] Players with no GPU, a phone-size window or a slow connection can join and play.
+- [ ] After the game goes public: a phone on mobile data and a second machine join at the same time.

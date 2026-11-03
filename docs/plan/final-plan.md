@@ -35,7 +35,7 @@ sleep, two play-tests and the recording. This plan orders the work, names the cu
 | P0 Setup, LOCAL_ONLY off, 34, 36 | Nov 3 16:30-17:30 | Deployed; spend watched for 30 min |
 | P1 Combat | Nov 3 17:30-24:00 | Sim tests, Prove numbers, live fight shots |
 | P2 Activities, ball, dance floor | Nov 4 00:00-06:00 (Director if user sleeps) | Each activity seen unforced on live |
-| P3 Many players | Nov 4 06:00-08:00 | Bot numbers + 3-4 real tabs |
+| P3 Many players join live | Nov 4 06:00-09:00 | Join checks clear on live: bots + 3-4 real tabs |
 | P4 Map polish + bug 46 | Nov 4 08:00-13:00 | User play-test #1 |
 | P5 Liveliness + surprise | Nov 4 13:00-17:00 | Spend under caps; off-flag still plays |
 | P6 Freeze, play-test #2 | Nov 4 18:00-22:00 | Every `checks/*.md` clear, 2+ players |
@@ -45,7 +45,7 @@ sleep, two play-tests and the recording. This plan orders the work, names the cu
 
 **Cut order if late:** postcards (P5) -> swim and animals (P2) -> gazette (P5) -> village challenges by NPCs (P1, keep
 player-started) -> battle polish extras. **Never cut:** LOCAL_ONLY off, core combat and NPC rivals, ball, dance floor,
-bug 46, many-players test, demo prep.
+bug 46, many players joining live without issue, demo prep.
 
 ## P0 Setup (this session, first)
 1. Copy this plan to `docs/plan/final-plan.md`; add it to `docs/README.md`; record the three user decisions in
@@ -115,11 +115,27 @@ Pack human strips: 12 loaded today; unused `carry`, `hammering`, `mining`, `swim
   no retrain. Fix the pet `eat` target that still points at the removed bowl (`overworld.ts` `this.bowl`).
 - Update `docs/testing/proof/game/activities.md` and `checks/game.md`.
 
-## P3 Many players
-- `scripts/net-bots.mjs`: 100 bots walking, kicking the ball and emoting; report bytes per peer and tick time; find why
-  only 89 held last time and fix it (`ROOM_MAX_PEERS`, socket cleanup, DO limits).
-- 3-4 real tabs in the TEMP Chrome profile (home network allowed): a duel, the ball in sync across tabs, a host
-  hand-over when a tab closes, three people dancing. Proof in `docs/testing/proof/network/` and `game/`.
+## P3 Many players join live without issue (user, 2026-11-03: "make sure many players can join live without issue")
+Today: one room Durable Object (`/api/room`, `worker/src/room.ts`), `ROOM_MAX_PEERS` 100, 12 plots (`CORNERS`), then
+guests; a 101st player gets `{t:"full"}` and plays alone (`world/live.ts` status `full`). 89 of 100 bots held last time.
+- **Join is quick and plain:** open the link, be in the village and "online" within about 10 s, no setup, whatever the
+  join order. Measure time to first frame and to online; a stuck "connecting" retries and says so.
+- **Bursts:** 20 bots joining in the same second, then up to 100 (`scripts/net-bots.mjs`, hard limit, clean close):
+  no lost peer, no duplicate, no stuck socket; bytes per peer and tick time reported. Find and fix the 89-of-100 gap.
+- **Full room:** the 101st player joins a second room (an overflow room name on `/api/room`, the client moves on `full`)
+  instead of playing alone. Unit tests in worker and `live.test.ts`.
+- **Plots:** players 1-12 get a plot, 13+ join the Guest yard and are told so in one line; a refresh or a dropped
+  connection gets the same plot back (the away hold in `room.ts`).
+- **Late joiners see now:** ball (last kick), a dance or soccer in progress, villagers in the same places, farms, a duel
+  shown as busy.
+- **Joining mid-event:** someone joins while another player fights, dances, is inside a house, or hosts the villagers;
+  nobody glitches. The villagers' host leaves mid-conversation: the chat carries on with the new host.
+- **Different machines:** no GPU (cloud minds: only elected hosts call `/api/llm`, so spend grows per room, not per
+  player; check `/api/spend`), a phone-size window, a throttled network in the test Chrome, a second browser.
+- **Real people:** 3-4 real tabs in the TEMP Chrome profile (home network allowed): a duel, the ball in sync, a host
+  hand-over when a tab closes, three people dancing.
+- Proof: `docs/testing/proof/network/join-live.md`. Gate: every line in `docs/testing/checks/network.md` clear on live.
+- Re-run the burst and the 3-tab check after P4 and P5 deploy, and at the freeze (P6): later features must not break joins.
 
 ## P4 Map polish + bug 46, then user play-test #1
 - One contact sheet of `VisualAssetPack/BuiltDemo/` in `.scratch/`; list what the demo village has that ours lacks
@@ -157,7 +173,10 @@ Bug fixes only. `scope-check` every scope on live. User play-test #2 with 2+ pla
 
 ## P8 Last (Nov 5 morning VN, done by 08:00)
 Remove `/api/chatlog`, its client call and KV rows; deploy. User makes GitHub and the 4 HF repos public and removes
-Access. Stranger test from a phone off the home network. User submits.
+Access. **Join check on the public URL** right after Access goes: a phone on mobile data and a second machine join at
+the same time, plus a 30-bot burst for 2 minutes; watch errors and `/api/spend`. User submits.
+Open question for the user: removing Access at the freeze (Nov 4 ~18:00 VN, already Nov 4 ET = submission day) would
+give this check, and the recording, time to fix what only outside players hit.
 
 ## Verification (every phase)
 - `npm --prefix client test`, `npm --prefix worker test`, tsc, secrets scan, local commit, deploy (two plain commands,

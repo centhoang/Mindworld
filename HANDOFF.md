@@ -27,7 +27,9 @@
    `game/chat-flow.ts`), `mind/npcs.ts` `hasPet`, `worker/src/wild-memos.ts` + `memo-dsl.ts` for `/api/rival`,
    the scripted coach rules in `sim/cortex.ts` (~line 288) as the local review fallback.
    Do not edit the coach prompt text in `sim/cortex.ts` (frozen for the tuned 1B); add cloud-only lines elsewhere.
-2. Then P2-P8 per the plan. If the user says "sleep", switch to Director mode (`docs/ops/director.md`) with the plan as the queue.
+2. Then P2-P8 per the plan. P3 is now "many players join live without issue" (user, 2026-11-03): join speed, bursts,
+   an overflow room when full (today the 101st plays alone), plots and guests, late joiners, mid-event joins, weak machines;
+   lines in `docs/testing/checks/network.md`. Re-run it after P4, P5 and at the freeze. If the user says "sleep", switch to Director mode (`docs/ops/director.md`) with the plan as the queue.
 3. After any user play-test: read the chat log unasked, add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`.
 
 ## Open
