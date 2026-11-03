@@ -6,11 +6,10 @@ Deadline: **Nov 4, 9 PM ET** (CV platform). Event facts: `docs/ops/event.md`. Li
 ## Session start
 Read `HANDOFF.md` only, then follow its Next actions. Read other docs when a task needs them. Never re-read the raw event files (`EventDetails/`, `EventFrontPage/`, `Event_CURRENT_F&Qs.txt`).
 
-## Keep start-up small (rule for every session)
-- This file stays under 70 lines, `HANDOFF.md` under 40 lines, with lines under 200 characters. Over the limit: move detail out before adding.
-- HANDOFF holds only what the next session needs now. History and old gotchas go to `docs/archive/HISTORY.md` (grep it, never read it whole).
-- Each doc has one job and stays under 80 lines (`docs/README.md`). `docs/archive/` is grep only.
-- New rules go in the doc for that topic, with a one-line pointer here only if every session needs it.
+## Docs (rule for every session)
+- No size limits on docs (user, 2026-11-03): sessions were losing context. Write down anything a later session needs, in the doc for that topic.
+- HANDOFF holds what the next session needs now. History and old gotchas go to `docs/archive/HISTORY.md` (grep it, never read it whole).
+- Each doc has one job (`docs/README.md`). `docs/archive/` is grep only. New rules: in the topic doc, a pointer here if every session needs it.
 
 ## Standing lists (update in the same turn)
 - `docs/BUGS.md`: every bug the user reports, by scope, with its screenshot in `.scratch/bugs/`. Remove when proven fixed.

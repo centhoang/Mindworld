@@ -7,6 +7,9 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 
 36. **The Brain panel names the model to a stranger.** User's call; the wording is unchanged.
 
+45. **Remove three props** (user, 2026-11-03): the log bench with a post (`.scratch/bugs/45-bench.png`), the playground slide (`45-slide.png`), the small box left of the HOME sign (`45-home-box.png`).
+46. **Same small houses for every player.** Player 1's house differs from player 2's. All players get the same small-size house (variants allowed), each with an interior.
+
 ### Fixed, waiting for review
 1-9, 13-23: ground tiles, pond edge, windmill, house entry, placement, farm art, beaches, fishing rules, coast corners, grid, cut-off tiles, road fences, bridge posts, world edge, road bulge, layering, pond pier, clouds, layer rule. Detail: git history of this file.
 35: playground slide redrawn straight-on (`proof/visual/slide-live.jpg`).
@@ -18,6 +21,7 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 - Fixed, waiting for review: 36, hatch line (the egg line and "hatched" stay up, the Brain line waits, `proof/game/sunny-hatch-line.jpg`).
 
 ## Movement
+47. **Stuck after leaving the house the first time.** First time in the game: go into the house, come out, the player cannot move (user, 2026-11-03).
 - Fixed, waiting for review: 25 (own character jumped back while holding a direction; `proof/game/walk-steady.md`).
 
 ## Game
@@ -29,6 +33,7 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
   with the time and what the villager is doing; replay and the chat-log failures in `proof/npc/chatlog-2026-11-03.md`). 28 (hurt villagers stay cool in small talk until sorry, `proof/npc/5f-free-talk.md`). 29 (feed dropped, clean stays player-only). 24 (asking for goods is buying; "how much?" means that good, unit test only). 12 (memory cut off invitations, unit test only). 10. Conversation continues: yes, no, later and "where?" act on offers.
 
 ## Pet
+48. **Wild pets get stuck**: one pressed into a house's side wall, one on a tree (`.scratch/bugs/48-wild-pets-stuck.png`, user 2026-11-03).
 - Fixed, waiting for review: 32 (head light is a crescent along the round head, `proof/pet/heads-round.png`, `proof/pet/head-live.png`). 33 (spots removed; old spots genes show plain).
 
 ## Network

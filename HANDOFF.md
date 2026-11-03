@@ -1,6 +1,6 @@
-# HANDOFF: Mindworld rework (2026-11-03, after the night shift)
+# HANDOFF: Mindworld rework (2026-11-03 day)
 
-**Starting prompt:** "Read HANDOFF.md. Continue from Next actions. Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md and docs/plan/final-input.md. Make the final plan in plan mode, then execute it. Follow CLAUDE.md."
 
 ## Morning report
 2026-11-03 day, live `main-CaH4vzcS`, committed locally, not pushed. API spend today about $0.10.
@@ -25,10 +25,10 @@ Ready for the user's play-test.
 - Pack rules (user): a human activity with no matching pack animation is dropped. Everything is top-down, front side only, never iso (`docs/visual/visual.md`).
 
 ## Next actions
-1. User play-test now. After it, read the chat log unasked and add failures to `checks/npc.md`; log new bugs.
-2. User: decide bugs 34 and 36, review fixed bugs, play with a second person. Bug 37 (dance) if time allows.
-3. Left in `game.md`: stranger test (a person), Teach and no-GPU (need step 7).
-4. Nov 5 morning: step 7 only. `LOCAL_ONLY` off for the rest. `/api/chatlog` goes last.
+1. In progress in the previous session: bugs 45-48 (remove 3 props, same small houses with interiors, stuck after first house exit, wild pets stuck).
+   If that session reported them done, they are in `docs/BUGS.md` under Fixed; otherwise include them in the plan.
+2. Final plan, in plan mode, from `docs/plan/final-input.md` (the user's demo target and asks, with facts for the planner). Then execute it.
+3. User's calls still open: bugs 34, 36. Step 7 runs last, Nov 5 morning: `LOCAL_ONLY` off for the rest, `/api/chatlog` removed.
 
 ## Gotchas
 - A deploy can take from minutes to 15+ min to show on the site, while wrangler says it is active. Check the `main-` file in `/`; do not redeploy for that.
