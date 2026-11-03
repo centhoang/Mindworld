@@ -90,3 +90,13 @@
 
 ## File map
 docs/{TILE-RULES,NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/{mlc_q4,convert_mlc,verify_mlc,publish_coach,finetune_llama}.py · worker/src/{mlc,app,room,room-do,npc,chat}.ts · worker/wrangler.toml · client/src/game/voices.ts · client/src/pixel/{main,setup,overworld,sunny,sunny-terrain,bubbles,teach,life-draw}.ts · scripts/art-sunny.py · client/src/mind/{brain,hub,npcs,memory,persona,scheduler}.ts · client/src/life/ · client/src/finetune/{gen-village,village-bench,mlc-bench,native-voice}.ts · scripts/codex.ps1
+
+## 2026-11-03 session: P0 and P1 combat (moved from HANDOFF)
+- P0: `LOCAL_ONLY = false` (user: "can go off now so I can test"). Minds without a local model use `CloudMind` (Muse Spark on
+  Baseten, one call a second at most, `pixel/main.ts`), then rules. New flag `CLOUD_LIVELY` in `game/test-mode.ts` for P5 extras.
+- Bug 34 (user: bubble moves aside): `layoutBubbles(..., keepOut)` in `view/bubbles.ts`; `drawGoals` returns the card's box.
+- Bug 36 (user: keep model names, friendlier): Brain lines in `switchBrain` say plain words first, then "(Llama 3.2 1B, tuned)".
+- P1 rules (`sim/battle.ts`, `sim/types.ts` `TurnFx`): block, counter x1.5, charge to `CHARGE_MAX` 2 then signature x2,
+  crits 8% both sides, foe counter. Brute HP 48. Bench and numbers in `docs/ai/pet.md`.
+- P1 screen (`pixel/battle.ts`, `fight-flow.ts`, `sim/duel.ts`): shouts on keys 1-5 (2 per wild fight), damage pops,
+  charge pips, signature names from genes, counter/crit/block lines. Proof: `docs/testing/proof/pet/combat-live.md`.

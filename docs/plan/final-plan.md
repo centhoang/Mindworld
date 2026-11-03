@@ -4,10 +4,15 @@
 - **P0 done** (Nov 3 ~17:00 VN, live): LOCAL_ONLY off, `CLOUD_LIVELY` flag added (nothing uses it yet), bugs 34 and 36.
 - **P1 part done** (live `main-DyR8JZim`): fight rules (block, counter, charge, signature, crits both sides, brute HP 48,
   Prove +29.0 held-out) and the battle screen (shouts 1-5 twice per wild fight, damage pops, charge pips, effect lines).
-- **P1 left, in order:** NPC rivals (villager pets, duel offer, `/api/rival` counter-memo, fallback persona memos, loss
-  explanation) -> adapted coach review after a fight ("Teach this") -> trainer sprites on the battle screen (`attack`,
-  `hurt`, `jump`, `idle` strips; not yet in `client/public/art/humans/`) -> pack UI bars (`redbar`/`greenbar`/`bluebar`)
-  and `glint` on crits. The screen today uses the old code-drawn HP bars.
+- **P1 rivals done** (live `main-mYTbEBmg`, worker b05d04d5): Elder/Mo/Ama pets from day 1, duel ask and refusals,
+  villager challenges, rehearsal-based adaptation with Muse Spark's `/api/rival` plan, loss explanation + next lesson,
+  memory/respect/news/coins. Design and bench: `docs/ai/pet.md` "Village rivals". Proof: `docs/testing/proof/pet/rivals-live.md`.
+  Changed from the plan: the duel is a live `Battle` (with shouts and Teach), not the precomputed `runDuel`; the model's
+  plan is one candidate the sim rehearses, not the memo itself.
+- **P1 left, in order:** adapted coach review after a fight ("Teach this"; reuse `nextLesson` in `sim/rivals.ts`, which
+  already names the next missing lesson) -> trainer sprites on the battle screen (`attack`, `hurt`, `jump`, `idle` strips;
+  not yet in `client/public/art/humans/`) -> pack UI bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits. The
+  screen today uses the old code-drawn HP bars.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted
