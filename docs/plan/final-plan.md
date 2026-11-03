@@ -26,8 +26,15 @@
   tabs on the same kicks; headless watch: every new activity starts unforced).
   Changed from the plan: one goal, not two; mining sells nothing (stone would unbalance the price board's pairs); no
   string lights or notes (only old non-pack lights art); the player's hammering to upgrade the house waits for P4 (bug 46).
-  **Left in P2:** the 12-min live watch with each activity seen unforced (swim and haul's carry not yet seen on screen).
-  **Next: P3** (build `scripts/join-check.mjs` first).
+  **P2 done** (2026-11-04 00:32 VN): 19-min live watch, every activity but soccer and farm started unforced (soccer seen
+  unforced earlier on live); haul's carry strip on screen; swim was drawn on the pond's edge, fixed (`waterReach`).
+- **P3 done** (live `main-26ntqsHn`, worker 82897677, commits 289c996, d5ad3ed): `scripts/join-check.mjs` loop, 3 runs on
+  live, clean at the end (20 at once, plots, refresh races, late joiners, kick burst, host leaves, 100 held, 101st sent to
+  the next room, clean close). Bugs 49-52 found and fixed. Real tabs: Guest yard and spill-room toasts, background host
+  hand-over, duel with a join, three dancing, phone-size window, Fast/Slow 3G. Proof `docs/testing/proof/network/join-live.md`.
+  Changed from the plan: bots use their own `check` room (they would host villagers in the real one); overflow rooms are
+  `main-2`..`main-9`. Not run live: joining while someone is indoors (same rule as fighting). Gap found: no touch controls.
+  **Next: P4** (map polish + bug 46), then user play-test #1. Run `node scripts/join-check.mjs` after every deploy.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

@@ -140,3 +140,21 @@ docs/{TILE-RULES,NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/
 - `sim/cortex.ts` ScriptedCortex learns "attack after a block" (`R.counter`); prompts untouched.
 - Live proof: Mo duel -> "Coach: Mochi blocked a hit but did not strike back once." -> counter lesson (0% -> 28%) ->
   Teach it -> Muse Spark taught it, Prove +14.3. `docs/testing/proof/pet/coach-review-live.md`.
+
+## 2026-11-03 session: P2 ball, dance floor, activities (moved from HANDOFF)
+- One shared ball: `client/src/life/ball.ts` (pure; state = last kick, fixed 1/30 s steps, walls, goal, reset). Room `kick` ->
+  numbered `ball` to everyone incl. kicker; welcome carries the last kick + age; DO stores it (`worker/src/room.ts` `kick()`,
+  `room-do.ts`). Client: `world/live.ts` `kick()`/`parseKick`, `room-flow.ts`, `Overworld.stepBall/kickBall/ballKicked/
+  playBall/nudgeBall`. Protocol: `docs/network/network.md` "The ball". Pitch cleared of trees.
+- Open groups: `ActivityDef.open` + `isGroup()`: soccer and dance may start alone (bug 37). Dance on `DANCE_FLOOR`, evening
+  `peak`; a dancing player pulls villagers (`NpcVillage.dancing`).
+- New activities (`life/activities.ts`): campfire, haul, repair, mine, feed (animal yard), swim. Places in
+  `world/village-map.ts`; spots in `Overworld.npcSpots`; drawing in `pixel-view.ts`. Worker `MIND_ACTS` extended.
+- Fixes: map rocks were invisible blockers; LiveLink's welcome dropped the open talks; pets eat at home.
+
+## 2026-11-04 session: P2 live watch, P3 join loop (moved from HANDOFF)
+- `scripts/join-check.mjs` (bots in the live `check` room): 3 loop runs, clean at the end. Bugs 49 (refresh lost its plot),
+  50 (late joiner missed farms), 51 (villagers froze while their host fought/was indoors/hidden), 52 (phone-size HUD cut).
+- `/api/room?room=` names main, main-2..9, check, check-2..9; client moves on `full`; endless retry; Guest/spill/drop toasts.
+- Swim drawn in open water (`waterReach`). Hidden or frame-throttled tabs step the world (`pixel/main.ts`).
+- Proof: `docs/testing/proof/network/join-live.md`, `docs/testing/proof/game/activities.md` "P2 live watch".
