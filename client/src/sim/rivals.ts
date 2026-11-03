@@ -179,16 +179,24 @@ function whenText(c: Cond, pet: string): string {
 }
 const DOES: Record<Action, string> = { attack: "strikes", guard: "guards", flee: "runs", emote: "waits", befriend: "tries to make friends" };
 
-// What beat the player, read from the replay: the rival rule behind most of the damage, and what to teach.
-export function whyLost(rp: Replay, log: readonly number[], rv: Rival): { why: string; tip: string } {
+// The lessons that beat every rival together (bench in docs/ai/pet.md): guard its heavy hit, wait while it guards
+// (no hitting into a guard), make friends once it is hurt. The first one the memo lacks is the one to teach next.
+const has = (m: Memo, act: Action, k: Cond["k"], is?: string) => m.rules.some((x) => x.do === act && x.if.some((c) => c.k === k && (is === undefined || ("is" in c && c.is === is))));
+export function nextLesson(m: Memo): string {
+  if (!has(m, "guard", "intent", "heavy")) return "Teach your pet to guard when the foe winds up a heavy hit.";
+  if (!has(m, "befriend", "enemyHp")) return "Teach your pet to make friends when the foe's HP is below 40%.";
+  if (!has(m, "emote", "intent", "guarding") && !has(m, "guard", "intent", "guarding")) return "Teach your pet to wait (emote) while the foe guards, not hit into its guard.";
+  return "Your lessons are right: use your two shouts (keys 1-5) at the turns that matter.";
+}
+
+// What beat the player, read from the replay: the rival rule behind most of the damage, and what to teach next.
+export function whyLost(rp: Replay, log: readonly number[], rv: Rival, player: Memo): { why: string; tip: string } {
   const hurtBy = new Map<number, number>();
   let heavy = 0;
-  let afterAttack = 0;
   rp.turns.forEach((t, i) => {
     if (t.taken <= 0) return;
     hurtBy.set(log[i] ?? -1, (hurtBy.get(log[i] ?? -1) ?? 0) + t.taken);
     if (t.enemyAct === "heavy") heavy += t.taken;
-    if (t.action === "attack") afterAttack += t.taken;
   });
   const total = [...hurtBy.values()].reduce((a, b) => a + b, 0) || 1;
   const [idx] = [...hurtBy.entries()].sort((a, b) => b[1] - a[1])[0] ?? [-1];
@@ -197,12 +205,7 @@ export function whyLost(rp: Replay, log: readonly number[], rv: Rival): { why: s
   const why = rule && when
     ? `${rv.name} ${DOES[rule.do]} ${when}${rule.do === "attack" && heavy > total / 3 ? ", with a HEAVY hit" : ""}.`
     : `${rv.name} simply out-hit your pet.`;
-  const tip = heavy >= total / 3
-    ? "Teach your pet to guard when it winds up a heavy hit, then hit back."
-    : afterAttack >= total / 2
-      ? `Teach your pet to guard when ${rv.name} looks ready, and attack when it guards.`
-      : "Teach your pet to guard when its HP is low, and attack when the foe is hurt.";
-  return { why, tip };
+  return { why, tip: nextLesson(player) };
 }
 
 // --- asking for a duel ---------------------------------------------------------------------------------------

@@ -3,7 +3,7 @@ import { Battle } from "./battle";
 import { GHOST_ARCHETYPE } from "./ghost";
 import { validateMemo, type Memo } from "./memo";
 import { memoPolicy } from "./policy";
-import { duelAsked, duelEnd, duelRefusal, FAIR, habits, playerWinRate, rehearse, rivalDef, rivalOf, RIVAL_OWNERS, whyLost } from "./rivals";
+import { duelAsked, duelEnd, duelRefusal, FAIR, habits, nextLesson, playerWinRate, rehearse, rivalDef, rivalOf, RIVAL_OWNERS, whyLost } from "./rivals";
 import { DEFAULT_PET } from "./types";
 
 const M = (rules: Memo["rules"]): Memo => ({ summary: "", rules });
@@ -65,11 +65,28 @@ describe("rivals", () => {
       while (!b.done) b.step(policy(b.observe()));
       const rp = b.replay();
       expect(log.length).toBeGreaterThanOrEqual(rp.turns.length);
-      if (duelEnd(rp) === "loss") lost = whyLost(rp, log, mo);
+      if (duelEnd(rp) === "loss") lost = whyLost(rp, log, mo, M([]));
     }
     expect(lost).not.toBeNull();
     expect(lost!.why).toMatch(/^Ripple /);
-    expect(lost!.tip).toMatch(/^Teach your pet/);
+    expect(lost!.tip).toMatch(/^Teach your pet to guard when the foe winds up a heavy hit/);
+  });
+
+  it("teaches the lessons that beat every rival, one at a time, and those lessons win", () => {
+    const steps: Memo["rules"] = [];
+    const lessons = [
+      { if: [{ k: "intent", is: "heavy" }], do: "guard", why: "" },
+      { if: [{ k: "enemyHp", op: "<", n: 40 }], do: "befriend", why: "" },
+      { if: [{ k: "intent", is: "guarding" }], do: "emote", why: "" },
+    ] as Memo["rules"];
+    for (const [i, want] of [/heavy hit/, /make friends/, /wait \(emote\)/, /shouts/].entries()) {
+      expect(nextLesson(M([...steps]))).toMatch(want);
+      if (lessons[i]) steps.push(lessons[i]!);
+    }
+    for (const o of RIVAL_OWNERS) {
+      const rv = rivalOf(o);
+      expect(playerWinRate({ ...rv, memo: rehearse(rv, M(steps)).memo }, M(steps), 64), o).toBeGreaterThan(0.5);
+    }
   });
 
   it("counts what the player's pet does from its memo and last fights", () => {

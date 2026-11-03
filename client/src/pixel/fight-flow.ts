@@ -203,7 +203,7 @@ export function makeFightFlow(d: FightDeps) {
       await battleView.say(`+${earned} coins.`);
     }
     if (end === "loss" || end === "draw") {
-      const w = whyLost(replay, log, rv);
+      const w = whyLost(replay, log, rv, state.memo);
       await battleView.say(w.why);
       await battleView.say(w.tip);
     }
