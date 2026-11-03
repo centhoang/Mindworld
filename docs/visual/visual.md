@@ -18,6 +18,7 @@ Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams, decor de
 
 **Humans:** only the pack's own strips. A dance is its jump, soccer its run. Villagers sleep and eat at home, unseen. An activity with no matching strip is dropped. No other person art is ever drawn: while a strip loads or retries, the same look stands in its idle strip, else nothing (bug 44).
 Battle screen (2026-11-03): each trainer stands beside its pet at 2x (half the pet's height), the player left facing right, the foe's trainer right facing left, drawn before the pets. Idle; a shout is the attack strip without the tools layer (no sword); a hard hit is hurt; the winner jumps. Wild pets have no trainer.
+Battle bars: the pack's `greenbar`/`redbar` for HP (red at or under 40%) and `bluebar` for the signature charge, each stretched from its 15x7 art (caps + middle column, trough filled with the full bar's colour, `packBar` in `pixel/sunny.ts`). Crits and signatures pop three pack glints (2x) around the pet hit.
 
 **Pets:** shading follows the shape, round on a round head. No marks too small to read at pet size.
 

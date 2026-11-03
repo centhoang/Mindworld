@@ -1,14 +1,20 @@
-# HANDOFF: Mindworld final plan (2026-11-03, 18:46 VN)
+# HANDOFF: Mindworld final plan (2026-11-03, 18:51 VN)
 
-**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P1: pack bars and glint next). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P1 done; P2 next). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
   Status section at the top. Keep that Status current every session.
-- Live `main-R92c8Tcb` (worker version 26730c70). Local commits on `rework/fresh-look`, not pushed.
+- Live `main-OQm_PqE6` (worker version 6bdb78ea). Local commits on `rework/fresh-look`, not pushed.
 - Tests: client 643, worker 214, tsc clean both.
 - Spend 2026-11-03: $0.39 of the $30 day cap. Baseten total $0.85 of its $50 cap. Meta ~$149.9, Modal ~$100 untouched.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-03 session").
+
+## Done this session (P1 pack bars and glint)
+- `pixel/sunny.ts` `packBar(g, colour, x, y, w, frac)`: the pack's 15x7 bar stretched (caps + middle column), trough
+  filled with the full bar's colour; 6 bar PNGs in `art/sunny/` (copied by `scripts/art-sunny.py`).
+- `pixel/battle.ts`: HP green, red at <= 40%; charge = blue bar; crits and signatures pop 3 pack glints at 2x. Old code
+  bars remain the fallback while art loads. Proof `docs/testing/proof/pet/bars-glint-live.md`.
 
 ## Done this session (P1 trainers on the battle screen)
 - `pixel/humans.ts`: `attack` and `hurt` actions, `humanFiles(look, action)`, `HumanSprites.drawAction(...)` (same
@@ -44,9 +50,8 @@
   proof `docs/testing/proof/pet/rivals-live.md`.
 
 ## Next actions
-1. P1 rest: pack UI bars for HP (`redbar`/`greenbar`) and charge (`bluebar`) in `pixel/battle.ts` `hpBox`/`chargePips`,
-   and the pack `glint` VFX (`spr_deco_glint_01_strip6`, already loaded by `pixel/sunny.ts`) on crits and signature
-   moves. Search the pack UI folder first. Do not edit the coach prompt text in `sim/cortex.ts` (frozen).
+1. P1 is done. Optional leftover: pack expression icons over pets (`expression_attack`, `stress`, `love`). Do not edit
+   the coach prompt text in `sim/cortex.ts` (frozen).
 2. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
    screen; a bored villager walks up and challenges you.
 3. Then P2-P8 per the plan. **P3 is a loop** (user: "make sure (test, update, repeat) so on live, many players can join

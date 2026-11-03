@@ -16,8 +16,9 @@
   sim (rehearsal + gate), not by replay rules alone; the cloud review text stays in P5.
 - **P1 trainers done** (live `main-R92c8Tcb`, worker 26730c70): player, villager or other player beside their pet,
   idle / attack swing on a shout (no sword layer) / hurt on a hard hit / jump on a win. Proof `proof/pet/trainers-live.md`.
-- **P1 left:** pack UI bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits and signatures. The screen today uses
-  the old code-drawn HP bars.
+- **P1 done** (live `main-OQm_PqE6`, worker 6bdb78ea): pack HP bars (green, red at <= 40%) and blue charge bar, pack
+  glint on crits and signatures. Proof `proof/pet/bars-glint-live.md`. Not done from the P1 list: pack expression icons
+  over pets (`expression_attack`, `stress`, `love`); left out as optional polish. **Next: P2.**
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted
