@@ -36,6 +36,20 @@ describe("layoutBubbles", () => {
   });
 });
 
+describe("layoutBubbles keep-out panels (bug 34)", () => {
+  it("never covers the Goals card: a bubble that would, steps below it", () => {
+    const goals = { x: 4, y: 4, w: 150, h: 58 };
+    const [p] = layoutBubbles([box(60, 40)], 320, 240, [goals]);
+    expect(p).not.toBeNull();
+    expect(p!.y).toBeGreaterThanOrEqual(goals.y + goals.h);
+    expect(p!.moved).toBe(true);
+  });
+
+  it("leaves bubbles clear of the card where they were", () => {
+    expect(layoutBubbles([box(160, 140)], 320, 240, [{ x: 4, y: 4, w: 150, h: 58 }])).toEqual([{ x: 110, y: 112, moved: false }]);
+  });
+});
+
 describe("layoutBubbles limits", () => {
   it("shows at most three, and whoever speaks to me comes first", () => {
     const crowd = Array.from({ length: 8 }, (_, i) => box(60 + i * 30, 150));

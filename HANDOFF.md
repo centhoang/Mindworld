@@ -23,21 +23,20 @@
 ## Open
 - 46: same small house for every player, with an interior. Needs small-house interior art; part of the map polish in the final plan (detail in BUGS).
 - 37: dance never chosen unforced (28 min watched). The user now asks for a dance floor: see `final-input.md`.
-- User's calls: 34 (speech box over the Goals panel), 36 (Brain panel names the model to a stranger).
 - Not done by a person: a 2-person play, the stranger test. 100 bots not proven (89 held).
 
 ## Decisions (standing)
 - NPCs are the star: a player cannot tell them from a human. The sim reasons; the model picks among valid options and speaks.
 - The game must still work free after the event. Local prompts are frozen at af455c4: a text change needs a retrain. Cloud `VILLAGER_STYLE` is not frozen.
-- Chat answers come from Muse Spark now (user, 2026-11-03), no per-client cap; everything else keeps `LOCAL_ONLY` until step 7.
+- `LOCAL_ONLY` is off since 2026-11-03 (user: "can go off now so I can test"). Minds without a local model use Muse Spark (`CloudMind`, one call a second at most), then rules. Cloud extras go behind `CLOUD_LIVELY`.
 - Submission day (user): make GitHub and the 4 HF repos public, remove Access. Remove `/api/chatlog`, its client call and the KV rows.
 - Pack rules (user): a human activity with no matching pack animation is dropped. Everything is top-down, front side only, never iso (`docs/visual/visual.md`).
 - Deadline: Nov 4, 9 PM ET = Nov 5, 9 AM Vietnam. Step 7 (`LOCAL_ONLY` off, `/api/chatlog` removed) runs last.
 
 ## Next actions
-1. Final plan in plan mode from `docs/plan/final-input.md`, then execute it. Include bug 46 in the map polish and bug 37 with the dance floor.
+1. **Execute `docs/plan/final-plan.md`** (approved 2026-11-03 16:20 VN), phase by phase. P0 (LOCAL_ONLY off, bugs 34, 36) done in the planning session.
 2. After any user play-test: read the chat log unasked and add failures to `docs/testing/checks/npc.md`; log new bugs in `docs/BUGS.md`.
-3. Step 7 on Nov 5 morning, last.
+3. P8 (remove `/api/chatlog`, user goes public and submits) on Nov 5 morning, last.
 
 ## Gotchas
 - **A hidden Browser pane stalls requestAnimationFrame**: the game looks frozen and keys do nothing. That is the pane, not the game.

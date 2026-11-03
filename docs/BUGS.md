@@ -3,14 +3,12 @@
 Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove when proven fixed. Fixed lines wait for the user's review.
 
 ## Visual
-34. **A speech box can cover the Goals panel.** A bubble of someone in the top left draws over it, on purpose today (`underBubbles`). Reads as an overlap. Shot: `proof/visual/sunny-bubble-over-goals.jpg`. User's call.
-
-36. **The Brain panel names the model to a stranger.** User's call; the wording is unchanged.
-
 46. **Same small houses for every player.** Player 1's house differs from player 2's. All players get the same small-size house (variants allowed), each with an interior.
     Left for the final plan (map polish): today yours is the big home wing (`HOME_ART`, `game/house.ts`) and the only interior is cut from it (`interior.ts`, `scripts/art-home-wing.py`); others' houses are small stamps (`HOUSE_ART` in `overworld.ts`). Needs small-house interior art.
 
 ### Fixed, waiting for review
+34 (user chose "bubble moves aside", 2026-11-03): a bubble that would cover the Goals card steps just below it (`layoutBubbles` keep-out, `bubbles.test.ts`). Not yet seen on live.
+36 (user chose "keep, friendlier"): the Brain lines say plain words first, model after: "The village now thinks on your own computer (Llama 3.2 1B, tuned)" (`pixel/main.ts` `switchBrain`).
 1-9, 13-23: ground tiles, pond edge, windmill, house entry, placement, farm art, beaches, fishing rules, coast corners, grid, cut-off tiles, road fences, bridge posts, world edge, road bulge, layering, pond pier, clouds, layer rule. Detail: git history of this file.
 35: playground slide redrawn straight-on (`proof/visual/slide-live.jpg`).
 44 (old character art): every person went through one draw that fell back to the old 16 x 24 sprites while a strip loaded, and for good once a load failed (no retry, bug 27 blips). Now all strips load up front, a failed file is asked for again, and a missing strip shows the same look's idle strip or nothing; the old fallbacks are gone (`humans.test.ts`, live day watch: `proof/visual/old-sprite-44.md`).

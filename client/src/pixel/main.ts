@@ -41,6 +41,7 @@ import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, ti
 import { drawMenu, type MenuRow } from "./menu";
 import { chipSpots } from "../view/mosaic/compose";
 import { MosaicView } from "../view/mosaic/mosaic-view";
+import type { Rect } from "../view/bubbles";
 import type { ScenePanel } from "../game/ports";
 import { runSetup, storeSetup } from "./setup";
 import { TeachScreen } from "./teach";
@@ -324,7 +325,8 @@ function showMenu(title: string, rows: readonly MenuRow[], cursor: number, t: nu
 }
 
 // The goals card (top left, G hides it): what a first visit should try. Gone once all four are done.
-function drawGoals(): void {
+// Returns the card's box on the pixel look, so speech bubbles step below it (bug 34).
+function drawGoals(): Rect | void {
   if (hidden("goals") || state.onboard?.goalsHidden || world.inspect) return;
   const list = pixelGoals({ taught: !!state.steps?.proved, party: (state.party ?? []).length, shipped: !!state.steps?.shipped });
   if (list.every((x) => x.done)) return;
@@ -332,10 +334,11 @@ function drawGoals(): void {
     nextPanels.push({ place: "corner", title: "GOALS  (G)", rows: list.map((x) => ({ label: `${x.done ? "+" : "-"} ${x.label}`.slice(0, 26), ink: x.done ? "#7A8F89" : "#39463F" })) });
     return;
   }
-  const w = 150;
-  drawFrame(g, 4, 4, w, 18 + list.length * 10);
+  const box = { x: 4, y: 4, w: 150, h: 18 + list.length * 10 };
+  drawFrame(g, box.x, box.y, box.w, box.h);
   drawText(g, "GOALS  (G)", 10, 9, "#795849");
   list.forEach((x, i) => drawText(g, `${x.done ? "+" : "-"} ${x.label}`.slice(0, 22), 10, 20 + i * 10, x.done ? "#7A8F89" : "#39463F"));
+  return box;
 }
 
 const CRT_KEY = "mw.crt";
@@ -509,20 +512,20 @@ const brainTag = () => (instinct.voice === webBrain ? "llama 1b" : "cloud");
 async function switchBrain(): Promise<void> {
   if (instinct.voice) {
     instinct.voice = null;
-    brainSay({ text: "Brain: rules only (the measured memo policy).", who: "Brain", t: 3 });
+    brainSay({ text: "Your pet thinks on rules only now (its taught memo). B: wake the AI again.", who: "Brain", t: 3 });
     return;
   }
   if (!WebLlmVoice.supported()) {
-    brainSay({ text: "No WebGPU here, so your pet stays on rules.", who: "Brain", t: 5 });
+    brainSay({ text: "This browser cannot run the AI here (no WebGPU), so your pet thinks on rules.", who: "Brain", t: 5 });
     return;
   }
   try {
-    await webBrain.load((_text, frac) => brainSay({ text: `Loading Llama 3.2 1B in this tab: ${Math.round(100 * frac)}%`, who: "Brain", t: 30 }));
+    await webBrain.load((_text, frac) => brainSay({ text: `Waking the AI on your own computer: ${Math.round(100 * frac)}% (Llama 3.2 1B, tuned)`, who: "Brain", t: 30 }));
     instinct.voice = webBrain;
-    brainSay({ text: "Llama 3.2 1B runs in this tab now. B again: back to rules only.", who: "Brain", t: 5 });
+    brainSay({ text: "The village now thinks on your own computer (Llama 3.2 1B, tuned). B: rules only.", who: "Brain", t: 5 });
   } catch (e) {
     storeSetup(null, false); // next visit runs the setup gate again
-    brainSay({ text: `Could not load the model (${(e as Error).message}). Rules only.`, who: "Brain", t: 5 });
+    brainSay({ text: `The AI could not start here (${(e as Error).message}). Rules only.`, who: "Brain", t: 5 });
   }
 }
 void (async () => {
@@ -535,8 +538,8 @@ void (async () => {
 // ---- village minds: every pet at your corner has a mind (persona, plan, memory, friends). The same local
 // Llama the B key loads for fights thinks for them through one queue; without it they run on needs + rules.
 const localBrain = () => (instinct.voice === webBrain ? webBrain : null);
-// Local model first, then Muse Spark, then the rules (the scheduler's fallback).
-const cloudMind = new CloudMind();
+// Local model first, then Muse Spark, then the rules (the scheduler's fallback). One cloud call a second at most.
+const cloudMind = new CloudMind(1000);
 void cloudMind.probe();
 webBrain.onLost = () => {
   if (instinct.voice === webBrain) instinct.voice = null;
@@ -705,9 +708,7 @@ function update(dt: number, t: number): void {
         save(state);
       }
     }
-    world.underBubbles = () => {
-      if (!menu && !crate && !board && !peerMenu && !duelIn) drawGoals();
-    };
+    world.underBubbles = () => (!menu && !crate && !board && !peerMenu && !duelIn ? drawGoals() : undefined);
     world.panels = nextPanels;
     nextPanels = [];
     if (!pixelLook && !menu && !crate && !board && !peerMenu && !duelIn) drawGoals();

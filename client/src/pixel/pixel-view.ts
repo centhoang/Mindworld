@@ -319,7 +319,7 @@ export class PixelView implements View {
     if (scene.showMap) this.drawMinimap(g, sw);
     if (scene.showNames) this.drawNames(g, toScreen, sw, sh);
 
-    o.underBubbles?.();
+    const panel = o.underBubbles?.();
     const shown: { id: string; head: string; lines: string[]; thought: boolean; cx: number; y: number; box: BubbleBox }[] = [];
     for (const b of scene.bubbles) {
       const [bx, by] = toScreen(b.x, b.z);
@@ -329,7 +329,7 @@ export class PixelView implements View {
       const bottom = by - OVERWORLD_MON - 12;
       shown.push({ id: b.id, head: b.head, lines, thought: b.thought, cx: bx, y: bottom, box: { cx: bx, bottom, w, h: (lines.length + (b.head ? 1 : 0)) * 10 + 8, first: b.first } });
     }
-    const spots = layoutBubbles(shown.map((s) => s.box), sw, sh);
+    const spots = layoutBubbles(shown.map((s) => s.box), sw, sh, panel ? [panel] : []);
     const fates: BubbleFate[] = shown.map((s, i) => {
       const spot = spots[i];
       if (spot) bubble(g, s.head, s.lines, s.cx, s.box.w, s.box.h, spot, s.thought);

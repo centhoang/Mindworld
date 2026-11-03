@@ -33,6 +33,7 @@ import { villageWorld } from "../world/village-map";
 import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
+import type { Rect } from "../view/bubbles";
 import { isNpc, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
 import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
@@ -881,7 +882,7 @@ export class Overworld {
   }
 
   indoors = false; // drawing the world around the house: the house and I are on the interior's layer
-  underBubbles?: () => void; // the screen's own panels: speech draws over them
+  underBubbles?: () => Rect | void; // the screen's own panels; speech steps around the one it returns
 
   // Standing in a dance that has started, you dance too.
   private partyPose(): Pose | null {

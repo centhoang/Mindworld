@@ -4,6 +4,7 @@ Each doc has one job, no size limit (user, 2026-11-03). Old detail lives in `arc
 
 | Doc | Job |
 |---|---|
+| `plan/final-plan.md` | **The plan to submission** (approved 2026-11-03): phases P0-P8, timeline, cut lines |
 | `plan/final-input.md` | The user's input for the final plan (2026-11-03): demo target and specific asks |
 | `RESTRUCTURE.md` | The plan for this rework: scopes, order, open decisions |
 | `BUGS.md` | Open bugs, by scope |
