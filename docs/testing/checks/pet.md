@@ -14,6 +14,7 @@ Lab: `/lab/pet`. It reads your save and never writes it. Proof so far: `proof/pe
 - [ ] A fight feels tense: blocks, counters, crits and a charged signature move show on screen, with damage numbers. (lines on live: [combat-live](../proof/pet/combat-live.md); a screenshot of pips, numbers and a signature still owed)
 - [x] The trainer can shout a move twice per wild fight (keys 1-5); the memo plays the rest. [combat-live](../proof/pet/combat-live.md)
 - [x] A village rival (Elder, Mo, Ama, later Pip) accepts or refuses a duel, adapts its tactics to your memo, and says why it beat you. [rivals-live](../proof/pet/rivals-live.md)
+- [x] Each trainer stands beside their pet on the battle screen, looking as in the village: shout = a swing, a hard hit = a flinch, the winner jumps. [trainers-live](../proof/pet/trainers-live.md)
 - [ ] A villager's pet looks the same in the village and on the battle screen. (code shares the genes; not yet seen on live: the pane was hidden)
 - [ ] A bored villager walks up and challenges you, and "yes" starts the duel. (unit tests only)
 - [ ] The tip after a loss, taught, wins the next duel more often. (bench: the three lessons win 62-70% against every adapted rival; the coach review now picks a lesson rehearsed against that rival, e.g. Mo 0% -> 28%)

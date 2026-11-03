@@ -1,14 +1,21 @@
-# HANDOFF: Mindworld final plan (2026-11-03, 18:35 VN)
+# HANDOFF: Mindworld final plan (2026-11-03, 19:05 VN)
 
-**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P1: trainer sprites next). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P1: pack bars and glint next). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
   Status section at the top. Keep that Status current every session.
-- Live `main-CKR3gYL-` (worker version 973186f7). Local commits on `rework/fresh-look`, not pushed.
-- Tests: client 641, worker 214, tsc clean both.
+- Live `main-R92c8Tcb` (worker version 26730c70). Local commits on `rework/fresh-look`, not pushed.
+- Tests: client 643, worker 214, tsc clean both.
 - Spend 2026-11-03: $0.39 of the $30 day cap. Baseten total $0.85 of its $50 cap. Meta ~$149.9, Modal ~$100 untouched.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-03 session").
+
+## Done this session (P1 trainers on the battle screen)
+- `pixel/humans.ts`: `attack` and `hurt` actions, `humanFiles(look, action)`, `HumanSprites.drawAction(...)` (same
+  idle-or-nothing rule as bug 44). Attack is drawn without the tools layer (it is a sword); `tools_attack` not shipped.
+- `pixel/battle.ts`: `Side.trainer`; trainers at 2x beside their pets, drawn first; poses: shout -> attack, hard hit ->
+  hurt, win -> jump (loop). Sides: `main.ts side()` = `world.myLook`, rival = `NPC_LOOKS[owner]`, live duel =
+  `humanLook(liveName(genes))`. Strips copied by `scripts/art-sunny.py`. Proof `docs/testing/proof/pet/trainers-live.md`.
 
 ## Done this session (P1 coach review)
 - `client/src/sim/review.ts` (pure): `coachReview(replay, memo, {pet, foe, def})` finds reasons in the replay (heavy hits
@@ -37,9 +44,9 @@
   proof `docs/testing/proof/pet/rivals-live.md`.
 
 ## Next actions
-1. P1 rest, in order: trainer sprites on the battle screen (`attack`, `hurt`, `jump`, `idle` strips from the pack into
-   `client/public/art/humans/` via `scripts/art-sunny.py`; read `docs/visual/visual.md` and `layers.md` first) -> pack
-   bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits. Do not edit the coach prompt text in `sim/cortex.ts` (frozen).
+1. P1 rest: pack UI bars for HP (`redbar`/`greenbar`) and charge (`bluebar`) in `pixel/battle.ts` `hpBox`/`chargePips`,
+   and the pack `glint` VFX (`spr_deco_glint_01_strip6`, already loaded by `pixel/sunny.ts`) on crits and signature
+   moves. Search the pack UI folder first. Do not edit the coach prompt text in `sim/cortex.ts` (frozen).
 2. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
    screen; a bored villager walks up and challenges you.
 3. Then P2-P8 per the plan. **P3 is a loop** (user: "make sure (test, update, repeat) so on live, many players can join
@@ -87,6 +94,10 @@
 - Tool how-to (test Chrome, tab driving, chat log): `docs/ops/tooling.md`. Benches: `.scratch/combat/bench.ts` (wild),
   `rival-bench.ts`, `tip-bench.ts`, `review-bench.ts` (gitignored; recreate from `docs/ai/pet.md` if gone).
 - Live tests change the profile's save (`localStorage["petmind.v1"]`): keep the memo first, write it back after.
+- **Screenshots on a hidden pane are stale frames.** Call `__px.update(0.01, performance.now() / 1000)` right before
+  each screenshot to draw a fresh one (`tabs_context` says whether the pane is hidden).
+- Villagers work mornings ("I'm working right now"); try each of Ama, Elder, Mo. Local dev starts at game night: set
+  `world.npcs.v.t` forward is not enough (the sim re-syncs); test rivals on live, or the visuals via a wild fight.
 - A fight on a hidden pane: after the result, `battleView.choosing` with labels "Teach it"/"Done" is the coach review;
   `cmdKey("enter")` = Teach it, then `#teach` `requestSubmit()` teaches the typed lesson.
 - `cd` inside a Bash call moves the session's working folder: use absolute paths.

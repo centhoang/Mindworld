@@ -14,9 +14,10 @@
   into Teach. Design and bench: `docs/ai/pet.md` "Coach review". Proof: `docs/testing/proof/pet/coach-review-live.md`
   (Mo duel -> counter lesson -> Muse Spark taught it, Prove +14.3). Changed from the plan: the lesson is chosen by the
   sim (rehearsal + gate), not by replay rules alone; the cloud review text stays in P5.
-- **P1 left, in order:** trainer sprites on the battle screen (`attack`, `hurt`, `jump`, `idle` strips; not yet in
-  `client/public/art/humans/`) -> pack UI bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits. The screen today
-  uses the old code-drawn HP bars.
+- **P1 trainers done** (live `main-R92c8Tcb`, worker 26730c70): player, villager or other player beside their pet,
+  idle / attack swing on a shout (no sword layer) / hurt on a hard hit / jump on a win. Proof `proof/pet/trainers-live.md`.
+- **P1 left:** pack UI bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits and signatures. The screen today uses
+  the old code-drawn HP bars.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted
