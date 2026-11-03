@@ -24,3 +24,7 @@ Run on `/`, Sunnyside (decided). `/lab/visual` is still the mosaic. Live proof: 
 - [x] No land a tile wide, so no loose cliff piece on the coast. Unit test: `village-look.test.ts`.
 - [x] A farm is the pack's field: light dirt with an edge all round, one tilled mound per bed, each crop growing out of its mound at every stage; the field stays inside its plot and off the road's edge (bug 41). [live](../proof/visual/farm-41-live.png)
 - [x] Every generated art file is top-down, front side only, never at an angle. [audit](../proof/visual/gen-art-audit.md)
+- [ ] Every player has the same small house (only the roof colour differs), on every plot, whoever holds it; going in lifts
+  the roof in place and shows a small room (bed, shelf, table, stool, the crate by the door) you and your pet walk in (bug 46).
+  Unit tests: `house.test.ts`, `village-map.test.ts`. Dev pane only so far.
+- [ ] Every plot has a tilled 2x3 field beside its house and a front fence of the pack's rails with a gate at the door. Dev pane only so far.

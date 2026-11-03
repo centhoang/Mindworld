@@ -27,5 +27,6 @@ the bot part is one command, `node scripts/join-check.mjs` (run it after every d
   fighting, not run live.)
 - [x] A player who fights, goes indoors or puts the tab in the background hands the villagers to a free player at once.
 - [x] Players with no GPU, a phone-size window or a slow connection can join and play. (A phone has no touch controls yet:
-  it can join and watch, not walk.)
+  it can join and watch.) Touch controls since P4 (`pixel/touch.ts`: stick, E / X / T), proven in the dev pane at 375x812;
+  not yet on a real phone.
 - [ ] After the game goes public: a phone on mobile data and a second machine join at the same time.

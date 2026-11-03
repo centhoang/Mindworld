@@ -3,10 +3,10 @@
 Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove when proven fixed. Fixed lines wait for the user's review.
 
 ## Visual
-46. **Same small houses for every player.** Player 1's house differs from player 2's. All players get the same small-size house (variants allowed), each with an interior.
-    Left for the final plan (map polish): today yours is the big home wing (`HOME_ART`, `game/house.ts`) and the only interior is cut from it (`interior.ts`, `scripts/art-home-wing.py`); others' houses are small stamps (`HOUSE_ART` in `overworld.ts`). Needs small-house interior art.
+(none open)
 
 ### Fixed, waiting for review
+46 (P4, deployed 2026-11-04, worker 3a555c50): every plot has the same small house (Codex art in pack style, roof recoloured into the pack's five colours by slot, `scripts/art-home-small.py`) with a small room inside; the old home wing is gone (`game/house.ts`, `interior.ts`, `village-map.ts plotHouse`). Seen in the dev pane; not yet on live by the user.
 34 (user chose "bubble moves aside", 2026-11-03): a bubble that would cover the Goals card steps just below it (`layoutBubbles` keep-out, `bubbles.test.ts`). Not yet seen on live.
 36 (user chose "keep, friendlier"): the Brain lines say plain words first, model after: "The village now thinks on your own computer (Llama 3.2 1B, tuned)" (`pixel/main.ts` `switchBrain`).
 1-9, 13-23: ground tiles, pond edge, windmill, house entry, placement, farm art, beaches, fishing rules, coast corners, grid, cut-off tiles, road fences, bridge posts, world edge, road bulge, layering, pond pier, clouds, layer rule. Detail: git history of this file.
