@@ -36,6 +36,9 @@ export type EnemyAct = "strike" | "heavy" | "guard" | "idle" | "flee";
 
 export type Outcome = "win" | "loss" | "fled" | "escaped" | "timeout";
 
+// What made a turn special, for the battle screen and the fight review.
+export type TurnFx = "block" | "counter" | "signature" | "crit" | "foe-counter" | "foe-crit";
+
 export interface TurnRecord {
   obs: Observation;
   action: Action;
@@ -44,6 +47,9 @@ export interface TurnRecord {
   taken: number; // damage the pet took
   myHp: number;
   enemyHp: number;
+  fx?: TurnFx[]; // only when something special happened
+  charge?: number; // the pet's signature charge after this turn, when above 0
+  shout?: boolean; // the trainer called this move
 }
 
 export interface Replay {

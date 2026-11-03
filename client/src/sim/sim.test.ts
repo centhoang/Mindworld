@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { Battle, MAX_TURNS, runBattle, runBattleAsync } from "./battle";
+import { Battle, CHARGE_MAX, MAX_TURNS, runBattle, runBattleAsync } from "./battle";
 import { CortexUnavailable, LlmCortex, LocalCortex, MEMO_JSON_SCHEMA, ScriptedCortex, buildReflectPrompt, buildTeachPrompt, summarizeFights, type LlmClient } from "./cortex";
 import { bootstrapMeanCi, comparePaired, makeScenarios, runArm, seedRange, signTestP } from "./evaluate";
 import { EMPTY_MEMO, extractJson, renderMemo, validateMemo, type Memo } from "./memo";
 import { baselinePolicy, memoPolicy } from "./policy";
 import { passesGate, prove } from "./proof";
+import { ENEMIES, type EnemyDef } from "./enemies";
 import { roll } from "./rng";
-import { ACTIONS, ARCHETYPES, type Observation, type Policy } from "./types";
+import { ACTIONS, ARCHETYPES, type Action, type EnemyAct, type Observation, type Policy } from "./types";
 
 const obs = (over: Partial<Observation> = {}): Observation => ({
   turn: 1, myHpPct: 100, enemyHpPct: 100, enemy: "brute", size: "bigger", intent: "idle", last: "none", ...over,
@@ -31,6 +32,48 @@ describe("rng", () => {
       expect(r).toBeGreaterThanOrEqual(0);
       expect(r).toBeLessThan(1);
     }
+  });
+});
+
+// An enemy that plays a fixed script, so each rule can be checked on its own.
+const scripted = (acts: EnemyAct[]): EnemyDef => ({ ...ENEMIES.pal, maxHp: 999, act: ({ turn }) => acts[turn - 1] ?? "idle" });
+const play = (acts: EnemyAct[], moves: Action[], seed = 5) => {
+  const b = new Battle({ enemy: "pal", seed, enemyDef: scripted(acts) });
+  return moves.map((m) => b.step(m));
+};
+
+describe("battle depth: counters, charge, crits", () => {
+  it("an attack right after blocking a hit is a counter and hits harder", () => {
+    const countered = play(["strike", "idle"], ["guard", "attack"]);
+    const plain = play(["strike", "idle"], ["emote", "attack"]);
+    expect(countered[0]!.fx).toContain("block");
+    expect(countered[1]!.fx).toContain("counter");
+    expect(plain[1]!.fx ?? []).not.toContain("counter");
+    expect(countered[1]!.dealt).toBeGreaterThan(plain[1]!.dealt);
+  });
+
+  it("blocked hits charge the signature move, which hits hardest and uses the charge", () => {
+    const blocks: EnemyAct[] = Array.from({ length: CHARGE_MAX }, () => "strike");
+    const turns = play([...blocks, "idle", "idle"], [...blocks.map((): Action => "guard"), "attack", "attack"]);
+    expect(turns[CHARGE_MAX - 1]!.charge).toBe(CHARGE_MAX);
+    const sig = turns[CHARGE_MAX]!;
+    expect(sig.fx).toContain("signature");
+    expect(sig.charge).toBeUndefined();
+    expect(sig.dealt).toBeGreaterThan(turns[CHARGE_MAX + 1]!.dealt);
+  });
+
+  it("the enemy counters too: attacking into its guard sets up its harder hit", () => {
+    const t = play(["guard", "strike"], ["attack", "emote"]);
+    expect(t[1]!.fx).toContain("foe-counter");
+    const calm = play(["idle", "strike"], ["attack", "emote"]);
+    expect(t[1]!.taken).toBeGreaterThan(calm[1]!.taken);
+  });
+
+  it("records a trainer's shout, and the same seed always plays the same fight", () => {
+    expect(play(["strike"], ["guard"])[0]!.shout).toBeUndefined();
+    const b = new Battle({ enemy: "pal", seed: 5, enemyDef: scripted(["strike"]) });
+    expect(b.step("guard", true).shout).toBe(true);
+    expect(play(["strike", "idle", "heavy"], ["guard", "attack", "guard"], 9)).toEqual(play(["strike", "idle", "heavy"], ["guard", "attack", "guard"], 9));
   });
 });
 

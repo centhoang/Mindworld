@@ -28,7 +28,7 @@ const ch = 0; // roll channel for enemy decisions
 export const ENEMIES: Record<ArchetypeId, EnemyDef> = {
   // Every third turn it telegraphs a heavy hit; guarding on that turn blunts it.
   brute: {
-    id: "brute", label: "Brute", maxHp: 44, atk: 3, spd: 3, size: 9, befriendBase: 0.05,
+    id: "brute", label: "Brute", maxHp: 48, atk: 3, spd: 3, size: 9, befriendBase: 0.05,
     act: ({ turn }) => (turn % 3 === 0 ? "heavy" : "strike"),
   },
   // Gets scared when hurt and tries to run; befriending a scared one nearly always works.
