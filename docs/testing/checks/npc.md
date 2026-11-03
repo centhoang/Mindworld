@@ -36,4 +36,13 @@ Pass means: follows the last line, acts on yes or no, never repeats itself, neve
 18. "asdf", an emoji, one word, a very long line, rude words: stays in character.
 19. Two players talk to one NPC: replies don't mix them up.
 
+From the chat log, 2026-11-02 play (proof: `proof/npc/chatlog-2026-11-03.md`):
+20. A villager walking up to me says hello for the time it is: no "good morning" in the evening.
+21. It greets me about something real: never a picnic, a meal or a party that did not happen.
+22. It never says the same greeting to me twice, and never talks about itself by its own name.
+23. It does not bring a grudge up again right after it told me, and never says "you kept your promise" after "you stood me up".
+24. "I want to sell you a fish for 3 coins": it answers as a buyer, not "I have no fish to sell".
+25. Small talk ("nice day" at night) gets a person's answer, not a correction.
+26. Each chat line I type gets a Muse Spark answer on live (unless the sim knows the one true answer).
+
 Real play is logged to KV, `chat:` keys, development only. After each play-test, read it and add failures here.

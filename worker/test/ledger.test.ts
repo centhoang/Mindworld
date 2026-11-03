@@ -101,6 +101,13 @@ describe("SpendLedger", () => {
     expect((await l.reserve(req("e", 0.1, { clientKey: "someone-else" }))).ok).toBe(true);
   });
 
+  it("a quota without perClient caps only the pool's daily total", async () => {
+    const l = new SpendLedger(memoryStorage(), { ...LIMITS, dailyUsd: 100, clientPerMinute: 1000, clientDailyUsd: 100 }, () => T0);
+    const quota = { pool: "chat", total: 3 };
+    for (const id of ["a", "b", "c"]) expect((await l.reserve({ ...req(id, 0.01), quota })).ok).toBe(true);
+    expect(await l.reserve({ ...req("d", 0.01, { clientKey: "c2" }), quota })).toEqual({ ok: false, reason: "daily_cap" });
+  });
+
   it("rejects duplicate reservation ids and resets daily counters at UTC midnight", async () => {
     let now = Date.parse("2026-10-28T23:59:00Z");
     const l = new SpendLedger(memoryStorage(), LIMITS, () => now);

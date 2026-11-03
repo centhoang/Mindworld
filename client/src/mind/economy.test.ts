@@ -91,6 +91,8 @@ describe("offers in plain words", () => {
     ["got any carrots?", { kind: "buy", good: "carrot", qty: 1, price: null }],
     ["are you selling wood", { kind: "buy", good: "wood", qty: 1, price: null }],
     ["I'm selling fish", { kind: "sell", good: "fish", qty: 1, price: null }],
+    ["I want to sell you a fish for 3 coins", { kind: "sell", good: "fish", qty: 1, price: 3 }], // chat log 2026-11-02
+
   ])("%s", (line, want) => expect(parseOffer(line)).toEqual(want));
 
   it("a line about a good with no offer in it is not one", () => {

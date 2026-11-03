@@ -43,7 +43,7 @@ export function directions(from: { x: number; z: number }, p: Place, self = ""):
 }
 
 // "fishes" to "fish", "has a picnic" to "have a picnic".
-const firstPerson = (label: string) => label.replace(/^has\b/, "have").replace(/^(\w+(?:sh|ch))es\b/, "$1").replace(/^(\w+)s\b/, "$1");
+export const firstPerson = (label: string) => label.replace(/^has\b/, "have").replace(/^(\w+(?:sh|ch))es\b/, "$1").replace(/^(\w+)s\b/, "$1");
 
 // "Who is the grumpiest here?" is an opinion for the model, not the list of residents.
 const ASKS_WHO = /\bwho\b(?!.*\b\w+est\b).*\b(lives?|live here|else|around|here|neighbou?rs?)\b|\bwho(?:'?s| is) here\b/i;

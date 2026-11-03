@@ -17,7 +17,7 @@ import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, go
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
 import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
-import { askedPlace, directions, doingAnswer, type Place, talkAnswer, topicOf, farAnswer, whoAnswer, whyPerson } from "./directions";
+import { askedPlace, directions, doingAnswer, firstPerson, type Place, talkAnswer, topicOf, farAnswer, whoAnswer, whyPerson } from "./directions";
 import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
 import { humanize } from "./human";
 import { answerTo, cleanReply, goodOfferedIn, offerIn } from "./offers";
@@ -35,6 +35,7 @@ export interface NpcOut {
 // Everybody on the islands knows everybody; the model cannot guess that.
 const NEIGHBOURS = "Neighbours here are Elder the herbalist, Mo the fisher, Ama of the market, Pip the wood-cutter";
 const TALK_KEEP = 8; // lines of a talk the cloud tier sees
+const CLOUD_MIND_MAX = 1400; // the Worker's MIND_MAX
 export type CloudTalk = (npc: Npc, line: string, scene: string, mind: string) => Promise<{ text: string; source: string } | null>;
 const personaOf = (id: string): Persona | undefined => VILLAGERS.find((p) => p.id === id);
 const SPOT_NAME: Record<string, string> = { lawn: "the lawn", picnic: "the picnic spot", playground: "the playground", pond: "the pond" }; // places told to a guest
@@ -270,7 +271,11 @@ export class NpcVillage {
     try {
       const aff = this.v.rel.get(pairKey(npc, other.id)) ?? 0;
       const topic = c.said.length ? "what was just said" : m.mem.log.at(-1)?.text ?? "the day on the islands";
-      const ans = this.hasModel()
+      // A player gets greeted by the same mind that answers them: the cloud tier first, with the time and the talk so far.
+      const human = !NPCS.includes(other.id as Npc);
+      const key = `${npc}:${other.name}`;
+      const cloud = human && this.cloud ? await this.cloud(npc, "", this.hub.sceneOf?.(npc) ?? "", this.cloudMind(npc, m, other.name, "", this.talks.get(key) ?? [])) : null;
+      const ans = cloud ? { value: cloud.text, source: cloud.source } : this.hasModel()
         ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 20000, req: linePrompt(m.persona, m.mem, other, aff, topic, c.said, this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedLine(m.persona, other, c.said.length, this.v.nextId) })
         : (await new Promise((r) => setTimeout(r, SCRIPT_GAP_MS)), { value: scriptedLine(m.persona, other, c.said.length, this.v.nextId), source: "rules" });
       if (!this.hosting(npc)) return; // moved to another host meanwhile
@@ -285,6 +290,7 @@ export class NpcVillage {
         if (c.said.length <= 2) remember(m.mem, g.day, clockLabel(g.hour), `talked with ${other.name}`);
       } else {
         remember(m.mem, g.day, clockLabel(g.hour), `I said to ${other.name} "${say.slice(0, 60)}"`);
+        this.talks.set(key, [...(this.talks.get(key) ?? []), `${m.persona.name}: ${say.slice(0, 80)}`].slice(-TALK_KEEP));
         this.noteOffer(npc, m, other.name, say);
         this.onChat?.({ npc, player: other.name, line: "", reply: say, source: ans.source });
       }
@@ -390,6 +396,24 @@ export class NpcVillage {
     if (place) this.topics.set(npc, place.name);
   }
 
+  // What a person always knows and the cloud cannot guess: the time of day and what they are busy with.
+  private nowText(npc: Npc): string {
+    const a = this.v.agents.find((x) => x.id === npc);
+    const g = gameTime(this.v.t);
+    const label = a?.act && a.act !== "wander" ? ACTIVITY.get(a.act)?.label : null;
+    const doing = label ? (a!.state === "walk" ? `on your way to ${firstPerson(label)}` : `busy: you ${firstPerson(label)}`) : a?.state === "walk" ? "out for a walk" : "taking it easy";
+    return `Right now it is ${clockLabel(g.hour)}, ${g.phase}, and you are ${doing}.`;
+  }
+
+  // The cloud tier's notes: the time first, the oldest talk dropped until it fits (the Worker cuts the tail).
+  private cloudMind(npc: Npc, m: Mind, player: string, line: string, talk: readonly string[]): string {
+    for (let t = [...talk]; ; t = t.slice(1)) {
+      const text = `${this.nowText(npc)}
+${cloudMindText(m.persona, m.mem, player, line, t)}`;
+      if (text.length <= CLOUD_MIND_MAX || !t.length) return text;
+    }
+  }
+
   // Questions with one true answer: the way somewhere, and what this villager is doing.
   private grounded(npc: Npc, line: string): string | null {
     const a = this.v.agents.find((x) => x.id === npc);
@@ -417,6 +441,7 @@ export class NpcVillage {
     this.hold(npc);
     const g0 = gameTime(this.v.t);
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
+    for (const p of this.people()) if (p.name === player) this.greeted.set(`${npc}:${p.id}`, this.v.t); // mid-talk, no greeting cuts in
     if (!m || !this.hosting(npc)) return null;
     const key = `${npc}:${player}`;
     const person = VILLAGERS.find((p) => p.name === this.topics.get(npc));
@@ -428,7 +453,7 @@ export class NpcVillage {
     this.ageOffer(npc, player);
     const seen = scene ?? this.hub.sceneOf?.(npc) ?? "";
     const heard = this.talks.get(key) ?? [];
-    const free = answer ? null : await this.cloud?.(npc, line, seen, cloudMindText(m.persona, m.mem, player, line, heard)) ?? null;
+    const free = answer ? null : await this.cloud?.(npc, line, seen, this.cloudMind(npc, m, player, line, heard)) ?? null;
     if (!answer && !free && !this.hasModel()) return null;
     const ans = answer ? { value: answer as string | null, source: "rules" } : free ? { value: free.text as string | null, source: free.source }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, seen), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
@@ -881,10 +906,12 @@ export class NpcVillage {
   private bringUp(npc: Npc, guest: Person): boolean {
     const m = this.hub.minds.get(npc);
     const r = m && bondOf(m.mem, guest.name)?.why.filter((x) => x.beat === "broken" || x.beat === "gossip").at(-1);
-    const key = `${npc}:${r?.text}`;
-    if (!r || this.raised.has(key)) return false;
+    if (!r) return false;
+    const told = toYou(r.text, guest.name);
+    const key = `${npc}:${guest.name}:${told}`;
+    if (this.raised.has(key) || this.talks.get(`${npc}:${guest.name}`)?.some((l) => l.includes(told))) return false;
     this.raised.add(key);
-    this.said(npc, `${guest.name}, ${toYou(r.text, guest.name)}.${r.beat === "gossip" ? " Is that true?" : ""}`, guest.name);
+    this.said(npc, `${guest.name}, ${told}.${r.beat === "gossip" ? " Is that true?" : ""}`, guest.name);
     return true;
   }
 
@@ -911,7 +938,10 @@ export class NpcVillage {
   private said(npc: Npc, text: string, to?: string): void {
     this.out.say(npc, text, to);
     if (text !== "..." && this.hosting(npc)) this.out.line({ who: npc, say: text });
-    if (to && !personaOf(to.toLowerCase())) this.onChat?.({ npc, player: to, line: "", reply: text, source: "rules" });
+    if (!to || personaOf(to.toLowerCase())) return;
+    const key = `${npc}:${to}`; // what it told a player is part of their talk: the cloud tier sees it
+    this.talks.set(key, [...(this.talks.get(key) ?? []), `${personaOf(npc)?.name ?? npc}: ${text.slice(0, 80)}`].slice(-TALK_KEEP));
+    this.onChat?.({ npc, player: to, line: "", reply: text, source: "rules" });
   }
 
   // `t` = the sim clock to follow (the pets' clock, so day and night match on this screen).

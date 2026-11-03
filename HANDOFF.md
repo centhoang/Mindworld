@@ -24,9 +24,10 @@ Needs you: bug 34 (speech box over Goals panel), bug 36 (Brain panel names the m
 - Chat: tiers, with cloud free talk during the event. World: one compact village. Deadline in Vietnam: Nov 5, 9 AM. Steps: `docs/RESTRUCTURE.md`.
 - Pack rules (user): a human activity with no matching pack animation is dropped. Everything is top-down, front side only, never iso (`docs/visual/visual.md`).
 
-## Next actions
-1. User: decide bugs 34 and 36, review bugs 13-23 and 30-33, play with a second person.
-2. Bug 37 if time allows: why villagers do not choose dance.
+## Next actions (director Queue; user play-tests only when all are done)
+1. Chat, bugs 42-43: per-client cap off, Muse Spark answers on live, read the chat log, make talk make sense.
+2. Visual, bugs 38-41: house roof, rod on pier, path piece, farm ground. Then verification pass and commit.
+3. User: decide bugs 34 and 36, review fixed bugs, play with a second person. Bug 37 (dance) if time allows.
 3. Left in `game.md`: stranger test (a person), Teach and no-GPU (need step 7).
 4. Nov 5 morning: step 7 only. It must turn `LOCAL_ONLY` off. `/api/chatlog` goes last.
 

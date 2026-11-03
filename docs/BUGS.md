@@ -7,6 +7,11 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 
 36. **The Brain panel names the model to a stranger.** User's call; the wording is unchanged.
 
+38. **House roof tiles are wrong.** Blue roof is a patchwork of mismatched pieces, odd blocks and stray bits on top. Shot: `.scratch/bugs/38-house-roof.png` (user, 2026-11-03).
+39. **Fishing rod lies on the pier.** A loose rod sprite sits on the dock planks. Shot: `.scratch/bugs/39-40-pond-rod-path.png`.
+40. **Path tile placed oddly.** A dirt path piece pokes into the grass beside the pond (bottom left of the same shot).
+41. **Farm ground is not correct.** Plots read as dark strips with crops pasted on; does not match the pack's tilled soil. Shot: `.scratch/bugs/41-farm-ground.png`.
+
 ### Fixed, waiting for review
 1-9, 13-23: ground tiles, pond edge, windmill, house entry, placement, farm art, beaches, fishing rules, coast corners, grid, cut-off tiles, road fences, bridge posts, world edge, road bulge, layering, pond pier, clouds, layer rule. Detail: git history of this file.
 35: playground slide redrawn straight-on (`proof/visual/slide-live.jpg`).
@@ -23,7 +28,8 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 
 ## NPC
 11. **Free talk is weak on the 1B.** Cloud free talk now fixes this during the event (`proof/npc/5a-transcript.md`). Local fallback alone is still weak.
-- Fixed, waiting for review: 28 (hurt villagers stay cool in small talk until sorry, `proof/npc/5f-free-talk.md`). 29 (feed dropped, clean stays player-only). 24 (asking for goods is buying; "how much?" means that good, unit test only). 12 (memory cut off invitations, unit test only). 10. Conversation continues: yes, no, later and "where?" act on offers.
+- Fixed, waiting for review: 42, 43 (per-client chat cap gone, day's USD cap stays; greetings and free talk answered by Muse Spark on live
+  with the time and what the villager is doing; replay and the chat-log failures in `proof/npc/chatlog-2026-11-03.md`). 28 (hurt villagers stay cool in small talk until sorry, `proof/npc/5f-free-talk.md`). 29 (feed dropped, clean stays player-only). 24 (asking for goods is buying; "how much?" means that good, unit test only). 12 (memory cut off invitations, unit test only). 10. Conversation continues: yes, no, later and "where?" act on offers.
 
 ## Pet
 - Fixed, waiting for review: 32 (head light is a crescent along the round head, `proof/pet/heads-round.png`, `proof/pet/head-live.png`). 33 (spots removed; old spots genes show plain).

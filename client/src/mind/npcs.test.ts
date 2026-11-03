@@ -325,6 +325,17 @@ describe("NpcVillage talks to pets", () => {
       expect(pipSays()).toHaveLength(1);
     });
 
+    it("does not bring the grudge up again when the talk already said it", async () => {
+      const { nv, bubbles } = await stoodUp();
+      const a = nv.v.agents.find((x) => x.id === "pip")!;
+      expect((await nv.reply("pip", "Kai", "why are you upset with me?"))?.text).toContain("you stood me up");
+      nv.people = () => [{ id: "me", name: "Kai", pos: a.pos }];
+      (nv as unknown as { greeted: Map<string, number> }).greeted.clear();
+      Object.assign(a, { state: "idle", act: null, idle: 5, gather: null });
+      nv.step(0.25, nv.v.t + 0.25);
+      expect(bubbles.filter(([id, t]) => id === "pip" && t.startsWith("Kai, you stood me up"))).toHaveLength(0);
+    });
+
     it("learns what a player likes and how they treat it", async () => {
       const { nv, pip } = setup();
       await nv.reply("pip", "Kai", "I love carrots, thank you");
@@ -506,6 +517,29 @@ describe("free talk tiers", () => {
     await nv.reply("mo", "Kai", "what do you think of it?");
     expect(minds[1]).toContain("Kai: I caught a big fish today");
     expect(minds[1]).toContain("A big fish, nice.");
+  });
+
+  it("tells the cloud the time and what the villager is doing", async () => {
+    const nv = village(null);
+    const minds: string[] = [];
+    nv.cloud = async (_n, _l, _s, mind) => (minds.push(mind), { text: "Evening, Kai.", source: "model" });
+    await nv.reply("mo", "Kai", "nice weather");
+    expect(minds[0]).toMatch(/^Right now it is \d\d:\d\d, (morning|noon|evening|night), and you are /);
+  });
+
+  it("greets a walking-up player through the cloud, and the greeting joins the talk", async () => {
+    const nv = village(null);
+    const asked: { line: string; mind: string }[] = [];
+    nv.cloud = async (_n, line, _s, mind) => (asked.push({ line, mind }), { text: "Oh hey, Kai. Fish are slow today.", source: "model" });
+    const a = nv.v.agents.find((x) => x.id === "mo")!;
+    nv.people = () => [{ id: "me", name: "Kai", pos: a.pos }];
+    Object.assign(a, { state: "idle", act: null, idle: 5, gather: null });
+    nv.step(0.25, nv.v.t + 0.25);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(asked[0]).toMatchObject({ line: "" });
+    expect(asked[0]!.mind).toContain("Kai just walked up to you.");
+    await nv.reply("mo", "Kai", "slow?");
+    expect(asked[1]!.mind).toContain("Mo: Oh hey, Kai. Fish are slow today.");
   });
 
   it("drops to the local model when the cloud gives nothing", async () => {

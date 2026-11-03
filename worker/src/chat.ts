@@ -1,6 +1,6 @@
 // NPC chat: the elder and the wild pets answer the player in one short, cute line from a Meta model.
 // The persona prompts live here (the client only names who it talks to), every call is capped through
-// the spend ledger (per client and per day), repeated openers are served from a small cache, and when the
+// the spend ledger (per day, in USD and in lines), repeated openers are served from a small cache, and when the
 // model is over budget or down the NPC still answers with a scripted line.
 
 export const CHAT_WHO = ["elder", "brute", "skitter", "turtle", "pal", "bully", "mo", "ama", "pip"] as const;
@@ -9,8 +9,9 @@ export type ChatWho = (typeof CHAT_WHO)[number];
 export const CHAT_MAX_LINE = 140; // the player's message, characters
 export const CHAT_MAX_WORDS = 25;
 export const CHAT_MAX_TOKENS = 500; // Muse reasons first (150-290 tokens), so leave room for the reply
-export const MIND_MAX_TOKENS = 800; // a villager's prompt is longer, and so is the reasoning
-export const CHAT_QUOTA = { pool: "chat", perClient: 120, total: 3000 };
+export const MIND_MAX_TOKENS = 1200; // a villager's prompt is longer, and so is the reasoning
+// No per-client line cap (user, 2026-11-03): players at one home share an IP. The day's USD cap and the total stay.
+export const CHAT_QUOTA = { pool: "chat", total: 3000 };
 
 const STYLE =
   "You are a character in Mindworld, a cozy village game where players raise and coach pet " +
@@ -87,15 +88,22 @@ const VILLAGER_STYLE =
   "You are playing a villager in a cozy village game. The player must not be able to tell you from a human player. " +
   "Reply with what you say next: one or two short sentences, under 22 words, plain text, no emoji, no quotes, no stage directions. " +
   "Answer the last thing said, and use the talk so far: if they say 'it' or 'why', you know what they mean, so never ask them to explain. " +
-  "Do not repeat a topic or a sentence you already used, and do not describe where you are unless asked. Talk like a person, not a helper: opinions, small moods, no offers of assistance. " +
+  "Do not repeat a topic, a phrase or a sentence you already used, and do not describe where you are unless asked. Talk like a person, not a helper: opinions, small moods, no offers of assistance. " +
   "Answer what was really said. If they insult you, react the way a person would: hurt, sharp or dry, never polite and never as if you misheard. " +
   "If your notes say you are hurt, every reply stays short and cool, small talk too, and you do not warm up until they say sorry. " +
   "This is one small village on one island. It has soccer, dancing, fishing, the market and farming, and no picnics: never suggest anything else to do together. " +
   "Never invent things that happened in the village: use only the memories given. A tale you are asked for is fine, and carry on with it when they ask what happened next. Never read your notes aloud, and only make an offer if it fits. " +
+  "Your notes say what time it is and what you are doing: greet and talk to fit that (no good morning in the evening), and never speak of yourself by your own name. " +
+  "Take small talk the way a person would: no correcting their words, no lectures. " +
   "If asked whether you are an AI, take it as an odd joke and stay yourself. Never ask for personal details.";
 
 export function chatPrompt(who: ChatWho, line: string, scene = "", mind = ""): { system: string; prompt: string } {
   const around = scene ? `Around you right now: ${scene}\nIf the player asks about something around you, answer only from that list.\n` : "";
+  if (mind && !line) {
+    // The villager speaks first: a player walked up. Something real from now or its memories, never a line it already said.
+    const first = "You speak first: greet them your own way, in a few words, about what you are doing now or something real from your memories. Say something new, not what you said before.";
+    return { system: VILLAGER_STYLE, prompt: `${mind}\n${around}${first}\nYour reply:` };
+  }
   if (mind) return { system: VILLAGER_STYLE, prompt: `${mind}\n${around}The player says: ${line}\nYour reply:` };
   return {
     system: `${STYLE}\n${PERSONA[who]}`,

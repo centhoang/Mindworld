@@ -295,7 +295,7 @@ async function handleChat(request: Request, deps: Deps): Promise<Response> {
   const costUsd = cfg.mock ? 0 : actualCostUsd(provider, completion.usage);
   await deps.spend.settle(id, costUsd);
   const text = completion.truncated ? "" : tidyReply(completion.text);
-  if (!text) return scripted("unusable");
+  if (!text) return scripted(completion.truncated ? "truncated" : "unusable");
   if (opener) cache.add(who, text);
   return json({ text, source: "model", model: completion.model, mock: cfg.mock, costUsd });
 }

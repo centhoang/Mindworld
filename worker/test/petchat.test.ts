@@ -44,8 +44,8 @@ describe("pet-to-pet chat", () => {
     expect((await pet(h, { a: A, b: B })).body).toMatchObject({ source: "scripted", why: "upstream" });
     h.upstream.respond = async () => basetenReply("A: hi\nB: yo");
     const T = ["bold", "careful", "cautious", "cheerful", "friendly", "curious"] as const;
-    for (let i = 0; i < CHAT_QUOTA.perClient; i++) h.deps.chatCache = new OpenerCache(), await pet(h, { a: { ...A, trait: T[i % 6] }, b: { ...B, trait: T[Math.floor(i / 6) % 6] } }, "9.9.9.9");
-    const over = await pet(h, { a: { name: "Z", trait: "curious" }, b: { name: "Y", trait: "curious" } }, "9.9.9.9");
-    expect(over.body).toMatchObject({ source: "scripted", why: "client_cap" });
+    for (let i = 0; i < 130; i++) h.deps.chatCache = new OpenerCache(), await pet(h, { a: { ...A, trait: T[i % 6] }, b: { ...B, trait: T[Math.floor(i / 6) % 6] } }, "9.9.9.9");
+    expect("perClient" in CHAT_QUOTA).toBe(false); // no per-client line cap any more
+    expect((await pet(h, { a: { name: "Z", trait: "curious" }, b: { name: "Y", trait: "curious" } }, "9.9.9.9")).body.source).toBe("model");
   });
 });

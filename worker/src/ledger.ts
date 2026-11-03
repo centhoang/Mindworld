@@ -25,8 +25,8 @@ export interface ReserveRequest {
   worstCaseUsd: number;
   clientKey: string;
   // Optional call-count quota for one feature (e.g. NPC chat), on top of the USD limits: at most
-  // `perClient` calls per client and `total` calls overall per UTC day in pool `pool`.
-  quota?: { pool: string; perClient: number; total: number };
+  // `perClient` calls per client (when set) and `total` calls overall per UTC day in pool `pool`.
+  quota?: { pool: string; perClient?: number; total: number };
 }
 
 export type RejectReason = "rate_limit" | "client_cap" | "daily_cap" | "total_cap" | "duplicate";
@@ -128,7 +128,7 @@ export class SpendLedger {
     const q = req.quota;
     const mine = q ? `${q.pool}|${req.clientKey}` : "";
     if (q) {
-      if ((counts[mine] ?? 0) >= q.perClient) return { ok: false, reason: "client_cap" };
+      if (q.perClient !== undefined && (counts[mine] ?? 0) >= q.perClient) return { ok: false, reason: "client_cap" };
       if ((counts[q.pool] ?? 0) >= q.total) return { ok: false, reason: "daily_cap" };
       if (!(mine in counts) && Object.keys(counts).length >= MAX_CLIENTS) return { ok: false, reason: "daily_cap" };
       counts[mine] = (counts[mine] ?? 0) + 1;

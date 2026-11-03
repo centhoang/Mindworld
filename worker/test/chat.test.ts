@@ -47,14 +47,12 @@ describe("NPC chat", () => {
     expect((await chat(h, { who: "skitter", line: "what do you eat?" })).body.source).toBe("model");
   });
 
-  it("falls back to a scripted line over the per-client quota, and other clients still get the model", async () => {
+  it("has no per-client line cap: one client (a home of players on one IP) keeps getting the model", async () => {
     const h = chatHarness({ clientPerMinute: 1000 });
     h.upstream.respond = async () => basetenReply("Zip zip, more questions!");
-    for (let i = 0; i < CHAT_QUOTA.perClient; i++) await chat(h, { who: "skitter", line: `question ${i}` });
-    const over = await chat(h, { who: "skitter", line: "one more?" });
-    expect(over.body).toMatchObject({ source: "scripted", why: "client_cap" });
-    expect(over.body.text.length).toBeGreaterThan(0);
-    expect((await chat(h, { who: "skitter", line: "me too?" }, "2.2.2.2")).body.source).toBe("model");
+    expect("perClient" in CHAT_QUOTA).toBe(false);
+    for (let i = 0; i < 150; i++) await chat(h, { who: "skitter", line: `question ${i}` });
+    expect((await chat(h, { who: "skitter", line: "one more?" })).body.source).toBe("model");
   });
 
   it("falls back to a scripted line when the daily budget is gone or the model fails", async () => {
@@ -113,6 +111,13 @@ describe("chat helpers", () => {
     expect(p.system).not.toContain("floating islands");
     expect(cleanMind("x".repeat(MIND_MAX + 9)).length).toBe(MIND_MAX);
     expect(cleanMind("<b>a\nb").split("\n")).toHaveLength(2);
+  });
+
+  it("lets a villager with a mind speak first when the player has said nothing", () => {
+    const p = chatPrompt("pip", "", "", "Right now it is 19:00, evening, and you are busy: you chop wood.\nPip the kid.");
+    expect(p.prompt).toContain("You speak first");
+    expect(p.prompt).not.toContain("The player says:");
+    expect(p.system).toContain("no good morning in the evening");
   });
 
   it("never serves a villager with a mind from the opener cache", async () => {
