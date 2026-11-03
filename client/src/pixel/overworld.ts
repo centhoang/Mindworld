@@ -77,6 +77,7 @@ export interface Wild {
   target: Vec;
   wait: number;
   cool: number; // seconds before it can start a fight (after one just ended)
+  stuck?: number; // seconds pressed against something without getting closer
 }
 
 // Owned pets that are not out with you live at your corner as minds in the life sim (life/village.ts):
@@ -625,7 +626,7 @@ export class Overworld {
     for (const r of this.residents) out.push({ name: r.agent.name, kind: "pet", ...xz(r.agent.pos), doing: label(r.agent.act) });
     for (const w of this.wilds) out.push({ name: `a wild ${w.arch}`, kind: "pet", ...xz(w.pos) });
     for (const m of this.life.messes) out.push({ name: "a poop", kind: "thing", ...xz(m.pos), petCares: true });
-    out.push({ name: "the food bowl", kind: "thing", ...xz(this.bowl), petCares: true }, { name: "your house", kind: "thing", ...xz(this.house) });
+    out.push({ name: "your house", kind: "thing", ...xz(this.house) });
     for (const h of this.houses) out.push({ name: "a little house", kind: "thing", ...xz(h) });
     for (const t of this.trees) out.push({ name: "a tree", kind: "thing", ...xz(t) });
     for (const d of this.decor) out.push({ name: DECOR_NAME[d.kind], kind: "thing", x: d.x, z: d.z });
@@ -849,8 +850,13 @@ export class Overworld {
   }
 
   exitHouse(): void {
-    this.player = { x: this.house.x + HOME_DOOR_DX, z: this.house.z + 0.9 };
-    this.pet = { x: this.house.x + HOME_DOOR_DX + 0.8, z: this.house.z + 1.4 };
+    // The nearest open spot at the door step: the door column can sit on the edge of the farm plot, and you were stuck in it.
+    const door = { x: this.house.x + HOME_DOOR_DX, z: this.house.z + 0.9 };
+    const spots = [0, 0.4, 0.8, 1.2, 1.6, 2.2].flatMap((dz) => [0, -0.35, 0.35, -0.7, 0.7].map((dx) => ({ x: door.x + dx, z: door.z + dz })));
+    this.player = spots.find((s) => this.canWalk(s.x, s.z)) ?? door;
+    const x = this.player.x;
+    const pet = [{ x: x - 0.8, z: this.player.z + 0.5 }, { x: x + 0.8, z: this.player.z + 0.5 }, { x, z: this.player.z + 0.8 }];
+    this.pet = pet.find((s) => this.canWalk(s.x, s.z)) ?? { ...this.player };
     this.cam = { ...this.player };
     this.playerMotion.dir = 0;
     this.playerMotion.flip = false;
@@ -1011,12 +1017,18 @@ export class Overworld {
     for (const w of this.wilds) {
       w.cool = Math.max(0, w.cool - dt);
       w.wait -= dt;
+      if (!this.canWalk(w.pos.x, w.pos.z)) w.pos = { ...w.home }; // inside a wall or a tree: nothing can move it out
       if (w.wait <= 0) {
         const s = stepToward(w.pos, w.target, WALK_SPEED * 0.35 * dt);
-        w.pos = slide(w.pos, s.dx, s.dz, this.canWalk);
-        if (s.arrived) {
+        const next = slide(w.pos, s.dx, s.dz, this.canWalk);
+        const gain = Math.hypot(w.target.x - w.pos.x, w.target.z - w.pos.z) - Math.hypot(w.target.x - next.x, w.target.z - next.z);
+        w.pos = next;
+        // Pressed into a wall or a tree, it gives up after a moment and picks somewhere it can reach (bug 48).
+        w.stuck = gain < WALK_SPEED * 0.35 * dt * 0.3 ? (w.stuck ?? 0) + dt : 0;
+        if (s.arrived || w.stuck > 0.8) {
           w.wait = 1 + Math.random() * 3;
-          w.target = { x: w.home.x + (Math.random() - 0.5) * 8, z: w.home.z + (Math.random() - 0.5) * 8 };
+          w.stuck = 0;
+          w.target = this.wildTarget(w);
         }
       }
       if (!met && !w.cool && Math.hypot(w.pos.x - this.player.x, w.pos.z - this.player.z) < MEET_DIST) met = w;
@@ -1032,6 +1044,19 @@ export class Overworld {
       p.pet.z += (p.to.pz - p.pet.z) * k8;
     }
     return met;
+  }
+
+  // A walkable spot near the wild pet's home with a clear straight line from where it stands.
+  private wildTarget(w: Wild): Vec {
+    for (let i = 0; i < 12; i++) {
+      const t = { x: w.home.x + (Math.random() - 0.5) * 8, z: w.home.z + (Math.random() - 0.5) * 8 };
+      if (!this.canWalk(t.x, t.z)) continue;
+      const n = Math.ceil(Math.hypot(t.x - w.pos.x, t.z - w.pos.z) / 0.25);
+      let clear = true;
+      for (let k = 1; k <= n && clear; k++) clear = this.canWalk(w.pos.x + ((t.x - w.pos.x) * k) / n, w.pos.z + ((t.z - w.pos.z) * k) / n);
+      if (clear) return t;
+    }
+    return { ...w.home };
   }
 
   // The world around the house while you are inside: `(sx, sy)` is where the house's foot sits on screen.
@@ -1082,8 +1107,7 @@ export class Overworld {
       ...this.signs.map((s) => ({ kind: "sign", x: s.x, z: s.z, text: s.text })),
       ...this.world.platforms.flatMap((p) => Object.entries(p.spots ?? {}).map(([kind, at]) => ({ kind, x: at.x, z: at.z }))),
       ...this.life.messes.map((m) => ({ kind: "mess", x: m.pos.x, z: m.pos.z })),
-      { kind: "bowl", x: this.bowl.x, z: this.bowl.z },
-    ];
+    ]; // no food bowl drawn (user, 2026-11-03)
     if (!this.indoors) props.push({ kind: "home", x: this.house.x, z: this.house.z });
     if (this.stall) props.push({ kind: "stall", x: this.stall.x, z: this.stall.z });
     if (this.noticeBoard) props.push({ kind: "board", x: this.noticeBoard.x, z: this.noticeBoard.z });

@@ -38,4 +38,13 @@ describe("walking the village", () => {
       expect(ok, `bed ${i} at ${b.x},${b.z}`).toBe(true);
     });
   });
+
+  it("puts you on open ground when you leave the house, free to walk away (bug 47)", () => {
+    w.exitHouse();
+    const p = { ...w.player };
+    expect(w.canWalk(p.x, p.z)).toBe(true);
+    expect(w.canWalk(w.pet.x, w.pet.z)).toBe(true);
+    for (let i = 0; i < 10; i++) w.update(0.05, new Set(["arrowdown"]));
+    expect(w.player.z).toBeGreaterThan(p.z + 0.3);
+  });
 });

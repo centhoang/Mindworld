@@ -124,8 +124,8 @@ const SHARED: Platform[] = [
   place("npc", "npc", "Elder's house", [0, -1], [-8, -18, 9, -8]),
   place("wild", "wild", "Wild meadow", [-1, -1], [-31, -18, -8, -7]),
   place("pond", "pond", "Fishing pond", [1, -1], [9, -18, 32, -7], { pond: { x: 20, z: -13 }, dock: { x: 20, z: -10.8 } }), // no loose rod: one shows only in a fisher's hands
-  place("picnic", "picnic", "Village green", [-1, 0], [-21, -7, -10, 7], { bench: { x: -19, z: -3 } }),
-  place("playground", "playground", "Playground", [1, 0], [11, -7, 32, 7], { goal: { x: 22, z: -4 }, ball: { x: 22, z: 2.5 }, slide: { x: 17.5, z: 2 } }),
+  place("picnic", "picnic", "Village green", [-1, 0], [-21, -7, -10, 7]), // no bench or slide (user, 2026-11-03)
+  place("playground", "playground", "Playground", [1, 0], [11, -7, 32, 7], { goal: { x: 22, z: -4 }, ball: { x: 22, z: 2.5 } }),
 ];
 
 export function villageWorld(input: LayoutInput = {}): WorldMap {

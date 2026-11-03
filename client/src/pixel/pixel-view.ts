@@ -13,7 +13,7 @@ import { generatedSprites } from "./generated-sprites";
 import { drawDecor, drawSpotProp } from "./grounds-draw";
 import { humanSprites, newHumanMotion, NPC_LOOKS } from "./humans";
 import { drawInspector } from "./inspector";
-import { drawBall, drawBowl, drawPetPose, drawPoop, drawTint } from "./life-draw";
+import { drawBall, drawPetPose, drawPoop, drawTint } from "./life-draw";
 import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_ART, OVERWORLD_MON, type Overworld } from "./overworld";
 import { characterShadow, drawCropArt, drawLand, drawRail, drawSea, drawTree, footRuns, stampSize, stand, standRun, strip } from "./sunny";
 import { tile } from "./sunny-terrain";
@@ -254,10 +254,6 @@ export class PixelView implements View {
       if (wx < -24 || wy < -24 || wx > sw + 24 || wy > sh + 24) continue;
       const wh = w.wait <= 0 ? Math.floor(t * 5 + w.id) % 2 : 0;
       items.push({ z: w.pos.z, draw: () => g.drawImage(w.sprite, wx - half, wy - OVERWORLD_MON + 2 - wh) });
-    }
-    {
-      const [bx, by] = toScreen(o.bowl.x, o.bowl.z);
-      items.push({ z: o.bowl.z, draw: () => drawBowl(g, bx, by) });
     }
     for (const m of o.life.messes) {
       const [mx, my] = toScreen(m.pos.x, m.pos.z);

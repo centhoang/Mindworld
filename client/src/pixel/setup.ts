@@ -53,7 +53,8 @@ export function storeSetup(gpu: string | null, ok: boolean): void {
 async function readGpu(): Promise<GpuInfo | null> {
   if (!("gpu" in navigator)) return null;
   try {
-    const a = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+    // A GPU that never answers must not hold the game shut: after 4 s it counts as no GPU.
+    const a = await Promise.race([navigator.gpu.requestAdapter({ powerPreference: "high-performance" }), new Promise<null>((r) => setTimeout(() => r(null), 4000))]);
     if (!a) return null;
     const i = a.info as GPUAdapterInfo & { isFallbackAdapter?: boolean };
     return { vendor: i.vendor ?? "", architecture: i.architecture ?? "", description: i.description ?? "", fallback: i.isFallbackAdapter ?? false };

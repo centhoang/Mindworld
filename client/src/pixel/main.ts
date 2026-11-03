@@ -660,12 +660,17 @@ const fights = makeFightFlow({
 const fight = fights.fight;
 
 let last = performance.now();
+let frameErrors = 0;
 function frame(now: number): void {
-  const dt = Math.min(0.05, (now - last) / 1000);
-  stepDoor(dt);
+  requestAnimationFrame(frame); // first: one bad frame must not stop the game for good
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
-  update(dt, now / 1000);
-  requestAnimationFrame(frame);
+  try {
+    stepDoor(dt);
+    update(dt, now / 1000);
+  } catch (e) {
+    if (frameErrors++ < 5) console.error("frame", e);
+  }
 }
 // A hidden tab gets no frames, but other players still see my villagers and me: the world runs on without drawing.
 setInterval(() => {
@@ -750,7 +755,9 @@ const setup = runSetup({
   ready: () => (instinct.voice = webBrain),
   background: () => void switchBrain(),
 });
-void Promise.all([loadArt(), loadSunny(), setup]).then(() => requestAnimationFrame(frame));
+// The game starts even if a load fails (a gap in the art beats a world you cannot move in).
+void Promise.all([loadArt(), loadSunny(), setup]).catch((e: unknown) => console.warn("start", e)).then(() => requestAnimationFrame(frame));
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
-(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain, fakeIsle };
+(window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain, fakeIsle,
+  blocked: () => ({ mode, door: !!door, menu: !!menu, crate: !!crate, board: !!board, peerMenu: !!peerMenu, duelIn: !!duelIn, teach: teach.open, chat: chat.target() }) };
