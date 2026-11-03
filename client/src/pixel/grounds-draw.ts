@@ -30,6 +30,11 @@ export function drawSpotProp(g: Ctx, name: string, x: number, y: number, t: numb
   drawOldSpotProp(g, name, x, y, t);
 }
 
+// The village ball where it is now, `hop` pixels off the ground.
+export function drawLiveBall(g: Ctx, x: number, y: number, hop: number): void {
+  generatedSprites.draw(g, "soccer-ball", x, y - hop, () => drawOldSpotProp(g, "ball", x, y, 0));
+}
+
 function drawOldSpotProp(g: Ctx, name: string, x: number, y: number, t: number): void {
   const item = SHEET[name];
   if (item && hasArt("props-grounds")) {
@@ -81,7 +86,8 @@ function drawOldSpotProp(g: Ctx, name: string, x: number, y: number, t: number):
   }
 }
 
-const DECOR_ART = { bush: "bush", "bush-big": "bush-berry", rock: "rock-small", "rock-big": "rock-big", stump: "stump", jar: "jar", crates: "crates" } as const;
+const DECOR_ART = { bush: "bush", "bush-big": "bush-berry", rock: "rock-big", "rock-big": "rock-big", // no small rock is loaded: one showed nothing and still blocked (P2)
+  stump: "stump", jar: "jar", crates: "crates" } as const;
 let plantSheet: HTMLImageElement | undefined;
 
 // Outdoor decor (grounds-decor.ts) at its foot, recoloured with the ground's theme like the trees. Party

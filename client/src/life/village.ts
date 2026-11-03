@@ -4,7 +4,7 @@
 // A mind's brain never runs inside an activity: it only picks the next one from `validChoices`.
 
 import { slide, stepToward, WALK_SPEED, type Vec } from "../world/movement";
-import { ACTIVITIES, ACTIVITY, type ActivityDef, type Place } from "./activities";
+import { ACTIVITIES, ACTIVITY, isGroup, type ActivityDef, type Place } from "./activities";
 import { gameTime, HOUR_SECONDS, type Phase } from "./clock";
 import { applyEffects, decay, fullNeeds, urgency, NEEDS, type Kind, type Needs } from "./needs";
 import { bump, pairKey } from "./relations";
@@ -74,6 +74,7 @@ export interface Env {
   jobOf?: (a: Agent) => string | null; // the job activity only this agent may do
   doorOf?: (a: Agent) => Vec | undefined; // where this agent goes in to sleep and eat
   route?: (from: Vec, to: Vec) => Vec[] | null; // waypoints around water (null = no route: walk straight)
+  play?: (a: Agent, dt: number) => void; // moves an agent during its activity (soccer chases the real ball)
 }
 
 export type LifeEvent =
@@ -115,15 +116,16 @@ export function validChoices(a: Agent, v: Village, env: Env): Choice[] {
       if (!v.messes.some((m) => !claimed(v, m.id))) continue;
     } else if (!env.spots[def.place]?.length) continue;
     if (def.jobOnly && env.jobOf?.(a) !== def.id) continue;
+    if (def.after && !def.after.includes(a.last ?? "")) continue;
     const s = score(a, def, v, phase) + (env.bias?.(a, def.id) ?? 0);
-    if (def.min > 1) {
+    if (isGroup(def)) {
       const open = v.gatherings.find((g) => g.act === def.id && g.members.length > 0 && g.members.length < def.max); // late joiners welcome
       if (open) {
         const aff = open.members.reduce((sum, m) => sum + (v.rel.get(pairKey(a.id, m)) ?? 0), 0) / Math.max(1, open.members.length);
         out.push({ act: def.id, score: s + 0.35 + aff / 200, join: open.id });
         continue;
       }
-      if (!v.agents.some((o) => o !== a && (def.who === "any" || o.kind === def.who))) continue; // nobody could join
+      if (def.min > 1 && !v.agents.some((o) => o !== a && (def.who === "any" || o.kind === def.who))) continue; // nobody could join
     }
     if (s > 0.05 || def.id === "wander") out.push({ act: def.id, score: s });
   }
@@ -144,6 +146,8 @@ function score(a: Agent, def: ActivityDef, v: Village, phase: Phase): number {
   if (def.id === "sleep") s += phase === "night" ? 1.5 : 0;
   if (def.id === "clean") s = 0.6 + v.messes.length * 0.15;
   if (def.id === "wander") s = 0.08;
+  if (def.after) s = 2.8; // take what the work made to the stall first (beats a shift's pull, not a promise)
+  s += (def.pull ?? 0) + (def.peak === phase ? 0.3 : 0);
   if (a.plan[phase]?.includes(def.id)) s += 0.3;
   if (a.last === def.id) s -= 0.15;
   return s;
@@ -173,7 +177,7 @@ function begin(a: Agent, c: Choice, v: Village, env: Env): void {
   const spot = door ? { ...door } : def.place === "home" ? near(a.pos, 3, env.rng) : { ...pick(env.spots[def.place]!, env.rng) };
   a.target = spot;
   a.path = env.route?.(a.pos, a.target) ?? undefined;
-  if (def.min > 1) {
+  if (isGroup(def)) {
     const g: Gathering = { id: v.nextId++, act: def.id, at: spot, members: [a.id], deadline: v.t + GATHER_WAIT, started: false };
     v.gatherings.push(g);
     a.gather = g.id;
@@ -214,8 +218,8 @@ export function stepVillage(v: Village, dt: number, env: Env): LifeEvent[] {
     a.needs = decay(a.needs, a.kind, hours);
     if (a.puppet) {
       // Another machine runs this one: follow it, and catch up at once when far behind.
-      const far = Math.hypot(a.puppet.x - a.pos.x, a.puppet.z - a.pos.z) > PUPPET_SNAP;
-      const s = stepToward(a.pos, a.puppet, far ? PUPPET_SNAP * 2 : SPEED[a.kind] * 1.5 * dt);
+      const gap = Math.hypot(a.puppet.x - a.pos.x, a.puppet.z - a.pos.z);
+      const s = stepToward(a.pos, a.puppet, gap > PUPPET_SNAP ? PUPPET_SNAP * 2 : Math.max(SPEED[a.kind] * 1.5, gap * 2.5) * dt); // a running player keeps up
       a.pos = { x: a.pos.x + s.dx, z: a.pos.z + s.dz };
       a.state = a.puppet.state;
       a.act = a.puppet.act;
@@ -263,6 +267,7 @@ export function stepVillage(v: Village, dt: number, env: Env): LifeEvent[] {
     }
     if (a.state === "do") {
       const def = ACTIVITY.get(a.act!)!;
+      env.play?.(a, dt);
       const used = Math.min(mins, a.left);
       a.needs = applyEffects(a.needs, def.fx, used / def.minutes);
       a.left -= used;

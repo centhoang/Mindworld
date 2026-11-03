@@ -137,5 +137,5 @@ export type MindBackend = MindLM;
 
 // What each flow may touch of the world.
 export type ChatWorld = Pick<Overworld, "npcs" | "say" | "sceneWithMe" | "wildScene">;
-export type RoomWorld = Pick<Overworld, "npcs" | "peers" | "peerFarms" | "me" | "day" | "relayout" | "addPeer" | "movePeer" | "posePeer" | "hearMind" | "say" | "speakerAt" | "onPose" | "onMind">;
+export type RoomWorld = Pick<Overworld, "npcs" | "peers" | "peerFarms" | "me" | "day" | "relayout" | "addPeer" | "movePeer" | "posePeer" | "hearMind" | "say" | "speakerAt" | "onPose" | "onMind" | "onKick" | "ballKicked">;
 export type FightWorld = Pick<Overworld, "world" | "removeWild" | "spawnWild" | "cheerPet">;

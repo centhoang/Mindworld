@@ -24,6 +24,10 @@ import { cleanCap, cleanMem, isNpc, MIND_ACTS, NPCS, NpcBoard, type Cap, type Ho
 // answer). Plain room chat stays public. `talk` marks a private chat: both sides are busy, others see that they are
 // talking and can't start a chat with them. It ends on close, on disconnect, or after TALK_TTL_MS of silence.
 //
+// The ball: one for the whole room. A client sends a `kick` (where the ball was, its speed); the room numbers it and
+// sends it to everyone, the kicker too, so every client ends on the same last kick. Clients roll it the same way
+// (client/src/life/ball.ts). The last kick goes to newcomers in the welcome, with its age.
+//
 // Billing note (Cloudflare free plan): incoming WebSocket messages count 20:1 as requests, so clients send
 // positions at <= 10 Hz and only while moving; the server drops anything faster.
 
@@ -47,6 +51,8 @@ const RATE_PER_S = 12; // token bucket refill (positions are <= 10 Hz plus the o
 const BURST = 20;
 const MAX_STRIKES = 60; // dropped messages before the socket is closed
 const MAX_GENES = 12;
+export const KICK_GAP_MS = 120; // one kick per peer per 120 ms (a host kicks for its villagers too)
+const KICK_SPEED_MAX = 9; // tiles a second (client KICK_MAX)
 
 export interface Fighter {
   id: string;
@@ -92,6 +98,7 @@ export interface Peer {
   askAt?: number; // last question to an NPC, ms
   cap: Cap; // local model speed: picks NPC hosts
   capAt?: number; // last cap message, ms
+  kickAt?: number; // last ball kick, ms
 }
 
 export type PublicPeer = Pick<Peer, "id" | "name" | "genes" | "x" | "z" | "px" | "pz" | "corner" | "seed">;
@@ -107,9 +114,22 @@ export type PublicAway = Omit<Away, "until"> & { ttl: number }; // ms left (clie
 
 export type NpcSpot = [string, number, number, string, string]; // id, x, z, state, activity
 export type FarmPlot = [string, number]; // crop ("" = empty), stage
+// The last kick: where the ball was, its speed, who kicked it, its number (rising, ms-based: it survives a restart)
+// and when (ms). `age` replaces `at` on the wire (clients' clocks differ).
+export interface BallKick {
+  x: number;
+  z: number;
+  vx: number;
+  vz: number;
+  by: string;
+  n: number;
+  at: number;
+}
+export type PublicKick = Omit<BallKick, "at"> & { age: number };
+const publicKick = (k: BallKick, now: number): PublicKick => ({ x: k.x, z: k.z, vx: k.vx, vz: k.vz, by: k.by, n: k.n, age: Math.max(0, now - k.at) });
 
 export type ServerMsg =
-  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[]; npcs: Partial<Record<Npc, string>>; talks: [string, string][] }
+  | { t: "welcome"; id: string; corner: number | null; peers: PublicPeer[]; aways: PublicAway[]; npcs: Partial<Record<Npc, string>>; talks: [string, string][]; ball?: PublicKick }
   | { t: "talking"; id: string; with: string; on: boolean }
   | { t: "talkNo"; with: string }
   | { t: "npcHost"; npc: Npc; host: string | null }
@@ -132,7 +152,8 @@ export type ServerMsg =
   | { t: "notice"; text: string }
   | { t: "duel"; duel: string; from: string; name: string }
   | { t: "duelStart"; duel: string; seed: number; a: Fighter; b: Fighter }
-  | { t: "duelEnd"; duel: string; reason: "declined" | "gone" };
+  | { t: "duelEnd"; duel: string; reason: "declined" | "gone" }
+  | ({ t: "ball" } & PublicKick);
 
 export interface Out {
   to: "others" | "near" | "self" | { id: string };
@@ -175,6 +196,8 @@ export class Room {
   private readonly mindSayAt = new Map<string, number>(); // "peer:who" -> last line, ms
   aways: Away[] = []; // ghost grounds (the DO stores them: they outlive every socket)
   awaysChanged = false;
+  ball: BallKick | null = null; // the last kick (the DO stores it too)
+  ballChanged = false;
   private readonly dirty = new Set<string>(); // peers changed as a side effect (persist their attachment)
   // peer -> who they opened a private chat with (a peer id or an NPC). Lost on a Durable Object restart, which
   // only means the talking bubbles stop until the next `talk` renewal.
@@ -186,6 +209,30 @@ export class Room {
     const d = [...this.dirty];
     this.dirty.clear();
     return d;
+  }
+
+  restoreBall(v: unknown): void {
+    if (!v || typeof v !== "object") return;
+    const o = v as Record<string, unknown>;
+    const x = coord(o.x), z = coord(o.z), vx = coord(o.vx), vz = coord(o.vz);
+    if (x === null || z === null || vx === null || vz === null || typeof o.n !== "number" || typeof o.at !== "number") return;
+    this.ball = { x, z, vx, vz, by: typeof o.by === "string" ? o.by.slice(0, 16) : "", n: o.n, at: o.at };
+  }
+
+  // A kick: checked, numbered, sent to everyone. Too soon after this peer's last one is dropped (not a strike:
+  // two touches in a row happen). `by` may be the peer or a villager it hosts.
+  private kick(peer: Peer, o: Record<string, unknown>, now: number): MessageResult {
+    const x = coord(o.x), z = coord(o.z), vx = coord(o.vx), vz = coord(o.vz);
+    if (x === null || z === null || vx === null || vz === null) return this.strike(peer);
+    if (peer.kickAt !== undefined && now - peer.kickAt < KICK_GAP_MS) return { out: [] };
+    peer.kickAt = now;
+    const s = Math.hypot(vx, vz), f = s > KICK_SPEED_MAX ? KICK_SPEED_MAX / s : 1;
+    const by = o.by === peer.id || (isNpc(o.by) && this.board.hostOf(o.by) === peer.id) ? (o.by as string) : peer.id;
+    const k: BallKick = { x, z, vx: Math.round(vx * f * 100) / 100, vz: Math.round(vz * f * 100) / 100, by, n: Math.max((this.ball?.n ?? 0) + 1, now), at: now };
+    this.ball = k;
+    this.ballChanged = true;
+    const msg: ServerMsg = { t: "ball", ...publicKick(k, now) };
+    return { out: [{ to: "others", msg }, { to: "self", msg }] };
   }
 
   // Rebuild after the Durable Object wakes from hibernation (state lives in each socket's attachment).
@@ -341,7 +388,7 @@ export class Room {
     return {
       peer,
       out: [
-        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)), npcs: this.board.hostsMap(), talks: [...this.talks].map(([a, t]) => [a, t.with]) } },
+        { to: "self", msg: { t: "welcome", id, corner: peer.corner, peers: others, aways: this.aways.map((a) => publicAway(a, now)), npcs: this.board.hostsMap(), talks: [...this.talks].map(([a, t]) => [a, t.with]), ...(this.ball ? { ball: publicKick(this.ball, now) } : {}) } },
         { to: "others", msg: { t: "join", peer: publicPeer(peer) } },
         ...hidden.flatMap((o): Out[] => [{ to: "self", msg: { t: "exit", id: o.id } }, { to: { id: o.id }, msg: { t: "exit", id } }]),
         ...sight.filter((o) => o.msg.t === "npcs"),
@@ -425,6 +472,7 @@ export class Room {
       peer.plots = plots;
       return { out: [{ to: "near", msg: { t: "farm", id, plots } }], changed: true };
     }
+    if (o.t === "kick") return this.kick(peer, o, now);
     if (o.t === "emote" && (EMOTES as readonly unknown[]).includes(o.e)) {
       return { out: [{ to: "near", msg: { t: "emote", id, e: o.e as Emote } }], changed: true };
     }

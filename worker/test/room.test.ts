@@ -188,3 +188,44 @@ describe("area of interest", () => {
     expect(r.far("a", "pos:b")).toBe(true);
   });
 });
+
+describe("the ball", () => {
+  const kick = (x: number, z: number, vx: number, vz: number, by?: string) => JSON.stringify({ t: "kick", x, z, vx, vz, by });
+
+  it("numbers each kick and sends it to everyone, the kicker too", () => {
+    const r = new Room();
+    r.join("a", {}, 0);
+    r.join("b", {}, 0);
+    const out = r.message("a", kick(22, 2.5, 3, -4), 1000).out;
+    expect(out.map((o) => o.to)).toEqual(["others", "self"]);
+    expect(out[0]!.msg).toEqual({ t: "ball", x: 22, z: 2.5, vx: 3, vz: -4, by: "a", n: 1000, age: 0 });
+    const next = r.message("b", kick(23, 1, 0, -2), 1001).out[0]!.msg as { n: number };
+    expect(next.n).toBe(1001);
+    expect(r.ballChanged).toBe(true);
+  });
+
+  it("caps the speed, drops a second kick too soon, and names a villager only for its host", () => {
+    const r = new Room();
+    r.join("a", {}, 0);
+    const m = r.message("a", kick(0, 0, 30, 0, "zed"), 1000).out[0]!.msg as { vx: number; by: string };
+    expect(m.vx).toBe(9);
+    expect(m.by).toBe("a"); // not a villager a hosts
+    expect(r.message("a", kick(0, 0, 1, 0), 1050).out).toEqual([]);
+    expect(r.message("a", kick(0, 0, "x" as unknown as number, 0), 2000).out).toEqual([]); // junk: a strike
+  });
+
+  it("hands the last kick and its age to a newcomer, and survives a restart", () => {
+    const r = new Room();
+    r.join("a", {}, 0);
+    r.message("a", kick(22, 2.5, 3, -4), 1000);
+    const w = r.join("b", {}, 4000)!.out.find((o) => o.to === "self")!.msg;
+    expect(w).toMatchObject({ t: "welcome", ball: { x: 22, z: 2.5, vx: 3, vz: -4, by: "a", n: 1000, age: 3000 } });
+    const again = new Room();
+    again.restoreBall(r.ball);
+    again.restoreBall({ x: "junk" }); // ignored
+    expect(again.ball).toEqual(r.ball);
+    again.restoreBall({ ...r.ball, n: 9000 });
+    again.join("c", {}, 5000);
+    expect((again.message("c", kick(1, 1, 1, 1), 6000).out[0]!.msg as { n: number }).n).toBe(9001); // still rising on a slow clock
+  });
+});

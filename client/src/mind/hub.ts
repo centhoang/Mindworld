@@ -4,7 +4,7 @@
 // decision has a fallback, so the village lives the same way without a model (just less personal).
 
 import type { Place as MapPlace } from "./directions";
-import { ACTIVITY, type Place } from "../life/activities";
+import { ACTIVITY, isGroup, type Place } from "../life/activities";
 import { clockLabel, gameTime, type Phase } from "../life/clock";
 import { fullNeeds, NEEDS, type Needs } from "../life/needs";
 import { bump, pairKey } from "../life/relations";
@@ -269,7 +269,7 @@ export class MindHub {
     const ph = this.now().phase;
     const next = PLAN_PHASES[PLAN_PHASES.indexOf(ph as (typeof PLAN_PHASES)[number]) + 1] ?? "evening";
     const act = m.mem.plan[next]?.[0];
-    if (act && (ACTIVITY.get(act)?.min ?? 1) > 1) return `${ACTIVITY.get(act)!.label.replace(/s\b/, "")} this ${next}`;
+    if (act && ACTIVITY.has(act) && isGroup(ACTIVITY.get(act)!)) return `${ACTIVITY.get(act)!.label.replace(/s\b/, "")} this ${next}`;
     const last = m.mem.log[m.mem.log.length - 1];
     return last ? last.text : "the weather";
   }
@@ -279,7 +279,7 @@ export class MindHub {
     if (aff < 0) return;
     for (const ph of PLAN_PHASES) {
       const act = from.mem.plan[ph]?.[0];
-      if (!act || (ACTIVITY.get(act)?.min ?? 1) < 2) continue;
+      if (!act || !ACTIVITY.has(act) || !isGroup(ACTIVITY.get(act)!)) continue;
       if (to.mem.plan[ph]?.includes(act)) continue;
       to.mem.plan = { ...to.mem.plan, [ph]: [act, ...(to.mem.plan[ph] ?? [])].slice(0, 2) };
       toAgent.plan = to.mem.plan;
@@ -293,7 +293,7 @@ export class MindHub {
   // yet adds the group activity to its next plan slot. Returns who took it, if anyone.
   heardInvite(fromName: string, act: string): string | null {
     const def = ACTIVITY.get(act);
-    if (!def || def.min < 2) return null;
+    if (!def || !isGroup(def)) return null;
     const ph = this.now().phase;
     const next = PLAN_PHASES[PLAN_PHASES.indexOf(ph as (typeof PLAN_PHASES)[number]) + 1] ?? "morning";
     const pick = [...this.minds.values()].filter((m) => !m.mem.plan[next]?.includes(act)).sort((a, b) => (a.mem.plan[next]?.length ?? 0) - (b.mem.plan[next]?.length ?? 0))[0];

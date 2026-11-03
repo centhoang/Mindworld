@@ -15,7 +15,7 @@ import { cloudLine } from "../game/npc-chat";
 import { CLOUD_CHAT } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
-import { NPC_HOMES } from "../world/village-map";
+import { CAMPFIRE, DANCE_FLOOR, NPC_HOMES, PEN, QUARRY } from "../world/village-map";
 import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
 import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePanel, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
@@ -24,6 +24,7 @@ import { PixelView } from "./pixel-view";
 import { compass, type Place } from "../mind/directions";
 import { clockLabel, gameTime, phaseOf, weekday, worldSeconds } from "../life/clock";
 import { addAgent, cleanMess, newVillage, removeAgent, stepVillage, type Agent, type Env, type Spots } from "../life/village";
+import { aim, Ball, cleanKick, KICK_GAP, PITCH_R, TOUCH, type BallNow, type Kick } from "../life/ball";
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
 import { cornerBlocks, railBlocks, seaCell, tile } from "./sunny-terrain";
@@ -34,7 +35,7 @@ import { MindHub, type MindsSave } from "../mind/hub";
 import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
 import type { Rect } from "../view/bubbles";
-import { isNpc, type MindLine, type Npc } from "../world/live";
+import { isNpc, type MindLine, type Npc, type RoomKick } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
 import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
@@ -111,6 +112,10 @@ export class Overworld {
   readonly playerMotion = newHumanMotion(this.player);
   readonly npcMotions = new Map<Npc, HumanMotion>();
   readonly npcPets = new Map<Npc, Vec>();
+  ball: Ball | null = null; // the one village ball (life/ball.ts): every kick goes through the room
+  ballNow: BallNow | null = null; // where it is this frame
+  onKick: ((k: Kick) => void) | null = null; // my kicks, and my hosted villagers', to the room
+  private scored = false; // the ball sat in the net last frame
   private place = "";
   private bannerT = 0;
   private sprite: Sprite | null = null;
@@ -214,6 +219,9 @@ export class Overworld {
     this.world = villageWorld(this.layoutIn);
     this.map = buildTileMap(this.world);
     this.sunny = buildSunny(this.map);
+    const pitch = this.world.platforms.find((p) => p.spots?.goal && p.spots.ball)?.spots;
+    if (!pitch) this.ball = null;
+    else this.ball ??= new Ball({ spot: pitch.ball!, goal: pitch.goal! }, this.canWalk);
     const plaza = this.world.platforms.find((p) => p.kind === "plaza");
     this.noticeBoard = plaza ? { x: plaza.x + 5, z: plaza.z - 3 } : null;
     this.mini = null;
@@ -312,8 +320,35 @@ export class Overworld {
       if (!out.pond?.length) out.pond = this.fishingSpots(plaza, 16, 4);
       if (!out.playground?.length) out.playground = ring(plaza, 3.2, 8); // no pitch near the hub: the square does for a kickabout
     }
+    // P2 places: the dance floor on the square, the campfire on the green, the quarry, the animals' yard, repairs beside
+    // the stall, the board and the well, the stall's crate for hauling, and the far shore of the pond for a swim.
+    const walk = (q: Vec) => this.canWalk(q.x, q.z);
+    const around = (c: Vec, r: number, n: number) => Array.from({ length: n }, (_, i) => ({ x: c.x + Math.cos((i / n) * Math.PI * 2) * r, z: c.z + Math.sin((i / n) * Math.PI * 2) * r * 0.8 })).filter(walk);
+    out.dancefloor = around({ x: DANCE_FLOOR.x + DANCE_FLOOR.w / 2, z: DANCE_FLOOR.z + DANCE_FLOOR.h / 2 }, 1.2, 6);
+    out.campfire = around(CAMPFIRE, 1.6, 6);
+    out.quarry = QUARRY.map((r) => ({ x: r.x - 1, z: r.z + 0.3 })).filter(walk);
+    out.pen = [1.5, 3.5].map((dx) => ({ x: PEN.x + dx, z: PEN.z + PEN.h + 0.5 })).filter(walk);
+    const well = this.landmarks.find((l) => l.art === "spr_deco_well");
+    this.fixables = [this.stall, this.noticeBoard, well].filter((v): v is Vec => !!v).map(xz);
+    out.repair = [this.stall && { x: this.stall.x + 1.7, z: this.stall.z - 0.3 }, this.noticeBoard && { x: this.noticeBoard.x + 1.2, z: this.noticeBoard.z - 0.2 }, well && { x: well.x - 1.4, z: well.z + 0.2 }].filter((v): v is Vec => !!v && walk(v));
+    if (this.stall) out.crate = [{ x: this.stall.x + 1.6, z: this.stall.z + 1.1 }].filter(walk);
+    const pond = this.world.platforms.find((pl) => pl.spots?.pond)?.spots?.pond;
+    if (pond) out.swim = this.fishingSpots(pond, 8, 8).slice(4);
     for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
     return out;
+  }
+
+  // What a repairer hammers at (stall, board, well): set with the spots.
+  private fixables: Vec[] = [];
+
+  // East (1) or west (-1) toward the nearest of `xs`.
+  private sideOf(p: Vec, xs: readonly Vec[]): number {
+    let [best, side] = [Infinity, 0];
+    for (const q of xs) {
+      const d = Math.hypot(q.x - p.x, q.z - p.z);
+      if (d < best) [best, side] = [d, Math.sign(q.x - p.x) || 1];
+    }
+    return side;
   }
 
   // Water within a rod's reach to the east (1) or west (-1) of a spot, or 0: casting art throws sideways.
@@ -352,7 +387,8 @@ export class Overworld {
 
   // Work faces what it works on; art only ever looks sideways.
   private faceWork(mo: HumanMotion, pos: Vec, pose: Pose | null | undefined): void {
-    const side = pose === "fish" ? this.waterSide(pos) : pose === "chop" ? this.treeSide(pos) : 0;
+    const side = pose === "fish" || pose === "swim" ? this.waterSide(pos) : pose === "chop" ? this.treeSide(pos) : pose === "mine" ? this.sideOf(pos, QUARRY)
+      : pose === "warm" ? this.sideOf(pos, [CAMPFIRE]) : pose === "hammer" ? this.sideOf(pos, this.fixables) : 0;
     if (side) mo.flip = side < 0;
   }
 
@@ -606,6 +642,8 @@ export class Overworld {
     this.syncMinds();
     this.npcs = new NpcVillage(sched, hasModel, { line: (l) => this.onMind?.(l), say: (id, text, to) => this.say(`n:${id}`, text, text === "..." ? 25 : 5, to), think: (id, text) => this.think(`n:${id}`, text) }, this.npcHomes(), this.npcSpots(), this.canWalk, (a, b) => findRoute(a, b, this.canWalk, NPC_ROUTE_TILES));
     if (CLOUD_CHAT) this.npcs.cloud = (npc, line, scene, mind) => cloudLine(npc, line, scene, mind);
+    this.npcs.env.play = (a, dt) => this.playBall(a, dt);
+    this.npcs.dancing = () => this.dancers();
     this.npcs.people = () => [{ id: this.npcs?.me ?? "me", name: this.myName, pos: this.player }, ...[...this.peers].map(([id, p]) => ({ id, name: p.name, pos: p.pos }))];
     this.npcs.pets = () => [
       { id: "pet", name: this.petName, pos: this.pet, busy: this.moving },
@@ -882,6 +920,72 @@ export class Overworld {
   indoors = false; // drawing the world around the house: the house and I are on the interior's layer
   underBubbles?: () => Rect | void; // the screen's own panels; speech steps around the one it returns
 
+  // The ball this frame. My feet on it kick it the way I walk (harder running); a goal gets a cheer.
+  private stepBall(d: Vec, running: boolean): void {
+    if (!this.ball) return void (this.ballNow = null);
+    const b = (this.ballNow = this.ball.now(Date.now() / 1000));
+    if (this.moving && !this.indoors && Math.hypot(b.x - this.player.x, b.z - this.player.z) < TOUCH) {
+      const n = Math.hypot(d.x, d.z) || 1, speed = running ? 6.5 : 4;
+      this.kickBall(this.npcs?.me ?? "me", (d.x / n) * speed, (d.z / n) * speed);
+    }
+    if (b.goal && !this.scored && b.by) {
+      const who = isNpc(b.by) ? `n:${b.by}` : b.by === "me" || b.by === this.npcs?.me ? "me" : this.peers.has(b.by) ? `p:${b.by}` : null;
+      if (who) this.say(who, "Goal!", 2.5);
+    }
+    this.scored = b.goal;
+  }
+
+  // Shown here at once, then sent to the room, which numbers it for everyone. Too soon after the last kick: no.
+  kickBall(by: string, vx: number, vz: number): boolean {
+    const now = Date.now() / 1000;
+    if (!this.ball || !this.ballNow || now - this.ball.kickedAt < KICK_GAP) return false;
+    const k = cleanKick({ x: this.ballNow.x, z: this.ballNow.z, vx, vz, by });
+    this.ball.apply(k, now);
+    this.ballNow = this.ball.now(now);
+    this.onKick?.(k);
+    return true;
+  }
+
+  // A kick the room numbered (anyone's, mine back too), made `age` ms ago.
+  ballKicked(k: RoomKick): void {
+    this.ball?.apply(k, Date.now() / 1000 - k.age / 1000, k.n);
+  }
+
+  // A villager in a game of soccer, on the machine that runs it: the two nearest chase the ball and shoot at the
+  // goal, the others keep their spot. A ball in the net or out of play: everyone back to their spot.
+  private playBall(a: Agent, dt: number): void {
+    const b = this.ballNow, ball = this.ball;
+    if (a.act !== "soccer" || !b || !ball || !this.npcs) return;
+    const { spot, goal } = ball.pitch;
+    const live = !b.goal && Math.hypot(b.x - spot.x, b.z - spot.z) < PITCH_R;
+    const dist = (o: Agent) => Math.hypot(o.pos.x - b.x, o.pos.z - b.z);
+    const chase = live && this.npcs.v.agents.filter((o) => o.act === "soccer" && o.state === "do").sort((x, y) => dist(x) - dist(y)).slice(0, 2).includes(a);
+    const back = aim(goal, b, 0.35); // just behind the ball, seen from the goal
+    const to = chase ? { x: b.x + back.vx, z: b.z + back.vz } : a.target;
+    const s = stepToward(a.pos, to, (chase ? HUMAN_RUN_SPEED * 0.9 : HUMAN_WALK_SPEED) * dt);
+    a.pos = slide(a.pos, s.dx, s.dz, this.canWalk);
+    if (!chase || dist(a) >= TOUCH || !this.npcs.hosting(a.id as Npc)) return; // a villager replayed here runs, its host kicks
+    const close = Math.hypot(goal.x - b.x, goal.z - b.z) < 6, r = this.lifeEnv.rng;
+    const v = aim(b, goal, close ? 6.5 : 3.5 + r() * 2.5, (r() - 0.5) * (close ? 0.5 : 0.9));
+    this.kickBall(a.id, v.vx, v.vz);
+  }
+
+  // A villager walking over the ball (on the machine that runs it) knocks it along.
+  private nudgeBall(a: Agent): void {
+    const b = this.ballNow;
+    if (!b || Math.hypot(a.pos.x - b.x, a.pos.z - b.z) >= TOUCH) return;
+    const v = aim(a.pos, a.path?.[0] ?? a.target, 2.5);
+    this.kickBall(a.id, v.vx, v.vz);
+  }
+
+  // People dancing near the dance floor (me, online players): villagers come and join them.
+  dancers(): number {
+    const c = { x: DANCE_FLOOR.x + DANCE_FLOOR.w / 2, z: DANCE_FLOOR.z + DANCE_FLOOR.h / 2 };
+    const near = (v: Vec) => Math.hypot(v.x - c.x, v.z - c.z) < 10;
+    const me = this.work?.pose === "dance" && near(this.player) ? 1 : 0;
+    return me + [...this.peers.values()].filter((p) => p.pose === "dance" && near(p.pos)).length;
+  }
+
   // Standing in a dance that has started, you dance too.
   private partyPose(): Pose | null {
     const near = this.npcs?.v.gatherings.some((g) => g.act === "dance" && g.started && Math.hypot(g.at.x - this.player.x, g.at.z - this.player.z) < 5);
@@ -901,6 +1005,7 @@ export class Overworld {
       if (Math.abs(x - l.x) < w && z < l.z + 0.2 && z > l.z - d) return false;
     }
     if (this.stall && Math.abs(x - this.stall.x) < 1.4 && z < this.stall.z + 0.2 && z > this.stall.z - 1.4) return false;
+    if (Math.abs(x - CAMPFIRE.x) < 0.7 && z < CAMPFIRE.z + 0.3 && z > CAMPFIRE.z - 0.5) return false;
     // A tile-deep support footprint also blocks tile-centre routes; the panel can overhang it.
     if (this.noticeBoard && Math.abs(x - this.noticeBoard.x) < 0.8 && z > this.noticeBoard.z - 0.8 && z < this.noticeBoard.z + 0.2) return false;
     if (this.allBeds.some((b) => x >= b.x - 0.1 && x < b.x + 1.1 && z >= b.z - 0.1 && z < b.z + 1.1)) return false;
@@ -968,6 +1073,7 @@ export class Overworld {
       const speed = (keys.has("shift") ? HUMAN_RUN_SPEED : HUMAN_WALK_SPEED) * dt;
       this.player = slide(this.player, d.x * speed, d.z * speed, this.canWalk);
     }
+    this.stepBall(d, keys.has("shift"));
     this.stepWork(dt);
     stepHumanMotion(this.playerMotion, this.player, dt, this.work?.pose ?? (this.moving ? null : this.partyPose()));
     this.moving = this.playerMotion.walking;
@@ -986,8 +1092,9 @@ export class Overworld {
     if (this.npcs) {
       for (const a of this.npcs.v.agents) if (!this.npcMotions.has(a.id as Npc)) this.npcMotions.set(a.id as Npc, newHumanMotion(a.pos));
       for (const e of this.npcs.step(dt, this.life.t)) if (e.kind === "start" && e.act !== "wander") this.say(`n:${e.who}`, ACTIVITY.get(e.act)!.label, 2.5);
+      for (const a of this.npcs.v.agents) if (a.state === "walk" && !a.puppet && this.npcs.hosting(a.id as Npc)) this.nudgeBall(a);
       for (const a of this.npcs.v.agents) {
-        const pose = a.state === "do" ? ACTIVITY.get(a.act!)?.pose ?? null : null;
+        const pose = a.state === "do" ? ACTIVITY.get(a.act!)?.pose ?? null : a.state === "walk" && a.act === "haul" ? "carry" : null;
         const mo = this.npcMotions.get(a.id as Npc)!;
         stepHumanMotion(mo, a.pos, dt, pose);
         this.faceWork(mo, a.pos, pose);

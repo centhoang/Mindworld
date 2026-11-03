@@ -8,7 +8,7 @@ import { answerTo, offerIn } from "./offers";
 import { MindScheduler } from "./scheduler";
 
 const HOMES = { elder: { x: 0, z: 0 }, mo: { x: 2, z: 0 }, ama: { x: 0, z: 2 }, pip: { x: 2, z: 2 } };
-const SPOTS = { home: [{ x: 0, z: 0 }], bed: [{ x: -3, z: 0 }], lawn: [{ x: 0, z: 3 }], picnic: [{ x: 3, z: 3 }] };
+const SPOTS = { home: [{ x: 0, z: 0 }], bed: [{ x: -3, z: 0 }], lawn: [{ x: 0, z: 3 }], dancefloor: [{ x: 0, z: 3 }], picnic: [{ x: 3, z: 3 }] };
 
 function make() {
   const lines: (MindLine & { mem?: string })[] = [];
@@ -270,7 +270,7 @@ describe("NpcVillage talks to pets", () => {
 
     it("says so when there is nowhere to do it, and promises nothing", async () => {
       const { nv, pip } = setup();
-      nv.setSpots({ ...nv.env.spots, lawn: [] });
+      nv.setSpots({ ...nv.env.spots, dancefloor: [] });
       const r = await nv.reply("pip", "Kai", LINE);
       expect(r?.text).toContain("nowhere");
       expect(pip.mem.promises).toEqual([]);
@@ -313,7 +313,7 @@ describe("NpcVillage talks to pets", () => {
     it("tells the place when it accepts, and says the grudge to your face once", async () => {
       const { nv, bubbles } = await stoodUp();
       const a = nv.v.agents.find((x) => x.id === "pip")!;
-      expect((await setup().nv.reply("pip", "Kai", LINE))?.text).toContain("Meet me at the lawn");
+      expect((await setup().nv.reply("pip", "Kai", LINE))?.text).toContain("Meet me at the dance floor");
       const pipSays = () => bubbles.filter(([id, t]) => id === "pip" && t.includes("you stood me up"));
       nv.people = () => [{ id: "me", name: "Kai", pos: a.pos }];
       Object.assign(a, { state: "idle", act: null, idle: 5, gather: null });
@@ -464,7 +464,7 @@ describe("open offers", () => {
   it("a free model line opens an offer, and yes acts on it", async () => {
     const { nv, m } = ready();
     nv.noteOffer("pip", m, "Kai", "Wanna dance?");
-    expect((await nv.reply("pip", "Kai", "yes"))?.text).toMatch(/lawn/);
+    expect((await nv.reply("pip", "Kai", "yes"))?.text).toMatch(/dance floor/);
     expect(m.mem.promises.filter((c) => c.act === "dance" && c.state === "open")).toHaveLength(1);
   });
 

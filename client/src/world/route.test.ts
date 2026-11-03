@@ -31,13 +31,13 @@ describe("findRoute", () => {
 });
 
 describe("village walking with routes", () => {
-  it("a pet reaches a bowl on the next island over the bridge", () => {
+  it("a pet reaches the lawn on the next island over the bridge", () => {
     const v = newVillage();
-    const a = addAgent(v, "p", "P", "pet", { x: -6, z: -4 }, { ...fullNeeds(), hunger: 5 });
+    const a = addAgent(v, "p", "P", "pet", { x: -6, z: -4 }, { ...fullNeeds(), bladder: 5 });
     a.idle = 0;
-    const env: Env = { spots: { bowl: [{ x: 6, z: -4 }] }, canWalk: walk, rng: mulberry32(3), chooser: () => "eat", route: (f, t) => findRoute(f, t, walk) };
+    const env: Env = { spots: { lawn: [{ x: 6, z: -4 }] }, canWalk: walk, rng: mulberry32(3), chooser: () => "poop", route: (f, t) => findRoute(f, t, walk) };
     let started = false;
-    for (let s = 0; s < 120 && !started; s += 0.25) started = stepVillage(v, 0.25, env).some((e) => e.kind === "start" && e.act === "eat");
+    for (let s = 0; s < 120 && !started; s += 0.25) started = stepVillage(v, 0.25, env).some((e) => e.kind === "start" && e.act === "poop");
     expect(started).toBe(true);
     expect(Math.hypot(a.pos.x - 6, a.pos.z + 4)).toBeLessThan(1);
   });

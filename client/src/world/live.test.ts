@@ -51,7 +51,18 @@ describe("live messages", () => {
     dispatch(JSON.stringify({ t: "full" }), h);
     for (const bad of ["{", JSON.stringify({ t: "pos", id: "a1", x: "1" }), JSON.stringify({ t: "emote", id: "a1", e: "<b>" }), JSON.stringify({ t: "nuke" })]) dispatch(bad, h);
     expect(log.map((l) => l[0])).toEqual(["welcome", "join", "pos", "emote", "leave", "status"]);
-    expect(log[0]).toEqual(["welcome", "me", 1, [peer], [{ slot: 2, name: "Mo", seed: 9, ttl: 5000 }], {}, []]);
+    expect(log[0]).toEqual(["welcome", "me", 1, [peer], [{ slot: 2, name: "Mo", seed: 9, ttl: 5000 }], {}, [], undefined]);
+  });
+
+  it("passes the room's ball kicks on, in the welcome too, and drops junk", () => {
+    const { h, log } = handlers();
+    h.ball = (...a) => void log.push(["ball", ...a]);
+    const k = { x: 22, z: 2.5, vx: 3, vz: -4, by: "pip", n: 1000, age: 50 };
+    dispatch(JSON.stringify({ t: "ball", ...k }), h);
+    dispatch(JSON.stringify({ t: "ball", ...k, vx: "fast" }), h);
+    dispatch(JSON.stringify({ t: "ball", ...k, n: -1 }), h);
+    dispatch(JSON.stringify({ t: "welcome", id: "me", corner: 1, peers: [], aways: [], ball: k, talks: [["a", "b"]] }), h);
+    expect(log).toEqual([["ball", k], ["welcome", "me", 1, [], [], {}, [["a", "b"]], k]]);
   });
 
   it("builds ws/wss urls", () => {

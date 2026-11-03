@@ -162,3 +162,4 @@ describe("room minds", () => {
     expect(NPCS.every((n) => r.board.hostOf(n) === other)).toBe(true);
   });
 });
+

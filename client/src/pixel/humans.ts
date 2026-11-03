@@ -17,7 +17,9 @@ export const HUMAN_WALK_SPEED = WALK_SPEED * 0.4;
 export const HUMAN_RUN_SPEED = HUMAN_WALK_SPEED * 1.9;
 const FRAME_SECONDS = 0.075;
 const WORK_SECONDS = 0.1;
-export const HUMAN_ACTIONS = { idle: 9, walk: 8, run: 8, doing: 8, waiting: 9, jump: 9, axe: 10, watering: 5, casting: 15, reeling: 13, caught: 10, dig: 13, attack: 10, hurt: 8 } as const;
+// "hamering" is the pack's own spelling of its hammering strip (file names follow it).
+export const HUMAN_ACTIONS = { idle: 9, walk: 8, run: 8, doing: 8, waiting: 9, jump: 9, axe: 10, watering: 5, casting: 15, reeling: 13, caught: 10, dig: 13, attack: 10, hurt: 8,
+  carry: 8, hamering: 23, mining: 10, swimming: 12, roll: 10 } as const;
 export type HumanAction = keyof typeof HUMAN_ACTIONS;
 type Action = HumanAction;
 // Drawn without the tools layer: a jump needs none, and the attack's tool is a sword (a trainer's shout is the bare swing).
@@ -36,6 +38,13 @@ const WORK: Partial<Record<Pose, readonly (readonly [Action, number])[]>> = {
   cook: [["doing", 2]],
   eat: [["doing", 2]],
   wiggle: [["doing", 2]],
+  dance: [["jump", 2], ["roll", 1], ["doing", 1]], // a little routine
+  carry: [["doing", 2]], // unloading at the stall
+  hammer: [["hamering", 1], ["idle", 1]],
+  mine: [["mining", 2], ["idle", 1]],
+  warm: [["idle", 3], ["waiting", 1]], // hands to the fire
+  feed: [["doing", 2], ["idle", 1]],
+  swim: [["swimming", 1]],
 };
 const workLength = (pose: Pose) => (WORK[pose] ?? []).reduce((sum, [a, n]) => sum + HUMAN_ACTIONS[a] * n, 0);
 // One full round of a job, in seconds.
@@ -61,13 +70,12 @@ export function humanLook(name: string): HumanLook {
   return { hair: HAIR[hash % HAIR.length]!, tool: tools[Math.floor(hash / HAIR.length) % tools.length]! };
 }
 
-// The pack has no sit, sleep, dance or kick. A dance is its jump, soccer is its run, and villagers sleep and eat at home, unseen.
+// The pack has no sit, sleep, dance or kick. A dance is its jump, roll and doing; soccer is running after the ball; villagers sleep and eat at home, unseen.
 export function humanLayers(look: HumanLook, pose: Pose | null, walking: boolean, running = false, clock = 0): { action: Action; frame?: number; files: string[] } {
   const work = !walking && pose ? workFrame(pose, clock) : null;
   let action: Action = work?.action ?? "idle";
-  if (walking) action = running ? "run" : "walk";
-  else if (pose === "dance") action = "jump";
-  else if (pose === "kick") action = "run";
+  if (walking) action = pose === "carry" ? "carry" : running ? "run" : "walk"; // a load is carried at a walk
+  // soccer moves for real (the ball is live): standing it waits for the ball
   return { action, frame: work?.frame, files: humanFiles(look, action) };
 }
 

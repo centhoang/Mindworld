@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "../sim/rng";
 import { ACTIVITIES } from "./activities";
@@ -145,5 +146,58 @@ describe("shared world clock", () => {
     expect(gameTime(worldSeconds(EPOCH_MS)).hour).toBe(0);
     expect(gameTime(worldSeconds(now)).day).toBe(worldDay(now) - worldDay(EPOCH_MS));
     expect(gameTime(worldSeconds(EPOCH_MS + 6 * 30_000)).phase).toBe("morning"); // 06:00
+  });
+});
+
+describe("P2 activities", () => {
+  const ALL = { ...SPOTS, playground: [{ x: 6, z: 0 }], dancefloor: [{ x: 0, z: 6 }], crate: [{ x: -6, z: 0 }], quarry: [{ x: 6, z: 6 }], pen: [{ x: -6, z: 6 }], repair: [{ x: 3, z: 3 }], campfire: [{ x: -3, z: 3 }], swim: [{ x: 3, z: -3 }] };
+
+  it("a kickabout starts alone, and a second player joins the game already running", () => {
+    const v = newVillage();
+    const pip = addAgent(v, "pip", "Pip", "human", { x: 6, z: 0.5 });
+    const mo = addAgent(v, "mo", "Mo", "human", { x: 5, z: 0 });
+    pip.idle = 0;
+    mo.idle = 999;
+    const e: Env = { spots: ALL, canWalk: () => true, rng: mulberry32(2), chooser: (a) => (a.id === "pip" ? "soccer" : null) };
+    const ev = run(v, e, 10);
+    expect(ev).toContainEqual({ kind: "start", who: "pip", act: "soccer", with: [] });
+    const join = validChoices(mo, v, e).find((c) => c.act === "soccer");
+    expect(join?.join).toBe(v.gatherings[0]!.id);
+    mo.idle = 0;
+    e.chooser = (a) => (a.id === "mo" ? "soccer" : undefined);
+    expect(run(v, e, 10)).toContainEqual({ kind: "start", who: "mo", act: "soccer", with: ["pip"] });
+  });
+
+  it("hauls only right after work that made something, and then it comes first", () => {
+    const v = newVillage();
+    const a = addAgent(v, "pip", "Pip", "human", { x: 0, z: 0 });
+    const e: Env = { spots: ALL, canWalk: () => true, rng: mulberry32(1) };
+    expect(validChoices(a, v, e).some((c) => c.act === "haul")).toBe(false);
+    a.last = "chop";
+    expect(validChoices(a, v, e)[0]!.act).toBe("haul");
+  });
+
+  it("dances most at the evening party, and the new work shows up in the day's choices", () => {
+    const v = newVillage();
+    const a = addAgent(v, "ama", "Ama", "human", { x: 0, z: 0 }, { ...fullNeeds(), fun: 40, social: 40 });
+    addAgent(v, "mo", "Mo", "human", { x: 1, z: 0 });
+    const e: Env = { spots: ALL, canWalk: () => true, rng: mulberry32(1) };
+    v.t = HOUR_SECONDS * 4; // 12:00
+    const noon = validChoices(a, v, e);
+    for (const id of ["repair", "mine", "swim", "dance"]) expect(noon.map((c) => c.act)).toContain(id);
+    const danceAtNoon = noon.find((c) => c.act === "dance")!.score;
+    v.t = HOUR_SECONDS * 11; // 19:00
+    const evening = validChoices(a, v, e);
+    expect(evening.find((c) => c.act === "dance")!.score).toBeGreaterThan(danceAtNoon + 0.2); // the party hour
+    for (const id of ["campfire", "feed"]) expect(evening.map((c) => c.act)).toContain(id);
+  });
+});
+
+describe("activity ids", () => {
+  it("are all let through by the room (worker MIND_ACTS), and nothing else is", () => {
+    const src = readFileSync(new URL("../../../worker/src/npc.ts", import.meta.url), "utf8");
+    const list = src.match(/MIND_ACTS = \[([^\]]+)\]/)![1]!;
+    const room = [...list.matchAll(/"([a-z]+)"/g)].map((m) => m[1]!);
+    expect(room.sort()).toEqual(ACTIVITIES.map((a) => a.id).sort());
   });
 });

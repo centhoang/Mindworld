@@ -89,7 +89,8 @@ export function makeRoomFlow(d: RoomDeps) {
     if (farm !== sharedFarm && live.farm(plots)) sharedFarm = farm;
   }
   const live: LiveLink = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: d.state.groundSeed, slot: slotKnown ? mySlot : undefined, ...world.me }), {
-    welcome: (id, corner, peers, awayList, npcs = {}, open = []) => {
+    welcome: (id, corner, peers, awayList, npcs = {}, open = [], ball) => {
+      if (ball) world.ballKicked(ball);
       chat.talks.clear();
       for (const [a, b] of open) chat.talks.set(a, b);
       npcHosts.clear();
@@ -152,6 +153,7 @@ export function makeRoomFlow(d: RoomDeps) {
     npcs: (list) => world.npcs?.shadow(list),
     farm: (id, plots) => void world.peerFarms.set(id, plots),
     emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
+    ball: (k) => world.ballKicked(k),
     status: (s) => {
       if (s === "online") return;
       for (const n of NPCS) setNpcHost(n, null);
@@ -174,6 +176,7 @@ export function makeRoomFlow(d: RoomDeps) {
   // Minds online: my pets' activity starts and lines go to the room; others' come back as bubbles. The cap
   // heartbeat tells the room how fast my local model is, so it can pick me to host village NPCs.
   world.onPose = (pose, flip) => void (live.status === "online" && live.pose(pose, flip));
+  world.onKick = (k) => void (live.status === "online" && live.kick(k));
   world.onMind = (l) => void (live.status === "online" && live.mind(l.say ? { ...l, ...world.speakerAt(l.who) } : l));
   setInterval(() => {
     if (live.status === "online") live.cap(d.speed(), "gpu" in navigator);

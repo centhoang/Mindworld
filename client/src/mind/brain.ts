@@ -172,9 +172,10 @@ export function scriptedLine(p: Persona, other: Persona, turn: number, k: number
 
 // Memory text for sim events ("ate at the bowl", "played ball with Sprig").
 const PAST: Record<string, string> = {
-  eat: "ate at the bowl", sleep: "slept", nap: "took a nap", poop: "pooped on the lawn", groom: "groomed", ball: "played ball",
-  dance: "danced", wander: "wandered around", cook: "cooked", clean: "cleaned up a mess", feed: "fed the pets", fish: "went fishing",
+  eat: "had a bite to eat", sleep: "slept", nap: "took a nap", poop: "pooped on the lawn", groom: "groomed", ball: "played ball",
+  dance: "danced", wander: "wandered around", cook: "cooked", clean: "cleaned up a mess", feed: "fed the animals", fish: "went fishing",
   picnic: "had a picnic", soccer: "played soccer", sell: "worked the market stall", chop: "chopped wood", tend: "tended the herbs",
+  campfire: "sat by the campfire", haul: "hauled goods to the stall", repair: "fixed things up", mine: "mined stone at the quarry", swim: "went for a swim",
 };
 export function eventText(act: string, mates: readonly string[]): string {
   const verb = PAST[act] ?? ACTIVITY.get(act)?.label ?? act;

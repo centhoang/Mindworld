@@ -14,7 +14,8 @@ describe("shared human layers", () => {
     expect(humanLayers(NPC_LOOKS.mo, "fish", false).action).toBe("casting");
     expect(humanLayers(NPC_LOOKS.mo, "fish", false, false, 2).files).toContain("tools_waiting_strip9.png");
     expect(humanLayers(NPC_LOOKS.mo, "fish", false, false, workSeconds("fish") - 0.05).action).toBe("caught");
-    expect(humanLayers(NPC_LOOKS.pip, "kick", false).action).toBe("run");
+    expect(humanLayers(NPC_LOOKS.pip, "kick", false).action).toBe("idle"); // waits for the ball; it runs when it moves
+    expect(humanLayers(NPC_LOOKS.pip, "kick", true, true).action).toBe("run");
     expect(humanLayers(NPC_LOOKS.mo, "dance", false).action).toBe("jump");
     expect(humanLayers(NPC_LOOKS.ama, "cook", false).action).toBe("doing");
     expect(humanLayers(NPC_LOOKS.pip, "sweep", true).action).toBe("walk");
@@ -22,7 +23,7 @@ describe("shared human layers", () => {
 
   it("ships exactly the native files that the renderer can select, at full strip resolution", () => {
     const used = new Set<string>();
-    const poses = [null, "stand", "sit", "sweep", "fish", "dance", "cook", "sleep", "eat", "kick", "squat", "wiggle", "chop", "water", "dig", "serve"] as const;
+    const poses = [null, "stand", "sit", "sweep", "fish", "dance", "cook", "sleep", "eat", "kick", "squat", "wiggle", "chop", "water", "dig", "serve", "carry", "hammer", "mine", "warm", "feed", "swim"] as const;
     const clocks = [0, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     for (const hair of HAIR) for (const tool of ["hands", "rod", "axe", "watering"] as const) for (const pose of poses) for (const walking of [false, true]) {
       for (const running of [false, true]) for (const clock of clocks) for (const file of humanLayers({ hair, tool }, pose, walking, running, clock).files) used.add(file);
@@ -102,7 +103,7 @@ describe("human loading and drawing", () => {
 
   it("finds a Sunnyside strip for every pose, walk and run, in every look", () => {
     const files = new Set(readdirSync("public/art/humans"));
-    const poses: (Pose | null)[] = [null, "stand", "sleep", "eat", "dance", "kick", "squat", "sit", "fish", "sweep", "wiggle", "cook", "chop", "water", "dig", "serve"];
+    const poses: (Pose | null)[] = [null, "stand", "sleep", "eat", "dance", "kick", "squat", "sit", "fish", "sweep", "wiggle", "cook", "chop", "water", "dig", "serve", "carry", "hammer", "mine", "warm", "feed", "swim"];
     const used = new Set<string>();
     const looks = [...Object.values(NPC_LOOKS), ...HAIR.map(hair => ({ hair, tool: "hands" as const }))];
     for (const look of looks) for (const pose of poses) for (const [walking, running] of [[false, false], [true, false], [true, true]] as const)

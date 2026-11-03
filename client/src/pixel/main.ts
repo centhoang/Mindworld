@@ -602,6 +602,7 @@ onPetChange = () => {
 // ---- live room extras: emotes (1-4 or the peer menu) and duels. A duel is pet vs pet, both following their
 // own memo rules on a shared seed (sim/duel.ts), so both players watch the same fight.
 function sendEmote(e: Emote): void {
+  if (e === "dance") world.startWork("dance", 8); // you dance a while, and villagers near the dance floor come
   if (live.emote(e)) world.say("me", EMOTE_TEXT[e], 3);
 }
 const DUEL_WAIT_MS = 20_000;

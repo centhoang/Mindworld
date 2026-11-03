@@ -4,6 +4,7 @@ import { cleanScene } from "../mind/scene";
 import { parseFighter, type Fighter } from "../sim/duel";
 import type { Genes } from "../sim/ghost";
 import type { Memo } from "../sim/memo";
+import type { Kick } from "../life/ball";
 
 // Live layer v0: one WebSocket to the world room (Worker Durable Object). Other online players' avatars
 // and pets walk around in our world; when the room is unreachable or full the world just keeps its
@@ -58,9 +59,11 @@ export type LiveStatus = "connecting" | "online" | "offline" | "full";
 
 export type NpcSpot = [string, number, number, string, string]; // id, x, z, state, activity
 export type FarmPlot = [string, number]; // crop ("" = empty), stage
+export type RoomKick = Kick & { n: number; age: number }; // the room's number for it, and ms since it was kicked
 
 export interface LiveHandlers {
-  welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[], npcs?: Partial<Record<Npc, string>>, talks?: [string, string][]): void;
+  welcome(id: string, corner: number | null, peers: LivePeer[], aways: LiveAway[], npcs?: Partial<Record<Npc, string>>, talks?: [string, string][], ball?: RoomKick): void;
+  ball?(k: RoomKick): void; // the room's numbered kick (mine too)
   talking?(id: string, withWho: string, on: boolean): void; // a private chat started or ended
   talkNo?(withWho: string): void; // they are busy: my chat did not open
   mind?(from: string, line: MindLine): void; // from = the sender's live id
@@ -121,6 +124,14 @@ export function parseAway(v: unknown): LiveAway | null {
   return { slot, name: cleanName(name), seed: seedOf(o.seed), ttl: Math.min(o.ttl, 15 * 60_000) };
 }
 const str = (v: unknown, max: number): string | null => (typeof v === "string" && v.length > 0 && v.length <= max ? v : null);
+
+export function parseKick(v: unknown): RoomKick | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const x = num(o.x), z = num(o.z), vx = num(o.vx), vz = num(o.vz), by = str(o.by, 16);
+  if (x === null || z === null || vx === null || vz === null || typeof o.n !== "number" || !(o.n > 0) || typeof o.age !== "number" || !(o.age >= 0)) return null;
+  return { x, z, vx, vz, by: by ?? "", n: o.n, age: o.age };
+}
 
 export function parsePeer(v: unknown): LivePeer | null {
   if (!v || typeof v !== "object") return null;
@@ -188,7 +199,7 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
         const [a, b] = Array.isArray(t) ? [str(t[0], 16), str(t[1], 16)] : [null, null];
         return a && b ? [[a, b]] : [];
       });
-      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, PEERS_MAX), aways, parseNpcs(m.npcs), talks);
+      return h.welcome(id, slotOf(m.corner), m.peers.map(parsePeer).filter((p): p is LivePeer => !!p).slice(0, PEERS_MAX), aways, parseNpcs(m.npcs), talks, parseKick(m.ball) ?? undefined);
     }
     case "talking": {
       const id = str(m.id, 16), w = str(m.with, 16);
@@ -248,6 +259,10 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
     case "emote": {
       const id = str(m.id, 16);
       return id && (EMOTES as readonly unknown[]).includes(m.e) ? h.emote(id, m.e as Emote) : undefined;
+    }
+    case "ball": {
+      const k = parseKick(m);
+      return k ? h.ball?.(k) : undefined;
     }
     case "full":
       return h.status("full");
@@ -320,9 +335,9 @@ export class LiveLink {
       if (ev.data === "pong") return;
       dispatch(ev.data, {
         ...this.h,
-        welcome: (id, corner, peers, aways, npcs) => {
+        welcome: (id, ...rest) => {
           this.myId = id;
-          this.h.welcome(id, corner, peers, aways, npcs);
+          this.h.welcome(id, ...rest);
         },
         status: (s) => {
           if (s === "full") this.full = true;
@@ -381,6 +396,10 @@ export class LiveLink {
   // instead of being dropped; a line that would wait over MIND_QUEUE_MS is stale and skipped.
   npcs(list: NpcSpot[]): boolean {
     return this.send({ t: "npcs", list });
+  }
+
+  kick(k: Kick): boolean {
+    return this.send({ t: "kick", x: k.x, z: k.z, vx: k.vx, vz: k.vz, by: k.by });
   }
 
   farm(plots: FarmPlot[]): boolean {

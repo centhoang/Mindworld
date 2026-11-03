@@ -39,7 +39,9 @@ const TALK_KEEP = 8; // lines of a talk the cloud tier sees
 const CLOUD_MIND_MAX = 1400; // the Worker's MIND_MAX
 export type CloudTalk = (npc: Npc, line: string, scene: string, mind: string) => Promise<{ text: string; source: string } | null>;
 const personaOf = (id: string): Persona | undefined => VILLAGERS.find((p) => p.id === id);
-const SPOT_NAME: Record<string, string> = { lawn: "the lawn", picnic: "the picnic spot", playground: "the playground", pond: "the pond" }; // places told to a guest
+const SPOT_NAME: Record<string, string> = { lawn: "the lawn", picnic: "the picnic spot", playground: "the playground", pond: "the pond", dancefloor: "the dance floor", campfire: "the campfire" }; // places told to a guest
+const DANCE_PULL = 0.6; // per person dancing on the floor, up to DANCE_PULL_MAX: villagers come and join
+const DANCE_PULL_MAX = 1.2;
 
 const REMOTE_WAIT = 20; // seconds a replaying NPC waits for its host's choice before deciding itself
 const GREET_DIST = 3; // a player this close may get greeted
@@ -106,6 +108,7 @@ export class NpcVillage {
   private readonly talks = new Map<string, string[]>(); // "npc:player" -> the talk so far, for the cloud tier
   private readonly greeted = new Map<string, number>(); // "npc:player" -> sim time of the greeting
   pets: () => PetSeen[] = () => []; // pets around, for a passing word
+  dancing: () => number = () => 0; // players dancing by the dance floor
   private readonly petted = new Map<string, number>(); // "npc:pet" (and "npc" for its last pet line) -> sim time
   private readonly lastChat = new Map<Npc, number>(); // sim time of the NPC's last NPC chat
   private readonly chats = new Map<Npc, { with: Npc; said: string[]; turns: number }>(); // NPC chats over the room
@@ -142,7 +145,7 @@ export class NpcVillage {
     this.out = { ...out, line: (l) => (l.say && this.follow(l.who as Npc, l.say), out.line(l)) };
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
     this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
-    this.env = { spots, canWalk, route, rng, doorOf: (a) => npcDoor(a.id), bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0) + (act === "farm" ? this.farmPull(a.id) : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
+    this.env = { spots, canWalk, route, rng, doorOf: (a) => npcDoor(a.id), bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0) + (act === "farm" ? this.farmPull(a.id) : 0) + (act === "dance" ? Math.min(DANCE_PULL_MAX, DANCE_PULL * this.dancing()) : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
     for (const n of NPCS) this.setHost(n, null);
   }
 

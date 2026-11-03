@@ -164,6 +164,9 @@ for hair in ['base', 'bowlhair', 'curlyhair', 'longhair', 'mophair', 'shorthair'
         if hair == 'tools' and a == 'attack':
             continue
         shutil.copy(A + f'Characters/Human/{d}/{hair}_{a}_strip{n}.png', f'client/public/art/humans/{hair}_{a}_strip{n}.png')
+    # Village work and play (P2): hauling, repairs, the quarry, the swim, and the dance routine's roll.
+    for d, a, n in [('CARRY', 'carry', 8), ('HAMMERING', 'hamering', 23), ('MINING', 'mining', 10), ('SWIMMING', 'swimming', 12), ('ROLL', 'roll', 10)]:
+        shutil.copy(A + f'Characters/Human/{d}/{hair}_{a}_strip{n}.png', f'client/public/art/humans/{hair}_{a}_strip{n}.png')
 
 # Clouds: the example room's cloud clusters as tile lists; the grey and shadow versions sit 3 and 6 rows below.
 d = LAYERS['clouds_01']

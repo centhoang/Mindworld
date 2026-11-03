@@ -8,6 +8,7 @@ import { Room, ROOM_MAX_MSG_BYTES, type Out, type Peer, type ServerMsg } from ".
 // is restored when the object wakes. Keepalive "ping" is answered by the runtime without waking it.
 
 const SILENT_MS = 90_000;
+const BALL_PUT_MS = 2000; // the ball goes to storage at most this often (kicks come in bursts)
 const REAP_TICKS = 100;
 
 interface Attachment {
@@ -20,6 +21,7 @@ export class WorldRoom extends DurableObject<Env> {
   private readonly batch = new Batcher<ServerMsg>();
   private tick = 0;
   private armed = false;
+  private ballPut = 0; // ms of the last ball write
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -31,6 +33,7 @@ export class WorldRoom extends DurableObject<Env> {
     void ctx.blockConcurrencyWhile(async () => {
       this.room.restoreAways(await ctx.storage.get("aways"));
       this.room.board.restore(await ctx.storage.get("npcLogs"));
+      this.room.restoreBall(await ctx.storage.get("ball"));
     });
   }
 
@@ -129,6 +132,12 @@ export class WorldRoom extends DurableObject<Env> {
 
   // Ghost grounds outlive the sockets, so they go to storage (tiny: <= 24 entries).
   private persistAways() {
+    const now = Date.now();
+    if (this.room.ballChanged && now - this.ballPut >= BALL_PUT_MS) {
+      this.room.ballChanged = false;
+      this.ballPut = now;
+      void this.ctx.storage.put("ball", this.room.ball);
+    }
     if (this.room.board.changed) {
       this.room.board.changed = false;
       void this.ctx.storage.put("npcLogs", this.room.board.snapshot());

@@ -7,10 +7,11 @@ import type { Agent } from "../life/village";
 import type { Vec } from "../world/movement";
 import { NPCS, type Npc } from "../world/live";
 import { AWAY, hash2, lookAt, T, TILE } from "../world/tilemap";
+import { CAMPFIRE, DANCE_FLOOR, PEN } from "../world/village-map";
 import { PAL } from "./art";
 import { layoutBubbles, type BubbleBox, type Placed } from "../view/bubbles";
 import { generatedSprites } from "./generated-sprites";
-import { drawDecor, drawSpotProp } from "./grounds-draw";
+import { drawDecor, drawLiveBall, drawSpotProp } from "./grounds-draw";
 import { humanSprites, newHumanMotion, NPC_LOOKS } from "./humans";
 import { drawInspector } from "./inspector";
 import { drawBall, drawPetPose, drawPoop, drawTint } from "./life-draw";
@@ -126,6 +127,17 @@ export class PixelView implements View {
     });
   }
 
+  // The dance floor on the square (pack-style tiles, art/gen): its lit tiles blink while anyone dances on it.
+  private drawDanceFloor(g: CanvasRenderingContext2D, toScreen: (x: number, z: number) => [number, number], t: number): void {
+    const f = DANCE_FLOOR;
+    const on = !!this.o.npcs?.v.gatherings.some((gt) => gt.act === "dance" && gt.started) || this.o.dancers() > 0;
+    const beat = Math.floor(t * 2);
+    for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) {
+      const [sx, sy] = toScreen(f.x + i, f.z + j);
+      generatedSprites.draw(g, on && (i + j + beat) % 2 === 0 ? "dance-floor-active" : "dance-floor-inactive", sx, sy);
+    }
+  }
+
   draw(scene: Scene, g: CanvasRenderingContext2D, sw: number, sh: number, t: number): BubbleFate[] {
     const o = this.o;
     const m = scene.map;
@@ -135,6 +147,7 @@ export class PixelView implements View {
     drawSea(g, m, camX, camY, sw, sh, t);
     drawLand(g, m, o.sunny, camX, camY, sw, sh, t);
     this.drawBeds(g, toScreen, t);
+    this.drawDanceFloor(g, toScreen, t);
     const plaza = o.world.platforms.find((p) => p.kind === "plaza");
     // Sprites sorted by their feet, so things lower on screen stand in front.
     const items: { z: number; draw: () => void }[] = [];
@@ -185,6 +198,23 @@ export class PixelView implements View {
       items.push({ z: tr.z, draw: () => drawTree(g, seed, sx, sy + 4, t, 0) });
     }
     const lit = gameTime(o.life.t).phase;
+    {
+      // The campfire: the pack's stone ring, burning in the evening and while anyone sits by it.
+      const [cx, cy] = toScreen(CAMPFIRE.x, CAMPFIRE.z);
+      const burning = lit === "evening" || !!o.npcs?.v.gatherings.some((gt) => gt.act === "campfire" && gt.started);
+      items.push({ z: CAMPFIRE.z, draw: () => {
+        stand(g, "spr_deco_campfire", cx, cy + 4);
+        if (burning) for (const dx of [-4, 0, 4]) strip(g, "spr_deco_fire_01_strip4", cx + dx - 2, cy - 12 + Math.abs(dx) / 2, Math.floor(t * 8) + dx);
+      } });
+      // The farm animals amble about their yard (the same on every screen: they follow the shared clock).
+      ANIMALS.forEach((art, k) => {
+        const u = o.life.t * 0.05 + k * 1.7, v = o.life.t * 0.037 + k * 2.3;
+        const ax = PEN.x + 0.5 + (PEN.w - 1) * (0.5 + 0.5 * Math.sin(u)), az = PEN.z + 0.5 + (PEN.h - 1) * (0.5 + 0.5 * Math.sin(v));
+        const [sx, sy] = toScreen(ax, az);
+        if (sx < -32 || sy < -32 || sx > sw + 32 || sy > sh + 32) return;
+        items.push({ z: az, draw: () => strip(g, art, sx - 16, sy - 26, Math.floor(t * 4 + k), Math.cos(u) < 0) });
+      });
+    }
     for (const d of o.decor) {
       const [sx, sy] = toScreen(d.x, d.z);
       if (sx < -40 || sy < -40 || sx > sw + 40 || sy > sh + 40) continue;
@@ -218,6 +248,7 @@ export class PixelView implements View {
     for (const p of o.world.platforms) {
       if (!p.spots) continue;
       for (const [name, at] of Object.entries(p.spots)) {
+        if (name === "ball" && o.ballNow) continue; // the live ball is drawn below
         const [sx, sy] = toScreen(at.x, at.z);
         if (sx < -48 || sy < -48 || sx > sw + 48 || sy > sh + 48) continue;
         items.push({ z: at.z - (name === "blanket" || name === "dock" ? 9 : 0), draw: () => drawSpotProp(g, name, sx, sy, t) });
@@ -277,11 +308,10 @@ export class PixelView implements View {
       const motion = o.npcMotions.get(a.id as Npc) ?? newHumanMotion(a.pos);
       const { walking } = motion;
       if (a.state === "do" && ACTIVITY.get(a.act!)?.indoors) continue; // home to sleep or eat: inside, out of sight
-      if (motion.pose === "kick" && !walking) {
-        // Soccer: up and down the pitch after the ball, on the pack's run.
-        const phase = t * 0.9 + a.id.length * 1.7;
-        const sx = nx + Math.round(Math.sin(phase) * 2.4 * TILE);
-        items.push({ z: a.pos.z, draw: () => (characterShadow(g, sx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], { ...motion, flip: Math.cos(phase) < 0 }, sx, ny, t)) });
+      if (motion.pose === "swim" && !walking) {
+        // A swim: out in the water beside the shore spot, no shadow.
+        const sx = nx + o.waterSide(a.pos) * TILE;
+        items.push({ z: a.pos.z, draw: () => humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, sx, ny + 2, t) });
         continue;
       }
       items.push({ z: a.pos.z, draw: () => (characterShadow(g, nx, ny), humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, nx, ny, t)) });
@@ -295,11 +325,12 @@ export class PixelView implements View {
         if (near) drawTinyText(g, sg.text, Math.round(sx), sy - 16);
       } });
     }
-    // The ball in a game of soccer runs ahead of the players.
-    for (const gt of o.npcs?.v.gatherings ?? []) {
-      if (gt.act !== "soccer" || !gt.started) continue;
-      const [bx, by] = toScreen(gt.at.x + Math.sin(t * 1.3) * 3, gt.at.z + Math.sin(t * 2.1) * 0.6);
-      items.push({ z: gt.at.z, draw: () => drawBall(g, bx, by - Math.round(Math.abs(Math.sin(t * 5)) * 3)) });
+    // The village ball (one for the room): a small hop while it rolls.
+    const ball = o.ballNow;
+    if (ball) {
+      const [bx, by] = toScreen(ball.x, ball.z);
+      const hop = ball.moving ? Math.round(Math.abs(Math.sin(t * 9)) * 2) : 0;
+      items.push({ z: ball.z, draw: () => drawLiveBall(g, bx, by, hop) });
     }
     // A ball bounces between pets playing together.
     for (const gt of o.life.gatherings) {
@@ -359,6 +390,8 @@ export class PixelView implements View {
     return fates;
   }
 }
+
+const ANIMALS = ["spr_deco_chicken_01_strip4", "spr_deco_sheep_01_strip4", "spr_deco_pig_01_strip4", "spr_deco_cow_strip4"];
 
 // A speech bubble above a sprite: up to 3 wrapped lines, kept on screen, with a small tail.
 function bubble(g: CanvasRenderingContext2D, head: string, lines: readonly string[], cx: number, w: number, h: number, at: Placed, thought = false): void {
