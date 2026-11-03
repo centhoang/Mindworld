@@ -333,7 +333,7 @@ export class Overworld {
     out.repair = [this.stall && { x: this.stall.x + 1.7, z: this.stall.z - 0.3 }, this.noticeBoard && { x: this.noticeBoard.x + 1.2, z: this.noticeBoard.z - 0.2 }, well && { x: well.x - 1.4, z: well.z + 0.2 }].filter((v): v is Vec => !!v && walk(v));
     if (this.stall) out.crate = [{ x: this.stall.x + 1.6, z: this.stall.z + 1.1 }].filter(walk);
     const pond = this.world.platforms.find((pl) => pl.spots?.pond)?.spots?.pond;
-    if (pond) out.swim = this.fishingSpots(pond, 8, 8).slice(4);
+    if (pond) out.swim = this.fishingSpots(pond, 8, 8).slice(4).filter((q) => this.waterReach(q, [0]));
     for (const k of Object.keys(out) as (keyof Spots)[]) if (!out[k]!.length) delete out[k];
     return out;
   }
@@ -353,6 +353,12 @@ export class Overworld {
 
   // Water within a rod's reach to the east (1) or west (-1) of a spot, or 0: casting art throws sideways.
   waterSide(p: Vec): number {
+    return Math.sign(this.waterReach(p));
+  }
+
+  // Tiles to the first open water beside a shore spot, signed by side (0 = none within 2). A line may reach the row
+  // below; a swimmer is drawn on the spot's own row (`rows` [0]).
+  waterReach(p: Vec, rows = [0, 0.8]): number {
     // Cliff and foam stand on water cells: only open water takes a line. A south coast edge or corner is cliff top.
     if ([T.water, T.pool].includes(tileAt(this.map, p.x, p.z + 1) as never)) return 0;
     const open = (x: number, z: number) => {
@@ -361,7 +367,7 @@ export class Overworld {
       return cell === 0 || cell === seaCell(i, j);
     };
     const wet = (x: number, z: number) => [T.water, T.pool].includes(tileAt(this.map, x, z) as never) && open(x, z);
-    for (let d = 1; d <= 2; d++) for (const dz of [0, 0.8]) for (const side of [1, -1]) if (wet(p.x + side * d, p.z + dz)) return side;
+    for (let d = 1; d <= 2; d++) for (const dz of rows) for (const side of [1, -1]) if (wet(p.x + side * d, p.z + dz)) return side * d;
     return 0;
   }
 

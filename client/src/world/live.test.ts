@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { dispatch, LiveLink, parsePeer, roomUrl, ROOM_SPILL, spillUrl, type LiveHandlers } from "./live";
+import { dispatch, LiveLink, parsePeer, roomQuery, roomUrl, ROOM_SPILL, spillUrl, type LiveHandlers } from "./live";
 
 function handlers() {
   const log: unknown[][] = [];
@@ -72,6 +72,7 @@ describe("live messages", () => {
     expect(spillUrl("wss://pets.uryto.dev/api/room", 2)).toBe("wss://pets.uryto.dev/api/room?room=main-2");
     expect(spillUrl("wss://h/api/room?room=check", 3)).toBe("wss://h/api/room?room=check-3");
     expect(spillUrl("wss://h/api/room?room=check-2", 4)).toBe("wss://h/api/room?room=check-4");
+    expect(["", "?room=check", "?p=2&room=main-3", "?room=main", "?room=evil"].map(roomQuery)).toEqual(["", "?room=check", "?room=main-3", "", ""]);
   });
 });
 

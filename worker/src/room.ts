@@ -523,8 +523,10 @@ export class Room {
       return { out: [{ to: { id: h.id }, msg: scene ? { t: "ask", npc: o.npc, from: id, name: peer.name, text, scene } : { t: "ask", npc: o.npc, from: id, name: peer.name, text } }], changed: true };
     }
     if (o.t === "cap") {
-      if (peer.capAt !== undefined && now - peer.capAt < CAP_GAP_MS) return { out: [] };
-      peer.cap = cleanCap(o);
+      const cap = cleanCap(o);
+      // A tab going to or from the background tells at once; plain heartbeats wait their gap.
+      if (peer.capAt !== undefined && now - peer.capAt < CAP_GAP_MS && !cap.bg === !peer.cap.bg) return { out: [] };
+      peer.cap = cap;
       peer.capAt = now;
       this.board.beat(peer.id, now);
       return { out: [], changed: true };

@@ -40,5 +40,14 @@ Found by the P3 join check (`scripts/join-check.mjs`, live `check` room, run 1, 
     seconds came back a guest, and the newcomer had their plot. Fix: a ground left under 60 s ago (`REFRESH_HOLD_MS`) is kept for
     its owner (`room.ts` `takeSlot`, unit test). Waiting for join-check run 2.
 50. **A late joiner did not see a nearby farm** unless its owner's tab resent it (a background tab never does). Fix: the welcome
-    brings the farms in view (`room.ts` `join`, unit test). Waiting for join-check run 2.
+    brings the farms in view (`room.ts` `join`, unit test). Proven fixed on live (join-check run 2); remove after review.
+51. **Villagers stood still for everyone while their host fought, sat indoors or had the tab in the background** (found with
+    real tabs in the `check` room: a mid-duel tab was handed Mo on someone's join). The game does not step the village in
+    battle or home mode, and a background tab is throttled. Fix: the cap heartbeat carries `bg` (hidden, fighting or indoors),
+    sent at once on a change; the room hosts villagers on a visible, free player when there is one (`npc.ts` `elect`, unit
+    test; `room-flow.ts` beat). Also: a view that throttles frames without saying it is hidden now steps the world too.
+    Proven on live: two tabs dueling, all four villagers moved to the third player at once and kept walking.
+52. **Phone-size window: the Goals card and the bottom line ran off the right edge, the map was off-screen** (375 x 812:
+    the scale came from the height alone, 125 art columns). Fix: the scale also keeps at least 360 columns
+    (`pixel/low-size.ts`, unit test). Not a bug but a gap: no touch controls, so a phone can join and watch but not walk.
 - Fixed, waiting for review: 27 (a static art file can 502 once after a deploy; `/art/tile-grass-snow-1.png` caught once, 200 since. Images and `sunny.json` now retry: unit test only, the blip did not recur).

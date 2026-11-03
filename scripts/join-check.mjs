@@ -2,7 +2,7 @@
 // Object, never the real village), with hard limits on sockets and time, and close cleanly. One line per check.
 // node scripts/join-check.mjs [--big 100] [--room check] [--url wss://pets.uryto.dev/api/room]   (--big 0 skips the full room)
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
-const MAX_SOCKETS = 160, MAX_SECONDS = 180, PLOTS = 12, ROOM_MAX = 100;
+const MAX_SOCKETS = 160, MAX_SECONDS = 180, PLOTS = 12, ROOM_MAX = 100, AWAY_MS = 600_000, REFRESH_HOLD_MS = 60_000; // worker room.ts
 const base = arg("url", "wss://pets.uryto.dev/api/room");
 const room = arg("room", "check");
 const big = Math.min(ROOM_MAX, Number(arg("big", ROOM_MAX)));
@@ -92,7 +92,10 @@ check("everyone sees everyone (none lost)", missing.every((n) => n === 0), `most
 check("nobody is seen twice", everyone.every((b) => b.dupJoins === 0) && everyone.every((b) => new Set(b.view.keys()).size === b.view.size));
 check("no socket stuck", burst.every((b) => b.id || b.full), `${burst.filter((b) => !b.id).length} without a welcome`);
 const corners = everyone.map((b) => b.corner).filter((c) => c !== null);
-const want = Math.min(everyone.length, PLOTS - takenBefore);
+// A plot left under a minute ago is kept for its owner's refresh (room.ts REFRESH_HOLD_MS): a fast rerun meets the last one's.
+const ours = new Set(everyone.map((b) => b.seed));
+const held = probe.welcome.aways.filter((a) => AWAY_MS - a.ttl < REFRESH_HOLD_MS && !ours.has(a.seed)).length;
+const want = Math.min(everyone.length, PLOTS - takenBefore - held);
 check(`the first ${PLOTS} get a plot, the rest the Guest yard`, corners.length === want && new Set(corners).size === corners.length,
   `${corners.length} plots (want ${want}), ${everyone.length - corners.length} guests`);
 

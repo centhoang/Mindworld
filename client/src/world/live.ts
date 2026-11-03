@@ -446,8 +446,9 @@ export class LiveLink {
   }
 
   // Heartbeat + model speed, so the room can pick NPC hosts (the server takes one per ~10 s).
-  cap(tps: number, webgpu: boolean): boolean {
-    return this.send({ t: "cap", tps, webgpu });
+  // `bg`: this tab is in the background, so the room hands its villagers to a visible player.
+  cap(tps: number, webgpu: boolean, bg = false): boolean {
+    return this.send(bg ? { t: "cap", tps, webgpu, bg } : { t: "cap", tps, webgpu });
   }
 
   // `to` = a player in an open private chat; without it the line is public room chat.
@@ -503,6 +504,11 @@ export class LiveLink {
 const rulesOnly = (m: Memo) => ({ summary: "", rules: m.rules.map((r) => ({ if: r.if, do: r.do, why: "" })) });
 
 export const roomUrl = (loc: { protocol: string; host: string }): string => `${loc.protocol === "https:" ? "wss" : "ws"}://${loc.host}/api/room`;
+// `?room=check` in the page address joins the join check's room (worker room.ts names); anything else, the village.
+export const roomQuery = (search: string): string => {
+  const r = new URLSearchParams(search).get("room") ?? "";
+  return /^(main|check)(-[2-9])?$/.test(r) && r !== "main" ? `?room=${r}` : "";
+};
 
 // A friendly display name derived from the pet's genes (no account, no personal data).
 const NAMES = ["Mochi", "Pip", "Tofu", "Maple", "Biscuit", "Nori", "Pebble", "Dumpling", "Clover", "Bean", "Puff", "Sunny"];

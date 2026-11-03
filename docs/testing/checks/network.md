@@ -10,15 +10,22 @@ Lab: `/lab/net`. Second player: `?p=2`.
 - [x] [proof](../proof/network/5c5d-live.md) Villagers are in the same place for both players.
 - [x] [proof](../proof/network/5c5d-live.md) If the villagers' host leaves, they carry on.
 - [x] [proof](../proof/network/5b-numbers.md) Traffic per player stays flat as players are added far away.
-- [!] [proof](../proof/network/5b-numbers.md) 100 bots asked, 89 held by one machine: smooth, but 100 itself is not proven.
+- [x] [proof](../proof/network/join-live.md) 100 players held at once on live (the old 89 was this machine's link with no retry).
 - [x] [proof](../proof/network/5b-numbers.md) A dropped connection reconnects with no duplicates.
 
-Many players join live without issue (user, 2026-11-03; plan P3):
-- [ ] Open the link and you are in the village, online, within about 10 s, with no setup.
-- [ ] 20 players joining in the same second all get in: none lost, none twice, none stuck "connecting".
-- [ ] When the village is full, the next player still plays with others (a second village), not alone.
-- [ ] The first 12 players get a plot; later ones join the Guest yard and are told so. A refresh gives you your plot back.
-- [ ] Someone who joins late sees the ball, a dance or a game in progress, the villagers and the farms as they are now.
-- [ ] Joining while others fight, dance, sit inside or host the villagers breaks nothing for anyone.
-- [ ] Players with no GPU, a phone-size window or a slow connection can join and play.
+Many players join live without issue (user, 2026-11-03; plan P3). Proof: [join-live.md](../proof/network/join-live.md);
+the bot part is one command, `node scripts/join-check.mjs` (run it after every deploy):
+- [x] Open the link and you are in the village, online, within about 10 s, with no setup (home link ~3 s; Fast 3G 3.3 s;
+  Slow 3G 12 s).
+- [x] 20 players joining in the same second all get in: none lost, none twice, none stuck "connecting" (100 held too).
+- [x] When the village is full, the next player still plays with others (a second village), not alone.
+- [x] The first 12 players get a plot; later ones join the Guest yard and are told so. A refresh gives you your plot back,
+  even if someone new joins in those seconds.
+- [x] Someone who joins late sees the ball, the villagers, who is talking and the farms as they are now. (A player's own
+  dance shows from their next move; villagers' dances show at once.)
+- [x] Joining while others fight, dance or host the villagers breaks nothing for anyone. (Indoors: the same away rule as
+  fighting, not run live.)
+- [x] A player who fights, goes indoors or puts the tab in the background hands the villagers to a free player at once.
+- [x] Players with no GPU, a phone-size window or a slow connection can join and play. (A phone has no touch controls yet:
+  it can join and watch, not walk.)
 - [ ] After the game goes public: a phone on mobile data and a second machine join at the same time.

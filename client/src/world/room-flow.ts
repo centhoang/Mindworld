@@ -7,7 +7,7 @@ import type { Fighter } from "../sim/duel";
 import type { Genes } from "../sim/ghost";
 import { worldDay, type GroundOwner } from "./layout";
 import { GUEST_SLOT, PLOT_COUNT } from "./village-map";
-import { isNpc, LiveLink, NPCS, roomUrl, type Emote, type LivePeer, type Npc } from "./live";
+import { isNpc, LiveLink, NPCS, roomQuery, roomUrl, type Emote, type LivePeer, type Npc } from "./live";
 
 export const EMOTE_TEXT: Record<Emote, string> = { wave: "*waves*", heart: "<3 <3", dance: "*dances*", laugh: "haha!" };
 
@@ -19,6 +19,7 @@ export interface RoomDeps {
   myGenes: () => Genes;
   toast: (text: string, t: number) => void;
   speed: () => number; // tokens a second this machine's model can give the room
+  away?: () => boolean; // fighting or indoors: the village does not step here, so its villagers should go elsewhere
   duel: {
     invited: (duel: string, from: string, name: string) => void;
     started: (seed: number, a: Fighter, b: Fighter) => Promise<void>;
@@ -90,7 +91,7 @@ export function makeRoomFlow(d: RoomDeps) {
     const farm = JSON.stringify(plots);
     if (farm !== sharedFarm && live.farm(plots)) sharedFarm = farm;
   }
-  const live: LiveLink = new LiveLink(roomUrl(location), () => ({ name: myName(), genes: myGenes(), groundSeed: d.state.groundSeed, slot: slotKnown ? mySlot : undefined, ...world.me }), {
+  const live: LiveLink = new LiveLink(roomUrl(location) + roomQuery(location.search), () => ({ name: myName(), genes: myGenes(), groundSeed: d.state.groundSeed, slot: slotKnown ? mySlot : undefined, ...world.me }), {
     welcome: (id, corner, peers, awayList, npcs = {}, open = [], ball) => {
       if (ball) world.ballKicked(ball);
       chat.talks.clear();
@@ -189,8 +190,18 @@ export function makeRoomFlow(d: RoomDeps) {
   world.onPose = (pose, flip) => void (live.status === "online" && live.pose(pose, flip));
   world.onKick = (k) => void (live.status === "online" && live.kick(k));
   world.onMind = (l) => void (live.status === "online" && live.mind(l.say ? { ...l, ...world.speakerAt(l.who) } : l));
-  setInterval(() => {
-    if (live.status === "online") live.cap(d.speed(), "gpu" in navigator);
-  }, 10_000);
+  // The heartbeat goes every 10 s, and at once when this tab goes away (hidden, fighting, indoors) or comes back:
+  // villagers hosted by a tab whose village does not step would stand still for everyone (join check, bug 51).
+  let beatAt = 0;
+  let beatBg: boolean | null = null;
+  const beat = () => {
+    if (live.status !== "online") return void (beatBg = null);
+    const bg = document.hidden || !!d.away?.();
+    const now = Date.now();
+    if (bg === beatBg && now - beatAt < 10_000) return;
+    if (live.cap(d.speed(), "gpu" in navigator, bg)) [beatAt, beatBg] = [now, bg];
+  };
+  setInterval(beat, 1000);
+  document.addEventListener("visibilitychange", beat);
   return { live, shareState, fakeIsle, hostOf: (npc: Npc) => npcHosts.get(npc) };
 }

@@ -39,3 +39,18 @@ Shots: `sunny-activities.jpg`, `../visual/sunny-village.jpg`, `../visual/sunny-h
   once): sleep 64, campfire 61, haul 38, cook 36, sell 32, dance 30, fish 18, farm 18, feed 18, mine 16, chop 16, swim 13,
   repair 9, tend 8, soccer 7. Every new activity starts unforced.
 - **Not proven yet:** the 12-min live watch with each activity seen unforced; swim and haul's carry strip not seen on screen.
+
+## P2 live watch (2026-11-04 00:13-00:32 VN, live `main-CrFuSOoI` in the pane, then fixes on `main-DyE8pDkv`)
+- 19 real minutes on live, villagers hosted by the watching tab, no forcing. The pane was hidden for most of it, which
+  throttles frames to ~1/s without setting `document.hidden`; a 1 s page timer stepped the game by the elapsed time in
+  0.1 s steps whenever no frame had run (the game itself now does this: `pixel/main.ts`, bug 51 note).
+- **Started unforced, first seen** (game hour, who): tend 7.1 Elder, cook 6.9 Ama, repair 8.2 Ama, chop 13.6 Pip, mine 14.5
+  Mo, sell 15.5 Ama, swim 16.2 Mo, haul 18.4 Pip, dance 20.5 Elder (then Mo and Pip joined), feed 20.5 Ama, fish 21.6 Mo,
+  campfire 22.3 Mo, sleep 22.5 Pip. Not in this watch: soccer (seen unforced on live earlier: Pip's kickabout and goal,
+  block above), farm (headless watch only).
+- **Haul's carry strip on screen:** Mo carrying a crate past the pier (`haul-carry-live.jpg`, `haul-carry-zoom.png`).
+- **Swim was drawn on the grass** (`swim-on-grass-before.jpg`): the shore spot finds open water up to 2 tiles out, the
+  drawing always moved 1 tile, onto the pond's cliff edge; one spot's water was only on the row below. Fixed: a swimmer is
+  drawn at the real distance on its own row, and swim spots need open water on their row (`overworld.ts` `waterReach`,
+  `village-walk.test.ts`, fails on the old code). After: the Elder swims in open water (`swim-in-water-live.jpg`, the
+  swim forced for the drawing check only).

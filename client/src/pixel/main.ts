@@ -47,18 +47,12 @@ import type { Rect } from "../view/bubbles";
 import type { ScenePanel } from "../game/ports";
 import { runSetup, storeSetup } from "./setup";
 import { TeachScreen } from "./teach";
+import { LOW_H, lowSize } from "./low-size";
 
-export const LOW_H = 216;
 // The game's look is Sunnyside. ?look=mosaic is the set-aside view of about 45 rows of 8-pixel cells.
 const pixelLook = new URLSearchParams(location.search).get("look") !== "mosaic";
 const lowRows = pixelLook ? LOW_H : 360;
 
-// One art pixel is always a whole number of screen pixels, or pixels come out in different sizes. The scale that
-// shows at least LOW_H rows wins, and the low-res picture takes whatever size fills the screen at that scale.
-export function lowSize(devW: number, devH: number, rows = LOW_H): { w: number; h: number; scale: number } {
-  const scale = Math.max(1, Math.floor(Math.max(1, devH) / rows));
-  return { w: Math.max(1, Math.ceil(devW / scale)), h: Math.max(1, Math.ceil(devH / scale)), scale };
-}
 
 
 const state = load();
@@ -590,6 +584,7 @@ showName();
 const room = makeRoomFlow({
   world, state, chat, myName, myGenes, toast: say,
   speed: () => (localBrain() ? mindSched.tps(12) : 0),
+  away: () => mode !== "world",
   duel: { invited: duelInvited, started: (seed, a, b) => fights.duel(seed, a, b), ended: duelEnded },
 });
 const live = room.live;
@@ -693,10 +688,11 @@ function frame(now: number): void {
   }
 }
 // A hidden tab gets no frames, but other players still see my villagers and me: the world runs on without drawing.
+// Some views throttle frames without saying the tab is hidden (an embedded or covered window): same then.
 setInterval(() => {
-  if (!document.hidden || mode !== "world") return;
   const now = performance.now();
-  const steps = Math.min(40, Math.floor((now - last) / 50));
+  if ((!document.hidden && now - last < 500) || mode !== "world") return;
+  const steps = Math.min(100, Math.floor((now - last) / 50)); // throttled timers can come seconds apart
   if (!steps) return;
   last = now;
   for (let i = 0; i < steps; i++) world.update(0.05, new Set<string>());

@@ -18,6 +18,7 @@ const TPS_MAX = 500;
 export interface Cap {
   webgpu: boolean;
   tps: number; // measured tokens/s of the player's local model (0 = none loaded)
+  bg?: boolean; // the tab is in the background: its frames are throttled, so it hosts only when nobody else can
 }
 
 export interface Hostable {
@@ -30,7 +31,7 @@ export const isNpc = (v: unknown): v is Npc => (NPCS as readonly unknown[]).incl
 export function cleanCap(v: unknown): Cap {
   const o = v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
   const tps = typeof o.tps === "number" && Number.isFinite(o.tps) ? Math.min(TPS_MAX, Math.max(0, Math.round(o.tps * 10) / 10)) : 0;
-  return { webgpu: o.webgpu === true, tps };
+  return { webgpu: o.webgpu === true, tps, ...(o.bg === true ? { bg: true } : {}) };
 }
 
 // Higher = better host. Everyone can host (a player without WebGPU runs the scripted/cloud brain), so the
@@ -95,8 +96,10 @@ export class NpcBoard {
   elect(peers: ReadonlyMap<string, Hostable>, now: number, balance = false): HostChange[] {
     const changes: HostChange[] = [];
     const load = (id: string) => [...this.hosts.values()].filter((h) => h.host === id).length;
-    const modeled = [...peers.values()].some((p) => p.cap.tps > 0);
-    const eligible = (p: Hostable) => !modeled || p.cap.tps > 0;
+    // A visible tab beats a background one (whose villagers would crawl for everyone), then a local model beats none.
+    const front = [...peers.values()].some((p) => !p.cap.bg);
+    const modeled = [...peers.values()].some((p) => p.cap.tps > 0 && (!front || !p.cap.bg));
+    const eligible = (p: Hostable) => (!front || !p.cap.bg) && (!modeled || p.cap.tps > 0);
     const best = (except?: string) => {
       let pick: Hostable | null = null;
       let score = -1;

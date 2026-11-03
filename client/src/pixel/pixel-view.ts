@@ -309,8 +309,8 @@ export class PixelView implements View {
       const { walking } = motion;
       if (a.state === "do" && ACTIVITY.get(a.act!)?.indoors) continue; // home to sleep or eat: inside, out of sight
       if (motion.pose === "swim" && !walking) {
-        // A swim: out in the water beside the shore spot, no shadow.
-        const sx = nx + o.waterSide(a.pos) * TILE;
+        // A swim: out in the open water beside the shore spot (past any cliff or foam), no shadow.
+        const sx = nx + o.waterReach(a.pos, [0]) * TILE;
         items.push({ z: a.pos.z, draw: () => humanSprites.draw(g, NPC_LOOKS[a.id as Npc], motion, sx, ny + 2, t) });
         continue;
       }

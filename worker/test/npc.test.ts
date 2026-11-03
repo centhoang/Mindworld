@@ -97,6 +97,19 @@ describe("room minds", () => {
     expect(NPCS.filter((n) => r.board.hostOf(n) === "d")).toHaveLength(2);
   });
 
+  it("moves the villagers off a tab that goes to the background, at once, and only while someone visible is in", () => {
+    const r = new Room();
+    r.join("a", { cap: { tps: 25, webgpu: true } }, 0);
+    r.join("b", { cap: { tps: 0, webgpu: false } }, 0);
+    expect(NPCS.every((n) => r.board.hostOf(n) === "a")).toBe(true);
+    send(r, "a", { t: "cap", tps: 25, webgpu: true }, 1000);
+    const res = send(r, "a", { t: "cap", tps: 25, webgpu: true, bg: true }, 2000); // inside the 9 s gap: still heard
+    expect(NPCS.every((n) => r.board.hostOf(n) === "b")).toBe(true);
+    expect(new Set(res.out.flatMap((o) => (o.msg.t === "npcHost" ? [o.msg.npc] : []))).size).toBe(NPCS.length);
+    send(r, "b", { t: "cap", tps: 0, webgpu: false, bg: true }, 3000); // both in the background: the model wins again
+    expect(NPCS.every((n) => r.board.hostOf(n) === "a")).toBe(true);
+  });
+
   it("town board trades reach everyone and stay out of the NPC's log; only the latest purse is kept", () => {
     const r = new Room();
     r.join("a", {}, 0);

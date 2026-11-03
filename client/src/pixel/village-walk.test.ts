@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { randomGenes } from "../game/genes";
 import { Overworld } from "./overworld";
 import { T } from "../world/tilemap";
+import { seaCell } from "./sunny-terrain";
 
 // Sprites draw to canvases nobody looks at here.
 const pen: unknown = new Proxy(() => pen, { get: () => pen, set: () => true, apply: () => pen });
@@ -46,5 +47,19 @@ describe("walking the village", () => {
     expect(w.canWalk(w.pet.x, w.pet.z)).toBe(true);
     for (let i = 0; i < 10; i++) w.update(0.05, new Set(["arrowdown"]));
     expect(w.player.z).toBeGreaterThan(p.z + 0.3);
+  });
+
+  it("draws every swimmer in open water, past the pond's cliff and foam (P2 live watch)", () => {
+    const spots = (w as unknown as { npcSpots(): { swim: { x: number; z: number }[] } }).npcSpots().swim;
+    expect(spots.length).toBeGreaterThan(0);
+    for (const s of spots) {
+      const reach = w.waterReach(s, [0]);
+      expect(reach, `${s.x},${s.z}`).not.toBe(0);
+      const x = s.x + reach;
+      expect([T.water, T.pool], `${x},${s.z}`).toContain(kindAt(x, s.z));
+      const [i, j] = [Math.floor(x), Math.floor(s.z)];
+      const cell = (w as unknown as { sunny: { terrain: { land: number[] } } }).sunny.terrain.land[(j - m.oz) * m.w + i - m.ox] ?? 0;
+      expect(cell === 0 || cell === seaCell(i, j), `cliff or foam at ${x},${s.z}`).toBe(true);
+    }
   });
 });
