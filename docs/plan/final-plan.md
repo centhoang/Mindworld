@@ -1,5 +1,14 @@
 # Final plan: Mindworld, Nov 3 16:00 VN to submission (Nov 5, 09:00 VN)
 
+## Status (update every session)
+- **P0 done** (Nov 3 ~17:00 VN, live): LOCAL_ONLY off, `CLOUD_LIVELY` flag added (nothing uses it yet), bugs 34 and 36.
+- **P1 part done** (live `main-DyR8JZim`): fight rules (block, counter, charge, signature, crits both sides, brute HP 48,
+  Prove +29.0 held-out) and the battle screen (shouts 1-5 twice per wild fight, damage pops, charge pips, effect lines).
+- **P1 left, in order:** NPC rivals (villager pets, duel offer, `/api/rival` counter-memo, fallback persona memos, loss
+  explanation) -> adapted coach review after a fight ("Teach this") -> trainer sprites on the battle screen (`attack`,
+  `hurt`, `jump`, `idle` strips; not yet in `client/public/art/humans/`) -> pack UI bars (`redbar`/`greenbar`/`bluebar`)
+  and `glint` on crits. The screen today uses the old code-drawn HP bars.
+
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted
 teaching and NPC rivals; more human activities (every one the pack supports), a ball that rolls when touched, a dance
