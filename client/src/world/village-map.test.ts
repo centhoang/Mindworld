@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildTileMap, T, tileAt, tileWalkable } from "./tilemap";
 import { platformAt } from "./layout";
-import { GUEST_SLOT, PLOT_AT, PLOT_COUNT, VILLAGE_ROWS, villageThings, villageWorld } from "./village-map";
+import { GUEST_SLOT, PLOT_AT, PLOT_COUNT, plotFences, plotHouse, ROOFS, VILLAGE_ROWS, villageThings, villageWorld } from "./village-map";
 
 describe("the village", () => {
   const others = Array.from({ length: PLOT_COUNT - 1 }, (_, n) => ({ id: `p${n}`, name: "Pip", seed: n + 2, slot: n + 1 }));
@@ -33,6 +33,19 @@ describe("the village", () => {
       seen.add(k);
       expect([T.grass, T.flowers, T.tall], k).toContain(tileAt(m, x + i + 0.5, z + j + 0.5));
     }
+  });
+
+  it("puts the same small house on every plot, inside it, with the front fence open at its door (bug 46)", () => {
+    const fences = plotFences([...Array(PLOT_COUNT).keys()]);
+    const fenced = (x: number, z: number) => fences.some((f) => f.z === z && x >= f.x0 && x < f.x1);
+    for (let s = 0; s < PLOT_COUNT; s++) {
+      const [x, z] = PLOT_AT[s]!;
+      const h = plotHouse(s);
+      expect(h.x - 2.5 >= x && h.x + 2.5 <= x + 10 && h.z - 4 >= z && h.z <= z + 7, `plot ${s}`).toBe(true);
+      expect(fenced(Math.floor(h.x), z + 6), `gate ${s}`).toBe(false);
+      expect(fenced(x + 6, z + 6), `fence ${s}`).toBe(true);
+    }
+    expect(new Set(PLOT_AT.slice(0, ROOFS.length).map((_, s) => plotHouse(s).roof)).size).toBe(ROOFS.length);
   });
 
   it("makes a late player a guest, who still has a yard", () => {

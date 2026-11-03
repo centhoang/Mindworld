@@ -20,13 +20,14 @@ describe("house plan", () => {
   it("every room can be walked to from the door", () => {
     const seen = [...reach()].map((k) => k.split(",").map(Number) as [number, number]);
     const near = (x: number, y: number) => seen.some(([a, b]) => Math.hypot(a - x, b - y) < 6);
-    for (const [x, y] of [[150, 55], [170, 45], [150, 85], [230, 45], [240, 85]]) expect(near(x!, y!)).toBe(true);
+    for (const [x, y] of [[8, 44], [26, 24], [40, 25], [72, 30], [72, 46], [56, 40]]) expect(near(x!, y!)).toBe(true);
   });
 
   it("walls, furniture and the outside block; the door leads out", () => {
-    expect(onFloor(190, 75)).toBe(false); // the drawers
-    expect(onFloor(120, 70)).toBe(false); // outside, by the wall
-    expect(onFloor(10, 10)).toBe(false);
-    expect(onFloor(217, HOUSE_EXIT_Y + 1)).toBe(true);
+    expect(onFloor(12, 23)).toBe(false); // the bed
+    expect(onFloor(64, 24)).toBe(false); // the table
+    expect(onFloor(10, 52)).toBe(false); // the front wall
+    expect(onFloor(2, 30)).toBe(false); // the west wall
+    expect(onFloor(40, HOUSE_EXIT_Y + 1)).toBe(true);
   });
 });

@@ -1,23 +1,23 @@
-// Inside your house: one wing of the pack's demo house with its roof lifted (scripts/art-home-wing.py). Walk around with your pets,
-// and use the shipping crate by the door (sell the harvest, buy seeds). The floor plan
-// is in ../game/house.ts and the furniture rules in ../game/room.ts; this file draws and walks them.
+// Inside your house: the small house every player has (bug 46), its roof lifted (home-small-open.png). Walk around with your
+// pets, and use the shipping crate by the door (sell the harvest, buy seeds). The floor plan is in ../game/house.ts; the
+// house comes furnished, so nothing is placed. This file draws and walks it.
 
 import { BUILT_IN_PIECES, HOME_FOOT, HOME_ROOF, HOUSE_DOOR, HOUSE_EXIT_Y, onFloor } from "../game/house";
 import type { Scene, SceneProp } from "../game/ports";
 import type { Genes } from "../sim/ghost";
 import { T, type TileMap } from "../world/tilemap";
-import { CRATE, COLS, FURNITURE, PIECE_KINDS, ROWS, blocked, canPlace, pieceAt, place, removeAt, type Piece, type PieceKind } from "../game/room";
+import { CRATE, COLS, ROWS, blocked } from "../game/room";
 import { followStep, keyDir, slide, type Vec } from "../world/movement";
 import { PAL } from "./art";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanSprites, newHumanMotion, stepHumanMotion, type HumanLook } from "./humans";
 import { characterShadow, drawFaded, stand } from "./sunny";
 import { drawFrame, drawText, GLYPH } from "./text";
 
-export const ROOM_W = 264;
-export const ROOM_H = 178;
+export const ROOM_W = HOME_ROOF.w;
+export const ROOM_H = HOME_ROOF.h;
 const C = 16; // cell size
-const GX = 53 / C; // where the furniture grid starts on the picture, in cells
-const GY = 28 / C;
+const GX = 48 / C - CRATE.x; // the cell grid lies so the crate's cell is the square inside the door, east of the lane
+const GY = 32 / C - CRATE.y;
 const ROOF_FADE = 0.7; // seconds for the roof to lift as you come in
 const DOOR_AT = { x: HOUSE_DOOR.x / C, z: HOUSE_DOOR.y / C };
 const EXIT_Z = HOUSE_EXIT_Y / C;
@@ -25,7 +25,7 @@ const EXIT_Z = HOUSE_EXIT_Y / C;
 type Ctx = CanvasRenderingContext2D;
 
 export interface InteriorHost {
-  room(): Piece[];
+  roof(): string; // my house's roofed picture, which lifts as I come in
   petSprite(): HTMLCanvasElement;
   residents(): HTMLCanvasElement[];
   look(): HumanLook;
@@ -44,7 +44,7 @@ export class Interior {
   private moving = false;
   private walkT = 0;
   private readonly motion = newHumanMotion(this.player);
-  private sitters: Vec[] = [{ x: 13, z: 5.2 }, { x: 14.5, z: 5.2 }, { x: 10.5, z: 5.2 }, { x: 9.5, z: 4.8 }, { x: 10.5, z: 3.2 }];
+  private sitters: Vec[] = [{ x: 0.6, z: 2.7 }, { x: 4.4, z: 2.9 }, { x: 1.5, z: 2.9 }, { x: 4.5, z: 2.3 }, { x: 1, z: 2 }];
 
   constructor(private readonly host: InteriorHost) {}
 
@@ -57,17 +57,12 @@ export class Interior {
     this.motion.dir = 3;
   }
 
-  // Pieces saved for an older house may lie on walls now: those simply don't stand.
-  private pieces(): Piece[] {
-    return this.host.room().filter((p) => cellsOnFloor(p));
-  }
-
   private readonly walk = (x: number, z: number): boolean => {
     if (!onFloor(x * C, z * C)) return false;
     const cx = x - GX;
     const cz = z - GY;
     const inGrid = cx >= 0 && cz >= 0 && cx < COLS && cz < ROWS;
-    return !inGrid || !blocked(this.pieces(), cx, cz);
+    return !inGrid || !blocked([], cx, cz); // only the crate's cell
   };
 
   // What the player faces: the crate, a cell, or nothing.
@@ -102,10 +97,6 @@ export class Interior {
   // The room as a scene for a view that reads scenes: the same plane as the village, on its own small map.
   scene(base: Scene): Scene {
     const props: SceneProp[] = BUILT_IN_PIECES.map((p) => ({ kind: p.kind, x: p.x / C, z: p.y / C }));
-    for (const p of this.pieces()) {
-      const f = FURNITURE[p.kind];
-      props.push({ kind: p.kind, x: p.x + GX + f.w / 2, z: p.y + GY + f.h });
-    }
     props.push({ kind: "crates", x: CRATE.x + GX + 0.5, z: CRATE.y + GY + 1 });
     const pets = this.host.residentGenes().slice(0, this.sitters.length).flatMap((genes, i) => {
       const pos = this.sitters[i]!;
@@ -132,14 +123,11 @@ export class Interior {
     const oy = Math.floor(sh / 2) - (HOME_FOOT.y - Math.floor(HOME_ROOF.h / 2));
     const [fx, fy] = [ox + HOME_FOOT.x, oy + HOME_FOOT.y];
     this.host.around(g, sw, sh, t, fx, fy);
-    stand(g, "home-wing-open", fx, fy);
+    stand(g, "home-small-open", fx, fy);
     const free = (x: number, z: number): [number, number] => [ox + Math.round(x * C), oy + Math.round(z * C)];
     const at = (x: number, z: number): [number, number] => free(x + GX, z + GY);
-    const room = this.pieces();
-    // Rugs first, then everything with feet, sorted by their bottom edge.
-    for (const p of room) if (FURNITURE[p.kind].rug) drawPiece(g, p.kind, ...at(p.x, p.y));
+    // Everything with feet, sorted by its bottom edge (the furniture is in the picture).
     const items: { z: number; draw: () => void }[] = [];
-    for (const p of room) if (!FURNITURE[p.kind].rug) items.push({ z: p.y + FURNITURE[p.kind].h - 0.01, draw: () => drawPiece(g, p.kind, ...at(p.x, p.y)) });
     items.push({ z: CRATE.y + 0.99, draw: () => drawCrate(g, ...at(CRATE.x, CRATE.y)) });
     const res = this.host.residents();
     res.slice(0, this.sitters.length).forEach((s, i) => {
@@ -158,7 +146,7 @@ export class Interior {
     } });
     items.sort((a, b) => a.z - b.z);
     for (const it of items) it.draw();
-    drawFaded(g, "home-wing-roof", fx - Math.floor(HOME_ROOF.w / 2), fy - HOME_ROOF.h, 1 - (t - this.entered) / ROOF_FADE);
+    drawFaded(g, this.host.roof(), fx - Math.floor(HOME_ROOF.w / 2), fy - HOME_ROOF.h, 1 - (t - this.entered) / ROOF_FADE);
 
     if (this.nearCrate()) {
       const hint = "E: CRATE";
@@ -184,19 +172,6 @@ function roomMap(): TileMap {
   return (room = { w, h, ox: 0, oz: 0, kind, look: new Uint8Array(w * h) });
 }
 
-function cellsOnFloor(p: Piece): boolean {
-  const f = FURNITURE[p.kind];
-  for (let j = 0; j < f.h; j++) for (let i = 0; i < f.w; i++) if (!onFloor((p.x + i + GX + 0.5) * C, (p.y + j + GY + 0.5) * C)) return false;
-  return true;
-}
-
 function drawCrate(g: Ctx, x: number, y: number): void {
   return stand(g, "crate", x + C / 2, y + C);
-}
-
-// The pack's furniture, standing on the bottom edge of its footprint.
-const ART: Record<PieceKind, string> = { bed: "f-bed", rug: "f-rug", table: "f-table", chair: "f-stool", lamp: "f-vase", plant: "f-sunflower", shelf: "f-shelf", cushion: "spr_deco_rug_01" };
-
-function drawPiece(g: Ctx, kind: PieceKind, x: number, y: number): void {
-  stand(g, ART[kind], x + (FURNITURE[kind].w * C) / 2, y + FURNITURE[kind].h * C);
 }

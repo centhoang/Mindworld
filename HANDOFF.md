@@ -24,13 +24,30 @@
   360 art columns (`pixel/low-size.ts`).
 - Proof: `docs/testing/proof/network/join-live.md`, `docs/testing/proof/game/activities.md` "P2 live watch".
 
+## P4 in progress (2026-11-04 ~02:00 VN, commit 160c5b6, NOT deployed)
+- Done, local: every plot (taken or not) has the same small house (`village-map.ts plotHouse`, roof by slot from
+  `ROOFS`), a 2x3 field (`bedsAt` rect branch, cols px+6..7, rows pz+2..4; free plots draw tilled beds, `freeBeds`), a
+  front fence of pack rail tiles row 2 cols 38/39/42 with a 3-tile gate at the door (`plotFences`, decor kind `rail`).
+  Name sign inside the fence east of the gate. Touch controls: `pixel/touch.ts` (stick + E/X/T, shown on coarse pointers),
+  proven in the pane at 375x812 (keys sent, player walks).
+- **Waiting on Codex:** `.scratch/brief-home-small.md` -> `client/public/art/gen/home-small-roof.png` +
+  `home-small-open.png` (80x64, same outline) and `.scratch/home-small-result.md` (FLOOR, BUILT_IN, DOOR, EXIT_Y, CHIMNEY).
+  Until then houses are invisible (art names `home-small-<roof>` / `home-small-open` load from `art/sunny/`).
+- **Next steps:** check the art (contact sheet, pack style, front only); write `scripts/art-home-small.py` that copies the
+  open picture and recolours the roof into 5 colours (map blue shingle colours to the other roof blocks in `tiles.png`,
+  same offsets) into `client/public/art/sunny/home-small-<roof>.png`; rewrite `game/house.ts` (FLOORS, BUILT_IN,
+  BUILT_IN_PIECES, HOME_FOOT {40,64}, HOME_ROOF {80,64}, HOUSE_DOOR, HOUSE_EXIT_Y, HOME_CHIMNEY is PROVISIONAL) and
+  `interior.ts` (draw `home-small-open`, fade the own roof art, GX/GY so CRATE {11,3} lands on the crate square, sitters
+  on the new floor, `pieces()` -> [] since the house comes furnished); then render, tests, deploy, join-check, play-test.
+- Map polish still open (from the BuiltDemo sheet `.scratch/p4/demo-all.png`): tree clumps toward the coast, stumps /
+  berry bushes / flowers, the plaza's big bare dirt (pack statue `statue.png` is exported, not loaded). Update
+  `docs/visual/visual.md` ("Not needed: decor density, fences" no longer holds: the user asked for BuiltDemo polish).
+- Debug render of any area: in the dev tab define `__region(cx, cz, scale)` (`docs/ops/tooling.md` "Seeing any part of the map") or draw
+  `world.view.draw({...world.buildScene(), cam, panels: []}, g, w, h, t)` into a big canvas.
+
 ## Next actions
-1. **P4** (plan): BuiltDemo contact sheet -> map polish within `docs/visual/visual.md` and `layers.md`; bug 46 (one small
-   house per plot with an interior; Codex brief for the interior art); lay out P2's places cleanly. Deploy, run
-   `node scripts/join-check.mjs`, then ask the user for play-test #1.
-2. **Touch controls (gap found in P3):** a phone joins and watches but cannot walk (no touch input). Claude's call: add
-   tap-to-walk and tap-to-use in P4 if time allows (~45 min), since judges may open the link on a phone. Say so in the demo
-   script otherwise.
+1. **P4** (above), then deploy, run `node scripts/join-check.mjs`, then ask the user for play-test #1.
+2. Touch controls are in (P4); say in the demo script that phones work.
 3. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
    screen; a bored villager walks up and challenges you. Optional P1 leftover: pack expression icons over pets.
 4. After any user play-test: read the chat log unasked, add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`.

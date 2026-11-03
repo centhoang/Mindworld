@@ -169,7 +169,7 @@ function stepDoor(dt: number): void {
 }
 state.room ??= defaultRoom();
 const interior = new Interior({
-  room: () => state.room!,
+  roof: () => world.homeArt,
   petSprite: () => world.petSprite,
   residents: () => world.residentSprites(),
   look: () => world.myLook,

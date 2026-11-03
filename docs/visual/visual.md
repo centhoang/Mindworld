@@ -9,7 +9,11 @@
 - Bubbles, thought bubble, name tags, inspector, chat box, minimap, day and night tint.
 
 ## Not needed
-Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams, decor density, fences. Each is a cost in rules and bugs.
+Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams. Each is a cost in rules and bugs.
+**Changed for P4 (2026-11-04, the user asked for map polish from BuiltDemo):** fences and more decor are in. Each plot has
+the same small house (roof colour by slot: blue, red, green, orange, purple), a 2x3 tilled field and a front fence of the
+pack's rail tiles (tileset row 2: col 38 west end, 39 middle, 42 east end) with a 3-tile gate at the door, whether anyone
+holds it or not. A run of one tile is left out (it would show a rail to nowhere).
 
 ## Look options
 **Decided (user, 2026-11-03):** compact Sunnyside. It loads about 60 of the 141 art files and draws no clouds, sea life or farm animals. Compare: `../testing/proof/visual/looks-compare.jpg`. The mosaic stays in the code, set aside, at `?look=mosaic`; labs still use it.
