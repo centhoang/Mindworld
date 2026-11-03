@@ -410,6 +410,7 @@ window.addEventListener("keydown", (e) => {
     toast = { text: state.muted ? "Voices off (M)." : "Voices on (M).", t: 1.5 };
   }
   if (mode === "battle" && battleView.choosing) battleView.cmdKey(k);
+  else if (mode === "battle" && battleView.shoutKey(k)) return;
   else if ((k === " " || k === "enter" || k === "z") && mode === "battle") battleView.skip();
   if (mode === "world" && !e.repeat) {
     if (duelIn) inviteKey(k);

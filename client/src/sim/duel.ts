@@ -2,7 +2,7 @@ import { Battle } from "./battle";
 import { ghostEnemyDef, ghostPet, type Genes, type Ghost } from "./ghost";
 import { validateMemo, type Memo } from "./memo";
 import { memoPolicy } from "./policy";
-import type { Action, EnemyAct, Replay } from "./types";
+import type { Action, EnemyAct, Replay, TurnFx } from "./types";
 
 // Live pet-vs-pet duel. The room sends both players the same seed and both pets (rules + genes), and each
 // client runs this exact sim, so both see the same fight. Side "a" (the challenger) is the battle's pet,
@@ -25,7 +25,16 @@ export interface DuelTurn {
   taken: number;
   myHp: number;
   theirHp: number;
+  fx?: TurnFx[]; // from this player's side
+  charge?: number; // my signature charge (side a only: side b's is not tracked)
 }
+
+// Side b sees side a's counters and crits as the foe's.
+const MIRROR: Partial<Record<TurnFx, TurnFx>> = { counter: "foe-counter", "foe-counter": "counter", crit: "foe-crit", "foe-crit": "crit" };
+const mirrorFx = (fx: TurnFx[] | undefined): TurnFx[] | undefined => {
+  const out = (fx ?? []).flatMap((f) => (MIRROR[f] ? [MIRROR[f]!] : []));
+  return out.length ? out : undefined;
+};
 
 export interface DuelView {
   turns: DuelTurn[];
@@ -70,8 +79,8 @@ export function duelView(a: Fighter, b: Fighter, seed: number, me: "a" | "b"): D
     const bAction = asAction(t.enemyAct);
     const view: DuelTurn =
       me === "a"
-        ? { mine: t.action, theirs: bAction, theirAct: t.enemyAct, dealt: t.dealt, taken: t.taken, myHp: t.myHp, theirHp: t.enemyHp }
-        : { mine: bAction, theirs: t.action, theirAct: asAct(t.action, last), dealt: t.taken, taken: t.dealt, myHp: t.enemyHp, theirHp: t.myHp };
+        ? { mine: t.action, theirs: bAction, theirAct: t.enemyAct, dealt: t.dealt, taken: t.taken, myHp: t.myHp, theirHp: t.enemyHp, ...(t.fx ? { fx: t.fx } : {}), ...(t.charge ? { charge: t.charge } : {}) }
+        : { mine: bAction, theirs: t.action, theirAct: asAct(t.action, last), dealt: t.taken, taken: t.dealt, myHp: t.enemyHp, theirHp: t.myHp, ...(mirrorFx(t.fx) ? { fx: mirrorFx(t.fx) } : {}) };
     last = t.action;
     return view;
   });

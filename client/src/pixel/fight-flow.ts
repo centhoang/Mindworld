@@ -65,7 +65,7 @@ export function makeFightFlow(d: FightDeps) {
     const mine = { ...d.side(d.activeMember()), maxHp: v.myMaxHp };
     await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), genes: them.genes, maxHp: v.theirMaxHp, level: 3 }, mine, `${them.name.slice(0, 12)} is ready to duel!`);
     await battleView.say(`Live duel! Both pets follow their own memo rules. Same fight on both screens.`);
-    for (const t of v.turns) await battleView.playTurn(t.mine, "", "duel", t.theirAct, t.dealt, t.taken, t.myHp, t.theirHp);
+    for (const t of v.turns) await battleView.playTurn(t.mine, "", "duel", t.theirAct, t.dealt, t.taken, t.myHp, t.theirHp, { fx: t.fx, charge: t.charge });
     await battleView.end(...DUEL_END[v.result]);
     const earned = duelCoins(v.result);
     if (earned) {
@@ -115,14 +115,17 @@ export function makeFightFlow(d: FightDeps) {
     // while the current turn animates.
     const name = d.activeMember().name;
     let next = instinct.decide(name, state.memo, battle.observe());
+    battleView.allowShouts();
     while (!battle.done) {
       const obs = battle.observe();
-      await battleView.say(`${foeName} ${TELL[obs.intent]}`);
+      const left = battleView.shouts;
+      await battleView.say(`${foeName} ${TELL[obs.intent]}${left ? ` (1-5: shout a move, ${left} left)` : ""}`);
       const choice = await next;
       const tag = choice.source === "rule" ? `memo #${choice.rule! + 1}` : choice.source === "model" ? d.brainTag() : "instinct";
-      const rec = battle.step(choice.action);
+      const shout = battleView.takeShout(); // the trainer's call beats the memo for this one turn
+      const rec = battle.step(shout ?? choice.action, !!shout);
       if (!battle.done) next = instinct.decide(name, state.memo, battle.observe());
-      await battleView.playTurn(choice.action, choice.line, tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp);
+      await battleView.playTurn(rec.action, shout ? "" : choice.line, tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp, rec);
     }
     const replay = battle.replay();
     await battleView.end(replay.outcome, replay.how);

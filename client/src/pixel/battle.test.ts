@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BattleView } from "./battle";
+import { BattleView, SHOUTS_PER_FIGHT, signatureName } from "./battle";
 
 const side = (name: string) => ({ name, sprite: {} as HTMLCanvasElement, maxHp: 30 });
 
@@ -43,5 +43,36 @@ describe("battle view script", () => {
     v.update(0.05);
     v.skip();
     expect(await runUntil(v, p, 1)).toBeLessThan(0.5);
+  });
+});
+
+describe("battle depth on screen", () => {
+  it("the trainer gets a few shouts per fight; keys 1-5 call a move, and fights without shouts ignore them", () => {
+    const v = new BattleView();
+    void v.open(side("Foe"), side("Mochi"));
+    expect(v.shoutKey("2")).toBe(false); // duels and the like: no shouts unless the fight allows them
+    v.allowShouts();
+    expect(v.shoutKey("9")).toBe(false);
+    for (let i = 0; i < SHOUTS_PER_FIGHT; i++) {
+      expect(v.shoutKey("2")).toBe(true);
+      expect(v.takeShout()).toBe("guard");
+    }
+    expect(v.shouts).toBe(0);
+    expect(v.shoutKey("1")).toBe(false);
+    expect(v.takeShout()).toBeNull();
+  });
+
+  it("names a signature move the same way every time, from the pet's genes", () => {
+    const a = signatureName({ name: "Mochi", genes: { hue: 0.4, ears: 0.7 } });
+    expect(a).toBe(signatureName({ name: "Other", genes: { hue: 0.4, ears: 0.7 } }));
+    expect(signatureName({ name: "Mochi" })).toBe(signatureName({ name: "Mochi" }));
+  });
+
+  it("plays a turn with a block, a counter, a signature and crits in a few seconds", async () => {
+    const v = new BattleView();
+    await runUntil(v, v.open(side("Foe"), side("Mochi")), 10);
+    expect(await runUntil(v, v.playTurn("guard", "", "memo #1", "strike", 0, 2, 28, 30, { fx: ["block"], charge: 2 }), 20)).toBeLessThan(10);
+    expect(await runUntil(v, v.playTurn("attack", "", "", "strike", 14, 9, 19, 16, { fx: ["signature", "crit", "foe-counter", "foe-crit"] }), 20)).toBeLessThan(12);
+    expect(v.busy).toBe(false);
   });
 });

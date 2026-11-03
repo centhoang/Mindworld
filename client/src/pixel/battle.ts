@@ -2,7 +2,8 @@
 // the lower-left one (back sprite), HP boxes, and the text box that narrates each turn. The fight rules
 // stay in ../sim/battle; this view only plays a turn record as a short script of timed steps.
 
-import type { Action, EnemyAct, Outcome } from "../sim/types";
+import { CHARGE_MAX } from "../sim/battle";
+import { ACTIONS, type Action, type EnemyAct, type Outcome, type TurnFx } from "../sim/types";
 import { drawProp, PAL, TREE } from "./art";
 import { drawDialogue, drawFrame, drawText, GLYPH } from "./text";
 import { MENU_H, MENU_W as CELL_MENU_W } from "../view/mosaic/battle";
@@ -23,6 +24,23 @@ export const COMMANDS = ["fight", "teach", "swap", "run"] as const;
 export type Command = (typeof COMMANDS)[number];
 const CMD_LABEL: Record<Command, string> = { fight: "Fight", teach: "Teach", swap: "Swap", run: "Run" };
 const MENU_W = 144;
+
+// What made a turn special (sim/battle.ts), and whether the trainer called the move.
+export interface TurnExtra {
+  fx?: readonly TurnFx[];
+  charge?: number;
+  shout?: boolean;
+}
+
+// Each pet's charged attack has its own name, from its genes (or its name, for a pet with none).
+const SIGNATURES = ["Star Pounce", "Comet Tackle", "Puff Burst", "Leaf Whirl", "Bubble Slam", "Ember Hop", "Moon Bonk", "Pebble Roll"];
+export function signatureName(side: Pick<Side, "name" | "genes">): string {
+  const genes = Object.values(side.genes ?? {});
+  const k = genes.length ? Math.floor(genes.reduce((a, b) => a + b, 0) * 7.31) : [...side.name].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return SIGNATURES[k % SIGNATURES.length]!;
+}
+const SHOUT_TEXT: Record<Action, string> = { attack: "Go!", guard: "Guard!", flee: "Run!", emote: "Be nice!", befriend: "Make friends!" };
+export const SHOUTS_PER_FIGHT = 2;
 
 interface Step {
   dur: number;
@@ -59,6 +77,10 @@ export class BattleView {
   private foeShield = false;
   private myShield = false;
   private hearts = 0;
+  private charge = 0; // my pet's signature charge, shown as pips
+  private pops: { side: "foe" | "me"; text: string; ink: string; t: number }[] = []; // damage numbers rising
+  private shoutsLeft = 0;
+  private shoutNext: Action | null = null;
   private cmd: { cursor: number; pick: (c: Command) => void } | null = null;
   private cursor = 0;
   onLine: ((text: string, who: "mine" | "foe" | "story") => void) | null = null; // babble hook
@@ -70,6 +92,10 @@ export class BattleView {
     this.myHp = this.myHpShown = mine.maxHp;
     this.foeGone = this.myGone = 0;
     this.foeShield = this.myShield = false;
+    this.charge = 0;
+    this.pops = [];
+    this.shoutsLeft = 0;
+    this.shoutNext = null;
     this.text = "";
     this.tag = "";
     this.push({ dur: 0.7, tick: (p) => (this.intro = ease(p)) });
@@ -155,27 +181,65 @@ export class BattleView {
     return this.run();
   }
 
-  playTurn(action: Action, line: string, tag: string, enemyAct: EnemyAct, dealt: number, taken: number, myHp: number, foeHp: number): Promise<void> {
+  // Trainer shouts: a few per fight, keys 1-5 call the pet's next move over its memo (wild and village fights).
+  allowShouts(n = SHOUTS_PER_FIGHT): void {
+    this.shoutsLeft = n;
+    this.shoutNext = null;
+  }
+  get shouts(): number {
+    return this.shoutsLeft;
+  }
+  shoutKey(k: string): boolean {
+    const a = ACTIONS[Number(k) - 1];
+    if (!a || this.shoutsLeft <= 0 || this.cmd) return false;
+    this.shoutNext = a;
+    return true;
+  }
+  takeShout(): Action | null {
+    const a = this.shoutNext;
+    this.shoutNext = null;
+    if (a) this.shoutsLeft -= 1;
+    return a;
+  }
+
+  playTurn(action: Action, line: string, tag: string, enemyAct: EnemyAct, dealt: number, taken: number, myHp: number, foeHp: number, extra: TurnExtra = {}): Promise<void> {
     const me = this.mine!.name;
     const foe = this.foe!.name;
+    const fx = new Set(extra.fx ?? []);
     this.push({ dur: 0, start: () => { this.myShield = action === "guard"; this.foeShield = enemyAct === "guard"; } });
-    this.sayStep(`${me}: ${MOVE_TEXT[action]}`, tag);
+    if (extra.shout) this.sayStep(`You shout: "${SHOUT_TEXT[action]}"`);
+    this.sayStep(`${me}: ${MOVE_TEXT[action]}`, extra.shout ? "your call" : tag);
     if (line) this.sayStep(`"${line}"`);
     if (action === "attack") {
+      if (fx.has("signature")) this.sayStep(`${me} unleashes ${signatureName(this.mine!).toUpperCase()}!`);
+      else if (fx.has("counter")) this.sayStep(`${me} counters!`);
       this.push({ dur: 0.25, tick: (p) => (this.myDx = Math.sin(p * Math.PI) * 14) });
-      if (dealt) this.hit("foe", () => (this.foeHp = foeHp));
+      if (dealt) {
+        this.hit("foe", () => (this.foeHp = foeHp), fx.has("signature") || fx.has("crit"));
+        this.push({ dur: 0, start: () => this.pop("foe", `-${dealt}`, fx.has("crit") || fx.has("signature") ? PAL.flowerY : PAL.coral) });
+        if (fx.has("crit")) this.sayStep("A critical hit!");
+      }
     } else if (action === "befriend" || action === "emote") {
       this.push({ dur: 0.7, tick: (p) => (this.hearts = p) , done: () => (this.hearts = 0) });
     }
     if (enemyAct === "strike" || enemyAct === "heavy") {
+      if (fx.has("foe-counter")) this.sayStep(`${foe} counters!`);
       this.sayStep(enemyAct === "heavy" ? `${foe} lands a HEAVY hit!` : `${foe} strikes!`);
       this.push({ dur: 0.25, tick: (p) => (this.foeDx = -Math.sin(p * Math.PI) * 14) });
-      if (taken) this.hit("me", () => (this.myHp = myHp), enemyAct === "heavy");
-      else this.sayStep(`${me} shrugs it off.`);
+      if (taken) {
+        this.hit("me", () => (this.myHp = myHp), enemyAct === "heavy" || fx.has("foe-crit"));
+        this.push({ dur: 0, start: () => this.pop("me", `-${taken}`, fx.has("foe-crit") ? PAL.flowerY : PAL.coral) });
+        if (fx.has("foe-crit")) this.sayStep("A critical hit!");
+      } else this.sayStep(`${me} shrugs it off.`);
+      if (fx.has("block")) this.sayStep(extra.charge === CHARGE_MAX ? `${me} blocks it! ${signatureName(this.mine!)} is charged!` : `${me} blocks it!`);
     } else if (enemyAct === "guard") this.sayStep(`${foe} hides behind its guard.`);
     else if (enemyAct === "flee") this.sayStep(`${foe} tries to run!`);
-    this.push({ dur: 0.35, tick: () => { this.foeHp = foeHp; this.myHp = myHp; }, done: () => { this.myShield = this.foeShield = false; } });
+    this.push({ dur: 0.35, tick: () => { this.foeHp = foeHp; this.myHp = myHp; this.charge = extra.charge ?? 0; }, done: () => { this.myShield = this.foeShield = false; } });
     return this.run();
+  }
+
+  private pop(side: "foe" | "me", text: string, ink: string): void {
+    this.pops.push({ side, text, ink, t: 0 });
   }
 
   end(outcome: Outcome, how: string): Promise<void> {
@@ -247,6 +311,8 @@ export class BattleView {
     const k = Math.min(1, dt * 6);
     this.foeHpShown += (this.foeHp - this.foeHpShown) * k;
     this.myHpShown += (this.myHp - this.myHpShown) * k;
+    for (const p of this.pops) p.t += dt;
+    this.pops = this.pops.filter((p) => p.t < 1);
     let budget = dt;
     while (budget > 0 && this.script.length) {
       const s = this.script[0]!;
@@ -314,6 +380,12 @@ export class BattleView {
       if (this.myShield) shield(g, x + s.width / 2, y + s.height / 2, s.width * 0.6);
       if (this.hearts > 0) hearts(g, x + s.width / 2, y, this.hearts);
       hpBox(g, sw - 154, 108, 146, this.mine, this.myHpShown, true);
+      chargePips(g, sw - 146, 136, this.charge);
+    }
+    for (const p of this.pops) {
+      const base = p.side === "foe" ? foeBase : myBase;
+      const w = p.text.length * GLYPH;
+      drawText(g, p.text, base.x - Math.round(w / 2), base.y - 56 - Math.round(p.t * 18), p.ink);
     }
     g.restore();
     const face = this.mine?.portrait;
@@ -340,6 +412,14 @@ export class BattleView {
         drawText(g, this.tag.toUpperCase(), sw - w - 6, sh - 70, PAL.wood);
       }
     }
+  }
+}
+
+// The signature charge under my HP: one pip per blocked hit, all lit = the next attack is the signature move.
+function chargePips(g: CanvasRenderingContext2D, x: number, y: number, charge: number): void {
+  for (let i = 0; i < CHARGE_MAX; i++) {
+    g.fillStyle = i < charge ? PAL.flowerY : PAL.stoneM;
+    g.fillRect(x + i * 6, y, 4, 3);
   }
 }
 
