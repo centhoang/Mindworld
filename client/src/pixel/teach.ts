@@ -94,9 +94,14 @@ export class TeachScreen {
     }
   }
 
-  show(): void {
+  // `lesson`: the coach's review typed in for the player, who teaches it with Enter or changes the words first.
+  show(lesson = ""): void {
     this.open = true;
     this.form.hidden = false;
+    if (lesson) {
+      this.input.value = lesson;
+      this.status = "The coach's lesson is typed in below. Press Enter to teach it, or change the words first.";
+    }
     this.input.focus();
   }
 

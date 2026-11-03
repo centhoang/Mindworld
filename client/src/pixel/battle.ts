@@ -81,7 +81,7 @@ export class BattleView {
   private pops: { side: "foe" | "me"; text: string; ink: string; t: number }[] = []; // damage numbers rising
   private shoutsLeft = 0;
   private shoutNext: Action | null = null;
-  private cmd: { cursor: number; pick: (c: Command) => void } | null = null;
+  private cmd: { cursor: number; labels: readonly string[]; face: boolean; pick: (i: number) => void } | null = null;
   private cursor = 0;
   onLine: ((text: string, who: "mine" | "foe" | "story") => void) | null = null; // babble hook
 
@@ -111,11 +111,21 @@ export class BattleView {
   // One turn: the pet's move, then the foe's, then HP settles.
   // The command menu: resolves with what the player picked (2x2 grid, Fight top-left).
   choose(): Promise<Command> {
-    this.text = `What will ${this.mine!.name} do?`;
+    return this.menu(`What will ${this.mine!.name} do?`, COMMANDS.map((c) => CMD_LABEL[c]), this.cursor, true).then((i) => COMMANDS[(this.cursor = i)]!);
+  }
+
+  // A question with up to 4 answers in the same box (8 letters each); resolves with the answer's index. Esc picks the last.
+  // No portrait beside it, so about 50 letters fit even on a 4:3 screen.
+  ask(text: string, labels: readonly string[]): Promise<number> {
+    return this.menu(text, labels, 0, false);
+  }
+
+  private menu(text: string, labels: readonly string[], cursor: number, face: boolean): Promise<number> {
+    this.text = text;
     this.typed = this.text.length;
     this.tag = "";
     return new Promise((res) => {
-      this.cmd = { cursor: this.cursor, pick: (c) => { this.cursor = this.cmd?.cursor ?? 0; this.cmd = null; res(c); } };
+      this.cmd = { cursor, labels, face, pick: (i) => { this.cmd = null; res(i); } };
     });
   }
 
@@ -126,10 +136,10 @@ export class BattleView {
   cmdKey(k: string): void {
     const c = this.cmd;
     if (!c) return;
-    if (k === "arrowleft" || k === "a" || k === "arrowright" || k === "d") c.cursor ^= 1;
-    if (k === "arrowup" || k === "w" || k === "arrowdown" || k === "s") c.cursor ^= 2;
-    if (k === "enter" || k === " " || k === "z") c.pick(COMMANDS[c.cursor]!);
-    if (k === "x" || k === "escape") c.cursor = 3;
+    const flip = k === "arrowleft" || k === "a" || k === "arrowright" || k === "d" ? 1 : k === "arrowup" || k === "w" || k === "arrowdown" || k === "s" ? 2 : 0;
+    if (flip && (c.cursor ^ flip) < c.labels.length) c.cursor ^= flip;
+    if (k === "enter" || k === " " || k === "z") c.pick(c.cursor);
+    if (k === "x" || k === "escape") c.cursor = c.labels.length - 1;
   }
 
   // Pointer pick in low-res screen coords; true when it hit a command.
@@ -139,9 +149,7 @@ export class BattleView {
     const mx = sw - MENU_W - 8;
     const my = sh - 56;
     if (x < mx || y < my || x > mx + MENU_W || y > my + 48) return false;
-    c.cursor = (x > mx + MENU_W / 2 ? 1 : 0) + (y > my + 24 ? 2 : 0);
-    c.pick(COMMANDS[c.cursor]!);
-    return true;
+    return this.pickAt((x > mx + MENU_W / 2 ? 1 : 0) + (y > my + 24 ? 2 : 0));
   }
 
   // The same pick on the cell menu (view/mosaic/battle.ts), in low-res pixels.
@@ -151,8 +159,14 @@ export class BattleView {
     const [col, row, cols, rows] = [Math.floor(x / 8), Math.floor(y / 8), Math.ceil(sw / 8), Math.ceil(sh / 8)];
     const left = cols - CELL_MENU_W - 2, top = rows - MENU_H - 7;
     if (col < left || col >= left + CELL_MENU_W || row <= top || row >= top + MENU_H - 1) return false;
-    c.cursor = (col >= left + 14 ? 1 : 0) + (row > top + 1 ? 2 : 0);
-    c.pick(COMMANDS[c.cursor]!);
+    return this.pickAt((col >= left + 14 ? 1 : 0) + (row > top + 1 ? 2 : 0));
+  }
+
+  private pickAt(i: number): boolean {
+    const c = this.cmd!;
+    if (i >= c.labels.length) return true; // an empty cell: inside the box, so no skip either
+    c.cursor = i;
+    c.pick(i);
     return true;
   }
 
@@ -169,7 +183,7 @@ export class BattleView {
       text,
       lines: (w) => wrap(text, w),
       tag: this.typed >= this.text.length ? this.tag.toUpperCase() : "",
-      menu: this.cmd && { labels: COMMANDS.map((c) => CMD_LABEL[c]), cursor: this.cmd.cursor },
+      menu: this.cmd && { labels: this.cmd.labels, cursor: this.cmd.cursor },
     };
   }
 
@@ -392,11 +406,11 @@ export class BattleView {
     g.restore();
     const face = this.mine?.portrait;
     if (this.cmd) {
-      drawDialogue(g, sw, sh, this.text, undefined, face, sw - 16 - MENU_W - 8);
+      drawDialogue(g, sw, sh, this.text, undefined, this.cmd.face ? face : undefined, sw - 16 - MENU_W - 8);
       const mx = sw - MENU_W - 8;
       const my = sh - 56;
       drawFrame(g, mx, my, MENU_W, 48);
-      COMMANDS.forEach((c, i) => {
+      this.cmd.labels.forEach((label, i) => {
         const cx = mx + 10 + (i % 2) * 66;
         const cy = my + 11 + Math.floor(i / 2) * 18;
         if (i === this.cmd!.cursor) {
@@ -404,7 +418,7 @@ export class BattleView {
           g.fillRect(cx - 5, cy - 4, 62, 15);
           if (Math.floor(t * 3) % 3 !== 2) drawText(g, ">", cx - 3, cy, PAL.ink);
         }
-        drawText(g, CMD_LABEL[c].toUpperCase(), cx + 5, cy);
+        drawText(g, label.toUpperCase(), cx + 5, cy);
       });
     } else if (this.text) {
       drawDialogue(g, sw, sh, this.text.slice(0, this.typed), undefined, face);

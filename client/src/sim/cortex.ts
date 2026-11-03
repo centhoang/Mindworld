@@ -290,6 +290,7 @@ const R = {
   befriendHurt: { if: [{ k: "enemyHp", op: "<", n: 40 }], do: "befriend", why: "hurt enemies are easy to befriend, ending the fight safely" } as Rule,
   palBefriend: { if: [{ k: "enemy", is: "pal" }, { k: "last", is: "emote" }], do: "befriend", why: "a calmed pal can be befriended" } as Rule,
   palEmote: { if: [{ k: "enemy", is: "pal" }], do: "emote", why: "pals calm down when you act cute" } as Rule,
+  counter: { if: [{ k: "last", is: "guard" }], do: "attack", why: "a hit right after a block counters for 1.5x" } as Rule,
 };
 
 export class ScriptedCortex implements Cortex {
@@ -312,6 +313,7 @@ export class ScriptedCortex implements Cortex {
     if (/friend|befriend|hurt|weak|scared|spare/.test(t)) fresh.push(why(R.befriendHurt));
     if (/calm|emote|cute|guarding|turtle/.test(t)) fresh.push(why(R.emoteGuard));
     if (/\bpal\b|friendly/.test(t)) fresh.push(why(R.palBefriend), why(R.palEmote));
+    if (/counter|hit back|strike back|after (?:it |you |your pet )?(?:guards?|blocks?)/.test(t)) fresh.push(why(R.counter));
     if (/flee|run away|retreat/.test(t)) fresh.push(why({ if: [{ k: "myHp", op: "<", n: 25 }], do: "flee", why: "" }));
     return this.result(addRules(memo, fresh, fresh.length ? `Taught: "${instruction.slice(0, 60)}".` : ""), "teach");
   }

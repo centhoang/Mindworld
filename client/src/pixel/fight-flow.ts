@@ -10,8 +10,9 @@ import { MAX_TAMED, save, type Save } from "../game/save";
 import { addCoins, coinsFor } from "../game/shop";
 import { Battle } from "../sim/battle";
 import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
-import { ENEMIES } from "../sim/enemies";
+import { ENEMIES, type EnemyDef } from "../sim/enemies";
 import { GHOST_ARCHETYPE, ghostPet, type Genes } from "../sim/ghost";
+import { coachReview } from "../sim/review";
 import { duelEnd, rehearse, rivalDef, rivalLabel, rivalOf, whyLost, type DuelEnd, type RivalOwner } from "../sim/rivals";
 import { withTactics, type WildMemos } from "../sim/tactics";
 import type { DEFAULT_PET, Intent, Outcome, Replay } from "../sim/types";
@@ -151,10 +152,14 @@ export function makeFightFlow(d: FightDeps) {
         msg = `${state.party.at(-1)!.name} the ${w.arch} is yours now! It waits at your corner. ${msg}`;
       }
       await battleView.say(msg);
+      await review(replay, foeName, () => withTactics(ENEMIES[arch], d.wildMemos()[arch]));
       world.removeWild(w.id);
       const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
       if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
-    } else d.coolFoe(w); // give the player time to walk away
+    } else {
+      await review(replay, foeName, () => withTactics(ENEMIES[arch], d.wildMemos()[arch]));
+      d.coolFoe(w); // give the player time to walk away
+    }
     state.recent = [...state.recent, replay].slice(-8);
     // A win with a taught memo shares its rules: the Worker's cron has Muse Spark re-teach wild pets from them.
     if (replay.outcome === "win" && state.memo.rules.length > 0 && state.shared !== d.memoKey()) {
@@ -169,6 +174,20 @@ export function makeFightFlow(d: FightDeps) {
     save(state);
     d.setMode("world");
   }
+  // The coach's review after a fight (sim/review.ts): what went wrong and the one lesson that wins more practice fights
+  // against this foe. "Teach it" opens Teach with the lesson typed in. With no lesson to give, `fallback` is said.
+  async function review(replay: Replay, foe: string, def: () => EnemyDef, fallback = ""): Promise<void> {
+    const r = coachReview(replay, state.memo, { pet: d.activeMember().name, foe, def });
+    if (!r) return void (fallback && (await battleView.say(fallback)));
+    if (r.seen) await battleView.say(`Coach: ${r.seen}`);
+    const pct = (x: number) => `${Math.round(100 * x)}%`;
+    await battleView.say(`Coach: one lesson wins ${pct(r.after)} of practice fights against ${foe}, not ${pct(r.before)}:`);
+    if ((await battleView.ask(r.lesson, ["Teach it", "Done"])) !== 0) return;
+    d.keys.clear();
+    teach.show(r.lesson);
+    while (teach.open) await new Promise((res) => setTimeout(res, 100));
+  }
+
   // A villager's pet. While the villager studies the player's memo (the cloud plan, if any, arrives meanwhile), the
   // battle screen is up; then it spars its plans in its head (sim/rivals.ts rehearse) and says which one it took.
   // Returns how it ended for the player, or null if they ran.
@@ -205,8 +224,8 @@ export function makeFightFlow(d: FightDeps) {
     if (end === "loss" || end === "draw") {
       const w = whyLost(replay, log, rv, state.memo);
       await battleView.say(w.why);
-      await battleView.say(w.tip);
-    }
+      await review(replay, base.name, () => rivalDef(rv, pet, []), w.tip);
+    } else await review(replay, base.name, () => rivalDef(rv, pet, []));
     if (end === "win") world.cheerPet();
     state.recent = [...state.recent, replay].slice(-8);
     state.steps = { ...state.steps, fought: true };
