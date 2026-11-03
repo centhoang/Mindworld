@@ -4,15 +4,17 @@ import { shareGhost } from "../game/ghost-api";
 import type { Speaker } from "../game/chatter";
 import type { Instinct } from "../game/instinct";
 import { addToParty } from "../game/party";
+import type { CloudPlan } from "../game/rival-api";
 import type { FightWorld, Transport } from "../game/ports";
 import { MAX_TAMED, save, type Save } from "../game/save";
 import { addCoins, coinsFor } from "../game/shop";
 import { Battle } from "../sim/battle";
 import { duelCoins, duelView, type DuelResult, type Fighter } from "../sim/duel";
 import { ENEMIES } from "../sim/enemies";
-import type { Genes } from "../sim/ghost";
+import { GHOST_ARCHETYPE, ghostPet, type Genes } from "../sim/ghost";
+import { duelEnd, rehearse, rivalDef, rivalLabel, rivalOf, whyLost, type DuelEnd, type RivalOwner } from "../sim/rivals";
 import { withTactics, type WildMemos } from "../sim/tactics";
-import type { DEFAULT_PET, Intent, Outcome } from "../sim/types";
+import type { DEFAULT_PET, Intent, Outcome, Replay } from "../sim/types";
 import type { BattleView, Side } from "./battle";
 import { BUILDS, drawMonster } from "./monster";
 import type { Wild } from "./overworld";
@@ -53,7 +55,7 @@ export interface FightDeps {
 
 export function makeFightFlow(d: FightDeps) {
   const { world, state, pet, battleView, teach, instinct } = d;
-  const DUEL_END: Record<DuelResult, [Outcome, string]> = { win: ["win", "ko"], loss: ["loss", "ko"], draw: ["timeout", ""], friends: ["win", "befriended"] };
+  const DUEL_END: Record<DuelResult, [Outcome, string]> = { win: ["win", "ko"], loss: ["loss", "ko"], draw: ["timeout", ""], friends: ["win", "friends"] };
   async function duel(seed: number, a: Fighter, b: Fighter): Promise<void> {
     const me = d.live().myId === a.id ? "a" : d.live().myId === b.id ? "b" : null;
     if (!me || d.mode() !== "world") return; // not ours, or busy (the other side still sees the whole duel)
@@ -76,17 +78,9 @@ export function makeFightFlow(d: FightDeps) {
     d.setMode("world");
   }
 
-  async function fight(w: Wild): Promise<void> {
-    d.setMode("battle");
-    d.keys.clear();
-    const arch = w.arch;
-    d.setFoeVoice(arch);
-    const def = withTactics(ENEMIES[arch], d.wildMemos()[arch]);
-    const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def });
-    const foeName = arch[0]!.toUpperCase() + arch.slice(1);
-    const foeSprite = drawMonster(petLook(w.genes), 64, "front", BUILDS[arch]);
-    await battleView.open({ name: foeName, sprite: foeSprite, genes: w.genes, maxHp: def.maxHp, level: 2 + (w.id % 3) }, d.side(d.activeMember()));
-    // Fight = watch the pet play its memo; Teach = change the memo first; Swap = next party member; Run = leave.
+  // One fight on the battle screen, a wild pet or a villager's: Fight = watch the pet play its memo; Teach = change
+  // the memo first; Swap = next party member; Run = leave (null).
+  async function play(battle: Battle, foeName: string): Promise<Replay | null> {
     for (;;) {
       const c = await battleView.choose();
       if (c === "fight") break;
@@ -103,12 +97,7 @@ export function makeFightFlow(d: FightDeps) {
           d.refreshParty();
           await battleView.swapMine(d.side(d.activeMember()));
         }
-      } else {
-        await battleView.say("You slip away safely.");
-        d.coolFoe(w);
-        d.setMode("world");
-        return;
-      }
+      } else return null;
     }
     // The pet's brain: a firing memo rule decides at once; otherwise a local Llama (if loaded) picks among
     // the moves the memo allows and gives the line, with the reflex as fallback. The next pick is prefetched
@@ -127,7 +116,26 @@ export function makeFightFlow(d: FightDeps) {
       if (!battle.done) next = instinct.decide(name, state.memo, battle.observe());
       await battleView.playTurn(rec.action, shout ? "" : choice.line, tag, rec.enemyAct, rec.dealt, rec.taken, rec.myHp, rec.enemyHp, rec);
     }
-    const replay = battle.replay();
+    return battle.replay();
+  }
+
+  async function fight(w: Wild): Promise<void> {
+    d.setMode("battle");
+    d.keys.clear();
+    const arch = w.arch;
+    d.setFoeVoice(arch);
+    const def = withTactics(ENEMIES[arch], d.wildMemos()[arch]);
+    const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def });
+    const foeName = arch[0]!.toUpperCase() + arch.slice(1);
+    const foeSprite = drawMonster(petLook(w.genes), 64, "front", BUILDS[arch]);
+    await battleView.open({ name: foeName, sprite: foeSprite, genes: w.genes, maxHp: def.maxHp, level: 2 + (w.id % 3) }, d.side(d.activeMember()));
+    const replay = await play(battle, foeName);
+    if (!replay) {
+      await battleView.say("You slip away safely.");
+      d.coolFoe(w);
+      d.setMode("world");
+      return;
+    }
     await battleView.end(replay.outcome, replay.how);
     if (replay.outcome === "win") {
       world.cheerPet();
@@ -160,5 +168,50 @@ export function makeFightFlow(d: FightDeps) {
     save(state);
     d.setMode("world");
   }
-  return { fight, duel };
+  // A villager's pet. While the villager studies the player's memo (the cloud plan, if any, arrives meanwhile), the
+  // battle screen is up; then it spars its plans in its head (sim/rivals.ts rehearse) and says which one it took.
+  // Returns how it ended for the player, or null if they ran.
+  async function rival(owner: RivalOwner, plan: Promise<CloudPlan>): Promise<DuelEnd | null> {
+    if (d.mode() !== "world") return null;
+    d.setMode("battle");
+    d.keys.clear();
+    d.setFoeVoice(owner);
+    const base = rivalOf(owner);
+    const label = rivalLabel(base);
+    const spec = ghostPet(base.genes, base.name);
+    await battleView.open({ name: label, sprite: drawMonster(petLook(base.genes), 64, "front"), genes: base.genes, maxHp: spec.maxHp, level: 3 }, d.side(d.activeMember()), `${base.ownerName} sends out ${base.name}!`);
+    await battleView.say(`${base.ownerName} studies how your pet fights...`);
+    const cloud = await plan;
+    const study = rehearse(base, state.memo, cloud.rules);
+    const rv = { ...base, memo: study.memo };
+    const said = study.from === "own" ? `${base.name}, just be yourself!` : study.from === "cloud" && cloud.summary ? cloud.summary : `${base.name}, ${study.plan[0]!.why}!`;
+    await battleView.say(`${base.ownerName}: "${said}"`, study.from === "cloud" ? "Muse Spark" : "");
+    const log: number[] = [];
+    const battle = new Battle({ enemy: GHOST_ARCHETYPE, seed: Math.floor(Math.random() * 1e9), enemyDef: rivalDef(rv, pet, log) });
+    const replay = await play(battle, base.name);
+    if (!replay) {
+      await battleView.say(`${base.ownerName}: "Another time, then."`);
+      d.setMode("world");
+      return null;
+    }
+    const end = duelEnd(replay);
+    await battleView.end(replay.outcome, replay.how === "befriended" ? "friends" : replay.how);
+    const earned = duelCoins(end);
+    if (earned) {
+      state.coins = addCoins(state.coins ?? 0, earned);
+      await battleView.say(`+${earned} coins.`);
+    }
+    if (end === "loss" || end === "draw") {
+      const w = whyLost(replay, log, rv);
+      await battleView.say(w.why);
+      await battleView.say(w.tip);
+    }
+    if (end === "win") world.cheerPet();
+    state.recent = [...state.recent, replay].slice(-8);
+    state.steps = { ...state.steps, fought: true };
+    save(state);
+    d.setMode("world");
+    return end;
+  }
+  return { fight, duel, rival };
 }

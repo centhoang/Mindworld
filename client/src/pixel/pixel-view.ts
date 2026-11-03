@@ -15,6 +15,13 @@ import { humanSprites, newHumanMotion, NPC_LOOKS } from "./humans";
 import { drawInspector } from "./inspector";
 import { drawBall, drawPetPose, drawPoop, drawTint } from "./life-draw";
 import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_ART, OVERWORLD_MON, type Overworld } from "./overworld";
+import { drawMonster } from "./monster";
+import { petLook } from "../game/genes";
+import { rivalOf, type RivalOwner } from "../sim/rivals";
+
+// Each villager's pet looks like itself (the same genes as on the battle screen).
+const villagerPets = new Map<RivalOwner, HTMLCanvasElement>();
+const villagerPet = (id: RivalOwner) => villagerPets.get(id) ?? villagerPets.set(id, drawMonster(petLook(rivalOf(id).genes), OVERWORLD_MON, "front")).get(id)!;
 import { characterShadow, drawCropArt, drawLand, drawRail, drawSea, drawTree, footRuns, stampSize, stand, standRun, strip } from "./sunny";
 import { tile } from "./sunny-terrain";
 
@@ -244,10 +251,7 @@ export class PixelView implements View {
       if (!o.npcs?.hasPet[id]) continue;
       const [nx, ny] = toScreen(pos.x, pos.z);
       if (nx < -24 || ny < -24 || nx > sw + 24 || ny > sh + 24) continue;
-      items.push({ z: pos.z, draw: () => {
-        const image = o.npcPetImages.get("/art/gen/wild/forest-sprig-16-front-idle.png");
-        if (image) g.drawImage(image, nx - 8, ny - 14 - hop);
-      } });
+      items.push({ z: pos.z, draw: () => g.drawImage(villagerPet(id), nx - half, ny - OVERWORLD_MON + 2 - hop) });
     }
     for (const w of o.wilds) {
       const [wx, wy] = toScreen(w.pos.x, w.pos.z);

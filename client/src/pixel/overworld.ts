@@ -37,7 +37,6 @@ import type { Rect } from "../view/bubbles";
 import { isNpc, type MindLine, type Npc } from "../world/live";
 import { NpcVillage } from "../mind/npcs";
 import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
-import { SpriteImages } from "./generated-sprites";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
 const LANDMARK_PROP: Record<string, string> = { spr_deco_well: "well" };
@@ -112,7 +111,6 @@ export class Overworld {
   readonly playerMotion = newHumanMotion(this.player);
   readonly npcMotions = new Map<Npc, HumanMotion>();
   readonly npcPets = new Map<Npc, Vec>();
-  readonly npcPetImages = new SpriteImages();
   private place = "";
   private bannerT = 0;
   private sprite: Sprite | null = null;

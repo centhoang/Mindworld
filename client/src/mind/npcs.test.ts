@@ -399,7 +399,7 @@ describe("NpcVillage talks to pets", () => {
       run(nv, 0.25);
       expect(nv.purseOf("pip").goals).toBe(1);
       expect(nv.hasPet.pip).toBe(true);
-      expect(nv.hasPet.mo).toBe(false);
+      expect(nv.hasPet.mo).toBe(true); // Elder, Mo and Ama own theirs from day 1
     });
 
     it("shows Pip's pet when a non-host hears the purchase", () => {
@@ -568,5 +568,56 @@ describe("a player's own offer", () => {
     expect(r?.source).toBe("rules");
     expect(r?.text).toMatch(/danc/i);
     expect(nv.hub.minds.get("pip")!.mem.promises.map((c) => c.act)).toEqual(["dance"]);
+  });
+});
+
+describe("villager duels", () => {
+  const at = (phase: string): number => {
+    for (let t = 0; t < DAY_SECONDS; t += 60) if (gameTime(t).phase === phase) return t;
+    throw new Error(phase);
+  };
+
+  it("a villager with a pet takes a duel; Pip has none yet; nobody duels at night", async () => {
+    const { nv } = make();
+    nv.v.t = at("noon");
+    expect(await nv.reply("mo", "Kai", "Wanna duel?")).toMatchObject({ duel: "mo", source: "rules" });
+    const pip = await nv.reply("pip", "Kai", "Let's battle!");
+    expect(pip?.duel).toBeUndefined();
+    expect(pip?.text).toMatch(/don't have a pet/);
+    nv.v.t = at("night");
+    const late = await nv.reply("ama", "Kai", "duel?");
+    expect(late?.duel).toBeUndefined();
+    expect(late?.text).toMatch(/asleep/);
+  });
+
+  it("a villager's own challenge waits for the player's yes or no", async () => {
+    const { nv } = make();
+    nv.v.t = at("noon");
+    nv.noteOffer("elder", nv.hub.minds.get("elder")!, "Kai", "Kai, wanna duel? Sage is restless.");
+    expect(await nv.reply("elder", "Kai", "sure")).toMatchObject({ duel: "elder" });
+    nv.noteOffer("mo", nv.hub.minds.get("mo")!, "Kai", "Fancy a duel?");
+    const no = await nv.reply("mo", "Kai", "no thanks");
+    expect(no?.duel).toBeUndefined();
+    expect(no?.text).toMatch(/Another day/);
+  });
+
+  it("after a duel the villager says so, remembers it, respects a winner, and the village hears", () => {
+    const { nv, bubbles } = make();
+    nv.v.t = at("noon");
+    nv.duelDone("mo", "Kai", "win");
+    const mo = nv.hub.minds.get("mo")!.mem;
+    expect(mo.bonds.Kai!.respect).toBeGreaterThan(0);
+    expect(mo.log.at(-1)!.text).toMatch(/Kai's pet beat my Ripple/);
+    expect(nv.hub.minds.get("ama")!.mem.beliefs.some((b) => b.about === "Kai" && /beat Mo's Ripple/.test(b.text))).toBe(true);
+    expect(bubbles.at(-1)![1]).toMatch(/Well fought/);
+  });
+
+  it("a pet that dueled three times today needs a rest", async () => {
+    const { nv } = make();
+    nv.v.t = at("noon");
+    for (let i = 0; i < 3; i++) nv.duelDone("ama", "Kai", "loss");
+    const r = await nv.reply("ama", "Kai", "Want to battle?");
+    expect(r?.duel).toBeUndefined();
+    expect(r?.text).toMatch(/fought enough/);
   });
 });

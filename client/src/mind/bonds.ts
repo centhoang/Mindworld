@@ -5,7 +5,7 @@
 import type { MindMemory } from "./memory";
 import type { Persona } from "./persona";
 
-export type Beat = "kept" | "broken" | "kind" | "rude" | "invited" | "gossip" | "sorry" | "gift";
+export type Beat = "kept" | "broken" | "kind" | "rude" | "invited" | "gossip" | "sorry" | "gift" | "outfought" | "sparred";
 
 export interface Reason {
   day: number;
@@ -41,6 +41,8 @@ const BEATS: Record<Beat, { fondness: number; trust: number; respect: number }> 
   gossip: { fondness: -4, trust: -8, respect: -2 },
   sorry: { fondness: 4, trust: 12, respect: 0 },
   gift: { fondness: 6, trust: 2, respect: 0 },
+  outfought: { fondness: 2, trust: 0, respect: 8 }, // their pet beat mine in a duel
+  sparred: { fondness: 4, trust: 0, respect: 2 }, // a duel I won, a draw, or the pets made friends
 };
 
 const clamp = (n: number): number => Math.max(-100, Math.min(100, Math.round(n)));

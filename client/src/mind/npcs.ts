@@ -24,6 +24,7 @@ import { answerTo, cleanReply, goodOfferedIn, offerIn } from "./offers";
 import { JOB_PULL, refuseLine, refusesChat, refusesDeal, shiftChoice, type Duty } from "./jobs";
 import { addCommitment, answerLine, type Invite, decidePrompt, dueNow, extractPrompt, extractRules, inviteScore, missed, outcomeAffinity, outcomeMemory, parseDecision, parseExtract, parsePromiseLine, promiseLine, ruleDecision, settle, type Commitment } from "./promises";
 import { bump, pairKey } from "../life/relations";
+import { acceptLine, afterLine, challengeLine, duelAsked, duelMemory, duelRefusal, DUELS_A_DAY, refusalLine, rivalOf, type DuelEnd } from "../sim/rivals";
 import { PRIO, type MindScheduler } from "./scheduler";
 
 export interface NpcOut {
@@ -59,6 +60,8 @@ const FARM_PULL = 0.5; // a villager short of coins or with a crop in the ground
 const FARM_COINS = 30;
 const OFFER_TURNS = 4; // player lines an unanswered offer stays open
 const QUIET_LINES = 4; // model lines after an invitation before the next one
+const DUEL_PITCH = 0.35; // how often a bored villager with a pet asks a passing player for a duel
+const DUEL_FUN = 50; // below this fun need, a villager feels like a duel
 const INVITE_HINT = /\b(party|birthday|danc|soccer|football|fish|picnic|lunch)/i; // only these lines cost a model call
 
 // A pet the NPCs can see (mine, at home or following me, or an online player's). `busy` = walking or doing
@@ -88,7 +91,7 @@ export type Deal = { ok: true } | { ok: false; npc: Npc; refused: boolean; text:
 
 export class NpcVillage {
   readonly v = newVillage();
-  readonly hasPet: Record<Npc, boolean> = { elder: false, mo: false, ama: false, pip: false };
+  readonly hasPet: Record<Npc, boolean> = { elder: true, mo: true, ama: true, pip: false }; // Pip's comes with his goal
   readonly env: Env;
   readonly hub: MindHub; // holds only the minds I host
   private readonly hosts = new Map<Npc, string | null>();
@@ -121,6 +124,9 @@ export class NpcVillage {
   private readonly lastSaid = new Map<string, string>(); // "npc:player" -> their previous line
   private readonly quiet = new Map<string, number>(); // "npc:player" -> model lines before it may invite again
   private readonly noThanks = new Map<string, number>(); // "npc:player:act" -> the day they said no: not asked again that day
+  private readonly duelAsks = new Map<string, number>(); // "npc:player" -> lines since the villager asked for a duel
+  private readonly duels = new Map<string, number>(); // "npc:day" -> duels its pet fought that day
+  private readonly dueled = new Map<string, number>(); // "npc:player" -> the day they last dueled (or were asked)
 
   constructor(
     private readonly sched: MindScheduler,
@@ -436,12 +442,14 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
   // remembers the chat, which reaches the room as a memory line. Otherwise null: the caller asks the cloud.
   // `to` = the asker's live id when the question came through the room (their game shows the answer).
   // `scene` = what the asker and the NPC both see on the asker's screen (relayed questions bring theirs).
-  async reply(npc: Npc, player: string, line: string, to?: string, scene?: string): Promise<{ text: string; source: string } | null> {
+  async reply(npc: Npc, player: string, line: string, to?: string, scene?: string): Promise<{ text: string; source: string; duel?: Npc } | null> {
     const m = this.hub.minds.get(npc);
     this.hold(npc);
     const g0 = gameTime(this.v.t);
     this.listen(npc, personaOf(npc)!, this.memOf(npc), player, line, g0.day);
     for (const p of this.people()) if (p.name === player) this.greeted.set(`${npc}:${p.id}`, this.v.t); // mid-talk, no greeting cuts in
+    const duel = this.duelTalk(npc, player, line, to);
+    if (duel) return duel;
     if (!m || !this.hosting(npc)) return null;
     const key = `${npc}:${player}`;
     const person = VILLAGERS.find((p) => p.name === this.topics.get(npc));
@@ -838,12 +846,81 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
       this.said(npc, `${guest.name}, I am saving for ${goal.what}. ${price} coins for my ${stock}?`, guest.name);
       return true;
     }
+    if (this.challenge(npc, m, guest.name)) return true;
     const act = PITCH_ACTS.find((a) => traitBias(m.persona, a) > 0 && this.env.spots[ACTIVITY.get(a)!.place]?.length);
     if (!act || g.phase === "evening" || g.phase === "night" || dueNow(m.mem.promises, g.day, "evening").length || this.noThanks.get(`${npc}:${guest.name}:${act}`) === g.day) return false;
     this.open(npc, guest.name, { act, occasion: "", day: g.day, phase: "evening" });
     m.mem.why = `feel like ${act} > ${guest.name} is around > asked them along`;
     this.said(npc, `${guest.name}, ${act} this evening? Say yes if you are in.`, guest.name);
     return true;
+  }
+
+  // Duels: the player asks, or answers the villager's own challenge. Settled on the asker's machine whoever hosts the
+  // villager's mind, since the fight plays on the asker's screen. A yes returns `duel`, so the chat starts the fight.
+  private duelTalk(npc: Npc, player: string, line: string, to?: string): { text: string; source: string; duel?: Npc } | null {
+    if (to) return null; // relayed from another player's game: theirs settles it
+    const key = `${npc}:${player}`;
+    const answer = this.duelAsks.has(key) ? answerTo(line) : null;
+    if (!answer && !duelAsked(line)) return null;
+    this.duelAsks.delete(key);
+    const rv = rivalOf(npc);
+    const g = gameTime(this.v.t);
+    const m = this.hosting(npc) ? this.hub.minds.get(npc) : undefined;
+    const done = (text: string, duel?: Npc) => {
+      this.onChat?.({ npc, player, line, reply: text, source: "rules" });
+      return { text, source: "rules", ...(duel ? { duel } : {}) };
+    };
+    if (answer === "no" || answer === "later") {
+      if (m) remember(m.mem, g.day, clockLabel(g.hour), `${player} did not want to duel ${answer === "no" ? "today" : "yet"}`);
+      return done(answer === "no" ? `Alright, ${player}. Another day.` : `Sure. Just say when, ${player}.`);
+    }
+    const a = this.v.agents.find((x) => x.id === npc);
+    const working = !!a && a.state === "do" && !!a.act && a.act === personaOf(npc)?.job?.act;
+    const no = duelRefusal({ hasPet: this.hasPet[npc], night: g.phase === "night", working, grudge: holdsGrudge(bondOf(this.memOf(npc), player)), today: this.duels.get(`${npc}:${g.day}`) ?? 0 });
+    if (m) {
+      remember(m.mem, g.day, clockLabel(g.hour), `${player} wanted a duel. I said ${no ? "no" : "yes"}`);
+      m.mem.why = no ? `${player} asked for a duel > ${no} > said no` : `${player} asked for a duel > ${rv.name} is ready > said yes`;
+    }
+    if (no) return done(refusalLine(no, rv, player));
+    this.hold(npc);
+    if (a?.state === "idle") a.idle = Math.max(a.idle, 60); // waits for the duel to end
+    this.dueled.set(key, g.day);
+    return done(acceptLine(rv), npc);
+  }
+
+  // A bored villager with a pet asks a passing player on fair terms for a duel, once a day each.
+  private challenge(npc: Npc, m: Mind, player: string): boolean {
+    const a = this.v.agents.find((x) => x.id === npc);
+    const g = gameTime(this.v.t);
+    if (!a || !this.hasPet[npc] || g.phase === "night" || a.needs.fun >= DUEL_FUN || this.env.rng() >= DUEL_PITCH) return false;
+    if ((this.duels.get(`${npc}:${g.day}`) ?? 0) >= DUELS_A_DAY || this.dueled.get(`${npc}:${player}`) === g.day) return false;
+    const rematch = this.dueled.has(`${npc}:${player}`);
+    this.dueled.set(`${npc}:${player}`, g.day);
+    this.duelAsks.set(`${npc}:${player}`, 0);
+    m.mem.why = `bored > ${player} is around > asked for a duel`;
+    this.said(npc, challengeLine(rivalOf(npc), player, rematch), player);
+    return true;
+  }
+
+  // A duel with this villager's pet ended on my screen. The villager says so and remembers it; the village hears.
+  duelDone(npc: Npc, player: string, end: DuelEnd): void {
+    const g = gameTime(this.v.t);
+    this.duels.set(`${npc}:${g.day}`, (this.duels.get(`${npc}:${g.day}`) ?? 0) + 1);
+    const rv = rivalOf(npc);
+    this.said(npc, afterLine(end, rv, player), player);
+    const a = this.v.agents.find((x) => x.id === npc);
+    if (a?.state === "idle") a.idle = Math.min(a.idle, 2);
+    const m = this.hub.minds.get(npc);
+    if (!m || !this.hosting(npc)) return;
+    if (a) a.needs.fun = Math.min(100, a.needs.fun + 30);
+    const text = duelMemory(end, rv, player);
+    remember(m.mem, g.day, clockLabel(g.hour), text, 6);
+    if (end === "win") addFact(m.mem, text);
+    bump(this.v.rel, npc, player, feel(m.mem, m.persona, player, end === "win" ? "outfought" : "sparred", g.day, text));
+    m.mem.why = `${text} > ${end === "win" ? "respect" : "fun with"} ${player}`;
+    // News travels: every other mind here now holds it about the player, told by this villager.
+    const news = end === "win" ? `beat ${rv.ownerName}'s ${rv.name} in a duel` : end === "loss" ? `lost a duel to ${rv.ownerName}'s ${rv.name}` : `dueled ${rv.ownerName}'s ${rv.name}`;
+    for (const o of this.hub.minds.values()) if (o !== m) addBelief(o.mem, { about: player, text: news, source: m.persona.name, conf: 0.8, day: g.day });
   }
 
   // The villager has just asked something: the answer belongs to that, and "where?" means that place.
@@ -858,6 +935,7 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
   // A line this villager said to a player, in its own words: did it ask them to something?
   noteOffer(npc: Npc, m: Mind, player: string, line: string): void {
     const g = gameTime(this.v.t);
+    if (this.hasPet[npc] && duelAsked(line)) this.duelAsks.set(`${npc}:${player}`, 0);
     const invite = offerIn(line, g.day, g.phase);
     if (invite) {
       if (this.noThanks.get(`${npc}:${player}:${invite.act}`) !== g.day) this.open(npc, player, invite);
@@ -874,6 +952,9 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
   private ageOffer(npc: Npc, player: string): void {
     const a = this.asked.get(`${npc}:${player}`);
     if (a && ++a.turns >= OFFER_TURNS) this.asked.delete(`${npc}:${player}`);
+    const d = this.duelAsks.get(`${npc}:${player}`);
+    if (d !== undefined && d + 1 >= OFFER_TURNS) this.duelAsks.delete(`${npc}:${player}`);
+    else if (d !== undefined) this.duelAsks.set(`${npc}:${player}`, d + 1);
   }
 
   // The player answered what the villager asked. A yes makes it a promise like any other; a no ends it for today.

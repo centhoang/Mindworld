@@ -24,6 +24,7 @@ export interface ChatDeps extends AnswerDeps {
   keys: Set<string>;
   babbler: Babbler;
   renamed: () => void;
+  rival?: (npc: Npc) => void; // a villager said yes to a duel: start it
 }
 
 // Who answers a villager, in tiers: the sim when one answer is true; free talk from Muse Spark with the villager's
@@ -34,14 +35,14 @@ export function makeVillagerAnswer(d: AnswerDeps) {
   const { world } = d;
   const asking = new Map<Npc, (text: string | null) => void>();
   // Nobody answers instantly: a reply takes as long as typing it would, however fast the mind was.
-  async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string; source?: string }> {
+  async function villagerAnswer(npc: Npc, line: string): Promise<{ text: string; source?: string; duel?: Npc }> {
     const t0 = performance.now();
     const answer = await villagerMind(npc, line);
     await new Promise((r) => setTimeout(r, typingMs(answer.text) - (performance.now() - t0)));
     return answer;
   }
 
-  async function villagerMind(npc: Npc, line: string): Promise<{ text: string; source?: string }> {
+  async function villagerMind(npc: Npc, line: string): Promise<{ text: string; source?: string; duel?: Npc }> {
     const scene = world.sceneWithMe(npc); // what we both see here, so "what's by the pond?" gets a real answer
     const here = await world.npcs?.reply(npc, d.myName(), line, undefined, scene);
     if (here) return here;
@@ -150,8 +151,9 @@ export function makeChatFlow(d: ChatDeps) {
     chatInput.value = "";
     world.say(chatKey(w), "...", 20);
     const answer = typeof w === "string" ? villagerAnswer(w as Npc, line) : wildAnswer(who, line, world.wildScene(w));
-    void answer.then((r) => {
+    void answer.then((r: { text: string; duel?: Npc }) => {
       world.say(chatKey(w), r.text, 6);
+      if (r.duel) d.rival?.(r.duel);
       if (!d.state.muted) {
         const v = voiceFor(typeof w === "string" ? (w as Npc) : w.arch);
         d.babbler.say(r.text, { base: 250 * v.pitch ** 0.8, speed: v.rate, wave: "triangle" });

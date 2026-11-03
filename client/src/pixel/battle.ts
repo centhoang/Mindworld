@@ -247,9 +247,9 @@ export class BattleView {
   end(outcome: Outcome, how: string): Promise<void> {
     const foe = this.foe!.name;
     const me = this.mine!.name;
-    if (outcome === "win" && how === "befriended") {
+    if (outcome === "win" && (how === "befriended" || how === "friends")) {
       this.push({ dur: 0.9, tick: (p) => (this.hearts = p), done: () => (this.hearts = 0) });
-      this.sayStep(`${foe} wants to come home with you!`);
+      this.sayStep(how === "friends" ? `${foe} and ${me} are friends now!` : `${foe} wants to come home with you!`); // "friends": someone's pet, it stays theirs
     } else if (outcome === "win") {
       this.push({ dur: 0.6, tick: (p) => (this.foeGone = p) });
       this.sayStep(`${foe} fainted. ${me} wins!`);

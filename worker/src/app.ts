@@ -15,6 +15,7 @@ import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
 import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
 import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
 import { loadWildMemos } from "./wild-memos";
+import { parseRivalAsk, rivalPlan } from "./rival";
 import { handleMlc, type MlcDeps } from "./mlc";
 import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
 
@@ -105,6 +106,7 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
       const w = await loadWildMemos(deps);
       return json(w ?? { version: 0, updatedAt: 0, source: "default", memos: {} });
     }
+    if (path === "/api/rival" && method === "POST") return handleRival(request, deps);
     if (path === "/api/chatlog" && method === "POST") return handleChatLog(request, deps);
     if (path === "/api/transcribe" && method === "POST") return handleTranscribe(request, deps);
     if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);
@@ -338,6 +340,14 @@ async function handlePetChat(request: Request, deps: Deps): Promise<Response> {
   if (!lines) return scripted("unusable");
   cache.add(key, JSON.stringify(lines));
   return json({ lines, source: "model", costUsd });
+}
+
+// A villager's pet studies the player's memo before a duel (worker/src/rival.ts). Always 200 unless the ask is bad.
+async function handleRival(request: Request, deps: Deps): Promise<Response> {
+  const ask = parseRivalAsk(await readJson(request, 3000));
+  if (!ask) return fail(400, "bad_request");
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  return json(await rivalPlan(ask, deps, clientKey));
 }
 
 // ---------- voice teaching ----------

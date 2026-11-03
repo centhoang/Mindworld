@@ -3,13 +3,15 @@
 
 import { afterLine, brainMayShow, type Line } from "../game/hatch-line";
 import { petLook } from "../game/genes";
-import { EMOTES, liveName, type Emote } from "../world/live";
+import { EMOTES, liveName, type Emote, type Npc } from "../world/live";
 import { newGroundSeed } from "../world/ground";
 import { addCoins } from "../game/shop";
 import { load, save } from "../game/save";
 import { type PartyMon } from "../game/party";
 import type { Genes } from "../sim/ghost";
 import { fetchWildMemos, type WildMemos } from "../sim/tactics";
+import { habits } from "../sim/rivals";
+import { fetchRivalPlan } from "../game/rival-api";
 import { DEFAULT_PET } from "../sim/types";
 import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
@@ -194,6 +196,7 @@ const chat = makeChatFlow({
   world, state, keys, babbler, myName,
   live: () => live,
   hostOf: (npc) => room.hostOf(npc),
+  rival: (npc) => startRival(npc),
   renamed: () => {
     showName();
     live.rejoin();
@@ -662,6 +665,17 @@ const fights = makeFightFlow({
   },
 });
 const fight = fights.fight;
+
+// A villager took the duel: its cloud study starts now, the fight once the yes has been read.
+const RIVAL_DELAY_MS = 1800;
+function startRival(npc: Npc): void {
+  const plan = fetchRivalPlan(npc, state.memo, habits(state.memo, state.recent));
+  window.setTimeout(() => {
+    if (mode !== "world" || teach.open) return;
+    chat.close();
+    void fights.rival(npc, plan).then((end) => end && world.npcs?.duelDone(npc, myName(), end));
+  }, RIVAL_DELAY_MS);
+}
 
 let last = performance.now();
 let frameErrors = 0;
