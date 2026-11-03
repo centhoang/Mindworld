@@ -17,8 +17,13 @@ export const HUMAN_WALK_SPEED = WALK_SPEED * 0.4;
 export const HUMAN_RUN_SPEED = HUMAN_WALK_SPEED * 1.9;
 const FRAME_SECONDS = 0.075;
 const WORK_SECONDS = 0.1;
-export const HUMAN_ACTIONS = { idle: 9, walk: 8, run: 8, doing: 8, waiting: 9, jump: 9, axe: 10, watering: 5, casting: 15, reeling: 13, caught: 10, dig: 13 } as const;
-type Action = keyof typeof HUMAN_ACTIONS;
+export const HUMAN_ACTIONS = { idle: 9, walk: 8, run: 8, doing: 8, waiting: 9, jump: 9, axe: 10, watering: 5, casting: 15, reeling: 13, caught: 10, dig: 13, attack: 10, hurt: 8 } as const;
+export type HumanAction = keyof typeof HUMAN_ACTIONS;
+type Action = HumanAction;
+// Drawn without the tools layer: a jump needs none, and the attack's tool is a sword (a trainer's shout is the bare swing).
+const NO_TOOLS: ReadonlySet<Action> = new Set(["jump", "attack"]);
+export const humanFiles = (look: HumanLook, action: Action): string[] =>
+  ["base", look.hair, ...(NO_TOOLS.has(action) ? [] : ["tools"])].map((layer) => `${layer}_${action}_strip${HUMAN_ACTIONS[action]}.png`);
 
 // Work is a loop of the pack's own strips: [strip, times through].
 const WORK: Partial<Record<Pose, readonly (readonly [Action, number])[]>> = {
@@ -63,10 +68,7 @@ export function humanLayers(look: HumanLook, pose: Pose | null, walking: boolean
   if (walking) action = running ? "run" : "walk";
   else if (pose === "dance") action = "jump";
   else if (pose === "kick") action = "run";
-  const layers = ["base", look.hair];
-  // The waiting tool is a rod: use it only for fishing. Jump needs no tool.
-  if (action !== "jump") layers.push("tools");
-  return { action, frame: work?.frame, files: layers.map(layer => `${layer}_${action}_strip${HUMAN_ACTIONS[action]}.png`) };
+  return { action, frame: work?.frame, files: humanFiles(look, action) };
 }
 
 export interface HumanMotion {
@@ -103,7 +105,7 @@ export function stepHumanMotion(m: HumanMotion, pos: Vec, dt: number, pose: Pose
 
 // Every strip any look can need, in any pose, walking or not: the whole set, loaded up front.
 export const ALL_HUMAN_FILES: readonly string[] = (Object.keys(HUMAN_ACTIONS) as Action[]).flatMap((action) =>
-  ["base", "tools", ...HAIR].filter((layer) => !(layer === "tools" && action === "jump")).map((layer) => `${layer}_${action}_strip${HUMAN_ACTIONS[action]}.png`));
+  ["base", "tools", ...HAIR].filter((layer) => !(layer === "tools" && NO_TOOLS.has(action))).map((layer) => `${layer}_${action}_strip${HUMAN_ACTIONS[action]}.png`));
 
 export class HumanSprites {
   private readonly images = new SpriteImages();
@@ -112,10 +114,7 @@ export class HumanSprites {
   // The pack's humans are the only people on this look (bug 44): while a strip is still loading, or retrying after a
   // failed load, the same look stands in its idle strip, and before that nothing is drawn. Never another art set.
   draw(g: CanvasRenderingContext2D, look: HumanLook, motion: HumanMotion, x: number, y: number, t: number): void {
-    if (!this.loading) {
-      this.loading = true;
-      for (const file of ALL_HUMAN_FILES) this.images.get(`/art/humans/${file}`);
-    }
+    this.preload();
     const clock = motion.walking ? motion.walkTime : motion.pose ? motion.poseTime : t;
     let { action, frame: step, files } = humanLayers(look, motion.pose, motion.walking, motion.running, clock);
     // All layers together, so partial bodies never appear.
@@ -128,11 +127,35 @@ export class HumanSprites {
     }
     const count = HUMAN_ACTIONS[action];
     const frame = step ?? Math.floor(clock / FRAME_SECONDS) % count;
+    this.blit(g, images as HTMLImageElement[], frame, x, y, motion.flip, 1);
+  }
+
+  // One frame of a strip, outside the overworld (the battle screen's trainers), `scale` screen pixels per art pixel. The
+  // same rule as above: a strip still loading shows the idle strip, else nothing.
+  drawAction(g: CanvasRenderingContext2D, look: HumanLook, action: Action, frame: number, x: number, y: number, flip: boolean, scale = 1): void {
+    this.preload();
+    let images = humanFiles(look, action).map((file) => this.images.get(`/art/humans/${file}`));
+    if (images.some((image) => !image)) {
+      images = humanFiles(look, "idle").map((file) => this.images.get(`/art/humans/${file}`));
+      frame = 0;
+      if (images.some((image) => !image)) return;
+    }
+    this.blit(g, images as HTMLImageElement[], frame % HUMAN_ACTIONS[action], x, y, flip, scale);
+  }
+
+  private preload(): void {
+    if (this.loading) return;
+    this.loading = true;
+    for (const file of ALL_HUMAN_FILES) this.images.get(`/art/humans/${file}`);
+  }
+
+  // x, y: the feet. A frame is 96x64 with the feet at (48, 39).
+  private blit(g: CanvasRenderingContext2D, images: readonly HTMLImageElement[], frame: number, x: number, y: number, flip: boolean, scale: number): void {
     g.save();
     g.imageSmoothingEnabled = false;
     g.translate(Math.round(x), Math.round(y));
-    if (motion.flip) g.scale(-1, 1);
-    for (const image of images) g.drawImage(image!, frame * 96, 0, 96, 64, -48, -39, 96, 64);
+    g.scale(flip ? -scale : scale, scale);
+    for (const image of images) g.drawImage(image, frame * 96, 0, 96, 64, -48, -39, 96, 64);
     g.restore();
   }
 }

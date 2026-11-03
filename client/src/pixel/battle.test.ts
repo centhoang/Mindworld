@@ -62,6 +62,41 @@ describe("battle depth on screen", () => {
     expect(v.takeShout()).toBeNull();
   });
 
+  it("asks a question in the command box: keys move only over the answers, Esc picks the last, the commands keep their own cursor", async () => {
+    const v = new BattleView();
+    await runUntil(v, v.open(side("Foe"), side("Mochi")), 10);
+    const picked = v.ask("Guard when the foe winds up a heavy hit.", ["Teach it", "Done"]);
+    expect(v.scene().menu?.labels).toEqual(["Teach it", "Done"]);
+    v.cmdKey("arrowdown"); // no answer below: stays on Teach it
+    expect(v.scene().menu?.cursor).toBe(0);
+    v.cmdKey("escape");
+    v.cmdKey("enter");
+    expect(await picked).toBe(1);
+    const cmd = v.choose();
+    expect(v.scene().menu?.labels).toEqual(["Fight", "Teach", "Swap", "Run"]);
+    v.cmdKey("arrowright");
+    v.cmdKey("enter");
+    expect(await cmd).toBe("teach");
+  });
+
+  it("trainers: a shout swings, a hard hit makes its trainer flinch, then idle again; the winner's trainer jumps", async () => {
+    const v = new BattleView();
+    const look = { hair: "shorthair", tool: "hands" } as const;
+    const pose = (s: "me" | "foe") => (v as unknown as { trainers: Record<string, { action: string }> }).trainers[s]!.action;
+    await runUntil(v, v.open({ ...side("Foe"), trainer: look }, { ...side("Mochi"), trainer: look }), 10);
+    let seen = new Set<string>();
+    const p = v.playTurn("attack", "", "", "heavy", 7, 9, 21, 23, { shout: true });
+    for (let t = 0; t < 20 && v.busy; t += 0.05) { v.update(0.05); seen.add(pose("me")); await Promise.resolve(); }
+    await p;
+    expect([...seen]).toEqual(expect.arrayContaining(["attack", "hurt"]));
+    for (let t = 0; t < 2; t += 0.05) v.update(0.05);
+    expect(pose("me")).toBe("idle");
+    await runUntil(v, v.end("win", "ko"), 10);
+    expect(pose("me")).toBe("jump");
+    seen = new Set([pose("foe")]);
+    expect(seen.has("jump")).toBe(false);
+  });
+
   it("names a signature move the same way every time, from the pet's genes", () => {
     const a = signatureName({ name: "Mochi", genes: { hue: 0.4, ears: 0.7 } });
     expect(a).toBe(signatureName({ name: "Other", genes: { hue: 0.4, ears: 0.7 } }));

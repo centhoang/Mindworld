@@ -158,6 +158,11 @@ for s in ['spr_deco_charactershadow', 'spr_deco_shadow', 'spr_deco_well', 'spr_d
     shutil.copy(d + pngs[0], OUT + s + '.png')
 for hair in ['base', 'bowlhair', 'curlyhair', 'longhair', 'mophair', 'shorthair', 'spikeyhair', 'tools']:
     shutil.copy(A + f'Characters/Human/RUN/{hair}_run_strip8.png', f'client/public/art/humans/{hair}_run_strip8.png')
+    # The battle screen's trainers: a shout is the attack swing (drawn without the tools layer: no sword), a hard hit the hurt flinch.
+    for d, a, n in [('ATTACK', 'attack', 10), ('HURT', 'hurt', 8)]:
+        if hair == 'tools' and a == 'attack':
+            continue
+        shutil.copy(A + f'Characters/Human/{d}/{hair}_{a}_strip{n}.png', f'client/public/art/humans/{hair}_{a}_strip{n}.png')
 
 # Clouds: the example room's cloud clusters as tile lists; the grey and shadow versions sit 3 and 6 rows below.
 d = LAYERS['clouds_01']

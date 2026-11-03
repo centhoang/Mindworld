@@ -506,7 +506,7 @@ function menuKey(k: string): void {
 
 function side(m: Member): Side {
   const build = m.arch ? BUILDS[m.arch] : undefined;
-  return { name: m.name, genes: m.genes, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3 };
+  return { name: m.name, genes: m.genes, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3, trainer: world.myLook };
 }
 
 // ---- pet brain: rules only by default; B switches to our tuned Llama 3.2 1B in the browser (WebGPU).

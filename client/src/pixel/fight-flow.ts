@@ -16,7 +16,9 @@ import { coachReview } from "../sim/review";
 import { duelEnd, rehearse, rivalDef, rivalLabel, rivalOf, whyLost, type DuelEnd, type RivalOwner } from "../sim/rivals";
 import { withTactics, type WildMemos } from "../sim/tactics";
 import type { DEFAULT_PET, Intent, Outcome, Replay } from "../sim/types";
+import { liveName } from "../world/live";
 import type { BattleView, Side } from "./battle";
+import { humanLook, NPC_LOOKS } from "./humans";
 import { BUILDS, drawMonster } from "./monster";
 import type { Wild } from "./overworld";
 import type { TeachScreen } from "./teach";
@@ -67,7 +69,7 @@ export function makeFightFlow(d: FightDeps) {
     const them = me === "a" ? b : a;
     const v = duelView(a, b, seed, me);
     const mine = { ...d.side(d.activeMember()), maxHp: v.myMaxHp };
-    await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), genes: them.genes, maxHp: v.theirMaxHp, level: 3 }, mine, `${them.name.slice(0, 12)} is ready to duel!`);
+    await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 64, "front"), genes: them.genes, maxHp: v.theirMaxHp, level: 3, trainer: humanLook(liveName(them.genes)) }, mine, `${them.name.slice(0, 12)} is ready to duel!`);
     await battleView.say(`Live duel! Both pets follow their own memo rules. Same fight on both screens.`);
     for (const t of v.turns) await battleView.playTurn(t.mine, "", "duel", t.theirAct, t.dealt, t.taken, t.myHp, t.theirHp, { fx: t.fx, charge: t.charge });
     await battleView.end(...DUEL_END[v.result]);
@@ -199,7 +201,7 @@ export function makeFightFlow(d: FightDeps) {
     const base = rivalOf(owner);
     const label = rivalLabel(base);
     const spec = ghostPet(base.genes, base.name);
-    await battleView.open({ name: label, sprite: drawMonster(petLook(base.genes), 64, "front"), genes: base.genes, maxHp: spec.maxHp, level: 3 }, d.side(d.activeMember()), `${base.ownerName} sends out ${base.name}!`);
+    await battleView.open({ name: label, sprite: drawMonster(petLook(base.genes), 64, "front"), genes: base.genes, maxHp: spec.maxHp, level: 3, trainer: NPC_LOOKS[owner] }, d.side(d.activeMember()), `${base.ownerName} sends out ${base.name}!`);
     await battleView.say(`${base.ownerName} studies how your pet fights...`);
     const cloud = await Promise.race([plan, new Promise<CloudPlan>((r) => setTimeout(() => r({ rules: [], summary: "", source: "late" }), STUDY_MS))]);
     const study = rehearse(base, state.memo, cloud.rules);

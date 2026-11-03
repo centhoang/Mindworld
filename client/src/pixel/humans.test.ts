@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pose } from "../life/activities";
-import { ALL_HUMAN_FILES, HAIR, HUMAN_ACTIONS, workSeconds, HUMAN_WALK_SPEED, HumanSprites, humanLayers, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion } from "./humans";
+import { ALL_HUMAN_FILES, HAIR, HUMAN_ACTIONS, workSeconds, HUMAN_WALK_SPEED, HumanSprites, humanFiles, humanLayers, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion } from "./humans";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -27,6 +27,8 @@ describe("shared human layers", () => {
     for (const hair of HAIR) for (const tool of ["hands", "rod", "axe", "watering"] as const) for (const pose of poses) for (const walking of [false, true]) {
       for (const running of [false, true]) for (const clock of clocks) for (const file of humanLayers({ hair, tool }, pose, walking, running, clock).files) used.add(file);
     }
+    // The battle screen's trainers (pixel/battle.ts): idle, the shout's swing, the hurt flinch, the win jump.
+    for (const hair of HAIR) for (const action of ["idle", "attack", "hurt", "jump"] as const) for (const file of humanFiles({ hair, tool: "hands" }, action)) used.add(file);
     const dir = new URL("../../public/art/humans/", import.meta.url);
     expect(readdirSync(dir).sort()).toEqual([...used].sort());
     for (const file of used) {

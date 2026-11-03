@@ -10,6 +10,7 @@ import { MENU_H, MENU_W as CELL_MENU_W } from "../view/mosaic/battle";
 import { wrap } from "../view/glyph/atlas";
 import type { SceneBattle, SceneFighter } from "../game/ports";
 import type { Genes } from "../sim/ghost";
+import { HUMAN_ACTIONS, humanSprites, type HumanAction, type HumanLook } from "./humans";
 
 export interface Side {
   name: string;
@@ -18,6 +19,7 @@ export interface Side {
   portrait?: HTMLCanvasElement; // 32x32 face for the text box
   genes?: Genes;
   level?: number;
+  trainer?: HumanLook; // the person standing beside the pet (none for a wild pet)
 }
 
 export const COMMANDS = ["fight", "teach", "swap", "run"] as const;
@@ -50,6 +52,12 @@ interface Step {
 }
 
 const ease = (p: number) => 1 - (1 - p) ** 2;
+const TRAINER_FRAME = 0.1; // seconds per strip frame
+const TRAINER_SCALE = 2; // a trainer stands about half its pet's height
+
+// What a trainer is doing: a strip played once (then idle again), or looped.
+interface TrainerPose { action: HumanAction; t: number; loop: boolean }
+const idlePose = (): TrainerPose => ({ action: "idle", t: 0, loop: true });
 
 export class BattleView {
   private foe: Side | null = null;
@@ -83,6 +91,7 @@ export class BattleView {
   private shoutNext: Action | null = null;
   private cmd: { cursor: number; labels: readonly string[]; face: boolean; pick: (i: number) => void } | null = null;
   private cursor = 0;
+  private trainers: Record<"foe" | "me", TrainerPose> = { foe: idlePose(), me: idlePose() };
   onLine: ((text: string, who: "mine" | "foe" | "story") => void) | null = null; // babble hook
 
   open(foe: Side, mine: Side, intro = `A wild ${foe.name} appears!`): Promise<void> {
@@ -98,6 +107,7 @@ export class BattleView {
     this.shoutNext = null;
     this.text = "";
     this.tag = "";
+    this.trainers = { foe: idlePose(), me: idlePose() };
     this.push({ dur: 0.7, tick: (p) => (this.intro = ease(p)) });
     this.sayStep(intro);
     return this.run();
@@ -221,7 +231,10 @@ export class BattleView {
     const foe = this.foe!.name;
     const fx = new Set(extra.fx ?? []);
     this.push({ dur: 0, start: () => { this.myShield = action === "guard"; this.foeShield = enemyAct === "guard"; } });
-    if (extra.shout) this.sayStep(`You shout: "${SHOUT_TEXT[action]}"`);
+    if (extra.shout) {
+      this.push({ dur: 0, start: () => this.pose("me", "attack") });
+      this.sayStep(`You shout: "${SHOUT_TEXT[action]}"`);
+    }
     this.sayStep(`${me}: ${MOVE_TEXT[action]}`, extra.shout ? "your call" : tag);
     if (line) this.sayStep(`"${line}"`);
     if (action === "attack") {
@@ -261,6 +274,14 @@ export class BattleView {
   end(outcome: Outcome, how: string): Promise<void> {
     const foe = this.foe!.name;
     const me = this.mine!.name;
+    const won = outcome === "win";
+    const friends = outcome === "win" && (how === "befriended" || how === "friends");
+    this.push({ dur: 0, start: () => {
+      if (won || friends) this.pose("me", "jump", true);
+      if (outcome === "loss" || friends) this.pose("foe", "jump", true);
+      if (outcome === "loss") this.pose("me", "hurt");
+      else if (won && !friends) this.pose("foe", "hurt");
+    } });
     if (outcome === "win" && (how === "befriended" || how === "friends")) {
       this.push({ dur: 0.9, tick: (p) => (this.hearts = p), done: () => (this.hearts = 0) });
       this.sayStep(how === "friends" ? `${foe} and ${me} are friends now!` : `${foe} wants to come home with you!`); // "friends": someone's pet, it stays theirs
@@ -278,10 +299,17 @@ export class BattleView {
     return this.run();
   }
 
+  private pose(side: "foe" | "me", action: HumanAction, loop = false): void {
+    this.trainers[side] = { action, t: 0, loop };
+  }
+
   private hit(who: "foe" | "me", apply: () => void, heavy = false): void {
     this.push({
       dur: heavy ? 0.45 : 0.3,
-      start: apply,
+      start: () => {
+        apply();
+        if (heavy) this.pose(who, "hurt"); // a hard hit makes its trainer flinch
+      },
       tick: (p) => {
         const f = Math.floor(p * 6) % 2 ? 1 : 0;
         if (who === "foe") this.foeFlash = f;
@@ -310,6 +338,13 @@ export class BattleView {
     });
   }
 
+  private trainer(g: CanvasRenderingContext2D, side: "foe" | "me", look: HumanLook, x: number, y: number, flip: boolean): void {
+    const tr = this.trainers[side];
+    const n = HUMAN_ACTIONS[tr.action];
+    const f = Math.floor(tr.t / TRAINER_FRAME);
+    humanSprites.drawAction(g, look, tr.action, tr.loop ? f % n : Math.min(n - 1, f), x, y, flip, TRAINER_SCALE);
+  }
+
   // Click / key: finish the current text line at once (and skip its hold).
   skip(): void {
     const s = this.script[0];
@@ -328,6 +363,11 @@ export class BattleView {
     this.foeHpShown += (this.foeHp - this.foeHpShown) * k;
     this.myHpShown += (this.myHp - this.myHpShown) * k;
     for (const p of this.pops) p.t += dt;
+    for (const side of ["foe", "me"] as const) {
+      const tr = this.trainers[side];
+      tr.t += dt;
+      if (!tr.loop && tr.t >= HUMAN_ACTIONS[tr.action] * TRAINER_FRAME) this.trainers[side] = idlePose();
+    }
     this.pops = this.pops.filter((p) => p.t < 1);
     let budget = dt;
     while (budget > 0 && this.script.length) {
@@ -378,6 +418,9 @@ export class BattleView {
     platform(g, myBase.x, myBase.y, 56, 10);
 
     const slide = 1 - this.intro;
+    // Trainers first, so their pets stand in front of them.
+    if (this.foe?.trainer) this.trainer(g, "foe", this.foe.trainer, foeBase.x + 44 + Math.round(slide * sw * 0.5), foeBase.y - 4, true);
+    if (this.mine?.trainer) this.trainer(g, "me", this.mine.trainer, myBase.x - 40 - Math.round(slide * sw * 0.5), myBase.y + 2, false);
     if (this.foe) {
       const s = this.foe.sprite;
       const bob = Math.round(Math.sin(t * 3) * 1);
