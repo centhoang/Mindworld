@@ -25,6 +25,7 @@ export interface ChatDeps extends AnswerDeps {
   babbler: Babbler;
   renamed: () => void;
   rival?: (npc: Npc) => void; // a villager said yes to a duel: start it
+  talking?: (npc: Npc) => void; // a chat with a villager opened (its pet may be asked to duel)
 }
 
 // Who answers a villager, in tiers: the sim when one answer is true; free talk from Muse Spark with the villager's
@@ -114,7 +115,10 @@ export function makeChatFlow(d: ChatDeps) {
     chatInput.focus();
     if (w === "name") return void chatInput.select();
     if (w !== "room" && !isPeerChat(w)) world.say(chatKey(w), typeof w === "string" ? GREET[w] : "?", 3);
-    if (typeof w === "string" && w !== "room") world.npcs?.hold(w);
+    if (typeof w === "string" && w !== "room") {
+      world.npcs?.hold(w);
+      d.talking?.(w);
+    }
   }
   function closeChat(): void {
     if (talkTarget(chatWith) && d.live().status === "online") d.live().talk();

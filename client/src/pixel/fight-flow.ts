@@ -29,6 +29,7 @@ const TELL: Record<Intent, string> = {
 };
 
 type Member = { name: string; genes: Genes };
+const STUDY_MS = 10_000; // longest a villager studies on the battle screen before it fights with its bundled plans
 
 export interface FightDeps {
   world: FightWorld;
@@ -181,7 +182,7 @@ export function makeFightFlow(d: FightDeps) {
     const spec = ghostPet(base.genes, base.name);
     await battleView.open({ name: label, sprite: drawMonster(petLook(base.genes), 64, "front"), genes: base.genes, maxHp: spec.maxHp, level: 3 }, d.side(d.activeMember()), `${base.ownerName} sends out ${base.name}!`);
     await battleView.say(`${base.ownerName} studies how your pet fights...`);
-    const cloud = await plan;
+    const cloud = await Promise.race([plan, new Promise<CloudPlan>((r) => setTimeout(() => r({ rules: [], summary: "", source: "late" }), STUDY_MS))]);
     const study = rehearse(base, state.memo, cloud.rules);
     const rv = { ...base, memo: study.memo };
     const said = study.from === "own" ? `${base.name}, just be yourself!` : study.from === "cloud" && cloud.summary ? cloud.summary : `${base.name}, ${study.plan[0]!.why}!`;

@@ -11,7 +11,7 @@ import { type PartyMon } from "../game/party";
 import type { Genes } from "../sim/ghost";
 import { fetchWildMemos, type WildMemos } from "../sim/tactics";
 import { habits } from "../sim/rivals";
-import { fetchRivalPlan } from "../game/rival-api";
+import { rivalPlanFor } from "../game/rival-api";
 import { DEFAULT_PET } from "../sim/types";
 import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
@@ -197,6 +197,7 @@ const chat = makeChatFlow({
   live: () => live,
   hostOf: (npc) => room.hostOf(npc),
   rival: (npc) => startRival(npc),
+  talking: (npc) => void (world.npcs?.hasPet[npc] && rivalPlanFor(npc, state.memo, habits(state.memo, state.recent))),
   renamed: () => {
     showName();
     live.rejoin();
@@ -666,10 +667,10 @@ const fights = makeFightFlow({
 });
 const fight = fights.fight;
 
-// A villager took the duel: its cloud study starts now, the fight once the yes has been read.
+// A villager took the duel: its cloud study (asked when the chat opened) goes on; the fight starts once the yes has been read.
 const RIVAL_DELAY_MS = 1800;
 function startRival(npc: Npc): void {
-  const plan = fetchRivalPlan(npc, state.memo, habits(state.memo, state.recent));
+  const plan = rivalPlanFor(npc, state.memo, habits(state.memo, state.recent));
   window.setTimeout(() => {
     if (mode !== "world" || teach.open) return;
     chat.close();

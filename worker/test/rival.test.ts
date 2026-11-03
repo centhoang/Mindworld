@@ -16,11 +16,14 @@ describe("/api/rival", () => {
     expect(parseRivalAsk({ ...ASK, rules: [{ if: [], do: "guard" }] })).toBeNull();
   });
 
-  it("keeps 1..3 rules with no enemy or size conditions", () => {
-    expect(validatePlan(PLAN)).not.toBeNull();
+  it("keeps up to 3 valid rules with no enemy or size conditions, dropping bad ones", () => {
+    expect(validatePlan(PLAN)!.rules).toHaveLength(2);
     expect(validatePlan({ summary: "", rules: [] })).toBeNull();
-    expect(validatePlan({ summary: "", rules: Array.from({ length: 4 }, () => PLAN.rules[0]) })).toBeNull();
+    expect(validatePlan({ summary: "", rules: Array.from({ length: 4 }, () => PLAN.rules[0]) })!.rules).toHaveLength(3);
     expect(validatePlan({ summary: "", rules: [{ if: [{ k: "size", is: "bigger" }], do: "flee", why: "" }] })).toBeNull();
+    const mixed = validatePlan({ summary: "Go <b>now</b>", rules: [{ if: [{ k: "enemy", is: "brute" }], do: "flee" }, { if: [{ k: "intent", is: "calm" }], do: "dance" }, PLAN.rules[1]] })!;
+    expect(mixed.rules).toEqual([PLAN.rules[1]]);
+    expect(mixed.summary).not.toMatch(/[<>]/);
   });
 
   it("asks Muse once per (villager, memo), then serves the cache; books spend", async () => {

@@ -12,7 +12,7 @@ export interface CloudPlan {
   source: string;
 }
 
-const WAIT_MS = 12_000; // the model reasons first; the duel waits on the battle screen meanwhile
+const WAIT_MS = 25_000; // the model reasons first (4-10 s); asked ahead, when a chat with the villager opens
 const NONE: CloudPlan = { rules: [], summary: "", source: "none" };
 
 export async function fetchRivalPlan(npc: RivalOwner, memo: Memo, moves: Record<Action, number>, fetchFn: typeof fetch = (i, o) => fetch(i, o)): Promise<CloudPlan> {
@@ -36,4 +36,19 @@ export async function fetchRivalPlan(npc: RivalOwner, memo: Memo, moves: Record<
   } finally {
     clearTimeout(timer);
   }
+}
+
+// One ask per (villager, memo) while it is useful: a plan that came back is kept for the session, a failed one may be
+// asked again later (the Worker's quota and caps bound that).
+const plans = new Map<string, Promise<CloudPlan>>();
+export function rivalPlanFor(npc: RivalOwner, memo: Memo, moves: Record<Action, number>): Promise<CloudPlan> {
+  const key = `${npc}:${JSON.stringify(memo.rules.map((r) => [r.if, r.do]))}`;
+  const known = plans.get(key);
+  if (known) return known;
+  const p = fetchRivalPlan(npc, memo, moves).then((plan) => {
+    if (!plan.rules.length) plans.delete(key);
+    return plan;
+  });
+  plans.set(key, p);
+  return p;
 }

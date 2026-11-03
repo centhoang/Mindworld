@@ -21,7 +21,7 @@ const CACHE_PREFIX = "rival:plan:";
 const SPEND_PREFIX = "rival:spend:";
 const CACHE_TTL_S = 2 * 86400;
 export const RIVAL_DAILY_USD = 1; // hard cap for this feature, per UTC day
-export const RIVAL_MAX_TOKENS = 1600; // the model reasons first; three rules of JSON need a few hundred
+export const RIVAL_MAX_TOKENS = 3200; // the model reasons first (~900-1300 tokens when told to keep it brief, 2400+ if not)
 export const RIVAL_MAX_RULES = 3;
 export const RIVAL_QUOTA = { pool: "rival", perClient: 20, total: 400 };
 const MAX_MOVES = 999;
@@ -48,12 +48,17 @@ export function parseRivalAsk(body: unknown): RivalAsk | null {
   return { npc: b.npc as RivalOwner, memo: { summary: "", rules: memo.rules.map((r) => ({ ...r, why: "" })) }, moves };
 }
 
-// 1..3 rules, none about the enemy's archetype or size (they mean nothing from the rival's side).
+// The valid rules among the first few, none about the enemy's archetype or size (they mean nothing from the rival's
+// side); a bad rule is dropped, not the plan. Null when none is left.
 export function validatePlan(input: unknown): GhostMemo | null {
-  const m = parseGhostMemo(input);
-  if (!m || m.rules.length === 0 || m.rules.length > RIVAL_MAX_RULES) return null;
-  if (m.rules.some((r) => r.if.some((c) => c.k === "enemy" || c.k === "size"))) return null;
-  return m;
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const o = input as Record<string, unknown>;
+  const rules = (Array.isArray(o.rules) ? o.rules : [])
+    .slice(0, RIVAL_MAX_RULES + 2)
+    .map((r) => parseGhostMemo({ summary: "", rules: [r] })?.rules[0])
+    .filter((r): r is GhostRule => !!r && !r.if.some((c) => c.k === "enemy" || c.k === "size"))
+    .slice(0, RIVAL_MAX_RULES);
+  return rules.length ? { summary: parseGhostMemo({ summary: o.summary, rules: [] })?.summary ?? "", rules } : null;
 }
 
 const ruleText = (r: GhostRule): string => `${r.if.map((c) => ("is" in c ? `${c.k}=${c.is}` : `${c.k}${c.op}${c.n}`)).join(" & ")} -> ${r.do}`;
@@ -68,7 +73,9 @@ export function memoHash(m: GhostMemo): string {
   return h.toString(36);
 }
 
-export const RIVAL_SYSTEM = "You coach a villager's pet for a friendly duel in a cozy pet-battle game. Reply with JSON only, no prose.";
+export const RIVAL_SYSTEM =
+  "You coach a villager's pet for a friendly duel in a cozy pet-battle game. Reply with JSON only, no prose. " +
+  "Think briefly, in a few short steps: a simulator tests your rules and keeps them only if they work, so a quick, plausible plan is best.";
 
 export function rivalPrompt(a: RivalAsk): string {
   return [
@@ -136,7 +143,8 @@ export async function rivalPlan(a: RivalAsk, deps: Deps, clientKey: string): Pro
   const costUsd = cfg.mock ? 0 : actualCostUsd(provider, completion.usage);
   await deps.spend.settle(id, costUsd);
   await deps.ghosts.put(spendKey, String(spent + costUsd), { expirationTtl: 3 * 86400 });
-  const plan = completion.truncated ? null : validatePlan(extractObject(completion.text));
+  if (completion.truncated) return none("truncated", costUsd);
+  const plan = validatePlan(extractObject(completion.text));
   if (!plan) return none("invalid", costUsd);
   await deps.ghosts.put(cacheKey, JSON.stringify(plan), { expirationTtl: CACHE_TTL_S });
   return { rules: plan.rules, summary: plan.summary, source: "model", costUsd };
