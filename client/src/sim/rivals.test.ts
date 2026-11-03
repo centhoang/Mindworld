@@ -3,7 +3,7 @@ import { Battle } from "./battle";
 import { GHOST_ARCHETYPE } from "./ghost";
 import { validateMemo, type Memo } from "./memo";
 import { memoPolicy } from "./policy";
-import { duelAsked, duelEnd, duelRefusal, FAIR, habits, nextLesson, playerWinRate, rehearse, rivalDef, rivalOf, RIVAL_OWNERS, whyLost } from "./rivals";
+import { CLOUD_SLACK, duelAsked, duelEnd, duelRefusal, FAIR, habits, nextLesson, playerWinRate, rehearse, rivalDef, rivalOf, RIVAL_OWNERS, whyLost } from "./rivals";
 import { DEFAULT_PET } from "./types";
 
 const M = (rules: Memo["rules"]): Memo => ({ summary: "", rules });
@@ -49,10 +49,13 @@ describe("rivals", () => {
     expect(Math.abs(study.playerWins - FAIR)).toBeLessThan(Math.abs(own - FAIR));
   });
 
-  it("weighs cloud rules in the same rehearsal", () => {
-    const cloud = M([{ if: [{ k: "intent", is: "calm" }], do: "attack", why: "strike while it plays nice" }]).rules;
-    const study = rehearse(rivalOf("ama"), GOOD, cloud);
-    expect(["cloud", "bundled"]).toContain(study.from);
+  it("weighs cloud rules in the same rehearsal, and takes them when nearly as good", () => {
+    const close = M([{ if: [{ k: "intent", is: "idle" }], do: "guard", why: "absorb" }, { if: [{ k: "last", is: "guard" }], do: "attack", why: "counter" }]).rules;
+    const ama = rehearse(rivalOf("ama"), GOOD, close);
+    expect(ama.from).toBe("cloud");
+    expect(Math.abs(ama.playerWins - FAIR)).toBeLessThanOrEqual(Math.abs(rehearse(rivalOf("ama"), GOOD).playerWins - FAIR) + CLOUD_SLACK);
+    const useless = M([{ if: [{ k: "turn", op: ">=", n: 99 }], do: "flee", why: "never" }]).rules;
+    expect(rehearse(rivalOf("ama"), GOOD, useless).from).toBe("bundled");
   });
 
   it("logs the rule behind each move and explains a loss in plain words", () => {
@@ -69,7 +72,7 @@ describe("rivals", () => {
     }
     expect(lost).not.toBeNull();
     expect(lost!.why).toMatch(/^Ripple /);
-    expect(lost!.tip).toMatch(/^Teach your pet to guard when the foe winds up a heavy hit/);
+    expect(lost!.tip).toMatch(/^(Your pet ran when it got hurt\. )?Teach your pet to guard when the foe winds up a heavy hit/);
   });
 
   it("teaches the lessons that beat every rival, one at a time, and those lessons win", () => {

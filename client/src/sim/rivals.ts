@@ -121,11 +121,12 @@ export function playerWinRate(rv: Rival, player: Memo, rounds = REHEARSALS, pet:
 }
 
 export const FAIR = 0.4; // the player's chance a rival aims for: a hard fight that good teaching still wins
+export const CLOUD_SLACK = 0.1; // the villager trusts its own study: the cloud plan wins if it is this close to the best
 
 // The villager studies the player's memo: it spars each plan (its own style, every counter it knows, and the cloud's
 // counter-rules when there are any) in its head. Its own style stays when the player's pet would lose to it anyway;
 // otherwise it takes the plan that leaves the player closest to a fair chance, never an unwinnable one on purpose.
-// Ties keep the earlier plan, so the cloud's plan wins a tie with the bundled ones.
+// The cloud's plan wins when it is within CLOUD_SLACK of the best bundled one.
 export type PlanFrom = "own" | "cloud" | "bundled";
 export function rehearse(rv: Rival, player: Memo, cloud: readonly Rule[] = []): { memo: Memo; plan: readonly Rule[]; playerWins: number; from: PlanFrom } {
   const own = { memo: rv.memo, plan: [] as readonly Rule[], playerWins: playerWinRate(rv, player), from: "own" as PlanFrom };
@@ -137,7 +138,15 @@ export function rehearse(rv: Rival, player: Memo, cloud: readonly Rule[] = []): 
     const playerWins = playerWinRate({ ...rv, memo }, player);
     if (Math.abs(playerWins - FAIR) < Math.abs(best.playerWins - FAIR)) best = { memo, plan, playerWins, from };
   }
-  return best;
+  if (best.from === "cloud" || !cloud.length) return best;
+  const gap = (w: number) => Math.abs(w - FAIR);
+  let study: typeof best | null = null;
+  for (const plan of variants(cloud)) {
+    const memo = rivalMemo(rv, plan);
+    const playerWins = playerWinRate({ ...rv, memo }, player);
+    if (gap(playerWins) <= gap(best.playerWins) + CLOUD_SLACK && (!study || gap(playerWins) < gap(study.playerWins))) study = { memo, plan, playerWins, from: "cloud" };
+  }
+  return study ?? best;
 }
 
 // The rival as the battle's enemy, logging which of its rules chose each turn's move (-1 = none, its reflex).
@@ -182,11 +191,12 @@ const DOES: Record<Action, string> = { attack: "strikes", guard: "guards", flee:
 // The lessons that beat every rival together (bench in docs/ai/pet.md): guard its heavy hit, wait while it guards
 // (no hitting into a guard), make friends once it is hurt. The first one the memo lacks is the one to teach next.
 const has = (m: Memo, act: Action, k: Cond["k"], is?: string) => m.rules.some((x) => x.do === act && x.if.some((c) => c.k === k && (is === undefined || ("is" in c && c.is === is))));
-export function nextLesson(m: Memo): string {
-  if (!has(m, "guard", "intent", "heavy")) return "Teach your pet to guard when the foe winds up a heavy hit.";
-  if (!has(m, "befriend", "enemyHp")) return "Teach your pet to make friends when the foe's HP is below 40%.";
-  if (!has(m, "emote", "intent", "guarding") && !has(m, "guard", "intent", "guarding")) return "Teach your pet to wait (emote) while the foe guards, not hit into its guard.";
-  return "Your lessons are right: use your two shouts (keys 1-5) at the turns that matter.";
+export function nextLesson(m: Memo, fled = false): string {
+  const ran = fled ? "Your pet ran when it got hurt. " : "";
+  if (!has(m, "guard", "intent", "heavy")) return `${ran}Teach your pet to guard when the foe winds up a heavy hit.`;
+  if (!has(m, "befriend", "enemyHp")) return `${ran}Teach your pet to make friends when the foe's HP is below 40%.`;
+  if (!has(m, "emote", "intent", "guarding") && !has(m, "guard", "intent", "guarding")) return `${ran}Teach your pet to wait (emote) while the foe guards, not hit into its guard.`;
+  return `${ran}Your lessons are right: use your two shouts (keys 1-5) at the turns that matter.`;
 }
 
 // What beat the player, read from the replay: the rival rule behind most of the damage, and what to teach next.
@@ -205,7 +215,7 @@ export function whyLost(rp: Replay, log: readonly number[], rv: Rival, player: M
   const why = rule && when
     ? `${rv.name} ${DOES[rule.do]} ${when}${rule.do === "attack" && heavy > total / 3 ? ", with a HEAVY hit" : ""}.`
     : `${rv.name} simply out-hit your pet.`;
-  return { why, tip: nextLesson(player) };
+  return { why, tip: nextLesson(player, rp.how === "pet-fled") };
 }
 
 // --- asking for a duel ---------------------------------------------------------------------------------------
