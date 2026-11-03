@@ -16,8 +16,9 @@ Lab: `/lab/pet`. It reads your save and never writes it. Proof so far: `proof/pe
 - [x] A village rival (Elder, Mo, Ama, later Pip) accepts or refuses a duel, adapts its tactics to your memo, and says why it beat you. [rivals-live](../proof/pet/rivals-live.md)
 - [ ] A villager's pet looks the same in the village and on the battle screen. (code shares the genes; not yet seen on live: the pane was hidden)
 - [ ] A bored villager walks up and challenges you, and "yes" starts the duel. (unit tests only)
-- [ ] The tip after a loss, taught, wins the next duel more often. (bench: the three lessons win 62-70% against every adapted rival)
-- [ ] After a fight, the coach suggests one lesson in plain words; teaching it raises Prove.
+- [ ] The tip after a loss, taught, wins the next duel more often. (bench: the three lessons win 62-70% against every adapted rival; the coach review now picks a lesson rehearsed against that rival, e.g. Mo 0% -> 28%)
+- [x] After a fight, the coach suggests one lesson in plain words; "Teach it" types it into Teach and teaching it raises Prove. [coach-review-live](../proof/pet/coach-review-live.md)
+- [ ] After a clean win the coach stays quiet (no lesson, no extra key press). (unit tests only)
 - [x] The light on a pet's head follows the round head: no square edges, on every build, front and back. [close-up](../proof/pet/heads-round.png)
 - [x] No small marks on a pet's body, front or back. Old pets that had spots still load and show plain. [unit tests](../../../client/src/game/genes.test.ts)
 - [x] On a new save the egg line stays readable through the hatch; the Brain line waits. [live](../proof/game/sunny-hatch-line.jpg)

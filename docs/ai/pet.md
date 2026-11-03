@@ -60,6 +60,32 @@ Bench (`.scratch/combat/rival-bench.ts`, 400 seeds, player win % vs elder/mo/ama
 | always attack | 60/0/2/96 | 60/0/2/96 |
 | always guard | 89/0/0/0 | 0/0/0/0 (draws: both pets wait) |
 
+## Coach review (2026-11-03, P1 adapted teaching)
+Code: `client/src/sim/review.ts` (pure), `pixel/fight-flow.ts` `review()`, `BattleView.ask`, `TeachScreen.show(lesson)`.
+- After every wild fight and rival duel. The replay gives the reasons (the pet's own moves only; shouts are the trainer's):
+  heavy hits taken unguarded, hits into the foe's guard (and the counters that followed), a block not followed by an
+  attack, a hurt foe (< 40%) never befriended in a lost fight.
+- Four lessons, each plain words plus the rule they become (`LESSONS`): guard heavy, emote at a guard, attack after a
+  block, befriend below 40%. One the memo already has is never proposed.
+- **The sim decides** (same idea as a rival's study): each lesson with a reason is sparred against this same foe (32 fixed
+  seeds, memo proxy, lesson rule first) and must win at least 2 more practice fights **and** pass the Teach gate (no worse
+  on the train seeds against every wild pet). Best win rate wins; ties go to the costlier mistake. After a loss with no
+  clear mistake every missing lesson is tried. Nothing helps -> no review (a rival loss then says the `nextLesson` tip).
+- Screen: "Coach: <what it saw>", "Coach: one lesson wins X% of practice fights against <foe>, not Y%:", then the lesson
+  with Teach it / Done (the question box drops the portrait so ~50 letters fit on 4:3). Teach it opens Teach with the
+  words typed in; Enter runs the normal coach chain (Muse Spark -> tuned Llama -> scripted). The scripted coach learned
+  the counter words, so every lesson works offline (unit test).
+- Without the gate, "emote at a guard" alone (proposed against Ama) cost -14.5 Prove points: emote with no befriend
+  rule just stalls. With it every proposed lesson raises Prove.
+- Cloud review text (Meta Model API Muse Spark 1.3) is P5; the lesson choice stays the sim's.
+
+Bench (`.scratch/combat/review-bench.ts`, 10 fights per foe, Prove = lowest held-out lift of a proposed lesson):
+| Start memo | brute | bully | turtle | elder | mo | ama | pip | Prove |
+|---|---|---|---|---|---|---|---|---|
+| none | friends 13>94 (loss), heavy 13>88 (win) | friends 6>53 | friends 81>100 (timeout) | friends 19>75 | none | none | friends 53>75 | +15.0 |
+| guard heavy | friends 88>100 | friends 9>75 | friends 81>100 | friends 9>75, counter 9>25 | counter 0>28 | counter 0>56, friends 0>34 | friends 53>75 | +3.1 |
+Skitter and pal: no review (the pet wins).
+
 ## Mind
 Needs, plan, choose, emote and reflect use the same scheduler as villagers. Lines are short. The persona comes from genes and the memo.
 

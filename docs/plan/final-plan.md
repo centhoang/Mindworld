@@ -9,10 +9,14 @@
   memory/respect/news/coins. Design and bench: `docs/ai/pet.md` "Village rivals". Proof: `docs/testing/proof/pet/rivals-live.md`.
   Changed from the plan: the duel is a live `Battle` (with shouts and Teach), not the precomputed `runDuel`; the model's
   plan is one candidate the sim rehearses, not the memo itself.
-- **P1 left, in order:** adapted coach review after a fight ("Teach this"; reuse `nextLesson` in `sim/rivals.ts`, which
-  already names the next missing lesson) -> trainer sprites on the battle screen (`attack`, `hurt`, `jump`, `idle` strips;
-  not yet in `client/public/art/humans/`) -> pack UI bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits. The
-  screen today uses the old code-drawn HP bars.
+- **P1 coach review done** (live `main-CKR3gYL-`, worker 973186f7): `sim/review.ts` reads the replay, rehearses each
+  lesson the memo lacks against the same foe, proposes the best one that also passes the Teach gate; "Teach it" types it
+  into Teach. Design and bench: `docs/ai/pet.md` "Coach review". Proof: `docs/testing/proof/pet/coach-review-live.md`
+  (Mo duel -> counter lesson -> Muse Spark taught it, Prove +14.3). Changed from the plan: the lesson is chosen by the
+  sim (rehearsal + gate), not by replay rules alone; the cloud review text stays in P5.
+- **P1 left, in order:** trainer sprites on the battle screen (`attack`, `hurt`, `jump`, `idle` strips; not yet in
+  `client/public/art/humans/`) -> pack UI bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits. The screen today
+  uses the old code-drawn HP bars.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

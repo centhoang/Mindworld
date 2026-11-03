@@ -1,16 +1,26 @@
-# HANDOFF: Mindworld final plan (2026-11-03, ~20:30 VN)
+# HANDOFF: Mindworld final plan (2026-11-03, 18:35 VN)
 
-**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P1: coach review next). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P1: trainer sprites next). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
   Status section at the top. Keep that Status current every session.
-- Live `main-mYTbEBmg` (worker version b05d04d5). Local commits on `rework/fresh-look`, not pushed.
-- Tests: client 635, worker 214, tsc clean both.
-- Spend 2026-11-03: $0.36 of the $30 day cap. Baseten total $0.82 of its $50 cap. Meta ~$149.9, Modal ~$100 untouched.
+- Live `main-CKR3gYL-` (worker version 973186f7). Local commits on `rework/fresh-look`, not pushed.
+- Tests: client 641, worker 214, tsc clean both.
+- Spend 2026-11-03: $0.39 of the $30 day cap. Baseten total $0.85 of its $50 cap. Meta ~$149.9, Modal ~$100 untouched.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-03 session").
 
-## Done this session (P1 NPC rivals)
+## Done this session (P1 coach review)
+- `client/src/sim/review.ts` (pure): `coachReview(replay, memo, {pet, foe, def})` finds reasons in the replay (heavy hits
+  unguarded, hits into a guard, missed counters, hurt foe never befriended), rehearses each missing lesson against the
+  same foe (`winRate`, 32 seeds) and keeps the best one with +2 wins that also `passesGate`. `LESSONS` = words + rule.
+- `pixel/fight-flow.ts` `review()` after wild fights and rival duels (rival loss: `whyLost.why`, then the review, else the
+  old tip). `BattleView.ask(text, labels)` reuses the 2x2 menu (no portrait). `TeachScreen.show(lesson)` pre-fills.
+- `sim/cortex.ts` ScriptedCortex learns "attack after a block" (`R.counter`); prompts untouched.
+- Live proof: Mo duel -> "Coach: Mochi blocked a hit but did not strike back once." -> counter lesson (0% -> 28%) ->
+  Teach it -> Muse Spark taught it, Prove +14.3. `docs/testing/proof/pet/coach-review-live.md`.
+
+## Done earlier today (P1 NPC rivals)
 - `client/src/sim/rivals.ts` (pure): 4 villager pets (Sage, Ripple, Honey, Zip) with fixed genes and persona memos;
   `duelAsked`, `duelRefusal` (no pet, grudge, night, work, 3 a day); `rehearse` spars plans against the player's memo
   and aims for a 40% player chance (`FAIR`), taking the cloud plan when within `CLOUD_SLACK` 0.1; `rivalDef` logs the rule
@@ -27,9 +37,9 @@
   proof `docs/testing/proof/pet/rivals-live.md`.
 
 ## Next actions
-1. P1 rest, in order: coach review after a fight ("Teach this" pre-fills Teach, `pixel/teach.ts`; local rule = `nextLesson`
-   in `sim/rivals.ts` plus replay rules; cloud = "Learn from my fights" path if still in `game/coach.ts`) -> trainer
-   sprites on the battle screen -> pack bars and `glint`. Do not edit the coach prompt text in `sim/cortex.ts` (frozen).
+1. P1 rest, in order: trainer sprites on the battle screen (`attack`, `hurt`, `jump`, `idle` strips from the pack into
+   `client/public/art/humans/` via `scripts/art-sunny.py`; read `docs/visual/visual.md` and `layers.md` first) -> pack
+   bars (`redbar`/`greenbar`/`bluebar`) and `glint` on crits. Do not edit the coach prompt text in `sim/cortex.ts` (frozen).
 2. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
    screen; a bored villager walks up and challenges you.
 3. Then P2-P8 per the plan. **P3 is a loop** (user: "make sure (test, update, repeat) so on live, many players can join
@@ -75,7 +85,10 @@
 - Shell edits with backticks or `${}` break Bash heredocs: write a Python patch script to `.scratch/` with the Write tool.
 - The dev GPU gate asks on first load in a clean profile: pick "This computer only has this graphics chip".
 - Tool how-to (test Chrome, tab driving, chat log): `docs/ops/tooling.md`. Benches: `.scratch/combat/bench.ts` (wild),
-  `rival-bench.ts`, `tip-bench.ts` (gitignored; recreate from `docs/ai/pet.md` if gone).
+  `rival-bench.ts`, `tip-bench.ts`, `review-bench.ts` (gitignored; recreate from `docs/ai/pet.md` if gone).
+- Live tests change the profile's save (`localStorage["petmind.v1"]`): keep the memo first, write it back after.
+- A fight on a hidden pane: after the result, `battleView.choosing` with labels "Teach it"/"Done" is the coach review;
+  `cmdKey("enter")` = Teach it, then `#teach` `requestSubmit()` teaches the typed lesson.
 - `cd` inside a Bash call moves the session's working folder: use absolute paths.
 - The untracked `info-ref/` folder is the user's; never commit or touch it.
 - Code: client/src/{sim,life,mind,world,game,pixel,finetune}/ · worker/src/{room,room-do,npc,app,rival}.ts. Seams: `game/ports.ts`, Overworld.buildScene, `pixel/pixel-view.ts`.
