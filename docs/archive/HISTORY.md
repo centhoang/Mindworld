@@ -158,3 +158,17 @@ docs/{TILE-RULES,NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/
 - `/api/room?room=` names main, main-2..9, check, check-2..9; client moves on `full`; endless retry; Guest/spill/drop toasts.
 - Swim drawn in open water (`waterReach`). Hidden or frame-throttled tabs step the world (`pixel/main.ts`).
 - Proof: `docs/testing/proof/network/join-live.md`, `docs/testing/proof/game/activities.md` "P2 live watch".
+
+## 2026-11-04 session (P2 finish, P3), moved from HANDOFF
+- **P2 live watch:** 19 min on live, all activities but soccer/farm started unforced; haul's carry strip seen; swim was drawn
+  on the pond's cliff edge: fixed (`Overworld.waterReach`, swim spots need open water on their own row, test fails on old code).
+- **`scripts/join-check.mjs`** (bots in the live `check` room, hard limits, one line per check, exit 1 on a FAIL). Run it
+  after every deploy: `node scripts/join-check.mjs` (about 40 s; `--big 0` skips the 100-player part).
+- **Rooms:** `/api/room?room=` = `main`, `main-2`..`main-9`, `check`, `check-2`..`check-9` (`room.ts roomName`). A client
+  told `full` moves to the next (`live.ts spillUrl`, `roomNo`). `?room=check` in the page address = a test tab in the
+  bots' room (`roomQuery`). A lost room retries forever (backoff to 30 s). Toasts: Guest yard, spill village, lost connection.
+- **Bugs fixed (49-52, `docs/BUGS.md`):** refresh keeps its plot for 60 s (`REFRESH_HOLD_MS`); the welcome carries farms in
+  view; a hidden, fighting or indoor tab sends `bg` in its cap at once and the room hosts villagers on a visible free player
+  (`npc.ts elect`, `room-flow.ts beat`); frame-throttled views step the world (`pixel/main.ts`); phone-size windows keep
+  360 art columns (`pixel/low-size.ts`).
+- Proof: `docs/testing/proof/network/join-live.md`, `docs/testing/proof/game/activities.md` "P2 live watch".

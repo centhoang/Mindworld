@@ -35,6 +35,13 @@
   Changed from the plan: bots use their own `check` room (they would host villagers in the real one); overflow rooms are
   `main-2`..`main-9`. Not run live: joining while someone is indoors (same rule as fighting). Gap found: no touch controls.
   **Next: P4** (map polish + bug 46), then user play-test #1. Run `node scripts/join-check.mjs` after every deploy.
+- **P4 mostly done** (live worker 14537484, commits 160c5b6, cbbf566, 821289a): bug 46 (the same small house on every plot,
+  Codex art in pack style, roofs recoloured into the pack's 5 colours by slot, a small room inside with the crate); every
+  plot has a 2x3 tilled field and a gated front fence of pack rail tiles; the west coast moved out a tile; touch controls
+  (`pixel/touch.ts`). Proof `docs/testing/proof/visual/house-46-live.png`, `house-46-inside-live.png`; join-check clean.
+  BuiltDemo sheet: `.scratch/p4/demo-all.png`. Changed from the plan: houses stand on free plots too (the streets were empty
+  grass); furniture placing inside is gone (the house comes furnished). Not done: tree clumps toward the coast, stumps,
+  berry bushes, the plaza's bare dirt (pack `statue.png` exported, not loaded). **Next: user play-test #1.**
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

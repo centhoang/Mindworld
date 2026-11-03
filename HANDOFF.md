@@ -1,53 +1,36 @@
-# HANDOFF: Mindworld final plan (2026-11-04, 00:58 VN)
+# HANDOFF: Mindworld final plan (2026-11-04, ~03:00 VN)
 
-**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P2 and P3 done; start P4). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P4 mostly done; user play-test #1 next). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
   Status section at the top. Keep that Status current every session.
-- Live `main-26ntqsHn` (worker 82897677). Local commits on `rework/fresh-look` (last d5ad3ed), not pushed.
-- Tests: client 661, worker 221, tsc clean both.
+- Live worker 14537484 (P4). Local commits on `rework/fresh-look` (last 821289a + docs), not pushed.
+- Tests: client 664, worker 221, tsc clean both. Join check on live clean after the P4 deploy.
 - Spend 2026-11-03 (ledger day): $0.72 of the $30 day cap. Baseten total $1.18 of its $50 cap. Meta, Modal untouched.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-04 session" or "2026-11-03 session").
 
-## Done this session (P2 finish, P3; commits 289c996, d5ad3ed)
-- **P2 live watch:** 19 min on live, all activities but soccer/farm started unforced; haul's carry strip seen; swim was drawn
-  on the pond's cliff edge: fixed (`Overworld.waterReach`, swim spots need open water on their own row, test fails on old code).
-- **`scripts/join-check.mjs`** (bots in the live `check` room, hard limits, one line per check, exit 1 on a FAIL). Run it
-  after every deploy: `node scripts/join-check.mjs` (about 40 s; `--big 0` skips the 100-player part).
-- **Rooms:** `/api/room?room=` = `main`, `main-2`..`main-9`, `check`, `check-2`..`check-9` (`room.ts roomName`). A client
-  told `full` moves to the next (`live.ts spillUrl`, `roomNo`). `?room=check` in the page address = a test tab in the
-  bots' room (`roomQuery`). A lost room retries forever (backoff to 30 s). Toasts: Guest yard, spill village, lost connection.
-- **Bugs fixed (49-52, `docs/BUGS.md`):** refresh keeps its plot for 60 s (`REFRESH_HOLD_MS`); the welcome carries farms in
-  view; a hidden, fighting or indoor tab sends `bg` in its cap at once and the room hosts villagers on a visible free player
-  (`npc.ts elect`, `room-flow.ts beat`); frame-throttled views step the world (`pixel/main.ts`); phone-size windows keep
-  360 art columns (`pixel/low-size.ts`).
-- Proof: `docs/testing/proof/network/join-live.md`, `docs/testing/proof/game/activities.md` "P2 live watch".
-
-## P4 in progress (2026-11-04 ~02:00 VN, commit 160c5b6, NOT deployed)
-- Done, local: every plot (taken or not) has the same small house (`village-map.ts plotHouse`, roof by slot from
-  `ROOFS`), a 2x3 field (`bedsAt` rect branch, cols px+6..7, rows pz+2..4; free plots draw tilled beds, `freeBeds`), a
-  front fence of pack rail tiles row 2 cols 38/39/42 with a 3-tile gate at the door (`plotFences`, decor kind `rail`).
-  Name sign inside the fence east of the gate. Touch controls: `pixel/touch.ts` (stick + E/X/T, shown on coarse pointers),
-  proven in the pane at 375x812 (keys sent, player walks).
-- **Waiting on Codex:** `.scratch/brief-home-small.md` -> `client/public/art/gen/home-small-roof.png` +
-  `home-small-open.png` (80x64, same outline) and `.scratch/home-small-result.md` (FLOOR, BUILT_IN, DOOR, EXIT_Y, CHIMNEY).
-  Until then houses are invisible (art names `home-small-<roof>` / `home-small-open` load from `art/sunny/`).
-- **Next steps:** check the art (contact sheet, pack style, front only); write `scripts/art-home-small.py` that copies the
-  open picture and recolours the roof into 5 colours (map blue shingle colours to the other roof blocks in `tiles.png`,
-  same offsets) into `client/public/art/sunny/home-small-<roof>.png`; rewrite `game/house.ts` (FLOORS, BUILT_IN,
-  BUILT_IN_PIECES, HOME_FOOT {40,64}, HOME_ROOF {80,64}, HOUSE_DOOR, HOUSE_EXIT_Y, HOME_CHIMNEY is PROVISIONAL) and
-  `interior.ts` (draw `home-small-open`, fade the own roof art, GX/GY so CRATE {11,3} lands on the crate square, sitters
-  on the new floor, `pieces()` -> [] since the house comes furnished); then render, tests, deploy, join-check, play-test.
-- Map polish still open (from the BuiltDemo sheet `.scratch/p4/demo-all.png`): tree clumps toward the coast, stumps /
-  berry bushes / flowers, the plaza's big bare dirt (pack statue `statue.png` is exported, not loaded). Update
-  `docs/visual/visual.md` ("Not needed: decor density, fences" no longer holds: the user asked for BuiltDemo polish).
-- Debug render of any area: in the dev tab define `__region(cx, cz, scale)` (`docs/ops/tooling.md` "Seeing any part of the map") or draw
-  `world.view.draw({...world.buildScene(), cam, panels: []}, g, w, h, t)` into a big canvas.
+## Done this session (P4; commits 160c5b6, cbbf566, 821289a)
+- **Bug 46:** every plot, taken or not, has the same small house (`village-map.ts plotHouse`: foot px+2.5, pz+4; roof
+  colour by slot from `ROOFS`). Art: Codex drew `client/public/art/gen/home-small-roof.png` + `home-small-open.png`
+  (80x64, one outline, brief `.scratch/brief-home-small.md`, its checks `.scratch/home-small-result.md`);
+  `python scripts/art-home-small.py` recolours the roof from the tileset's matching house blocks (128 px apart) into
+  `art/sunny/home-small-<roof>.png`. Inside: `game/house.ts` floor plan (picture pixels), `interior.ts` draws the open
+  picture, fades my own roof (`InteriorHost.roof`), crate square east of the door lane (GX/GY), no placed furniture.
+- **Plots:** a 2x3 tilled field (`bedsAt` rect: px+6..7, pz+2..4; free plots draw tilled beds via `freeBeds`), a front
+  fence of pack rail tiles (tileset row 2 cols 38/39/42, decor kind `rail`, `plotFences`) with a 3-tile gate at the door,
+  the name sign just inside, east of the gate. West coast moved out one tile so west houses do not stand on the shore.
+- **Touch controls:** `pixel/touch.ts` (stick: walk, rim = run; E / X / T buttons send real key events), on coarse
+  pointers only; proven in the pane at 375x812. Not yet tried on a real phone.
+- Proof: `docs/testing/proof/visual/house-46-live.png`, `house-46-inside-live.png`. Checks added to `checks/visual.md`.
+- Still open from the BuiltDemo sheet (`.scratch/p4/demo-all.png`): tree clumps toward the coast, stumps, berry bushes,
+  the plaza's bare dirt (pack `statue.png` is exported, not loaded). Do after play-test #1 if time.
 
 ## Next actions
-1. **P4** (above), then deploy, run `node scripts/join-check.mjs`, then ask the user for play-test #1.
-2. Touch controls are in (P4); say in the demo script that phones work.
+1. **User play-test #1** (asked at the end of the P4 session). After it: read the chat log unasked, add failures to
+   `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md` with screenshots in `.scratch/bugs/`, fix, deploy, join-check.
+2. Then P4 leftovers (tree clumps, decor, plaza) if time, then **P5** (liveliness + surprise, behind `CLOUD_LIVELY`).
+   Touch controls are in: say in the demo script that phones work.
 3. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
    screen; a bored villager walks up and challenges you. Optional P1 leftover: pack expression icons over pets.
 4. After any user play-test: read the chat log unasked, add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`.
@@ -56,8 +39,7 @@
 ## Open
 - User's call, asked and not yet answered: remove Access at the freeze (Nov 4 ~18:00 VN) instead of Nov 5 morning, so
   outside joins get tested with time to fix. Ask again before P6.
-- 46: same small house for every player, with an interior (P4).
-- 34, 36, 37, 45, 47, 48, 49-52 fixed, waiting for the user's review on live.
+- 34, 36, 37, 45, 46, 47, 48, 49-52 fixed, waiting for the user's review on live.
 - Not done by a person: a 2-person play, the stranger test. P3 real-tab checks were all tabs on this machine.
 - Not run live: joining while someone is indoors (same away rule as fighting); a host leaving mid-conversation (earlier
   proof `proof/network/5c5d-live.md` covers hand-over with bonds intact).
