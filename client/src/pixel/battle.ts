@@ -222,7 +222,9 @@ export class BattleView {
     } else if (action === "befriend" || action === "emote") {
       this.push({ dur: 0.7, tick: (p) => (this.hearts = p) , done: () => (this.hearts = 0) });
     }
-    if (enemyAct === "strike" || enemyAct === "heavy") {
+    if (foeHp <= 0) {
+      // fainted on my hit: it does not get its move
+    } else if (enemyAct === "strike" || enemyAct === "heavy") {
       if (fx.has("foe-counter")) this.sayStep(`${foe} counters!`);
       this.sayStep(enemyAct === "heavy" ? `${foe} lands a HEAVY hit!` : `${foe} strikes!`);
       this.push({ dur: 0.25, tick: (p) => (this.foeDx = -Math.sin(p * Math.PI) * 14) });

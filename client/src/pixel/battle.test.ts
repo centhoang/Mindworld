@@ -75,4 +75,13 @@ describe("battle depth on screen", () => {
     expect(await runUntil(v, v.playTurn("attack", "", "", "strike", 14, 9, 19, 16, { fx: ["signature", "crit", "foe-counter", "foe-crit"] }), 20)).toBeLessThan(12);
     expect(v.busy).toBe(false);
   });
+
+  it("a foe that faints on my hit does not strike back on screen", async () => {
+    const v = new BattleView();
+    const lines: string[] = [];
+    v.onLine = (t) => lines.push(t);
+    await runUntil(v, v.open(side("Foe"), side("Mochi")), 10);
+    await runUntil(v, v.playTurn("attack", "", "", "strike", 9, 0, 30, 0), 20);
+    expect(lines.some((l) => l.includes("strikes"))).toBe(false);
+  });
 });
