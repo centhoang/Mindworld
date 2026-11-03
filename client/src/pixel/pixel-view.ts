@@ -18,16 +18,12 @@ import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_ART, OVERWORLD_MON, type Ov
 import { characterShadow, drawCropArt, drawLand, drawRail, drawSea, drawTree, footRuns, stampSize, stand, standRun, strip } from "./sunny";
 import { tile } from "./sunny-terrain";
 
-const SOIL = tile(7, 1); // the pack's earth, one whole tile, so beds side by side read as one field
-
-// Dug earth: the pack's tile, darkened so a bed never reads as road, with two furrows.
+// A bed is the pack's tilled mound on the field's dirt, and its crop grows out of the mound's middle, as in the
+// pack's demo farm (bug 41). The field itself is terrain (`m.soil`).
+const MOUND_FOOT = 14; // the mound's bottom, from the tile's top
+const CROP_FOOT = 10; // the crop's foot: the mound's hollow
 function drawSoil(g: CanvasRenderingContext2D, x: number, y: number): void {
-  drawRail(g, SOIL, x, y);
-  g.fillStyle = "rgba(96,52,32,0.55)";
-  g.fillRect(x, y, TILE, TILE);
-  g.fillStyle = "rgba(60,32,24,0.5)";
-  g.fillRect(x, y + 5, TILE, 1);
-  g.fillRect(x, y + 11, TILE, 1);
+  stand(g, "soil", x + 8, y + MOUND_FOOT);
 }
 import { drawFrame, drawText, drawTinyText, GLYPH, wrap } from "./text";
 
@@ -103,14 +99,14 @@ export class PixelView implements View {
         const [sx, sy] = toScreen(b.x, b.z);
         drawSoil(g, sx, sy);
         const [crop, stage] = farm?.[i] ?? ["", 0];
-        if (crop) drawCropArt(g, CROP_ART[crop] ?? "carrot", CROP_STAGE[Math.min(3, stage)]!, sx + 8, sy + 13);
+        if (crop) drawCropArt(g, CROP_ART[crop] ?? "carrot", CROP_STAGE[Math.min(3, stage)]!, sx + 8, sy + CROP_FOOT);
       });
     }
     o.beds.forEach((b, i) => {
       const [sx, sy] = toScreen(b.x, b.z);
       const p = o.farm?.plots[i];
       drawSoil(g, sx, sy);
-      if (p?.crop) drawCropArt(g, CROP_ART[p.crop] ?? "carrot", CROP_STAGE[Math.min(3, p.stage)]!, sx + 8, sy + 13);
+      if (p?.crop) drawCropArt(g, CROP_ART[p.crop] ?? "carrot", CROP_STAGE[Math.min(3, p.stage)]!, sx + 8, sy + CROP_FOOT);
       if (p && p.wetUntil) {
         g.fillStyle = PAL.teal; // wet soil: teal corner marker (STYLE.md farms)
         g.fillRect(sx + 3, sy + 11, 2, 2);

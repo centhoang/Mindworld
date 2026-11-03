@@ -23,10 +23,12 @@ LAYERS = {l['name']: decode(l['tiles']) for l in room['layers'] if 'tiles' in l 
 sheet = Image.open(A + 'Tileset/spr_tileset_sunnysideworld_16px.png').convert('RGBA')
 sheet.save(OUT + 'tiles.png', optimize=True)
 
+# Bug 38: the room's roofs mix in shingle tiles with a brown patch; on a lone house they read as odd blocks.
+PLAIN = {34 * 64 + 20: 36 * 64 + 16, 10 * 64 + 20: 12 * 64 + 16}  # red, blue patched shingle -> plain shingle
 def tile(v):
     v &= 0xffffffff
     if v >> 31 or not v & 0x7ffff: return None
-    i = v & 0x7ffff
+    i = PLAIN.get(v & 0x7ffff, v & 0x7ffff)
     t = sheet.crop(((i % 64) * 16, (i // 64) * 16, (i % 64) * 16 + 16, (i // 64) * 16 + 16))
     if v >> 28 & 1: t = t.transpose(Image.FLIP_LEFT_RIGHT)
     if v >> 29 & 1: t = t.transpose(Image.FLIP_TOP_BOTTOM)

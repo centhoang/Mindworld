@@ -507,10 +507,12 @@ export class Overworld {
     // Feature clearings take priority over trees, like the pack's fields and mill yards.
     // Farm ground is the pack's light dirt: real beds with a tile around them, and the decorative fields.
     const soil = (m.soil = new Uint8Array(m.w * m.h));
-    if (!this.world.things) for (const p of this.world.platforms) if (p.ground) {
-      const { x, z } = bedsAt(p)[0]!;
-      // One plain block of dirt: slots side by side, a walkable row between, nothing else on it.
-      for (let dz = -1; dz <= 4; dz++) for (let dx = -1; dx <= 3; dx++) {
+    for (const p of this.world.platforms) if (p.ground) {
+      const beds = bedsAt(p);
+      const { x, z } = beds[0]!;
+      const last = beds[beds.length - 1]!;
+      // One plain block of dirt with a tile of edge all round, nothing else on it (bug 41).
+      for (let dz = -1; dz <= last.z - z + 1; dz++) for (let dx = -1; dx <= last.x - x + 1; dx++) {
         const k = (z + dz - m.oz) * m.w + x + dx - m.ox;
         if (m.kind[k] === T.flowers || m.kind[k] === T.tall) m.kind[k] = T.grass;
         if (m.kind[k] === T.grass || m.kind[k] === T.path) soil[k] = 1;
@@ -1145,7 +1147,11 @@ export class Overworld {
   }
 }
 
-export const bedsAt = (home: Vec): Vec[] => Array.from({ length: PLOTS }, (_, i) => ({ x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 2 + Math.floor(i / 3) * 2 }));
+// A village plot (it has a rect) keeps its field and the field's edge inside the plot, clear of the road's edge
+// tiles: two rows of three side by side, as on the pack's demo farm (bug 41). The set-aside mosaic grounds keep theirs.
+export const bedsAt = (home: Vec & { rect?: unknown }): Vec[] => Array.from({ length: PLOTS }, (_, i) => home.rect
+  ? { x: Math.floor(home.x) + 1 + (i % 3), z: Math.floor(home.z) - 2 + Math.floor(i / 3) }
+  : { x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 2 + Math.floor(i / 3) * 2 });
 
 const GATHER_HINT: Record<string, string> = { fish: "E: FISH", chop: "E: CHOP", herbs: "E: PICK HERBS" };
 

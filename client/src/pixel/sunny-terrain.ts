@@ -66,9 +66,12 @@ export function buildTerrain(m: TileMap): Terrain {
   const dry = (i: number, j: number) => at(i, j) !== T.water && at(i, j) !== T.bridge && at(i, j) !== T.pool;
   const isSoil = (i: number, j: number) => m.soil?.[j * m.w + i] === 1;
   const onPath = (i: number, j: number) => at(i, j) === T.path && !isSoil(i, j);
-  // A road's edge tiles are mostly grass, so the shape is one tile wider than the walkable path: the dirt then shows
-  // at the path's real width, and a two-tile street stays a street.
-  const isRoad = (i: number, j: number) => onPath(i, j) || (dry(i, j) && (onPath(i + 1, j) || onPath(i - 1, j) || onPath(i, j + 1) || onPath(i, j - 1)));
+  // A road's edge tiles are mostly grass, so the shape is one tile wider than the walkable path, diagonals too: the
+  // dirt then shows at the path's real width, a two-tile street stays a street, and a path's end is square, not a
+  // one-tile tip with no edge on one side (bug 40). Roads stay off the coast's own edge tiles; a pier foot is land here.
+  const firm = (i: number, j: number) => dry(i, j) || at(i, j) === T.bridge;
+  const nearPath = (i: number, j: number) => [-1, 0, 1].some((dj) => [-1, 0, 1].some((di) => onPath(i + di, j + dj)));
+  const isRoad = (i: number, j: number) => dry(i, j) && !isSoil(i, j) && edgeOf(firm, i, j) === null && nearPath(i, j);
   const high = (i: number, j: number) => m.high?.[j * m.w + i] === 1;
   const isPool = (i: number, j: number) => at(i, j) === T.pool;
   const free = (i: number, j: number) => i >= 0 && j >= 0 && i < m.w && j < m.h && !dry(i, j);

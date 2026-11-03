@@ -28,7 +28,7 @@ Decide each tile from the land shape alone, with 4 neighbours and then diagonals
 
 - Fill: nothing in the game scales; the pack's 3.1 is an 8 px checker, so one 16 px thing covered four squares. The user wants one square per tree or farm spot, so the fill is the same two greens, flat, one per tile.
 - The light road family is the grass table moved down 4 rows (3.k becomes 7.k, 4.k becomes 8.k). Not used yet.
-- Roads are 3 tiles wide and stay on land.
+- Roads are 3 tiles wide and stay on land. The road shape is the path grown by one tile all round, diagonals too, so a path end is square (bug 40). It never covers a coast edge tile; a pier foot counts as land, so a lane meets the pier. No land strip 1 tile wide anywhere (`village-look.test.ts`).
 - Island outlines are straight edges with stepped corners, never slants or circles: coast, cliff and foam tiles only join on those. Grounds are stepped rectangles (world/ground.ts), other places squares with corner notches (`inBlock` in world/layout.ts). Roads run along one axis, then the other.
 - Trees stay inland (`SHORE` in overworld.ts: 2 tiles from water, 3 to the south, so a canopy never hangs over a cliff) and grow in tight clumps, about 2 tiles apart. Try 8-9 clumps per player ground and 3-4 elsewhere (previously 5-6 / 2-3); larger compact patches use available clear grass before starting another clump. Clearance takes priority over the density target. Trees stand on tile centres (bug 14): only the clump's outline is uneven. Four seed residues in five draw the round `tree_01` strip; one draws a pine. The pack's `tree_02` strip is also a conifer, not a second round tree.
 - Straight roads of 6+ tiles carry a fence on both sides, either direction: segments 3-8 tiles, gaps 2+, kept 2 tiles clear of junctions, gates and bridges (grounds-decor.ts). East-west uses `fence-a`, north-south the rail tiles 1.40 / 3.40 / 4.40 (`fence-v`).
@@ -79,10 +79,11 @@ The ends lie one tile up on the land.
 - The sea repeat runs on past the map edge: no sky, no edge line.
 
 ## Buildings, props, crops, furniture
+- Roofs: the room's patched shingles (red 34.20, blue 10.20) export as plain 36.16 / 12.16 (`PLAIN` in art-sunny.py). The home wing's roof is cleaned in art-home-wing.py: nothing above the eaves, east terrace mirrored from the west, dormer shadows refilled from the 16 px shingle repeat (bug 38).
 - Stamps are cut from room rects in `STAMPS` in art-sunny.py and keep only the largest connected blob, because rects catch neighbours. Add a name to `LOOSE` when the stamp has several pieces on purpose.
 - Tile rects are easy to misread on a labelled sheet: column = first + (x - 24) / cell width. Check the output on a review sheet.
 - Anchor: bottom centre at the foot (`stand`). Draw with people, sorted by foot z. Solid area comes from `footprint`: half width, depth about half the height plus 0.6.
-- Crops: pack art 0 is the seed, 1-4 grow, 5 is the harvested item. Farm stages 0-3 map to 1, 2, 3, 4. Farm ground is one plain block of the light dirt family (`m.soil`), fill 7.1, with no flowers or decor: slots side by side, a walkable row between. Wheat comes from the GameMaker sprites. Tomato uses radish art.
+- Crops: pack art 0 is the seed, 1-4 grow, 5 is the harvested item. Farm stages 0-3 map to 1, 2, 3, 4. Farm ground is one plain block of the light dirt family (`m.soil`), fill 7.1, with no flowers or decor: with an edge tile all round. On a village plot the beds are 3 x 2, side by side, right of the door, and the field with its edge stays inside the plot and off the road's edge (`bedsAt`). Each bed is the pack's tilled mound (`soil` stamp) with its crop standing in the mound's hollow, as on the demo farm (bug 41). Wheat comes from the GameMaker sprites. Tomato uses radish art.
 - Furniture: rows 33-37 of the tileset, listed in `FURNITURE`. Big rug is at 35.40, table at 35.50.
 
 ### Ground dressing (2026-11-01)

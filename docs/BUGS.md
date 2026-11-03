@@ -7,14 +7,10 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 
 36. **The Brain panel names the model to a stranger.** User's call; the wording is unchanged.
 
-38. **House roof tiles are wrong.** Blue roof is a patchwork of mismatched pieces, odd blocks and stray bits on top. Shot: `.scratch/bugs/38-house-roof.png` (user, 2026-11-03).
-39. **Fishing rod lies on the pier.** A loose rod sprite sits on the dock planks. Shot: `.scratch/bugs/39-40-pond-rod-path.png`.
-40. **Path tile placed oddly.** A dirt path piece pokes into the grass beside the pond (bottom left of the same shot).
-41. **Farm ground is not correct.** Plots read as dark strips with crops pasted on; does not match the pack's tilled soil. Shot: `.scratch/bugs/41-farm-ground.png`.
-
 ### Fixed, waiting for review
 1-9, 13-23: ground tiles, pond edge, windmill, house entry, placement, farm art, beaches, fishing rules, coast corners, grid, cut-off tiles, road fences, bridge posts, world edge, road bulge, layering, pond pier, clouds, layer rule. Detail: git history of this file.
 35: playground slide redrawn straight-on (`proof/visual/slide-live.jpg`).
+38-41 (Sunnyside, live): 38 home roof cleaned of the demo's smoke, rocks, branch, chimney trail and dormer shadows; villager roofs lose the patched shingle tiles (`proof/visual/roof-38-live.png`, `roof-38-art.png`). 39 the pond carried a `rod` prop spot: removed, the rod shows only in Mo's hands (`pond-39-40-live.png`). 40 roads are the path grown by a full tile ring, kept off coast edges; the pond lane moved a row to meet the pier; a 1-tile coast spur and a stepped street end fixed (same shot, `village-look.test.ts`). 41 the village plots now get the pack's field with edges and a tilled mound per bed, beds moved inside the plot (`farm-41-live.png`).
 30, 31: soccer goal redrawn straight-on, all 654 gen files audited, only the goal failed (`proof/visual/gen-art-audit.md`, `proof/visual/goal-live.png`).
 
 ## Hatch
