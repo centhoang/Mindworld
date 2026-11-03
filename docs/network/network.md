@@ -45,3 +45,17 @@ Build for 100 peers in a room, then one world per room with new rooms when full.
 Compact world note: a small village means most players share cells there. AOI helps most on separate plots, and the tick batching helps in the crowd. Crowd rule: past ~16 entities in view, lower the far ones' rate.
 
 Sources: [Photon MMO concept](https://doc.photonengine.com/server/v4/applications/mmo/mmo-concept), [Fusion interest area](https://doc.photonengine.com/fusion-godot/v3-client-server/manual/interest-area), [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/).
+
+## The ball (P2, 2026-11-04)
+- One ball for the room. Its state is the last kick `{x, z, vx, vz, by}`; every client rolls it the same way in fixed
+  1/30 s steps (`client/src/life/ball.ts`: rolling loss, bounces off what nobody can walk through, a goal from the south,
+  back on its spot 2.5 s after a goal or 40 s after resting lost).
+- Client -> room `{t:"kick", x, z, vx, vz, by}`; the room checks it (coords, speed capped at 9, one per peer per 120 ms;
+  `by` is the peer or a villager it hosts), numbers it (`n` = max(last + 1, now ms), so it keeps rising after a restart)
+  and sends `{t:"ball", ..., n, age}` to everyone, the kicker too. Clients apply kicks in `n` order; the kicker shows its own
+  kick at once and its echo does not reset the ball. Two kicks at once end the same on every screen (the later `n` wins).
+- Late joiners: the welcome carries `ball` with its `age` (ms since the kick). The Durable Object stores the last kick
+  (at most one write per 2 s), so a wake from hibernation keeps it.
+- Who kicks: each player's own client (walking into it), and the villager's host for villagers (soccer chase or walking
+  over it). A machine that only replays a villager never kicks for it.
+- Cost: kicks are rare (a kickabout is about one every 2 s); "others" reaches every peer, not AOI.

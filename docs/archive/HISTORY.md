@@ -116,3 +116,27 @@ docs/{TILE-RULES,NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/
   Client `game/rival-api.ts` asks when a chat with a villager who has a pet opens.
 - Docs: `docs/ai/pet.md` "Village rivals" (design + bench), `checks/pet.md` (rival line ticked, 3 new open lines),
   proof `docs/testing/proof/pet/rivals-live.md`.
+
+## 2026-11-03 session: P1 coach review, trainers, bars (moved from HANDOFF)
+### P1 pack bars and glint
+- `pixel/sunny.ts` `packBar(g, colour, x, y, w, frac)`: the pack's 15x7 bar stretched (caps + middle column), trough
+  filled with the full bar's colour; 6 bar PNGs in `art/sunny/` (copied by `scripts/art-sunny.py`).
+- `pixel/battle.ts`: HP green, red at <= 40%; charge = blue bar; crits and signatures pop 3 pack glints at 2x. Old code
+  bars remain the fallback while art loads. Proof `docs/testing/proof/pet/bars-glint-live.md`.
+
+### P1 trainers on the battle screen
+- `pixel/humans.ts`: `attack` and `hurt` actions, `humanFiles(look, action)`, `HumanSprites.drawAction(...)` (same
+  idle-or-nothing rule as bug 44). Attack is drawn without the tools layer (it is a sword); `tools_attack` not shipped.
+- `pixel/battle.ts`: `Side.trainer`; trainers at 2x beside their pets, drawn first; poses: shout -> attack, hard hit ->
+  hurt, win -> jump (loop). Sides: `main.ts side()` = `world.myLook`, rival = `NPC_LOOKS[owner]`, live duel =
+  `humanLook(liveName(genes))`. Strips copied by `scripts/art-sunny.py`. Proof `docs/testing/proof/pet/trainers-live.md`.
+
+### P1 coach review
+- `client/src/sim/review.ts` (pure): `coachReview(replay, memo, {pet, foe, def})` finds reasons in the replay (heavy hits
+  unguarded, hits into a guard, missed counters, hurt foe never befriended), rehearses each missing lesson against the
+  same foe (`winRate`, 32 seeds) and keeps the best one with +2 wins that also `passesGate`. `LESSONS` = words + rule.
+- `pixel/fight-flow.ts` `review()` after wild fights and rival duels (rival loss: `whyLost.why`, then the review, else the
+  old tip). `BattleView.ask(text, labels)` reuses the 2x2 menu (no portrait). `TeachScreen.show(lesson)` pre-fills.
+- `sim/cortex.ts` ScriptedCortex learns "attack after a block" (`R.counter`); prompts untouched.
+- Live proof: Mo duel -> "Coach: Mochi blocked a hit but did not strike back once." -> counter lesson (0% -> 28%) ->
+  Teach it -> Muse Spark taught it, Prove +14.3. `docs/testing/proof/pet/coach-review-live.md`.

@@ -18,7 +18,16 @@
   idle / attack swing on a shout (no sword layer) / hurt on a hard hit / jump on a win. Proof `proof/pet/trainers-live.md`.
 - **P1 done** (live `main-OQm_PqE6`, worker 6bdb78ea): pack HP bars (green, red at <= 40%) and blue charge bar, pack
   glint on crits and signatures. Proof `proof/pet/bars-glint-live.md`. Not done from the P1 list: pack expression icons
-  over pets (`expression_attack`, `stress`, `love`); left out as optional polish. **Next: P2.**
+  over pets (`expression_attack`, `stress`, `love`); left out as optional polish.
+- **P2 mostly done** (live `main-CrFuSOoI`, worker f42a02af, commit 57b6461): one shared ball through the room (kick
+  numbers, late joiners, DO storage; `docs/network/network.md` "The ball"), soccer villagers chase and shoot, pitch cleared;
+  soccer and dance open to start alone (bug 37); dance floor; campfire, haul, repair, mine, feed (animal yard), swim with
+  the pack strips. Proof: `docs/testing/proof/game/activities.md` P2 (Pip's unforced kickabout and goal on live, two live
+  tabs on the same kicks; headless watch: every new activity starts unforced).
+  Changed from the plan: one goal, not two; mining sells nothing (stone would unbalance the price board's pairs); no
+  string lights or notes (only old non-pack lights art); the player's hammering to upgrade the house waits for P4 (bug 46).
+  **Left in P2:** the 12-min live watch with each activity seen unforced (swim and haul's carry not yet seen on screen).
+  **Next: P3** (build `scripts/join-check.mjs` first).
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

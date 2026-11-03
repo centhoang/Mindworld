@@ -1,54 +1,48 @@
-# HANDOFF: Mindworld final plan (2026-11-03, 18:51 VN)
+# HANDOFF: Mindworld final plan (2026-11-03, 23:55 VN)
 
-**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P1 done; P2 next). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P2 mostly done; finish its live watch, then P3). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
   Status section at the top. Keep that Status current every session.
-- Live `main-OQm_PqE6` (worker version 6bdb78ea). Local commits on `rework/fresh-look`, not pushed.
-- Tests: client 643, worker 214, tsc clean both.
-- Spend 2026-11-03: $0.39 of the $30 day cap. Baseten total $0.85 of its $50 cap. Meta ~$149.9, Modal ~$100 untouched.
+- Live `main-CrFuSOoI` (worker version f42a02af). Local commits on `rework/fresh-look`, not pushed.
+- Tests: client 657, worker 217, tsc clean both.
+- Spend 2026-11-03: $0.46 of the $30 day cap. Baseten total $0.92 of its $50 cap. Meta ~$149.9, Modal ~$100 untouched.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-03 session").
 
-## Done this session (P1 pack bars and glint)
-- `pixel/sunny.ts` `packBar(g, colour, x, y, w, frac)`: the pack's 15x7 bar stretched (caps + middle column), trough
-  filled with the full bar's colour; 6 bar PNGs in `art/sunny/` (copied by `scripts/art-sunny.py`).
-- `pixel/battle.ts`: HP green, red at <= 40%; charge = blue bar; crits and signatures pop 3 pack glints at 2x. Old code
-  bars remain the fallback while art loads. Proof `docs/testing/proof/pet/bars-glint-live.md`.
-
-## Done this session (P1 trainers on the battle screen)
-- `pixel/humans.ts`: `attack` and `hurt` actions, `humanFiles(look, action)`, `HumanSprites.drawAction(...)` (same
-  idle-or-nothing rule as bug 44). Attack is drawn without the tools layer (it is a sword); `tools_attack` not shipped.
-- `pixel/battle.ts`: `Side.trainer`; trainers at 2x beside their pets, drawn first; poses: shout -> attack, hard hit ->
-  hurt, win -> jump (loop). Sides: `main.ts side()` = `world.myLook`, rival = `NPC_LOOKS[owner]`, live duel =
-  `humanLook(liveName(genes))`. Strips copied by `scripts/art-sunny.py`. Proof `docs/testing/proof/pet/trainers-live.md`.
-
-## Done this session (P1 coach review)
-- `client/src/sim/review.ts` (pure): `coachReview(replay, memo, {pet, foe, def})` finds reasons in the replay (heavy hits
-  unguarded, hits into a guard, missed counters, hurt foe never befriended), rehearses each missing lesson against the
-  same foe (`winRate`, 32 seeds) and keeps the best one with +2 wins that also `passesGate`. `LESSONS` = words + rule.
-- `pixel/fight-flow.ts` `review()` after wild fights and rival duels (rival loss: `whyLost.why`, then the review, else the
-  old tip). `BattleView.ask(text, labels)` reuses the 2x2 menu (no portrait). `TeachScreen.show(lesson)` pre-fills.
-- `sim/cortex.ts` ScriptedCortex learns "attack after a block" (`R.counter`); prompts untouched.
-- Live proof: Mo duel -> "Coach: Mochi blocked a hit but did not strike back once." -> counter lesson (0% -> 28%) ->
-  Teach it -> Muse Spark taught it, Prove +14.3. `docs/testing/proof/pet/coach-review-live.md`.
+## Done this session (P2, commit 57b6461 + docs)
+- **One shared ball:** `client/src/life/ball.ts` (pure; state = last kick, fixed 1/30 s steps, walls, goal, reset). Room
+  `kick` -> numbered `ball` to everyone incl. kicker; welcome carries the last kick + age; DO stores it (`worker/src/room.ts`
+  `kick()`, `room-do.ts`). Client: `world/live.ts` `kick()`/`parseKick`, `room-flow.ts`, `Overworld.stepBall/kickBall/
+  ballKicked/playBall/nudgeBall`. Protocol: `docs/network/network.md` "The ball". Pitch cleared of trees (village rows).
+- **Open groups:** `ActivityDef.open` + `isGroup()`: soccer and dance may start alone, others join (bug 37). Dance on
+  `DANCE_FLOOR` (6x4 gen tiles on the square, lit while dancing), evening `peak`; a dancing player (Dance emote = 8 s dance)
+  pulls villagers (`NpcVillage.dancing`).
+- **New activities** (`life/activities.ts`, pack strips copied by `scripts/art-sunny.py`): campfire (green), haul (`after`
+  chop/farm/mine, carry strip walking), repair (stall/board/well), mine (3 quarry rocks NE of the pond), feed (animal yard,
+  `PEN`, on the Elder's lawn), swim (pond's far shore, drawn in the water). Places in `world/village-map.ts`; spots in
+  `Overworld.npcSpots`; drawing in `pixel-view.ts`. Worker `MIND_ACTS` extended; `life.test.ts` keeps both lists equal.
+- **Fixes found:** map rocks were invisible blockers (`rock-small` never loaded -> `rock-big`); LiveLink's welcome dropped
+  the open talks; pets eat at home (old bowl spot gone).
+- Proof: `docs/testing/proof/game/activities.md` P2 (live: Pip's unforced kickabout and goal; two live tabs on the same
+  kick numbers; local two-tab exact match; headless watch counts).
 
 ## Next actions
-1. P1 is done. Optional leftover: pack expression icons over pets (`expression_attack`, `stress`, `love`). Do not edit
-   the coach prompt text in `sim/cortex.ts` (frozen).
-2. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
-   screen; a bored villager walks up and challenges you.
-3. Then P2-P8 per the plan. **P3 is a loop** (user: "make sure (test, update, repeat) so on live, many players can join
-   without issues"): build `scripts/join-check.mjs` first, run on live, log failures in `docs/BUGS.md`, fix, deploy,
-   repeat until one full run is clean; again after every later deploy. If the user says "sleep", Director mode
-   (`docs/ops/director.md`) with the plan as the queue.
+1. **Finish P2:** a 12-min live watch (pane visible) and note each activity seen unforced in `proof/game/activities.md`;
+   look for swim (drawn in the water) and haul's carry strip on screen. Bench: `client/node_modules/.bin/tsx .scratch/p2-watch.mts 4`.
+2. **P3 is a loop** (user: "make sure (test, update, repeat) so on live, many players can join without issues"): build
+   `scripts/join-check.mjs` first, run on live, log failures in `docs/BUGS.md`, fix, deploy, repeat until one full run is
+   clean; again after every later deploy. Bots may ignore `ball` messages; add a kick burst to the check.
+3. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
+   screen; a bored villager walks up and challenges you. Optional P1 leftover: pack expression icons over pets.
 4. After any user play-test: read the chat log unasked, add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`.
+   If the user says "sleep", Director mode (`docs/ops/director.md`) with the plan as the queue.
 
 ## Open
 - User's call, asked and not yet answered: remove Access at the freeze (Nov 4 ~18:00 VN) instead of Nov 5 morning, so
   outside joins get tested with time to fix. Ask again before P6.
-- 46: same small house for every player, with an interior (P4). 37: dance never chosen unforced (P2).
-- 34, 36 and 45, 47, 48 fixed, waiting for the user's review on live.
+- 46: same small house for every player, with an interior (P4; the player hammering to upgrade it was moved here from P2).
+- 34, 36, 37 and 45, 47, 48 fixed, waiting for the user's review on live (37 also waits for the P2 live watch).
 - Not done by a person: a 2-person play, the stranger test. 100 bots not proven (89 held) (P3).
 - Rival plan latency: 13-15 s for a new memo. Prefetch at chat open covers a human typing; a fast "duel?" may fight on the
   bundled plan. Fine, but say so in the demo script (P7).
@@ -64,6 +58,11 @@
 - Deadline: Nov 4, 9 PM ET = Nov 5, 9 AM Vietnam.
 
 ## Gotchas
+- **Ball debugging:** `__px.world.ballNow` (where it is), `.ball.seq` (last room kick number), `.ball.pitch`. Hook
+  `world.ballKicked` to log kicks per tab. A tab's ball only matches another's once both have the same `seq`.
+- **Headless village bench** (`.scratch/p2-watch.mts`): villager chats wait real seconds per line; without the bench's
+  instant `setTimeout` they hold everyone idle forever (looked like a night freeze; it is not a game bug).
+- A Vite HMR reload (any client edit while the dev tab is open) resets `alwaysDay`, `ui.map` and forced states.
 - **A hidden Browser pane stalls requestAnimationFrame**: the game looks frozen, keys do nothing, the overworld does not
   re-render (screenshots are stale). Drive by hand: `__px.world.update(0.05, new Set(["arrowdown"]))`. A fight:
   `__px.fight(__px.world.wilds[0])`, then loop `__px.battleView.update(0.05)`; `battleView.cmdKey("enter")` picks Fight.
