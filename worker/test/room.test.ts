@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AWAY_MS, cleanGenes, CORNERS, Room, ROOM_MAX_PEERS } from "../src/room";
+import { AWAY_MS, cleanGenes, CORNERS, Room, REFRESH_HOLD_MS, ROOM_MAX_PEERS, roomName } from "../src/room";
 import { NPCS } from "../src/npc";
 import { harness } from "./helpers";
 
@@ -50,8 +50,27 @@ describe("live room", () => {
     for (let n = 0; n < CORNERS; n++) r.join(`p${n}`, { groundSeed: n + 1 }, 0);
     r.leave("p5", 100);
     r.leave("p3", 50);
-    expect(r.join("x", { groundSeed: 999 }, 200)!.peer.corner).toBe(3);
+    expect(r.join("x", { groundSeed: 999 }, REFRESH_HOLD_MS + 200)!.peer.corner).toBe(3);
     expect(r.aways.map((a) => a.slot)).toEqual([5]);
+  });
+
+  it("keeps a just-left plot for its owner's refresh when a newcomer joins in those seconds (join check, bug 49)", () => {
+    const r = new Room();
+    for (let n = 0; n < CORNERS; n++) r.join(`p${n}`, { groundSeed: n + 1 }, 0);
+    r.leave("p4", 1000);
+    expect(r.join("new", { groundSeed: 999 }, 1150)!.peer.corner).toBeNull();
+    expect(r.join("p4b", { groundSeed: 5, slot: 4 }, 3000)!.peer.corner).toBe(4);
+  });
+
+  it("sends the farms in view with the welcome, not the far ones (join check, bug 50)", () => {
+    const r = new Room();
+    r.join("near", { x: 0, z: 0 }, 0);
+    r.join("far", { x: 120, z: 0 }, 0);
+    r.message("near", JSON.stringify({ t: "farm", plots: [["wheat", 3]] }), 0);
+    r.message("far", JSON.stringify({ t: "farm", plots: [["corn", 1]] }), 0);
+    const out = r.join("late", { x: 1, z: 0 }, 10)!.out;
+    const farms = out.filter((o) => o.msg.t === "farm");
+    expect(farms).toEqual([{ to: "self", msg: { t: "farm", id: "near", plots: [["wheat", 3]] } }]);
   });
 
   it("restores stored ghost grounds and drops junk", () => {
@@ -131,10 +150,18 @@ describe("room route", () => {
     expect((await h.call("/api/room")).status).toBe(426);
     expect((await h.call("/api/room", { headers: { upgrade: "websocket" }, country: "RU" })).status).toBe(451);
     expect((await h.call("/api/room", { headers: { upgrade: "websocket" } })).status).toBe(503);
-    let hit = 0;
-    h.deps.room = { fetch: async () => (hit++, new Response("ok")) };
+    const hits: string[] = [];
+    h.deps.room = (name) => ({ fetch: async () => (hits.push(name), new Response("ok")) });
     await h.call("/api/room", { headers: { upgrade: "websocket" } });
-    expect(hit).toBe(1);
+    await h.call("/api/room?room=main-2", { headers: { upgrade: "websocket" } });
+    await h.call("/api/room?room=check", { headers: { upgrade: "websocket" } });
+    expect(hits).toEqual(["main", "main-2", "check"]);
+    expect((await h.call("/api/room?room=anything", { headers: { upgrade: "websocket" } })).status).toBe(400);
+  });
+
+  it("names the spill rooms and nothing else", () => {
+    expect([null, "", "main", "main-2", "main-9", "check", "check-3"].map(roomName)).toEqual(["main", "main", "main", "main-2", "main-9", "check", "check-3"]);
+    expect(["main-1", "main-10", "main-0", "Main", "x", "main-2-2", "check-"].map(roomName)).toEqual([null, null, null, null, null, null, null]);
   });
 });
 

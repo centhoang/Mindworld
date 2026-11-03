@@ -41,7 +41,7 @@ function buildDeps(env: Env, ctx?: ExecutionContext): Deps {
     cfg,
     spend: env.SPEND.get(env.SPEND.idFromName("global")),
     ghosts: env.GHOSTS,
-    room: env.ROOM.get(env.ROOM.idFromName("main")),
+    room: (name) => env.ROOM.get(env.ROOM.idFromName(name)),
     assets: env.ASSETS,
     fetch: (input, init) => fetch(input, init),
     mlc: {

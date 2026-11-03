@@ -73,6 +73,8 @@ export function makeRoomFlow(d: RoomDeps) {
     world.npcs?.setHost(npc, host);
   }
   const DROP_GRACE_MS = 20_000;
+  let toldWhere = "1:false"; // what the last welcome told us (room:guest); the main village with a plot says nothing
+  let wasOnline = false;
   // What every machine must see the same: where the villagers I host are, and what grows on my ground.
   const SHARE_MS = 500;
   let sharedAt = 0;
@@ -101,6 +103,13 @@ export function makeRoomFlow(d: RoomDeps) {
       aways.clear();
       mySlot = corner ?? GUEST_SLOT;
       slotKnown = corner !== null;
+      // One line on why you are where you are: another village, the Guest yard. Once per room and slot.
+      const told = `${live.roomNo}:${corner === null}`;
+      if (told !== toldWhere && (live.roomNo > 1 || corner === null)) {
+        const where = live.roomNo > 1 ? `The village was full, so you are in village ${live.roomNo}. ` : "";
+        d.toast(where + (corner === null ? `All ${PLOT_COUNT} plots are taken, so you live in the Guest yard.` : ""), 5);
+      }
+      toldWhere = told;
       for (const a of awayList) aways.set(a.slot, { g: { id: `away${a.slot}`, name: a.name, seed: a.seed || 1, slot: a.slot, away: true }, until: Date.now() + a.ttl });
       for (const p of peers) (addPeer(p), trackGround(p));
       relayoutGrounds();
@@ -155,7 +164,9 @@ export function makeRoomFlow(d: RoomDeps) {
     emote: (id, e) => world.say(`p:${id}`, EMOTE_TEXT[e], 3),
     ball: (k) => world.ballKicked(k),
     status: (s) => {
-      if (s === "online") return;
+      if (s === "online") return void (wasOnline = true);
+      if (s === "offline" && wasOnline) d.toast("Lost the village connection. Trying again...", 4);
+      wasOnline = false;
       for (const n of NPCS) setNpcHost(n, null);
       if (world.npcs) world.npcs.me = null; // offline: the NPCs' minds run here
       world.peers.clear();

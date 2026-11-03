@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { dispatch, LiveLink, parsePeer, roomUrl, type LiveHandlers } from "./live";
+import { dispatch, LiveLink, parsePeer, roomUrl, ROOM_SPILL, spillUrl, type LiveHandlers } from "./live";
 
 function handlers() {
   const log: unknown[][] = [];
@@ -68,6 +68,10 @@ describe("live messages", () => {
   it("builds ws/wss urls", () => {
     expect(roomUrl({ protocol: "https:", host: "pets.uryto.dev" })).toBe("wss://pets.uryto.dev/api/room");
     expect(roomUrl({ protocol: "http:", host: "localhost:5173" })).toBe("ws://localhost:5173/api/room");
+    expect(spillUrl("wss://pets.uryto.dev/api/room", 1)).toBe("wss://pets.uryto.dev/api/room");
+    expect(spillUrl("wss://pets.uryto.dev/api/room", 2)).toBe("wss://pets.uryto.dev/api/room?room=main-2");
+    expect(spillUrl("wss://h/api/room?room=check", 3)).toBe("wss://h/api/room?room=check-3");
+    expect(spillUrl("wss://h/api/room?room=check-2", 4)).toBe("wss://h/api/room?room=check-4");
   });
 });
 
@@ -93,27 +97,53 @@ describe("LiveLink", () => {
     expect(link.emote("wave")).toBe(true);
   });
 
-  it("stops reconnecting when the room is full, and retries after a drop", () => {
-    vi.useFakeTimers();
+  it("moves on to the next village when one is full, and plays alone only when all are", () => {
     const { h, log } = handlers();
+    const urls: string[] = [];
     const sockets: ReturnType<typeof fakeSocket>[] = [];
-    const link = new LiveLink("ws://x", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, () => {
+    const link = new LiveLink("wss://h/api/room", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, (u) => {
+      urls.push(u);
       const s = fakeSocket();
       sockets.push(s);
       return s;
     });
     link.connect();
-    sockets[0]!.readyState = 1;
-    sockets[0]!.onopen!({});
-    sockets[0]!.onclose!({});
-    expect(link.status).toBe("offline");
-    vi.advanceTimersByTime(2000);
-    expect(sockets).toHaveLength(2);
-    sockets[1]!.onmessage!({ data: JSON.stringify({ t: "full" }) });
-    sockets[1]!.onclose!({});
-    vi.advanceTimersByTime(60_000);
-    expect(sockets).toHaveLength(2);
+    for (let i = 0; i < ROOM_SPILL; i++) {
+      sockets[i]!.readyState = 1;
+      sockets[i]!.onopen!({});
+      sockets[i]!.onmessage!({ data: JSON.stringify({ t: "full" }) });
+      sockets[i]!.onclose!({});
+    }
+    expect(urls.slice(0, 3)).toEqual(["wss://h/api/room", "wss://h/api/room?room=main-2", "wss://h/api/room?room=main-3"]);
+    expect(urls).toHaveLength(ROOM_SPILL);
+    expect(link.roomNo).toBe(ROOM_SPILL);
     expect(log.at(-1)).toEqual(["status", "full"]);
+  });
+
+  it("retries a lost room forever, backing off to 30 s, and stays in its spill room", () => {
+    vi.useFakeTimers();
+    const { h } = handlers();
+    const urls: string[] = [];
+    const sockets: ReturnType<typeof fakeSocket>[] = [];
+    const link = new LiveLink("wss://h/api/room", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, (u) => {
+      urls.push(u);
+      const s = fakeSocket();
+      sockets.push(s);
+      return s;
+    });
+    link.connect();
+    sockets[0]!.onmessage!({ data: JSON.stringify({ t: "full" }) });
+    sockets[0]!.onclose!({});
+    sockets[1]!.readyState = 1;
+    sockets[1]!.onopen!({});
+    sockets[1]!.onclose!({});
+    expect(link.status).toBe("offline");
+    for (let i = 0; i < 12; i++) {
+      vi.advanceTimersByTime(30_000);
+      sockets.at(-1)!.onclose!({});
+    }
+    expect(sockets.length).toBe(14);
+    expect(new Set(urls.slice(1))).toEqual(new Set(["wss://h/api/room?room=main-2"]));
     vi.useRealTimers();
   });
 });

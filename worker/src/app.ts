@@ -15,6 +15,7 @@ import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
 import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
 import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
 import { loadWildMemos } from "./wild-memos";
+import { roomName } from "./room";
 import { parseRivalAsk, rivalPlan } from "./rival";
 import { handleMlc, type MlcDeps } from "./mlc";
 import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
@@ -43,7 +44,7 @@ export interface Deps {
   random(): number;
   now(): number;
   hashClient(raw: string): Promise<string>;
-  room?: { fetch(request: Request): Promise<Response> }; // the live world room (Durable Object)
+  room?: (name: string) => { fetch(request: Request): Promise<Response> }; // a live world room (Durable Object) by name
   chatCache?: OpenerCache; // tests pass their own; the Worker shares one per isolate
   mlc?: Omit<MlcDeps, "fetch">; // the tuned 1B weights (private repos until submission day)
 }
@@ -100,7 +101,9 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     if (path === "/api/petchat" && method === "POST") return handlePetChat(request, deps);
     if (path === "/api/room" && method === "GET") {
       if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") return fail(426, "expected_websocket");
-      return deps.room ? deps.room.fetch(request) : fail(503, "no_room");
+      const name = roomName(url.searchParams.get("room"));
+      if (!name) return fail(400, "bad_room");
+      return deps.room ? deps.room(name).fetch(request) : fail(503, "no_room");
     }
     if (path === "/api/wild-memos" && method === "GET") {
       const w = await loadWildMemos(deps);

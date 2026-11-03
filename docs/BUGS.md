@@ -35,5 +35,10 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 - Fixed, waiting for review: 48 (a wild pet pressed into a wall or tree kept pushing at an unreachable target; now it re-picks a reachable one after 0.8 s, and one inside a wall goes home; 120 s sim: none still). 32 (head light is a crescent along the round head, `proof/pet/heads-round.png`, `proof/pet/head-live.png`). 33 (spots removed; old spots genes show plain).
 
 ## Network
-None open. AOI is new work: `network/network.md`.
+Found by the P3 join check (`scripts/join-check.mjs`, live `check` room, run 1, 2026-11-04 00:25 VN; `proof/network/join-live.md`):
+49. **A refresh lost its plot to a newcomer.** With all 12 plots held, a player who refreshed while someone new joined in those
+    seconds came back a guest, and the newcomer had their plot. Fix: a ground left under 60 s ago (`REFRESH_HOLD_MS`) is kept for
+    its owner (`room.ts` `takeSlot`, unit test). Waiting for join-check run 2.
+50. **A late joiner did not see a nearby farm** unless its owner's tab resent it (a background tab never does). Fix: the welcome
+    brings the farms in view (`room.ts` `join`, unit test). Waiting for join-check run 2.
 - Fixed, waiting for review: 27 (a static art file can 502 once after a deploy; `/art/tile-grass-snow-1.png` caught once, 200 since. Images and `sunny.json` now retry: unit test only, the blip did not recur).

@@ -292,7 +292,17 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
 
 export const SEND_INTERVAL_MS = 100; // <= 10 Hz
 const MOVE_EPS = 0.05;
-const MAX_RETRIES = 5;
+const RETRY_MAX_MS = 30_000; // a lost room is retried forever, at most this far apart
+export const ROOM_SPILL = 9; // a full room sends you on to the next: main, main-2 ... main-9 (worker room.ts)
+
+// The url of spill room n (1 = the url as given). `?room=check` spills to check-2, and so on.
+export function spillUrl(url: string, n: number): string {
+  if (n <= 1) return url;
+  const u = new URL(url);
+  const base = (u.searchParams.get("room") ?? "main").replace(/-\d+$/, "");
+  u.searchParams.set("room", `${base}-${n}`);
+  return u.toString();
+}
 
 export class LiveLink {
   private ws: SocketLike | null = null;
@@ -301,7 +311,10 @@ export class LiveLink {
   private readonly sayNext = new Map<string, number>(); // mind -> earliest time (ms) its next spoken line may go
   private retries = 0;
   private stopped = false;
-  private full = false;
+  private full = false; // every spill room is full: play alone
+  private moving = false; // told `full`: the next spill room on close
+  /** Which spill room we are in (1 = the main village). */
+  roomNo = 1;
   private ping: ReturnType<typeof setInterval> | null = null;
   status: LiveStatus = "offline";
   myId: string | null = null; // our id in the room, from the welcome
@@ -318,7 +331,7 @@ export class LiveLink {
     this.set("connecting");
     let ws: SocketLike;
     try {
-      ws = this.open(this.url);
+      ws = this.open(spillUrl(this.url, this.roomNo));
     } catch {
       return this.retry();
     }
@@ -340,6 +353,7 @@ export class LiveLink {
           this.h.welcome(id, ...rest);
         },
         status: (s) => {
+          if (s === "full" && this.roomNo < ROOM_SPILL) return void ((this.moving = true), this.roomNo++);
           if (s === "full") this.full = true;
           this.set(s);
         },
@@ -351,6 +365,7 @@ export class LiveLink {
       if (this.ws !== ws) return;
       this.ws = null;
       if (this.full) return;
+      if (this.moving) return void ((this.moving = false), this.connect());
       this.set("offline");
       this.retry();
     };
@@ -360,8 +375,8 @@ export class LiveLink {
   }
 
   private retry() {
-    if (this.stopped || this.retries >= MAX_RETRIES) return this.set("offline");
-    const delay = 2000 * 2 ** this.retries++;
+    if (this.stopped) return this.set("offline");
+    const delay = Math.min(RETRY_MAX_MS, 2000 * 2 ** this.retries++);
     setTimeout(() => this.connect(), delay);
   }
 

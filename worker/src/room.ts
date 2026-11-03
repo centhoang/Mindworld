@@ -24,6 +24,10 @@ import { cleanCap, cleanMem, isNpc, MIND_ACTS, NPCS, NpcBoard, type Cap, type Ho
 // answer). Plain room chat stays public. `talk` marks a private chat: both sides are busy, others see that they are
 // talking and can't start a chat with them. It ends on close, on disconnect, or after TALK_TTL_MS of silence.
 //
+// Rooms: `main` holds ROOM_MAX_PEERS; a client told `full` moves on to `main-2`, `main-3` ... (ROOM_SPILL rooms in all),
+// each its own Durable Object with its own villagers. `check` and its spills are for scripts/join-check.mjs, so test
+// bots never take plots or host villagers in the real village.
+//
 // The ball: one for the whole room. A client sends a `kick` (where the ball was, its speed); the room numbers it and
 // sends it to everyone, the kicker too, so every client ends on the same last kick. Clients roll it the same way
 // (client/src/life/ball.ts). The last kick goes to newcomers in the welcome, with its age.
@@ -32,6 +36,14 @@ import { cleanCap, cleanMem, isNpc, MIND_ACTS, NPCS, NpcBoard, type Cap, type Ho
 // positions at <= 10 Hz and only while moving; the server drops anything faster.
 
 export const ROOM_MAX_PEERS = 100;
+export const ROOM_SPILL = 9; // rooms per base name: main, main-2 ... main-9
+
+// The Durable Object name for `?room=` (null = not a room). No value = the main village.
+export function roomName(raw: string | null): string | null {
+  if (raw === null || raw === "") return "main";
+  const m = /^(main|check)(?:-([2-9]))?$/.exec(raw);
+  return m && (!m[2] || Number(m[2]) <= ROOM_SPILL) ? raw : null;
+}
 export const ROOM_MAX_MSG_BYTES = 4096; // a duel carries a memo (<= 8 rules); positions are ~60 bytes
 export const SAY_MAX = 80;
 export const SAY_GAP_MS = 1500;
@@ -39,6 +51,7 @@ export const DUEL_TTL_MS = 30_000;
 const DUEL_COST = 4; // extra tokens per challenge, so nobody spams invites
 export const CORNERS = 12; // plots along the village streets; later players are guests (client: world/village-map PLOT_COUNT)
 export const AWAY_MS = 10 * 60_000;
+export const REFRESH_HOLD_MS = 60_000; // a ground left this recently is kept for its owner's refresh, even when every slot is held
 export const EMOTES = ["wave", "heart", "dance", "laugh"] as const;
 export const MIND_SAY_GAP_MS = 3000;
 export const ASK_GAP_MS = 3000;
@@ -347,7 +360,8 @@ export class Room {
 
   // A slot for a new player: their own ghost ground first (same seed, back within AWAY_MS), else the slot they
   // just had (a dropped socket, even if the room restarted and lost its ghosts), else the first slot nobody
-  // holds, else the ghost ground closest to expiring.
+  // holds, else the ghost ground closest to expiring, if its owner left over REFRESH_HOLD_MS ago (a refresh
+  // takes a few seconds, and a newcomer in those seconds must not take that player's plot).
   private takeSlot(seed: number, now: number, was: number | null): number | null {
     this.setAways(this.aways.filter((a) => a.until > now));
     const used = new Set([...this.peers.values()].map((p) => p.corner));
@@ -356,7 +370,8 @@ export class Room {
     const back = was !== null && was < CORNERS && !held.has(was) ? was : null;
     let slot = mine?.slot ?? back;
     for (let c = 0; slot === null && c < CORNERS; c++) if (!held.has(c)) slot = c;
-    if (slot === null) slot = [...this.aways].sort((a, b) => a.until - b.until).find((a) => !used.has(a.slot))?.slot ?? null;
+    const settled = (a: Away) => now - (a.until - AWAY_MS) >= REFRESH_HOLD_MS;
+    if (slot === null) slot = [...this.aways].sort((a, b) => a.until - b.until).find((a) => !used.has(a.slot) && settled(a))?.slot ?? null;
     if (slot !== null) this.setAways(this.aways.filter((a) => a.slot !== slot));
     return slot;
   }
@@ -384,6 +399,8 @@ export class Room {
     this.peers.set(id, peer);
     const sight = this.sight(id, peer.x, peer.z);
     const hidden = others.filter((o) => !this.grid.sees(id, o.id)); // the ground stays, the person is not in view
+    // The farms in view come with the welcome: their owners' tabs may be in the background and never resend them.
+    const farms = [...this.peers.values()].flatMap((o): Out[] => (o.id !== id && o.plots && this.grid.sees(id, o.id) ? [{ to: "self", msg: { t: "farm", id: o.id, plots: o.plots } }] : []));
     const elected = this.board.elect(this.peers, now, true);
     return {
       peer,
@@ -392,6 +409,7 @@ export class Room {
         { to: "others", msg: { t: "join", peer: publicPeer(peer) } },
         ...hidden.flatMap((o): Out[] => [{ to: "self", msg: { t: "exit", id: o.id } }, { to: { id: o.id }, msg: { t: "exit", id } }]),
         ...sight.filter((o) => o.msg.t === "npcs"),
+        ...farms,
         ...this.hostOuts(elected, true),
       ],
     };
