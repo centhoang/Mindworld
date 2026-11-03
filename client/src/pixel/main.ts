@@ -48,6 +48,7 @@ import type { ScenePanel } from "../game/ports";
 import { runSetup, storeSetup } from "./setup";
 import { TeachScreen } from "./teach";
 import { LOW_H, lowSize } from "./low-size";
+import { touchControls } from "./touch";
 
 // The game's look is Sunnyside. ?look=mosaic is the set-aside view of about 45 rows of 8-pixel cells.
 const pixelLook = new URLSearchParams(location.search).get("look") !== "mosaic";
@@ -269,7 +270,8 @@ function crateKey(k: string): void {
   } else crate = null;
   save(state);
 }
-let toast: Line | null = { text: "WASD: walk. Shift: run. E: use/talk. T: teach. P: pets. B: brain. N: name. M: mute.", who: "Hint", t: 7 };
+const touchFirst = matchMedia("(pointer: coarse)").matches;
+let toast: Line | null = { text: touchFirst ? "Stick: walk (push far to run). E: use/talk. X: back. T: teach." : "WASD: walk. Shift: run. E: use/talk. T: teach. P: pets. B: brain. N: name. M: mute.", who: "Hint", t: 7 };
 // First visit: the hatch line, then the control hints one after another (each 6 s, Esc skips), once.
 const hintQueue: Line[] = [];
 let heldBrain: Line | null = null;
@@ -445,6 +447,7 @@ out.addEventListener("pointerdown", (e) => {
   if (!(pixelLook ? battleView.cmdAt(x, y, low.width, low.height) : battleView.cmdAtCells(x, y, low.width, low.height))) battleView.skip();
 });
 resize();
+touchControls();
 
 // The stall is a person: closed outside the keeper's hours, and the keeper may refuse you (then you can talk it out).
 function openStall(): void {

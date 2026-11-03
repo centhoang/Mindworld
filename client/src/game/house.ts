@@ -27,9 +27,10 @@ const inside = ([x0, y0, x1, y1]: Rect, x: number, y: number) => x >= x0 && x < 
 // centre of home-wing-roof.png) in picture pixels, and the door's offset from that foot in tiles. What blocks, in tiles
 // from the foot: x0, x1, z0, z1.
 export const HOME_FOOT = { x: 202, y: 113 };
-export const HOME_DOOR_DX = 1;
+export const HOME_DOOR_DX = 0;
 export const HOME_ROOF = { w: 124, h: 136 };
-export const HOME_BLOCKS: readonly (readonly [number, number, number, number])[] = [[-3.9, 3.9, -3.6, 0.1]];
+export const HOME_BLOCKS: readonly (readonly [number, number, number, number])[] = [[-2.5, 2.5, -2.6, 0.2]];
+export const HOME_CHIMNEY: [number, number] = [62, 8]; // PROVISIONAL until the art lands
 export const HOUSE_DOOR = { x: 217, y: 90 }; // where you stand on coming in
 export const HOUSE_EXIT_Y = 98; // past this you are outside
 

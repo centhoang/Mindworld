@@ -15,7 +15,7 @@ import { cloudLine } from "../game/npc-chat";
 import { CLOUD_CHAT } from "../game/test-mode";
 import { BUILDS, drawMonster } from "./monster";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
-import { CAMPFIRE, DANCE_FLOOR, NPC_HOMES, PEN, QUARRY } from "../world/village-map";
+import { CAMPFIRE, DANCE_FLOOR, NPC_HOMES, PEN, PLOT_AT, PLOT_COUNT, plotFences, plotHouse, QUARRY, ROOFS, type Roof } from "../world/village-map";
 import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
 import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePanel, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
@@ -28,7 +28,7 @@ import { aim, Ball, cleanKick, KICK_GAP, PITCH_R, TOUCH, type BallNow, type Kick
 import { mulberry32 } from "../sim/rng";
 import { findRoute } from "../world/route";
 import { cornerBlocks, railBlocks, seaCell, tile } from "./sunny-terrain";
-import { HOME_BLOCKS, HOME_DOOR_DX } from "../game/house";
+import { HOME_BLOCKS, HOME_CHIMNEY, HOME_DOOR_DX } from "../game/house";
 import { liveName } from "../world/live";
 import { villageWorld } from "../world/village-map";
 import { MindHub, type MindsSave } from "../mind/hub";
@@ -44,18 +44,19 @@ const LANDMARK_PROP: Record<string, string> = { spr_deco_well: "well" };
 const CLUMP = 6; // tiles: trees gather in cells of this size
 const SHORE: readonly (readonly [number, number])[] = [[-2, 0], [2, 0], [-1, 0], [1, 0], [0, -2], [-2, 1], [2, 1], [0, 1], [0, 2], [0, 3], [-2, 3], [2, 3]];
 // The mouth of each house's chimney, in pixels from the stamp's top left. Houses not listed have none.
-export const CHIMNEY: Record<string, [number, number]> = { "house-blue": [63, 11], "house-red": [15, 1], "house-orange": [15, 22], "house-orangelong": [63, 18], "house-bluesmall": [55, 7] };
+// Every player's house is the same small house (bug 46), roofed in one of the pack's five colours.
+export const houseArt = (roof: Roof): string => `home-small-${roof}`;
+export const CHIMNEY: Record<string, [number, number]> = { "house-blue": [63, 11], "house-red": [15, 1], "house-orange": [15, 22], "house-orangelong": [63, 18], "house-bluesmall": [55, 7],
+  ...Object.fromEntries(ROOFS.map((r) => [houseArt(r), HOME_CHIMNEY])) };
 const READ_CHARS = 12; // a bubble stays long enough to read at this many characters a second
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
-const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", "fence-v": "a fence", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", lights: "party lights" };
+const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", "fence-v": "a fence", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", rail: "a fence", lights: "party lights" };
 const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "the lawn", playground: "the playground slide and goal", picnic: "the picnic blanket", pond: "the fishing pond", plaza: "the village square" };
 
 export const OVERWORLD_MON = 20; // px: monsters in the overworld
 const WILD_PER_MEADOW = 3;
 const MEET_DIST = 1.0;
 const NPC_ROUTE_TILES = 120_000; // the NPCs may walk across the whole map
-export const HOME_ART = "home-wing-roof";
-const HOUSE_ART = ["house-red", "house-green", "house-redsmall", "house-bluesmall"];
 export const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
 // Farm stages 0-3 onto the pack's six growth pictures.
 export const CROP_STAGE = [1, 2, 3, 4]; // the pack's stage 5 is the harvested item, not a plant
@@ -146,7 +147,10 @@ export class Overworld {
   private petHeld = 0; // seconds it has been pushing against something
   petName = "your pet"; // the pet following me (main.ts), so villagers can talk to it by name
   cam: Vec = { x: 0, z: 0 };
-  house: Vec = { x: 0, z: 0 }; // the A-frame's front-centre (door) at the home plaza
+  house: Vec = { x: 0, z: 0 }; // my house's foot (bottom centre); the door is in the middle of its front
+  homeArt = houseArt("blue");
+  private homeSlot = -1; // my plot in the village (PLOT_AT), -1 elsewhere
+  freeBeds: Vec[] = []; // the tilled beds of village plots nobody holds: drawn, never sown
   beds: Vec[] = []; // farm bed tile corners (world units), 3x2 east of the A-frame
   private allBeds: Vec[] = []; // the same on every ground: all machines must agree on what stands where
   readonly peerFarms = new Map<string, readonly [string, number][]>();
@@ -228,8 +232,15 @@ export class Overworld {
     const home = this.home;
     const dx = old ? home.x - old.x : 0;
     const dz = old ? home.z - old.z : 0;
-    this.house = { x: home.x, z: home.z - 2.5 };
-    this.houses = this.world.platforms.filter((p) => p.kind === "ground").map((p) => ({ x: p.x, z: p.z - 2.5, art: HOUSE_ART[(p.ground?.seed ?? 0) % HOUSE_ART.length]! }));
+    // The village: a house on every plot, taken or not, so the streets look lived in; mine is the one I go into.
+    const slot = home.rect ? PLOT_AT.findIndex(([x, z]) => x === home.rect![0] && z === home.rect![1]) : -1;
+    const mine = slot >= 0 ? plotHouse(slot) : { x: home.x, z: home.z - 2.5, roof: ROOFS[0] };
+    this.homeSlot = slot;
+    this.house = { x: mine.x, z: mine.z };
+    this.homeArt = houseArt(mine.roof);
+    this.houses = this.world.things
+      ? PLOT_AT.slice(0, PLOT_COUNT).flatMap((_, s) => (s === slot ? [] : [plotHouse(s)])).map((h) => ({ x: h.x, z: h.z, art: houseArt(h.roof) }))
+      : this.world.platforms.filter((p) => p.kind === "ground").map((p) => ({ x: p.x, z: p.z - 2.5, art: houseArt(ROOFS[(p.ground?.seed ?? 0) % ROOFS.length]!) }));
     this.beds = bedsAt(home);
     this.allBeds = this.world.platforms.filter((p) => p.ground).flatMap((p) => bedsAt(p));
     this.trees = [];
@@ -249,7 +260,7 @@ export class Overworld {
       if (this.canWalk(q.x, q.z)) lawn.push(q);
     }
     this.lifeEnv.spots = {
-      home: [{ x: home.x, z: home.z + 2 }],
+      home: [home.rect ? { x: this.house.x, z: this.house.z + 1.4 } : { x: home.x, z: home.z + 2 }], // in front of the door
       bowl: [{ x: this.bowl.x, z: this.bowl.z + 0.5 }, { x: this.bowl.x - 0.8, z: this.bowl.z + 0.2 }],
       bed: [{ x: this.house.x - 2, z: this.house.z + 1.2 }, { x: this.house.x + 2, z: this.house.z + 1.2 }, { x: this.house.x - 2.6, z: this.house.z + 1.8 }],
       lawn,
@@ -446,14 +457,18 @@ export class Overworld {
     for (const p of this.world.platforms) {
       if (!p.ground) continue;
       const [ci, cj] = p.cell;
-      const side = p.rect ? "s" : Math.abs(ci) >= Math.abs(cj) ? (ci > 0 ? "w" : "e") : cj > 0 ? "n" : "s";
+      const name = p.owner === "me" ? "HOME" : p.label.replace(/'s ground.*$/, "").toUpperCase();
+      if (p.rect) { // a village plot: inside the front fence, just east of the gate
+        this.signs.push({ x: p.rect[0] + 4.6, z: p.rect[1] + 5.6, text: name.slice(0, 12) });
+        continue;
+      }
+      const side = Math.abs(ci) >= Math.abs(cj) ? (ci > 0 ? "w" : "e") : cj > 0 ? "n" : "s";
       const [ox, oz] = groundOrigin(p);
       const gate = p.ground.gates[side];
       const inX = side === "w" ? 2 : side === "e" ? -2 : 0; // a couple of tiles inside the gate
       const inZ = side === "n" ? 2 : side === "s" ? -2 : 0;
       const x0 = ox + gate.i + 0.5 + inX;
       const z0 = oz + gate.j + 0.5 + inZ;
-      const name = p.owner === "me" ? "HOME" : p.label.replace(/'s ground.*$/, "").toUpperCase();
       for (const d of [1.6, -1.6]) {
         const at = inX ? { x: x0, z: z0 + d } : { x: x0 + d, z: z0 };
         if (!this.canWalk(at.x, at.z)) continue;
@@ -546,11 +561,22 @@ export class Overworld {
     this.decor = this.world.things
       ? this.world.things.filter((t) => t.kind !== "tree").map((t) => ({ kind: t.kind as DecorPiece["kind"], x: t.x, z: t.z, tiles: [Math.floor(t.z - m.oz) * m.w + Math.floor(t.x - m.ox)], platform: "" }))
       : placeDecor(this.world, m, (x, z) => reserved(x, z) || this.treeTiles.has(Math.floor(z - m.oz) * m.w + Math.floor(x - m.ox)), reserved);
+    // The village's front fences, one run per stretch of road, gated at each door; a guest's yard has its own.
+    if (this.world.things) {
+      const slots = [...Array(PLOT_COUNT).keys(), ...(this.homeSlot >= PLOT_COUNT ? [this.homeSlot] : [])];
+      for (const f of plotFences(slots)) {
+        const tiles = Array.from({ length: f.x1 - f.x0 }, (_, n) => (f.z - m.oz) * m.w + f.x0 + n - m.ox);
+        this.decor.push({ kind: "rail", x: (f.x0 + f.x1) / 2, z: f.z + 0.5, tiles, platform: "" });
+      }
+    }
     // Feature clearings take priority over trees, like the pack's fields and mill yards.
     // Farm ground is the pack's light dirt: real beds with a tile around them, and the decorative fields.
     const soil = (m.soil = new Uint8Array(m.w * m.h));
-    for (const p of this.world.platforms) if (p.ground) {
-      const beds = bedsAt(p);
+    // Every village plot has its field, sown or not, so a free plot reads as one.
+    const taken = this.world.platforms.filter((p) => p.ground);
+    const free = this.world.things ? PLOT_AT.slice(0, PLOT_COUNT).filter(([x, z]) => !taken.some((p) => p.rect?.[0] === x && p.rect?.[1] === z)) : [];
+    this.freeBeds = free.flatMap(([x, z]) => bedsAt({ x, z, rect: [x, z] }));
+    for (const beds of [...taken.map((p) => bedsAt(p)), ...free.map(([x, z]) => bedsAt({ x, z, rect: [x, z] }))]) {
       const { x, z } = beds[0]!;
       const last = beds[beds.length - 1]!;
       // One plain block of dirt with a tile of edge all round, nothing else on it (bug 41).
@@ -1285,8 +1311,9 @@ export class Overworld {
 
 // A village plot (it has a rect) keeps its field and the field's edge inside the plot, clear of the road's edge
 // tiles: two rows of three side by side, as on the pack's demo farm (bug 41). The set-aside mosaic grounds keep theirs.
-export const bedsAt = (home: Vec & { rect?: unknown }): Vec[] => Array.from({ length: PLOTS }, (_, i) => home.rect
-  ? { x: Math.floor(home.x) + 1 + (i % 3), z: Math.floor(home.z) - 2 + Math.floor(i / 3) }
+// A village plot's beds are two columns of three on its right, beside the house (village-map.ts plotHouse).
+export const bedsAt = (home: Vec & { rect?: readonly number[] }): Vec[] => Array.from({ length: PLOTS }, (_, i) => home.rect
+  ? { x: home.rect[0]! + 6 + (i % 2), z: home.rect[1]! + 2 + Math.floor(i / 2) }
   : { x: Math.floor(home.x) + 3 + (i % 3), z: Math.floor(home.z) - 2 + Math.floor(i / 3) * 2 });
 
 const GATHER_HINT: Record<string, string> = { fish: "E: FISH", chop: "E: CHOP", herbs: "E: PICK HERBS" };

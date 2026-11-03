@@ -122,6 +122,6 @@ export function drawDecor(g: Ctx, kind: DecorKind, x: number, y: number, tiles: 
     const w = stampSize("fence-a")[0];
     const count = Math.max(1, Math.round((tiles * 16) / w));
     for (let k = 0; k < count; k++) stand(g, "fence-a", x + (k - (count - 1) / 2) * w, y);
-  } else if (kind !== "fence-v") stand(g, DECOR_ART[kind], x, y); // north-south fences are drawn per tile by the scene
+  } else if (kind !== "fence-v" && kind !== "rail") stand(g, DECOR_ART[kind], x, y); // fences of rail tiles are drawn per tile by the scene
   g.globalAlpha = 1;
 }

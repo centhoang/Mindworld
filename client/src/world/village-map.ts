@@ -109,12 +109,43 @@ export const npcDoor = (id: string): { x: number; z: number } | undefined => {
 
 const COLUMNS = [-11, 2, -21, 12, -31, 22]; // nearest the spine road first, so early players are neighbours
 const ROWS = [7, 16];
-// Plot n's top-left tile. Slot order is what the room hands out; the house stands at x + 4, its beds to the right.
+// Plot n's top-left tile. Slot order is what the room hands out; the house stands on the left, its beds to the right.
 export const PLOT_AT: [number, number][] = [...ROWS.flatMap((z) => COLUMNS.map((x): [number, number] => [x, z])), [-31, -6]];
+
+// Every plot has the same small house (bug 46), whoever holds it; only the roof colour changes, by slot. `x, z` is the
+// house's foot (bottom centre of its picture), in the plot's left half; the door is in the middle of its front wall.
+export const ROOFS = ["blue", "red", "green", "orange", "purple"] as const;
+export type Roof = (typeof ROOFS)[number];
+export const plotHouse = (slot: number): { x: number; z: number; roof: Roof } => {
+  const [x, z] = PLOT_AT[slot] ?? PLOT_AT[GUEST_SLOT]!;
+  return { x: x + 2.5, z: z + 4, roof: ROOFS[slot % ROOFS.length]! };
+};
+// The front fence along each plot's south row, with a three-tile gate centred on the door: runs of whole tiles,
+// [x0, x1) at row z. Runs that meet across plots join into one.
+export function plotFences(slots: readonly number[]): { x0: number; x1: number; z: number }[] {
+  const rows = new Map<number, Set<number>>();
+  for (const s of slots) {
+    const [x, z] = PLOT_AT[s]!;
+    const row = rows.get(z + PLOT_H - 1) ?? new Set<number>();
+    for (let i = 0; i < PLOT_W; i++) if (i < 1 || i > 3) row.add(x + i);
+    rows.set(z + PLOT_H - 1, row);
+  }
+  const out: { x0: number; x1: number; z: number }[] = [];
+  for (const [z, row] of rows) {
+    const xs = [...row].sort((a, b) => a - b);
+    let x0 = xs[0]!;
+    xs.forEach((x, n) => {
+      if (xs[n + 1] === x + 1) return;
+      if (x > x0) out.push({ x0, x1: x + 1, z }); // a lone post would show a rail to nowhere
+      x0 = xs[n + 1]!;
+    });
+  }
+  return out;
+}
 
 const plotGround = (seed: number): Ground => ({
   seed, theme: "meadow", w: PLOT_W, h: PLOT_H, land: new Uint8Array(PLOT_W * PLOT_H).fill(1),
-  gates: { n: { i: 1, j: 0 }, e: { i: 9, j: 3 }, s: { i: 1, j: 6 }, w: { i: 0, j: 3 } },
+  gates: { n: { i: 1, j: 0 }, e: { i: 9, j: 3 }, s: { i: 2, j: 6 }, w: { i: 0, j: 3 } }, // s: the middle of the gap in the front fence
 });
 
 function plot(slot: number, p: { id: string; kind: PlatformKind; label: string; owner: string; seed: number; away?: boolean }): Platform {

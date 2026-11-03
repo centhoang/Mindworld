@@ -15,7 +15,7 @@ import { drawDecor, drawLiveBall, drawSpotProp } from "./grounds-draw";
 import { humanSprites, newHumanMotion, NPC_LOOKS } from "./humans";
 import { drawInspector } from "./inspector";
 import { drawBall, drawPetPose, drawPoop, drawTint } from "./life-draw";
-import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, HOME_ART, OVERWORLD_MON, type Overworld } from "./overworld";
+import { bedsAt, CHIMNEY, CROP_ART, CROP_STAGE, OVERWORLD_MON, type Overworld } from "./overworld";
 import { drawMonster } from "./monster";
 import { petLook } from "../game/genes";
 import { rivalOf, type RivalOwner } from "../sim/rivals";
@@ -110,6 +110,7 @@ export class PixelView implements View {
         if (crop) drawCropArt(g, CROP_ART[crop] ?? "carrot", CROP_STAGE[Math.min(3, stage)]!, sx + 8, sy + CROP_FOOT);
       });
     }
+    for (const b of o.freeBeds) drawSoil(g, ...toScreen(b.x, b.z));
     o.beds.forEach((b, i) => {
       const [sx, sy] = toScreen(b.x, b.z);
       const p = o.farm?.plots[i];
@@ -217,7 +218,13 @@ export class PixelView implements View {
     }
     for (const d of o.decor) {
       const [sx, sy] = toScreen(d.x, d.z);
-      if (sx < -40 || sy < -40 || sx > sw + 40 || sy > sh + 40) continue;
+      if (d.kind !== "rail" && (sx < -40 || sy < -40 || sx > sw + 40 || sy > sh + 40)) continue;
+      if (d.kind === "rail") {
+        // A long east-west fence of the pack's rail tiles is one standing item (docs/visual/layers.md).
+        const [fx, fy] = toScreen(m.ox + (d.tiles[0]! % m.w), m.oz + Math.floor(d.tiles[0]! / m.w));
+        items.push({ z: d.z, draw: () => d.tiles.forEach((_, n) => drawRail(g, n === 0 ? tile(2, 38) : n === d.tiles.length - 1 ? tile(2, 42) : tile(2, 39), fx + n * TILE, fy)) });
+        continue;
+      }
       if (d.kind === "fence-v") {
         // One item per tile, so people passing along it sort with each post (docs/visual/layers.md).
         d.tiles.forEach((k, n) => {
@@ -233,7 +240,7 @@ export class PixelView implements View {
     }
     {
       const [hx, hy] = toScreen(o.house.x, o.house.z);
-      if (!scene.indoors) this.pushHouse(items, g, HOME_ART, o.house.z, hx, hy, t);
+      if (!scene.indoors) this.pushHouse(items, g, o.homeArt, o.house.z, hx, hy, t);
     }
     for (const h of o.houses) {
       const [hx, hy] = toScreen(h.x, h.z);

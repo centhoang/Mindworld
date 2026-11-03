@@ -5,6 +5,7 @@ import { loadImage, recoloured } from "./art";
 import { mulberry32 } from "../sim/rng";
 import { bridgeLayers, buildTerrain, CELL_ID, FLIP, MIRROR, tile, type Terrain } from "./sunny-terrain";
 import { AWAY, hash2, T, TILE, type TileMap } from "../world/tilemap";
+import { ROOFS } from "../world/village-map";
 
 type Ctx = CanvasRenderingContext2D;
 const BASE = "/art/sunny/";
@@ -20,7 +21,9 @@ const STRIPS: Record<string, { frames: number }> = {
   spr_deco_pig_01_strip4: { frames: 4 }, spr_deco_cow_strip4: { frames: 4 },
 };
 const BARS = ["redbar_00", "redbar_06", "greenbar_00", "greenbar_06", "bluebar_00", "bluebar_05"];
-const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", "home-wing-roof", "home-wing-open",
+// Every player's house (bug 46): one small house in the pack's five roof colours, and its open room (scripts/art-home-small.py).
+const HOUSES = ["home-small-open", ...ROOFS.map((r) => `home-small-${r}`)];
+const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", ...HOUSES,
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture", ...BARS];
 const STAMPS = ["house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "jar", "crates", "crate", "soil", "bench"];
 export const CROPS_ART = ["wheat", "carrot", "radish"] as const;
