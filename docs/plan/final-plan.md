@@ -115,7 +115,12 @@ Pack human strips: 12 loaded today; unused `carry`, `hammering`, `mining`, `swim
   no retrain. Fix the pet `eat` target that still points at the removed bowl (`overworld.ts` `this.bowl`).
 - Update `docs/testing/proof/game/activities.md` and `checks/game.md`.
 
-## P3 Many players join live without issue (user, 2026-11-03: "make sure many players can join live without issue")
+## P3 Many players join live without issue (user, 2026-11-03: "make sure (test, update, repeat) so on live, many players can join without issues")
+**How:** a loop on the deployed build, not a one-off test. (1) Run every check below on live. (2) Log each failure in
+`docs/BUGS.md` (Network) with its proof. (3) Fix, test, deploy. (4) Run the whole check again. Repeat until one full run
+is clean. First build one command, `scripts/join-check.mjs` (bots burst + full room + late join + plot reclaim, numbers
+out, hard limits, clean close), so every loop is cheap; the real-tab and machine checks stay manual in the TEMP Chrome.
+The loop runs again after every later deploy (P4, P5, P6 freeze, P8 public): a feature that breaks joining is fixed first.
 Today: one room Durable Object (`/api/room`, `worker/src/room.ts`), `ROOM_MAX_PEERS` 100, 12 plots (`CORNERS`), then
 guests; a 101st player gets `{t:"full"}` and plays alone (`world/live.ts` status `full`). 89 of 100 bots held last time.
 - **Join is quick and plain:** open the link, be in the village and "online" within about 10 s, no setup, whatever the
@@ -134,8 +139,8 @@ guests; a 101st player gets `{t:"full"}` and plays alone (`world/live.ts` status
   player; check `/api/spend`), a phone-size window, a throttled network in the test Chrome, a second browser.
 - **Real people:** 3-4 real tabs in the TEMP Chrome profile (home network allowed): a duel, the ball in sync, a host
   hand-over when a tab closes, three people dancing.
-- Proof: `docs/testing/proof/network/join-live.md`. Gate: every line in `docs/testing/checks/network.md` clear on live.
-- Re-run the burst and the 3-tab check after P4 and P5 deploy, and at the freeze (P6): later features must not break joins.
+- Proof: `docs/testing/proof/network/join-live.md`, one dated block per loop run (what failed, what was fixed).
+  Gate: one clean run of every join line in `docs/testing/checks/network.md` on live.
 
 ## P4 Map polish + bug 46, then user play-test #1
 - One contact sheet of `VisualAssetPack/BuiltDemo/` in `.scratch/`; list what the demo village has that ours lacks

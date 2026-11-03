@@ -27,12 +27,16 @@
    `game/chat-flow.ts`), `mind/npcs.ts` `hasPet`, `worker/src/wild-memos.ts` + `memo-dsl.ts` for `/api/rival`,
    the scripted coach rules in `sim/cortex.ts` (~line 288) as the local review fallback.
    Do not edit the coach prompt text in `sim/cortex.ts` (frozen for the tuned 1B); add cloud-only lines elsewhere.
-2. Then P2-P8 per the plan. P3 is now "many players join live without issue" (user, 2026-11-03): join speed, bursts,
-   an overflow room when full (today the 101st plays alone), plots and guests, late joiners, mid-event joins, weak machines;
-   lines in `docs/testing/checks/network.md`. Re-run it after P4, P5 and at the freeze. If the user says "sleep", switch to Director mode (`docs/ops/director.md`) with the plan as the queue.
+2. Then P2-P8 per the plan. **P3 is a loop** (user, 2026-11-03: "make sure (test, update, repeat) so on live, many
+   players can join without issues"): run the join checks on live, log failures in `docs/BUGS.md`, fix, deploy, run again,
+   until one full run is clean; build `scripts/join-check.mjs` first so each loop is one command. Run the loop again after
+   every later deploy (P4, P5, freeze, public). Checks: join speed, bursts, overflow room when full (today the 101st plays
+   alone), plots and guests, late joiners, mid-event joins, weak machines (`docs/testing/checks/network.md`). If the user says "sleep", switch to Director mode (`docs/ops/director.md`) with the plan as the queue.
 3. After any user play-test: read the chat log unasked, add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`.
 
 ## Open
+- User's call, asked and not yet answered: remove Access at the freeze (Nov 4 ~18:00 VN, already Nov 4 ET) instead of
+  Nov 5 morning, so outside joins get tested with time to fix. Ask again before P6.
 - 46: same small house for every player, with an interior (P4).
 - 37: dance never chosen unforced (P2, dance floor).
 - 34, 36 and 45, 47, 48 fixed, waiting for the user's review on live.
