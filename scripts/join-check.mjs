@@ -117,7 +117,10 @@ check("a refresh keeps its plot when someone joins meanwhile", b2.corner === b.c
   `had ${b.corner}, got ${b2.corner}; newcomer got ${newcomer.corner}`);
 
 // 3. Someone who joins late sees things as they are now.
-const [kicker, farmer, talkA, talkB] = [a2, b2, inBurst[2], inBurst[3]].filter(Boolean);
+const [kicker, farmer] = [a2, b2];
+// The talkers are any two still in the room: the refresh steps above quit whichever burst bots had plots first, and
+// plots go by arrival order, so a fixed burst slot can be a closed socket (the 19/20 failures on 2026-11-04).
+const [talkA, talkB] = live().filter((o) => ![probe, kicker, farmer, newcomer].includes(o));
 send(kicker, { t: "kick", x: 22, z: 2.5, vx: 3, vz: -1, by: kicker.id });
 send(farmer, { t: "farm", plots: [["wheat", 3], ["", 0]] });
 send(talkA, { t: "talk", with: talkB.id });
@@ -128,7 +131,9 @@ await wait(1200);
 check("a late joiner gets the ball's last kick", !!late.welcome?.ball && late.welcome.ball.n === kicker.lastN, `kick ${kicker.lastN}, welcome ${late.welcome?.ball?.n}`);
 check("a late joiner sees a nearby farm without anyone resending it",
   late.got.some((m) => (m.t === "farm" && m.id === farmer.id && m.plots?.[0]?.[0] === "wheat") || (m.t === "enter" && m.peer?.id === farmer.id && m.plots?.[0]?.[0] === "wheat")));
-check("a late joiner sees who is talking", late.welcome?.talks?.some(([x, y]) => x === talkA.id && y === talkB.id));
+const talkGot = talkA.got.filter((m) => (m.t === "talking" && m.id === talkA.id) || m.t === "talkNo").map((m) => m.t);
+check("a late joiner sees who is talking", late.welcome?.talks?.some(([x, y]) => x === talkA.id && y === talkB.id),
+  `talker got ${talkGot.join(",") || "nothing"}; welcome talks ${late.welcome?.talks?.length ?? "none"}`);
 check("a late joiner learns who hosts the villagers", ["elder", "mo", "ama", "pip"].every((n) => !!late.hosts[n]), JSON.stringify(late.hosts));
 
 // 4. A kick burst: ten players kick for 3 s; everyone ends on the same last kick, never going back.

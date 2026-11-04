@@ -52,3 +52,12 @@ another save (another player), `?room=check` joins the bots' room.
   12.0 s. The rest of the art (6.6 MB in all) streams in after; the village is playable meanwhile.
 - **No GPU model:** every tab above ran without a local model (tps 0): villagers ran on rules and cloud lines, hosting
   worked the same.
+
+## 2026-11-04 ~10:40 VN: "a late joiner sees who is talking" (worker c25d5953, no worker change)
+- Failed twice at 11:00 VN-ish runs (`.scratch/p4/join-check-55.txt`, `-55b.txt`). Cause was the script: the talkers were
+  fixed burst slots 2 and 3, but the refresh steps quit whichever burst bots got plots first, and plots go by arrival
+  order, so a talker could be a closed socket (its `talk` never sent, or its id gone). The room's `talk()` was fine.
+- Fix (`scripts/join-check.mjs`): the talkers are any two bots still in the room; the check's note now says what the
+  talker got (`talking` / `talkNo`) and how many talks the late joiner's welcome holds.
+- Runs after: `--big 0` 18/18 (`-56.txt`); full 19/20 once (one burst socket retried past the 12 s window, 100-player
+  fill 13 s: network); full again **20/20** (`-56c.txt`, talker got `talking`, welcome talks 1, 100 in 4 s).
