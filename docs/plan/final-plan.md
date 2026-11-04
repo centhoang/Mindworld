@@ -62,7 +62,7 @@
 - **P5e done** (live worker ebecde8f, build `main-p-yOsRi0`, 2026-11-04 ~12:50 VN): Postcards. Muse Image 1.0 on the
   Meta Model API ($0.01 an image, checked on dev.meta.ai first) paints a keepsake of your pet and who was there after a
   win, a new friend or a campfire story, from real state (genes, watcher, storyteller); album on C / the Album chip.
-  $2/day cap. Proof `p5-live.md` e. **P5 complete. Next: P6 freeze at 18:00 VN** (ask about Access first).
+  $2/day cap. Proof `p5-live.md` e. **P5 complete. Next: P6 now** (user: no need to follow the timeline; Access goes right before submitting, P8).
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted
@@ -219,24 +219,33 @@ Spread across the services, each with a cap and a free fallback:
   price on dev.meta.ai docs; hard cap $2/day; skip if unavailable.
 - Brain panel names which service answered each line (bug 36 wording).
 
-## P6 Freeze (Nov 4 18:00 VN)
-Bug fixes only. `scope-check` every scope on live. User play-test #2 with 2+ players: the whole-game check.
+## P6 Freeze (starts now: user, 2026-11-04 ~13:20 VN, "no need to follow the timeline")
+Ahead of time is good: the submission form has questions to fill in, and the demo and the video need preparing.
+Bug fixes only. First the flaky join check (HANDOFF). Then, before Access goes (see P8):
+- `/api/llm` is a general model proxy: any prompt, the provider picked by the client (kinds memo, teach, dialogue,
+  move). Lock it down: provider fixed per kind, a tight prompt size, and the system prompts on the worker if that is
+  small enough to do safely.
+- `CLIENT_DAILY_USD` is "10" in `worker/wrangler.toml` (raised so tabs on one home IP could test). Public, three
+  strangers could spend the whole $30 day and leave everyone on rules. Keep it for the user's play-test, then lower it
+  (~$2) before Access goes. The Meta total cap (`MAX_TOTAL_USD_META` 100 under the $149.91 credit) keeps the card safe.
+`scope-check` every scope on live. User play-test #2 with 2+ players: the whole-game check.
 
 ## P7 Submission prep
-- Rewrite `docs/ops/demo.md` for this build. Opening line names what pre-existed: the Sunnyside World art pack
-  (`VisualAssetPack/License.txt` allows use), open-source libraries, Meta's models. Beats: birthday promise (star), a
+- Rewrite `docs/ops/demo.md` for this build. Opening line names what pre-existed: open-source libraries, Meta's models. Beats: birthday promise (star), a
   rival who adapts, the lively village (ball, dance, gazette), Teach and Prove, many players and host hand-over. List
   every Meta model use.
 - README for a stranger: play link, what to do, how the models are used, "Built with Llama" (Llama licence).
 - Re-check numbers (bench, new Prove lift, spend). Compliance: secrets scan of all history, first commit is Oct 26
   23:14 VN = 12:14 ET after kickoff (confirm acceptable), no copied code. X post draft for after submission (user posts).
 
-## P8 Last (Nov 5 morning VN, done by 08:00)
-Remove `/api/chatlog`, its client call and KV rows; deploy. User makes GitHub and the 4 HF repos public and removes
-Access. **Join check on the public URL** right after Access goes: a phone on mobile data and a second machine join at
+## P8 Last (right before submitting; user, 2026-11-04: "Remove Access right before submitting")
+Order: remove `/api/chatlog`, its client call and KV rows; lower `CLIENT_DAILY_USD`; deploy. Then the user makes
+GitHub and the 4 HF repos public and removes Access. Leave at least an hour between Access going and the submit
+button: until then nobody outside this home network has ever joined. **Join check on the public URL** right after Access goes: a phone on mobile data and a second machine join at
 the same time, plus a 30-bot burst for 2 minutes; watch errors and `/api/spend`. User submits.
-Open question for the user: removing Access at the freeze (Nov 4 ~18:00 VN, already Nov 4 ET = submission day) would
-give this check, and the recording, time to fix what only outside players hit.
+Decided (user, 2026-11-04): Access stays until right before submitting. A way to test from outside earlier without
+going public: the user adds one friend's email to the Access policy (the user's change; Claude does not touch
+security settings).
 
 ## Verification (every phase)
 - `npm --prefix client test`, `npm --prefix worker test`, tsc, secrets scan, local commit, deploy (two plain commands,

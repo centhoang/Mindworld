@@ -1,11 +1,12 @@
 # HANDOFF: Mindworld final plan (2026-11-04, ~13:10 VN = 06:10 UTC)
 
-**Starting prompt:** "Read HANDOFF.md, then do Next actions 1 and 2 (the flaky join check, then the goal check in docs/game/mission.md). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then do Next actions in order: the flaky join check, then P6 and the rest of the plan (no need to wait for the timeline). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
-  Status section at the top. Keep that Status current every session. P5 window 13:00-17:00 (we are ahead), freeze (P6)
-  18:00 VN. Earlier HANDOFF times said ~12:25 VN for the last session; the real clock was ~11:20 VN then.
+  Status section at the top. Keep that Status current every session. **User, 2026-11-04 ~13:20 VN: continue P6 and
+  the rest now, no need to follow the timeline** (time ahead goes to the submission form's questions, the demo and the
+  video). Access stays until right before submitting (P8).
 - **P5 is complete.** Live worker ebecde8f, build `main-p-yOsRi0`. Local commits on `rework/fresh-look`, not pushed.
 - Tests: client 702, worker 242, tsc clean both. **Join check is flaky today:** four runs after the P5d/P5e
   deploys went 16, 20, 17, 19 of 20, each failing a different socket check (bots with no welcome, the spill room not
@@ -42,15 +43,14 @@
    the network. Rerun 3 times first (`node scripts/join-check.mjs`, test Chrome closed; ~2 min each, background it),
    read the failing rows in `.scratch/p5/join-check-p5{d,d-2,e,e-2}.txt`, then `worker/src/room-do.ts` and
    `scripts/join-check.mjs`. Fix, deploy, prove 20/20 three times in a row.
-2. **Goal check** (user's pick): `docs/game/mission.md` holds the user's mission in their words, a table of what is
-   built, partly built and not yet built, and the comparison with Atelico. Talk it through with the user; the main gap
-   is the local-server tier (a tab offering a local `llama-server` with a bigger GGUF as host power; the room's
-   tokens/s ranking, hand-over and memory relay already exist). Whether to build any of it before the deadline is the
-   user's call (scope: ask first; the freeze is 18:00 VN).
-3. **P6 freeze 18:00 VN**: bug fixes only from then. Ask the user first: remove Access at the freeze instead of Nov 5
-   morning (Open, below). Then `scope-check` every scope on live, then the user's last play-test (2+ players).
-4. P4 leftovers only if time before the freeze: tree clumps toward the coast, stumps, berry bushes, the plaza's bare
-   dirt (pack `statue.png`).
+2. **P6 now** (bug fixes only from here): before Access goes, lock down `/api/llm` (a general model proxy: any
+   prompt, client-picked provider) and plan to lower `CLIENT_DAILY_USD` from "10" (~$2) after the user's play-test;
+   details in `docs/plan/final-plan.md` P6. Then `scope-check` every scope on live, then the user's last play-test (2+
+   players), then P7 (demo script, README, numbers; the submission form's questions) and P8 (order written there).
+3. **The mission** (`docs/game/mission.md`) is vision only, for the submission text and after the event: no new build
+   before the deadline (user). It now also holds the original island world idea and the host spreading rule.
+4. P4 leftovers (tree clumps, stumps, berry bushes, the plaza's dirt) are out: P6 started early and is bug fixes only.
+   Only if the user asks.
 5. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
    villager walks up and challenges you.
 6. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
@@ -63,8 +63,9 @@
 - Gazette weak spot: plain `remember()` notes live only in the host's tab, so a reload or host hand-over mid-day
   loses that day's everyday notes (promises, duels, trades, bonds are relayed and survive). Fine for the demo.
 - Play-test #1 (2026-11-04) bugs 53-60 are fixed on live; the user plays once more, last, at P6.
-- User's call, asked and not yet answered: remove Access at the freeze (Nov 4 ~18:00 VN) instead of Nov 5 morning, so
-  outside joins get tested with time to fix. Ask again before P6.
+- Decided (user): Access goes right before submitting. Leave an hour between that and the submit button for the
+  outside join check (P8). Earlier outside testing without going public: the user may add a friend's email to the
+  Access policy (the user's change).
 - 34, 36, 37, 45, 46, 47, 48, 49-52, 53-60 fixed, waiting for the user's review on live.
 - Not done by a person: a 2-person play, the stranger test. P3 real-tab checks were all tabs on this machine.
 - Not run live: joining while someone is indoors (same away rule as fighting); a host leaving mid-conversation (earlier
