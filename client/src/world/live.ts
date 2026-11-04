@@ -326,6 +326,11 @@ export class LiveLink {
     private readonly open: (url: string) => SocketLike = (u) => new WebSocket(u) as unknown as SocketLike,
   ) {}
 
+  // The room I am in (or would join): "main", "main-2", ...
+  roomName(): string {
+    return new URL(spillUrl(this.url, this.roomNo), "https://x").searchParams.get("room") ?? "main";
+  }
+
   connect() {
     if (this.stopped || this.full) return;
     this.set("connecting");

@@ -9,14 +9,15 @@ import { ACTIVITY } from "../life/activities";
 import { clockLabel, gameTime } from "../life/clock";
 import { addAgent, newVillage, stepVillage, type Agent, type Choice, type Env, type LifeEvent, type Spots, type Village } from "../life/village";
 import type { Vec } from "../world/movement";
-import { NPCS, type MindLine, type Npc } from "../world/live";
+import { isNpc, NPCS, type MindLine, type Npc } from "../world/live";
 import { MindHub, type Mind } from "./hub";
 import { npcDoor } from "../world/village-map";
 import { cloudMindText, linePrompt, parseLine, petLinePrompt, replyPrompt, scriptedLine, scriptedPetLine } from "./brain";
 import { addBelief, beliefFrom, beliefLine, bondLine, bondOf, feel, feelWord, gossipFrom, gossipLine, holdsGrudge, hurt, parseBeliefLine, parseBondLine, parseGossip, toneOf, toYou, wariness, whyAnswer } from "./bonds";
 import { addFact, emptyMemory, remember, type MemoryEntry, type MindMemory } from "./memory";
+import { gazetteNotes } from "./gazette";
 import { traitBias, VILLAGERS, type Persona } from "./persona";
-import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
+import { add as addGood, bestCrop, priceAnswer, boardRows, dealLine, dealPrompt, dealScore, giftLine, GROW_STEPS, HARVEST_YIELD, JOB_GOOD, judge, newMarket, newPurse, openDay, parseDeal, parseOffer, parsePurseLine, parseTradeLine, plantCrop, priceOf, GOOD_IDS, purseLine, wantOf, record, sellStock, tradeLine, WORK_YIELD, type BoardRow, type Good, type Market, type Offer, type Purse, type Trade } from "./economy";
 import { askedPlace, directions, doingAnswer, firstPerson, type Place, talkAnswer, topicOf, farAnswer, whoAnswer, whyPerson } from "./directions";
 import { closeTo, goalAnswer, goalOf, reached, spare } from "./goals";
 import { humanize } from "./human";
@@ -63,6 +64,7 @@ const FARM_COINS = 30;
 const OFFER_TURNS = 4; // player lines an unanswered offer stays open
 const QUIET_LINES = 4; // model lines after an invitation before the next one
 const DUEL_PITCH = 0.35; // how often a bored villager with a pet asks a passing player for a duel
+const GOAL_SEEN = 14; // tiles: a villager this near the ball saw the goal
 const DUEL_FUN = 50; // below this fun need, a villager feels like a duel
 const INVITE_HINT = /\b(party|birthday|danc|soccer|football|fish|picnic|lunch)/i; // only these lines cost a model call
 
@@ -570,6 +572,43 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
   purseOf(npc: string): Purse {
     const m = this.memOf(npc as Npc);
     return (m.purse ??= newPurse());
+  }
+
+  // The Village Gazette's material (game/gazette-api.ts): what the villagers whose minds run here noted that day.
+  hostsAny(): boolean {
+    return NPCS.some((n) => this.hosting(n));
+  }
+  gazetteNotes(day: number): string[] {
+    return gazetteNotes([...this.hub.minds].filter(([id]) => this.hosting(id as Npc)).map(([, m]) => ({ name: m.persona.name, log: m.mem.log })), day);
+  }
+  // A villager watching the player's fight: how it feels about them, and the memory of what it saw.
+  feelFor(npc: Npc, player: string): string {
+    const b = bondOf(this.memOf(npc), player);
+    return b ? `${feelWord(b)} ${player}` : "";
+  }
+  watched(npc: Npc, text: string): void {
+    const m = this.hub.minds.get(npc);
+    if (!m || !this.hosting(npc)) return;
+    const g = gameTime(this.v.t);
+    remember(m.mem, g.day, clockLabel(g.hour), text, 4);
+  }
+
+  // A goal on the pitch is news: a villager who scored remembers it; one standing near remembers who scored.
+  noteGoal(by: string, name: string, at: Vec): void {
+    const g = gameTime(this.v.t);
+    if (isNpc(by)) {
+      const m = this.hub.minds.get(by);
+      if (m && this.hosting(by)) remember(m.mem, g.day, clockLabel(g.hour), "scored a goal at the pitch", 5);
+      return;
+    }
+    for (const a of this.v.agents) {
+      const m = this.hub.minds.get(a.id);
+      if (m && this.hosting(a.id as Npc) && Math.hypot(a.pos.x - at.x, a.pos.z - at.z) < GOAL_SEEN) remember(m.mem, g.day, clockLabel(g.hour), `${name} scored a goal at the pitch`, 4);
+    }
+  }
+  gazettePrices(): string[] {
+    openDay(this.market, gameTime(this.v.t).day, VILLAGERS);
+    return GOOD_IDS.map((g) => `${g} ${priceOf(this.market, g)}c`);
   }
 
   board(): BoardRow[] {

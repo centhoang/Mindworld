@@ -36,6 +36,7 @@ import { petPersona } from "../mind/persona";
 import type { MindScheduler } from "../mind/scheduler";
 import type { Rect } from "../view/bubbles";
 import { isNpc, type MindLine, type Npc, type RoomKick } from "../world/live";
+import type { Watcher } from "../game/cheer-api";
 import { NpcVillage } from "../mind/npcs";
 import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
@@ -56,6 +57,7 @@ const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "t
 export const OVERWORLD_MON = 20; // px: monsters in the overworld
 const WILD_PER_MEADOW = 3;
 const MEET_DIST = 1.0;
+const WATCH_DIST = 16; // tiles: a villager this near sees a fight start (about a screen away)
 const NPC_ROUTE_TILES = 120_000; // the NPCs may walk across the whole map
 export const CROP_ART: Record<string, string> = { wheat: "wheat", carrot: "carrot", tomato: "radish" };
 // Farm stages 0-3 onto the pack's six growth pictures.
@@ -963,6 +965,8 @@ export class Overworld {
     if (b.goal && !this.scored && b.by) {
       const who = isNpc(b.by) ? `n:${b.by}` : b.by === "me" || b.by === this.npcs?.me ? "me" : this.peers.has(b.by) ? `p:${b.by}` : null;
       if (who) this.say(who, "Goal!", 2.5);
+      const name = who === "me" ? this.myName : who?.startsWith("p:") ? this.peers.get(b.by)?.name : undefined;
+      if (who) this.npcs?.noteGoal(b.by, name ?? "Someone", { x: b.x, z: b.z });
     }
     this.scored = b.goal;
   }
@@ -1092,6 +1096,20 @@ export class Overworld {
     this.hatchLeft = HATCH_TIME;
     const spot = [3, 4, -3].map((dz) => ({ x: this.player.x, z: this.player.z + dz })).find((v) => this.canWalk(v.x, v.z));
     if (spot) this.pet = spot;
+  }
+
+  // The villager nearest to me who sees a fight start here: awake, outdoors, within WATCH_DIST; null if none.
+  watcher(exclude = ""): Watcher | null {
+    const npcs = this.npcs;
+    if (!npcs || this.indoors) return null;
+    let best: { id: Npc; name: string } | null = null;
+    let bestD = WATCH_DIST;
+    for (const a of npcs.v.agents) {
+      if (!isNpc(a.id) || a.id === exclude || a.act === "sleep" || a.act === "nap" || (a.state === "do" && ACTIVITY.get(a.act!)?.indoors)) continue;
+      const d = Math.hypot(a.pos.x - this.player.x, a.pos.z - this.player.z);
+      if (d < bestD) [best, bestD] = [{ id: a.id, name: a.name }, d];
+    }
+    return best ? { npc: best.id, name: best.name, feel: npcs.feelFor(best.id, this.myName) } : null;
   }
 
   cheerPet(): void {

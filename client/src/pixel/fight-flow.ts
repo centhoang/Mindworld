@@ -5,6 +5,7 @@ import type { Speaker } from "../game/chatter";
 import type { Instinct } from "../game/instinct";
 import { addToParty } from "../game/party";
 import type { CloudPlan } from "../game/rival-api";
+import { watchLine, type CheerEnd, type Watch } from "../game/cheer-api";
 import type { FightWorld, Transport } from "../game/ports";
 import { MAX_TAMED, save, type Save } from "../game/save";
 import { addCoins, coinsFor } from "../game/shop";
@@ -55,6 +56,9 @@ export interface FightDeps {
   memoKey: () => string;
   brainTag: () => string;
   duelBegun: () => void;
+  // A villager who sees the fight start (null if none near); `exclude` = the rival's owner, who is fighting.
+  watch: (foe: string, duel: boolean, exclude?: string) => Watch | null;
+  watched: (w: Watch, end: CheerEnd) => void;
 }
 
 export function makeFightFlow(d: FightDeps) {
@@ -67,6 +71,7 @@ export function makeFightFlow(d: FightDeps) {
     d.setMode("battle");
     d.keys.clear();
     const them = me === "a" ? b : a;
+    const watch = d.watch(`${them.name.slice(0, 12)}'s pet`, true);
     const v = duelView(a, b, seed, me);
     const mine = { ...d.side(d.activeMember()), maxHp: v.myMaxHp };
     await battleView.open({ name: them.name.slice(0, 12), sprite: drawMonster(petLook(them.genes), 32, "front"), genes: them.genes, maxHp: v.theirMaxHp, level: 3, trainer: humanLook(liveName(them.genes)) }, mine, `${them.name.slice(0, 12)} is ready to duel!`);
@@ -78,6 +83,7 @@ export function makeFightFlow(d: FightDeps) {
       state.coins = addCoins(state.coins ?? 0, earned);
       await battleView.say(`+${earned} coins.`);
     }
+    await cheer(watch, v.result);
     save(state);
     d.setMode("world");
   }
@@ -132,6 +138,7 @@ export function makeFightFlow(d: FightDeps) {
     const battle = new Battle({ enemy: arch, seed: Math.floor(Math.random() * 1e9), enemyDef: def });
     const foeName = arch[0]!.toUpperCase() + arch.slice(1);
     const foeSprite = drawMonster(petLook(w.genes), 32, "front", BUILDS[arch]);
+    const watch = d.watch(`a wild ${foeName}`, false);
     await battleView.open({ name: foeName, sprite: foeSprite, genes: w.genes, maxHp: def.maxHp, level: 2 + (w.id % 3) }, d.side(d.activeMember()));
     const replay = await play(battle, foeName);
     if (!replay) {
@@ -154,11 +161,13 @@ export function makeFightFlow(d: FightDeps) {
         msg = `${state.party.at(-1)!.name} the ${w.arch} is yours now! It waits at your corner. ${msg}`;
       }
       await battleView.say(msg);
+      await cheer(watch, replay.how === "befriended" ? "friends" : "win");
       await review(replay, foeName, () => withTactics(ENEMIES[arch], d.wildMemos()[arch]));
       world.removeWild(w.id);
       const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
       if (meadow) setTimeout(() => world.spawnWild(meadow.x, meadow.z, meadow.r), 20000);
     } else {
+      await cheer(watch, replay.outcome === "timeout" ? "draw" : "loss");
       await review(replay, foeName, () => withTactics(ENEMIES[arch], d.wildMemos()[arch]));
       d.coolFoe(w); // give the player time to walk away
     }
@@ -176,6 +185,14 @@ export function makeFightFlow(d: FightDeps) {
     save(state);
     d.setMode("world");
   }
+  // The watching villager calls out how it went, and remembers it.
+  async function cheer(w: Watch | null, end: CheerEnd): Promise<void> {
+    if (!w) return;
+    const { text, by } = await watchLine(w, end);
+    await battleView.say(`${w.name}: "${text}"`, by);
+    d.watched(w, end);
+  }
+
   // The coach's review after a fight (sim/review.ts): what went wrong and the one lesson that wins more practice fights
   // against this foe. "Teach it" opens Teach with the lesson typed in. With no lesson to give, `fallback` is said.
   async function review(replay: Replay, foe: string, def: () => EnemyDef, fallback = ""): Promise<void> {
@@ -202,6 +219,7 @@ export function makeFightFlow(d: FightDeps) {
     const label = rivalLabel(base);
     const spec = ghostPet(base.genes, base.name);
     await battleView.open({ name: label, sprite: drawMonster(petLook(base.genes), 32, "front"), genes: base.genes, maxHp: spec.maxHp, level: 3, trainer: NPC_LOOKS[owner] }, d.side(d.activeMember()), `${base.ownerName} sends out ${base.name}!`);
+    const watch = d.watch(`${base.ownerName}'s ${base.name}`, true, owner);
     await battleView.say(`${base.ownerName} studies how your pet fights...`);
     const cloud = await Promise.race([plan, new Promise<CloudPlan>((r) => setTimeout(() => r({ rules: [], summary: "", source: "late" }), STUDY_MS))]);
     const study = rehearse(base, state.memo, cloud.rules);
@@ -223,6 +241,7 @@ export function makeFightFlow(d: FightDeps) {
       state.coins = addCoins(state.coins ?? 0, earned);
       await battleView.say(`+${earned} coins.`);
     }
+    await cheer(watch, end);
     if (end === "loss" || end === "draw") {
       const w = whyLost(replay, log, rv, state.memo);
       await battleView.say(w.why);

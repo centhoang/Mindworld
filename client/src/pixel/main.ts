@@ -12,6 +12,9 @@ import type { Genes } from "../sim/ghost";
 import { fetchWildMemos, type WildMemos } from "../sim/tactics";
 import { habits } from "../sim/rivals";
 import { rivalPlanFor } from "../game/rival-api";
+import { Gazette, paperRows } from "../game/gazette-api";
+import { startWatch, watchMemory } from "../game/cheer-api";
+import { gameTime, worldSeconds } from "../life/clock";
 import { DEFAULT_PET } from "../sim/types";
 import { BattleView, type Side } from "./battle";
 import { makePresenter } from "./crt";
@@ -40,7 +43,7 @@ import { defaultRoom } from "../game/room";
 import type { Good } from "../mind/economy";
 import type { Pocket } from "../mind/npcs";
 import { buySeeds, CROP_IDS, CROPS, emptyFarm, harvest, plant, RIPE, sellAll, tick, water, type CropId } from "../game/farm";
-import { drawMenu, type MenuRow } from "./menu";
+import { drawMenu, ROW_H, type MenuRow } from "./menu";
 import { chipSpots } from "../view/mosaic/compose";
 import { MosaicView } from "../view/mosaic/mosaic-view";
 import type { Rect } from "../view/bubbles";
@@ -592,6 +595,23 @@ const room = makeRoomFlow({
 });
 const live = room.live;
 const { fakeIsle, shareState } = room;
+// The Village Gazette: today's paper about yesterday, on the town board and once as a toast.
+const gazette = new Gazette({
+  room: () => live.roomName(),
+  hosts: () => !!world.npcs?.hostsAny(),
+  notes: (day) => world.npcs?.gazetteNotes(day) ?? [],
+  prices: () => world.npcs?.gazettePrices() ?? [],
+}, (p) => {
+  const line: Line = { text: p.headlines[0]!, who: "Gazette", t: 7 };
+  if (!toast) toast = line;
+  else hintQueue.push(line);
+});
+// The board: the paper first, then the prices, as many rows as the screen holds.
+function boardRows(): MenuRow[] {
+  const width = Math.floor((Math.min(low.width - 24, 280) - 28) / 6);
+  const rows: MenuRow[] = [...paperRows(gazette.paper, width), ...(world.npcs?.board() ?? [])];
+  return rows.slice(0, Math.max(4, Math.floor((low.height - 50) / ROW_H)));
+}
 onPetChange = () => {
   showName();
   live.rejoin();
@@ -663,6 +683,8 @@ const fights = makeFightFlow({
     if (duelOut) clearTimeout(duelOut.timer);
     duelOut = null;
   },
+  watch: (foe, duel, exclude) => startWatch(world.watcher(exclude), { player: myName(), pet: activeMember().name, foe, duel }),
+  watched: (w, end) => world.npcs?.watched(w.npc, watchMemory(w, end)),
 });
 const fight = fights.fight;
 
@@ -724,6 +746,7 @@ function update(dt: number, t: number): void {
         save(state);
       }
     }
+    if (world.npcs) gazette.update(gameTime(worldSeconds()).day, Date.now());
     world.underBubbles = () => (!menu && !crate && !board && !peerMenu && !duelIn ? drawGoals() : undefined);
     world.panels = nextPanels;
     nextPanels = [];
@@ -738,7 +761,7 @@ function update(dt: number, t: number): void {
     } else if (duelIn) showMenu(`${duelIn.name} wants a duel!`, [{ label: "Accept" }, { label: "Decline" }], duelIn.cursor, t, "Your pet fights with its memo rules");
     else if (peerMenu) showMenu(world.peers.get(peerMenu.id)?.name ?? "Player", PEER_ROWS.map((label) => ({ label })), peerMenu.cursor, t, "Enter: pick  Esc: close  1-4: emotes");
     else if (crate) showMenu(`Market  ${state.coins ?? 0}c`, crateRows(), crate.cursor, t, "Enter: pick  Esc: close");
-    else if (board) showMenu("Town board", world.npcs?.board() ?? [], -1, t, "Prices move with real trades. Esc: close");
+    else if (board) showMenu("Town board", boardRows(), -1, t, gazette.paper ? `By ${gazette.paper.by}`.slice(0, 44) : "Prices move with real trades. Esc: close");
     else if (chat.target() && !pixelLook) nextPanels.push({ place: "bottom", title: chat.target() === "name" ? "Your name" : "Say", rows: [{ label: `> ${chat.draft()}${Math.floor(t * 2) & 1 ? "_" : " "}` }], width: 60, footer: "Enter: send  Esc: bye" });
     else if (toast) {
       toast.t -= dt;
@@ -777,4 +800,5 @@ void Promise.all([loadArt(), loadSunny(), setup]).catch((e: unknown) => console.
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
 (window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain, fakeIsle,
+  gazette, openBoard: () => void (board = { cursor: 0 }),
   blocked: () => ({ mode, door: !!door, menu: !!menu, crate: !!crate, board: !!board, peerMenu: !!peerMenu, duelIn: !!duelIn, teach: teach.open, chat: chat.target() }) };

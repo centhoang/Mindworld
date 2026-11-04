@@ -13,6 +13,18 @@ import type { Agent } from "../life/village";
 import { PAL } from "./art";
 import { drawFrame, drawText, GLYPH, wrap } from "./text";
 
+// Which service answered a mind's last line, plain words first and the model after (bug 36 wording). `source` is what
+// the line came back with: a model label from the scheduler, "model"/"cache" from the cloud chat (worker /api/chat,
+// Muse Spark Open on Baseten), or "rules".
+export function serviceLabel(source: string): string {
+  if (/llama/i.test(source)) return "thought on your computer (Llama 3.2 1B, tuned)";
+  if (source === "model" || source === "cache" || /muse spark open|^muse spark$/i.test(source)) return "from the cloud (Muse Spark Open)";
+  if (/muse spark 1|meta model/i.test(source)) return "from the cloud (Muse Spark 1.3, Meta Model API)";
+  if (source === "rules") return "the village rules (no model)";
+  if (source === "offline" || source === "scripted") return "a scripted line (no model)";
+  return source;
+}
+
 type Ctx = CanvasRenderingContext2D;
 export const SHOW_NEEDS = ["hunger", "energy", "fun", "social"] as const;
 const SHORT: Record<string, string> = { morning: "AM", noon: "NOON", evening: "PM" };
@@ -23,7 +35,7 @@ export function inspectorLines(m: Mind, a: Agent, rel: Map<string, number>, name
   const add = (s: string, col: string = PAL.ink) => wrapLine(s).forEach((l) => lines.push([l, col]));
   const p = m.persona;
   add(`${p.name}  (${p.kind === "pet" ? "PET" : "VILLAGER"})`, PAL.coral);
-  add(`MIND: ${m.source === "rules" ? "RULES (B: LOAD LLAMA)" : m.source}`, PAL.teal);
+  add(`LAST LINE: ${serviceLabel(m.source)}${m.source === "rules" ? " (B: load Llama)" : ""}`, PAL.teal);
   add(`RUNS ON: ${where}`, PAL.teal);
   add(`IS: ${p.traits.join(", ")}`);
   add(`LIKES: ${p.hobbies.join(", ")}`);

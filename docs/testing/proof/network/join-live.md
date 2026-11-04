@@ -54,7 +54,7 @@ another save (another player), `?room=check` joins the bots' room.
   worked the same.
 
 ## 2026-11-04 ~10:40 VN: "a late joiner sees who is talking" (worker c25d5953, no worker change)
-- Failed twice at 11:00 VN-ish runs (`.scratch/p4/join-check-55.txt`, `-55b.txt`). Cause was the script: the talkers were
+- Failed twice in a row this morning (`.scratch/p4/join-check-55.txt`, `-55b.txt`). Cause was the script: the talkers were
   fixed burst slots 2 and 3, but the refresh steps quit whichever burst bots got plots first, and plots go by arrival
   order, so a talker could be a closed socket (its `talk` never sent, or its id gone). The room's `talk()` was fine.
 - Fix (`scripts/join-check.mjs`): the talkers are any two bots still in the room; the check's note now says what the

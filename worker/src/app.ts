@@ -17,6 +17,8 @@ import { complete, UnreadableResponse, UpstreamError, type Completion, type Prov
 import { loadWildMemos } from "./wild-memos";
 import { roomName } from "./room";
 import { parseRivalAsk, rivalPlan } from "./rival";
+import { gazettePaper, parseGazetteAsk } from "./gazette";
+import { cheerLines, parseCheerAsk } from "./cheer";
 import { handleMlc, type MlcDeps } from "./mlc";
 import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
 
@@ -110,6 +112,8 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
       return json(w ?? { version: 0, updatedAt: 0, source: "default", memos: {} });
     }
     if (path === "/api/rival" && method === "POST") return handleRival(request, deps);
+    if (path === "/api/gazette" && method === "POST") return handleGazette(request, deps);
+    if (path === "/api/cheer" && method === "POST") return handleCheer(request, deps);
     if (path === "/api/chatlog" && method === "POST") return handleChatLog(request, deps);
     if (path === "/api/transcribe" && method === "POST") return handleTranscribe(request, deps);
     if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);
@@ -351,6 +355,22 @@ async function handleRival(request: Request, deps: Deps): Promise<Response> {
   if (!ask) return fail(400, "bad_request");
   const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
   return json(await rivalPlan(ask, deps, clientKey));
+}
+
+// The Village Gazette (worker/src/gazette.ts): one paper per room and game day. Always 200 unless the ask is bad.
+async function handleGazette(request: Request, deps: Deps): Promise<Response> {
+  const ask = parseGazetteAsk(await readJson(request, 4000), deps.now());
+  if (!ask) return fail(400, "bad_request");
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  return json(await gazettePaper(ask, deps, clientKey));
+}
+
+// A watching villager's line for each way a fight can end (worker/src/cheer.ts). Always 200 unless the ask is bad.
+async function handleCheer(request: Request, deps: Deps): Promise<Response> {
+  const ask = parseCheerAsk(await readJson(request, 1000));
+  if (!ask) return fail(400, "bad_request");
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  return json(await cheerLines(ask, deps, clientKey));
 }
 
 // ---------- voice teaching ----------

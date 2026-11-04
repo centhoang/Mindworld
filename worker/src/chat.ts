@@ -20,7 +20,7 @@ const STYLE =
   "(names, places, ages, contacts). If the player is rude or asks for something unsafe, gently change the subject " +
   "back to the village.";
 
-const PERSONA: Record<ChatWho, string> = {
+export const PERSONA: Record<ChatWho, string> = {
   elder:
     "You are the Elder, the village's oldest herb gardener, who has watched pets grow for a lifetime. You give gentle, " +
     "practical tips: pets learn from rules the player teaches (guard when a heavy hit is coming, befriend calm creatures).",
