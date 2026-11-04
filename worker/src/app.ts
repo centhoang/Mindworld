@@ -11,8 +11,9 @@ import {
   type GhostStore,
 } from "./ghosts";
 import type { ReserveRequest, ReserveResult, SpendSnapshot, RejectReason } from "./ledger";
-import { LLM_KINDS, mockCompletion, type LlmKind } from "./mock";
-import { actualCostUsd, estimateInputTokens, PROVIDERS, worstCaseCostUsd, type Provider } from "./pricing";
+import { mockCompletion, type LlmKind } from "./mock";
+import { checkLlm } from "./llm-policy";
+import { actualCostUsd, estimateInputTokens, worstCaseCostUsd, type Provider } from "./pricing";
 import { complete, UnreadableResponse, UpstreamError, type Completion, type ProviderConfig } from "./providers";
 import { loadWildMemos } from "./wild-memos";
 import { roomName } from "./room";
@@ -55,8 +56,6 @@ export interface Deps {
 
 const sharedChatCache = new OpenerCache();
 
-const MAX_SYSTEM_CHARS = 4000;
-const MAX_PROMPT_CHARS = 8000;
 const MAX_BODY_CHARS = 20_000;
 const MIN_OUTPUT_TOKENS = 64;
 const DEFAULT_OUTPUT_TOKENS = 800;
@@ -155,13 +154,11 @@ async function handleChatLog(request: Request, deps: Deps): Promise<Response> {
 
 // ---------- LLM proxy ----------
 
-const EFFORTS = ["low", "medium", "high"] as const;
-
 interface LlmRequest {
-  effort: (typeof EFFORTS)[number] | undefined;
+  effort: "low";
   provider: Provider;
   kind: LlmKind;
-  system: string | undefined;
+  system: string;
   prompt: string;
   maxTokens: number;
 }
@@ -169,13 +166,9 @@ interface LlmRequest {
 function parseLlmRequest(body: unknown, cfg: AppConfig): LlmRequest | string {
   if (!body || typeof body !== "object") return "body must be a JSON object";
   const b = body as Record<string, unknown>;
-  const provider = (b.provider ?? cfg.defaultProvider) as Provider;
-  if (!PROVIDERS.includes(provider)) return "unknown provider";
-  if (!LLM_KINDS.includes(b.kind as LlmKind)) return "unknown kind";
-  if (typeof b.prompt !== "string" || b.prompt.length === 0 || b.prompt.length > MAX_PROMPT_CHARS) return "bad prompt";
-  if (b.system !== undefined && (typeof b.system !== "string" || b.system.length > MAX_SYSTEM_CHARS)) return "bad system";
+  const policy = checkLlm(b.kind, b.system, b.prompt);
+  if (typeof policy === "string") return policy;
   let maxTokens = DEFAULT_OUTPUT_TOKENS;
-  if (b.effort !== undefined && !EFFORTS.includes(b.effort as never)) return "bad effort";
   if (b.maxTokens !== undefined) {
     if (typeof b.maxTokens !== "number" || !Number.isInteger(b.maxTokens) || b.maxTokens < MIN_OUTPUT_TOKENS) {
       return "bad maxTokens";
@@ -183,12 +176,12 @@ function parseLlmRequest(body: unknown, cfg: AppConfig): LlmRequest | string {
     maxTokens = b.maxTokens;
   }
   return {
-    provider,
+    provider: policy.provider,
     kind: b.kind as LlmKind,
-    system: b.system as string | undefined,
-    prompt: b.prompt,
-    maxTokens: Math.min(maxTokens, cfg.maxOutputTokens),
-    effort: b.effort as LlmRequest["effort"],
+    system: b.system as string,
+    prompt: b.prompt as string,
+    maxTokens: Math.min(maxTokens, cfg.maxOutputTokens, policy.maxTokens),
+    effort: "low",
   };
 }
 

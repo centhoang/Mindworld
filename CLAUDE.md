@@ -46,7 +46,9 @@ Everything lives in this folder; temp files in `.scratch/` (gitignored). No proj
 - **Nothing goes public before submission day:** game stays behind Access, GitHub and HF stay private until the user opens them.
 - **Proven = deployed build.** Review scope by scope: `docs/testing/testing.md`, skills `scope-check` and `scope-publish`. Whole-game play-test needs 2+ players and every list clear.
 - **`LOCAL_ONLY` is off** (client/src/game/test-mode.ts, user 2026-11-03): minds fall back to Muse Spark, then rules and scripted lines. Daily USD cap kept. Cloud extras sit behind `CLOUD_LIVELY`; off must leave the game playable and free. `/api/chatlog` removal runs last (`docs/plan/final-plan.md` P8).
-- **Codex is for new visual assets only**, matching the pack and docs/visual/style.md. Claude does everything else. Run: `powershell -NoProfile -File scripts/codex.ps1 -Prompt "Read .scratch/brief-x.md and carry it out exactly." [-Sandbox workspace-write] [-Effort max] [-Out .scratch/x.md]`. Briefs name files and checks; no secrets, no git commit.
+- **Codex (user, 2026-11-04):** new visual assets (matching the pack and docs/visual/style.md), and now also non-visual tasks
+  with a clear scope (code, tests, docs, research) to save Claude's quota. Claude keeps visual work, the demo video, the final
+  check and filling in the submission form, and reviews every Codex output (diff, tests) before it counts. Run: `powershell -NoProfile -File scripts/codex.ps1 -Prompt "Read .scratch/brief-x.md and carry it out exactly." [-Sandbox workspace-write] [-Effort max] [-Out .scratch/x.md]`. Briefs name files and checks; no secrets, no git commit.
 - Public posts: never reveal idea, mechanics or architecture.
 
 ## Work modes

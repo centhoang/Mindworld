@@ -70,6 +70,13 @@
 - **P4 visual leftovers done** (same deploy): tree clumps toward the coast, stumps, berry bushes, the pack's statue on
   the square and three of its corners rounded (`docs/visual/visual.md`). Proof `proof/visual/p4-*-live.png`.
   **Next: P6** (`/api/llm` lock-down first).
+- **P6 `/api/llm` lock-down done** (live worker 950958dc, 2026-11-04 ~19:30 VN; Codex built, Claude reviewed):
+  `worker/src/llm-policy.ts` fixes provider, output cap, prompt cap and system text per kind; low effort forced. Live:
+  reflect, Teach, a cloud villager line and a cloud move answer; appended or free-form systems and long prompts are
+  refused. Proof `proof/network/llm-lockdown-live.md`. Found bug 61 (cloud mind stand-in always truncates; left in the freeze).
+  **P7 drafts written:** `ops/submission.md` (the form's questions read from the user's Chrome, draft answers, X post),
+  `ops/demo.md` (script for this build), README rewritten (Codex, reviewed). **Domain move** to `mindworld.uryto.dev`
+  (user, 2026-11-04): waits for the user to add the hostname to the Access app first.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

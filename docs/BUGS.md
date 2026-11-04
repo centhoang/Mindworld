@@ -28,6 +28,13 @@ Play-test #1 (2026-11-04) bugs 53-60 are all fixed on live (worker c25d5953), wa
 - Fixed (found in P2): map rocks drew nothing yet blocked the way (their "rock-small" picture was never loaded); they use the pack's rock stamp now.
 
 ## NPC
+61 (found by Claude, P6 live proof 2026-11-04): **the cloud mind stand-in never answers.** On a host with no local model,
+   `CloudMind` (`game/voices.ts`) sends villager decisions to `/api/llm` kind `dialogue` with 400 output tokens; Muse
+   Spark Open reasons past 400, so every reply is empty and `truncated`, it backs off for 5 min, and the rules decide.
+   `/api/chat` uses 1200 for the same prompts (`MIND_MAX_TOKENS`). Pre-existing, not from the lock-down. Left as is in
+   the freeze (Claude): raising it would let one no-GPU host spend about once a second from the shared daily cap and
+   starve the Gazette, stories and postcards. After the event: raise to ~1200 with its own small daily quota and a
+   10-20 s gap. Talk with villagers is not affected (`/api/chat`). README "Honest limits" says so.
 11. **Free talk is weak on the 1B.** Cloud free talk now fixes this during the event (`proof/npc/5a-transcript.md`). Local fallback alone is still weak.
 - Fixed, waiting for review: 53 (play-test #1: the campfire pose plays idle and `doing`, never the fishing strips; `humans.test.ts`). 60 (play-test #1: "what are you up to?" with no activity says the hour's words, "Just taking it easy tonight", and "we" when asked as a group at a shared activity; `directions.test.ts`). 42, 43 (per-client chat cap gone, day's USD cap stays; greetings and free talk answered by Muse Spark on live
   with the time and what the villager is doing; replay and the chat-log failures in `proof/npc/chatlog-2026-11-03.md`). 28 (hurt villagers stay cool in small talk until sorry, `proof/npc/5f-free-talk.md`). 29 (feed dropped, clean stays player-only). 24 (asking for goods is buying; "how much?" means that good, unit test only). 12 (memory cut off invitations, unit test only). 10. Conversation continues: yes, no, later and "where?" act on offers.

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { geoOf, isRestricted } from "../src/geo";
 import { actualCostUsd, estimateInputTokens, worstCaseCostUsd } from "../src/pricing";
-import { basetenReply, CFG, harness, metaReply, postJson } from "./helpers";
+import { basetenReply, CFG, harness, LLM_SYSTEMS, metaReply, postJson } from "./helpers";
 
-const llmBody = { kind: "memo", system: "be brief", prompt: "summarize the fight", maxTokens: 400 };
+const llmBody = { kind: "teach", system: LLM_SYSTEMS.teach, prompt: "summarize the fight", maxTokens: 400 };
 
 describe("geo-block", () => {
   it.each(["CN", "RU", "IR", "PK", "KP", "VE", "HK", "MM"])("returns 451 for %s on every route", async (country) => {
@@ -78,7 +78,7 @@ describe("POST /api/llm", () => {
     expect((call.init.headers as Record<string, string>).authorization).toBe("Bearer test-baseten-key");
     const sent = JSON.parse(call.init.body as string);
     expect(sent).toMatchObject({ model: "meta-models/muse-spark-open-1026", max_tokens: 400 });
-    expect(sent.messages[0]).toEqual({ role: "system", content: "be brief" });
+    expect(sent.messages[0]).toEqual({ role: "system", content: LLM_SYSTEMS.teach });
 
     expect(JSON.stringify(out)).not.toContain("test-baseten-key");
     const snap = await h.ledger.snapshot();
@@ -89,14 +89,14 @@ describe("POST /api/llm", () => {
   it("proxies to the Meta Responses API and reads the nested output text", async () => {
     const h = harness();
     h.upstream.respond = async () => metaReply("ok from meta");
-    const res = await h.call("/api/llm", postJson({ ...llmBody, provider: "meta" }));
+    const res = await h.call("/api/llm", postJson({ ...llmBody, kind: "memo", provider: "baseten" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ text: "ok from meta", provider: "meta", model: "muse-spark-1.3" });
     const call = h.upstream.calls[0]!;
     expect(call.url).toBe("https://api.meta.ai/v1/responses");
     expect(JSON.parse(call.init.body as string)).toMatchObject({
       model: "muse-spark-1.3",
-      instructions: "be brief",
+      instructions: LLM_SYSTEMS.memo,
       input: "summarize the fight",
       max_output_tokens: 400,
     });
@@ -115,7 +115,7 @@ describe("POST /api/llm", () => {
 
   it("accepts move requests for Modal in mock mode without calling upstream", async () => {
     const h = harness({ cfg: { mock: true } });
-    const res = await h.call("/api/llm", postJson({ ...llmBody, kind: "move", provider: "modal", maxTokens: 600, effort: "low" }));
+    const res = await h.call("/api/llm", postJson({ ...llmBody, kind: "move", system: LLM_SYSTEMS.move, provider: "modal", maxTokens: 600, effort: "low" }));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ text: "attack: Hyaa!", provider: "modal", mock: true, costUsd: 0, truncated: false });
     expect(h.upstream.calls).toHaveLength(0);
@@ -234,7 +234,7 @@ describe("POST /api/llm", () => {
   });
 
   it.each([
-    ["unknown provider", { ...llmBody, provider: "openai" }],
+    ["inherited kind", { ...llmBody, kind: "constructor" }],
     ["unknown kind", { ...llmBody, kind: "hack" }],
     ["empty prompt", { ...llmBody, prompt: "" }],
     ["huge prompt", { ...llmBody, prompt: "x".repeat(9000) }],

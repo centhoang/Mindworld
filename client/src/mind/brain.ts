@@ -21,7 +21,7 @@ export interface LmRequest {
   temperature: number;
 }
 
-const SYSTEM = "You are the inner voice of a character in a cozy village game. Stay in character. Answer only in the requested format.";
+export const SYSTEM = "You are the inner voice of a character in a cozy village game. Stay in character. Answer only in the requested format.";
 const LINE_CHARS = `[a-zA-Z ,.!?']`;
 export const LINE_MAX = 90;
 const alt = (xs: readonly string[]) => xs.map((x) => `"${x}"`).join(" | ");

@@ -1,6 +1,14 @@
 import { handleRequest, type AppConfig, type Deps } from "../src/app";
 import type { GhostStore } from "../src/ghosts";
 import { SpendLedger, type LedgerLimits, type LedgerStorage } from "../src/ledger";
+import { LLM_POLICIES } from "../src/llm-policy";
+
+export const LLM_SYSTEMS = {
+  memo: LLM_POLICIES.memo.system,
+  teach: LLM_POLICIES.teach.system,
+  dialogue: LLM_POLICIES.dialogue.system,
+  move: "You are Mochi, a small pet in a turn-based duel (curious, a little cheeky, loyal to its coach). Pick one of the allowed moves and say a short line (max 8 words) in character. Format: move: line",
+} as const;
 
 export function memoryStorage(delayMs = 0): LedgerStorage & { data: Map<string, unknown> } {
   const data = new Map<string, unknown>();
