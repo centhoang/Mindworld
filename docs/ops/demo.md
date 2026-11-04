@@ -6,7 +6,7 @@ Order of the story (HANDOFF, `game/mission.md`): lead with what is new (browser,
 hand-over, free on any hardware), then show the villagers being alive, then the pet, then the close.
 
 ## Setup
-- Record https://mindworld.uryto.dev (the move from pets.uryto.dev is in progress; use whichever is live) at 1080p, 1x.
+- Record https://mindworld.uryto.dev at 1080p, 1x.
 - Two windows side by side: **A** = the user's normal profile with the tuned 1B loaded (B key or the setup screen; let
   it finish the download before recording). **B** = a second machine or an incognito window with no model (press B
   to unload if it loaded). Note A's and B's generated names; say A's name where the script says "Kai".

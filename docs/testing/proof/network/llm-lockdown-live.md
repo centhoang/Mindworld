@@ -35,3 +35,10 @@ after run 4: 0 in the room. **Run 5 from an empty room: 19/20**, only "after eve
 behind: Big2)"; a probe 100 s later: 0. So a close lost on this home link in the 100-socket burst leaves a ghost until
 the room's reaper (`SILENT_MS` 90 s, `room-do.ts`) drops it. The room is fine; the check's settle window is shorter
 than the reaper. Rule added to `ops/tooling.md`: wait 2 minutes between runs.
+
+## The move to mindworld.uryto.dev (worker 0b90b603, 2026-11-04 ~21:20 VN)
+Access app "pets" lists pets.uryto.dev and mindworld.uryto.dev (policy "Owner home only"; read in the TEMP profile).
+From home: `https://mindworld.uryto.dev/` 200 with `main-czFxq799`, `/api/spend` 200, pets.uryto.dev still 200.
+Join check on the new host from an empty room (probe 0): **16/19**. Misses: "who is talking" (welcome talks 0 though
+the talk started: bug 62), "100 held" (99 in 27 s, retries 9: the home link), "room empty" (2 left behind: Bot8, Big45;
+a probe 100 s later: 0). The phone check from outside (Access login) is the user's.

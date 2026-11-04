@@ -1,6 +1,6 @@
 # Deploy notes
 
-**Live since 2026-10-28: https://pets.uryto.dev** (Cloudflare Worker `pet-mind`, custom domain in `wrangler.toml`, workers.dev disabled). Redeploy: `cd client && npm run build`, then `cd ../worker && npx wrangler deploy`. Wrangler is logged in via the TEMP Chrome profile (`wrangler login --browser=false`, open the URL there). Secrets set with `wrangler secret bulk` from a temp JSON in `.scratch/` (deleted after): BASETEN_API_KEY, META_API_KEY, MODAL_PROXY_TOKEN, MODAL_BASE_URL. Glimmer URL not set (too slow/cold for players).
+**Live: https://mindworld.uryto.dev** (since 2026-11-04; https://pets.uryto.dev since 2026-10-28, kept until P8) (Cloudflare Worker `pet-mind`, custom domain in `wrangler.toml`, workers.dev disabled). Redeploy: `cd client && npm run build`, then `cd ../worker && npx wrangler deploy`. Wrangler is logged in via the TEMP Chrome profile (`wrangler login --browser=false`, open the URL there). Secrets set with `wrangler secret bulk` from a temp JSON in `.scratch/` (deleted after): BASETEN_API_KEY, META_API_KEY, MODAL_PROXY_TOKEN, MODAL_BASE_URL. Glimmer URL not set (too slow/cold for players).
 
 One Cloudflare Worker (`worker/`) serves the built client (`client/dist`) and the API, so the geo-block covers every request.
 
@@ -17,7 +17,7 @@ Client dev with hot reload: `cd client && npm run dev` (proxies /api to :8787). 
 ## First deploy (needs `wrangler login`; the user's Cloudflare account)
 1. `cd worker && npx wrangler secret put BASETEN_API_KEY` and `... META_API_KEY` (paste from `.env`; never commit). Same for `MODAL_PROXY_TOKEN` and `MODAL_BASE_URL` (the Modal Spark Open provider stays disabled until both are set).
 2. `npx wrangler deploy` (provisions the `GHOSTS` KV and the `SpendCounter` Durable Object automatically).
-3. Add the custom domain `pets.uryto.dev` to the Worker (dashboard: Workers > pet-mind > Settings > Domains) or a `routes` entry with `custom_domain = true` in `wrangler.toml`. That is the only DNS-touching step.
+3. Add the custom domain (`mindworld.uryto.dev`; its hostname must be in the Access app first, until P8) to the Worker (dashboard: Workers > pet-mind > Settings > Domains) or a `routes` entry with `custom_domain = true` in `wrangler.toml`. That is the only DNS-touching step.
 4. Optional second layer: a Cloudflare WAF custom rule blocking the restricted countries on the zone (the Worker already returns 451).
 
 ## Spend guard (see `worker/src/ledger.ts`)

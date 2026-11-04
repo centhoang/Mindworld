@@ -14,8 +14,8 @@ How to drive the game and read its logs. Moved from `HANDOFF.md`.
   minutes between runs** and check the room is empty first (`node scripts/room-probe.mjs check`): a close lost on
   the home link leaves a ghost until the room's 90 s reaper, and the next run's checks fail on it. A lone "room is
   empty: 1 left behind" that a probe 100 s later shows gone is the link, not the room (`proof/network/llm-lockdown-live.md`). Each
-  bot try with no welcome in 6 s is dropped and retried; the lines under a failed check say what each try did. Hold a room with bots: `node scripts/net-bots.mjs 20 75 spread "wss://pets.uryto.dev/api/room?room=check"`.
-- Test tabs in the bots' room: `https://pets.uryto.dev/?room=check&p=N`. Slow-link first visit: `.scratch/chk/slow-net.mjs <kbps> <latencyMs>` (test Chrome).
+  bot try with no welcome in 6 s is dropped and retried; the lines under a failed check say what each try did. Hold a room with bots: `node scripts/net-bots.mjs 20 75 spread "wss://mindworld.uryto.dev/api/room?room=check"`.
+- Test tabs in the bots' room: `https://mindworld.uryto.dev/?room=check&p=N`. Slow-link first visit: `.scratch/chk/slow-net.mjs <kbps> <latencyMs>` (test Chrome).
 
 ## Seeing any part of the map at 1:1 (P4, dev tab in the Browser pane)
 Paste into `javascript_tool`, then `__region(x, z, scale)` and take a screenshot (scale 3 = zoomed in, 1 = 800x600 art px):

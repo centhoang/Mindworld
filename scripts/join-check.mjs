@@ -1,9 +1,9 @@
 // Join check on the live room: what many players joining at once get. Bots go to the `check` room (its own Durable
 // Object, never the real village), with hard limits on sockets and time, and close cleanly. One line per check.
-// node scripts/join-check.mjs [--big 100] [--room check] [--url wss://pets.uryto.dev/api/room]   (--big 0 skips the full room)
+// node scripts/join-check.mjs [--big 100] [--room check] [--url wss://mindworld.uryto.dev/api/room]   (--big 0 skips the full room)
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
 const MAX_SOCKETS = 160, MAX_SECONDS = 180, PLOTS = 12, ROOM_MAX = 100, AWAY_MS = 600_000, REFRESH_HOLD_MS = 60_000; // worker room.ts
-const base = arg("url", "wss://pets.uryto.dev/api/room");
+const base = arg("url", "wss://mindworld.uryto.dev/api/room");
 const room = arg("room", "check");
 const big = Math.min(ROOM_MAX, Number(arg("big", ROOM_MAX)));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

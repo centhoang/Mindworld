@@ -1,5 +1,5 @@
 // Network list on the live room with two sockets: what each one hears as the other walks away and back.
-const url = process.argv[2] ?? "wss://pets.uryto.dev/api/room";
+const url = process.argv[2] ?? "wss://mindworld.uryto.dev/api/room";
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 function bot(name, x, z) {
   const b = { got: [], ws: new WebSocket(url), id: "" };

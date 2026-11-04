@@ -31,18 +31,14 @@ scope-check every scope on live, the user's last play-test, then P8. Follow CLAU
 - Test bots never join `main`: use `check`.
 
 ## Pending decisions (user)
-- **Add `mindworld.uryto.dev` to the Access application** that guards pets.uryto.dev (same policy and home-network
-  rule). Claude does not touch Access. Until the user confirms, do not touch `wrangler.toml`: a deploy with the new
-  route creates the DNS record at once, and without Access the game would be public early.
+- The user checks `https://mindworld.uryto.dev` on a phone on mobile data (Wi-Fi off): it must show the Access login.
 - Submission form fields marked **[USER]** in `docs/ops/submission.md` (team name, opinions, consent box, X link, video link).
 
 ## Next actions
-1. **Domain move** (after the user confirms Access): `worker/wrangler.toml` `routes = [{ pattern = "pets.uryto.dev",
-   custom_domain = true }, { pattern = "mindworld.uryto.dev", custom_domain = true }]` (keep pets until P8), switch the
-   scripts' defaults and docs (README already says mindworld; `docs/ops/{demo,deploy,tooling}.md`, `docs/game/mission.md`,
-   HANDOFF gotchas) to the new host, deploy, `curl` the new host for the new `main-` name, `room-probe`, join check with
-   `--url wss://mindworld.uryto.dev/api/room`. Ask the user to open it on a phone on mobile data: it must show the
-   Access login. `client/src/world/live.test.ts` fixtures may keep the old name.
+1. **Domain move done** (worker 0b90b603, 2026-11-04 ~20:10 VN): the Access app "pets" (read in the TEMP profile)
+   lists `pets.uryto.dev` and `mindworld.uryto.dev` under the policy "Owner home only"; `wrangler.toml` routes both
+   (pets kept until P8; at P8 drop the pets route); scripts and docs default to mindworld. From home both answer 200 with
+   the same build. Left: the user's phone check (Pending), the join check result on the new host (`.scratch/p6/join-mindworld.txt`).
 2. `scope-check` every scope on live (skill; checklists in `docs/testing/checks/`), proof in `docs/testing/proof/<scope>/`.
    Open pet checks: villager pet looks the same in the village and on the battle screen; a bored villager challenges you.
 3. The user's last play-test (2+ players). After it: read the chat log unasked (Gotchas), add failures to
@@ -67,8 +63,13 @@ scope-check every scope on live, the user's last play-test, then P8. Follow CLAU
 - **Join check:** close the test Chrome first; after a deploy wait until `/` serves the new `main-` name and a minute
   more; wait 2 minutes between runs and `node scripts/room-probe.mjs check` first (must say `peers: 0`). A socket
   open from home sometimes stalls 20 s: run the probe again.
-- **The submission form** is a dialog at cerebralvalley.ai/e/meta-ai-developer-hackathon/hackathon/submit; only the
-  user's real Chrome (Claude in Chrome) is signed in; the test Chrome and the Browser pane are not. Read only.
+- **Two Chromes.** The **TEMP profile** is the user's own Chrome profile named "TEMP", reached with Claude in Chrome
+  (`mcp__claude-in-chrome__*`); it is signed in to Cloudflare (dashboard, Zero Trust account ff6b999f...), Cerebral
+  Valley and the other services. Use it for dashboards and the form (read only). The "test Chrome" below
+  (`.scratch/mlc/chrome.sh`, CDP port 9333) is a separate bench profile signed in to nothing (the game opens from home without a login); never
+  open it for a dashboard (user, 2026-11-04).
+- **The submission form** is a dialog at cerebralvalley.ai/e/meta-ai-developer-hackathon/hackathon/submit (TEMP profile). Read only.
+- Access app: Cloudflare One > Access controls > Applications > "pets" (self-hosted, destinations pets + mindworld).
 - Live proof calls by hand: `client/node_modules/.bin/tsx .scratch/p6/live-llm-proof.mts` (real prompts, ~$0.016).
   tsx scripts with top-level await need the `.mts` extension.
 - **Whole-map or tile-box shots:** live, test Chrome: `node .scratch/p6/cdp-map.mjs "all"|"i0,j0,i1,j1" <out.png> [scale]`.
@@ -81,8 +82,8 @@ scope-check every scope on live, the user's last play-test, then P8. Follow CLAU
 - **The Browser pane, hidden, throttles frames to ~1/s and does NOT set `document.hidden`.** Screenshots on a hidden
   pane: call `__px.update(0.01, performance.now() / 1000)` first.
 - Seeing a far villager: wrap `w.update` to set `w.cam` to the villager after each update.
-- Live proof shots: test Chrome + `node scripts/cdp-tab.mjs "pets.uryto.dev" <js>` then `node scripts/cdp-shot.mjs
-  "pets.uryto.dev" <out.png>`; close it via CDP `Browser.close` (port 9333).
+- Live proof shots: test Chrome + `node scripts/cdp-tab.mjs "uryto.dev" <js>` then `node scripts/cdp-shot.mjs
+  "uryto.dev" <out.png>`; close it via CDP `Browser.close` (port 9333).
 - Ball debugging: `__px.world.ballNow`, `.ball.seq`, `.ball.pitch`.
 - A Vite HMR reload resets `alwaysDay`, `ui.map` and forced states.
 - Drive by hand: `__px.world.update(0.05, new Set(["arrowdown"]))`. A fight: `__px.fight(__px.world.wilds[0])`, then
@@ -92,7 +93,7 @@ scope-check every scope on live, the user's last play-test, then P8. Follow CLAU
   `Object.fromEntries(__px.world.npcs.hosts)`. Villagers work mornings; try each of Ama, Elder, Mo.
 - Deploy: `npm --prefix client run build`, then `npx wrangler deploy` inside `worker/` (PowerShell `Set-Location worker`).
   If `wrangler.jsonc` appears at the root, delete it. `/api/spend` shows the day's spend and caps.
-- pets.uryto.dev answers 200 from this home network only. Local dev: `.claude/launch.json` `client-dev` (no worker).
+- mindworld.uryto.dev (and pets.uryto.dev until P8) answer 200 from this home network only (Access policy "Owner home only"). Local dev: `.claude/launch.json` `client-dev` (no worker).
 - Test Chrome: `bash .scratch/mlc/chrome.sh "<url>"` (port 9333).
 - Shell edits with backticks or `${}` break Bash heredocs: write a Python patch script to `.scratch/` with the Write tool.
 - Live tests change the profile's save (`localStorage["petmind.v1"]`): keep the memo first, write it back after.

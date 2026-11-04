@@ -1,7 +1,7 @@
 // Join a room once, print who the welcome lists, leave: is the room empty before a join check?
-// node scripts/room-probe.mjs [room] [host]   (default: check, pets.uryto.dev)
+// node scripts/room-probe.mjs [room] [host]   (default: check, mindworld.uryto.dev)
 const room = process.argv[2] ?? "check";
-const host = process.argv[3] ?? "pets.uryto.dev";
+const host = process.argv[3] ?? "mindworld.uryto.dev";
 const ws = new WebSocket(`wss://${host}/api/room?room=${room}`);
 const t = setTimeout(() => { console.log("no welcome in 20 s"); process.exit(1); }, 20000);
 ws.onopen = () => ws.send(JSON.stringify({ t: "hello", name: "Probe2", x: 0, z: 0, px: -1, pz: 0, genes: { hue: 0.1 }, groundSeed: 901 }));

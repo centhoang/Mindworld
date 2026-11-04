@@ -29,7 +29,7 @@ after the event. It adds no task before the deadline: build only what the plan a
 ## Goal check (2026-11-04, build `main-p-yOsRi0`): what is true today
 | Part of the goal | State | Where |
 |---|---|---|
-| Browser game, anyone joins from a link, no setup | Built | `client/`, served by the Worker at pets.uryto.dev (behind Access until submission) |
+| Browser game, anyone joins from a link, no setup | Built | `client/`, served by the Worker at mindworld.uryto.dev (behind Access until submission) |
 | AOI: each player gets only what is near | Built | `worker/src/aoi.ts` (16-tile cells, a 3x3 view, newest position only, far ones every other tick past 16); `docs/network/network.md` |
 | Many players | Built, with a flaky check | 100 per room, then a spill room; join check 20/20 before, 16-20/20 today (`HANDOFF.md`) |
 | Local inference in the tab | Built | Llama 3.2 1B, fine-tuned (distilled from Muse Spark Open), WebLLM on WebGPU; 97.0% valid decisions on a GTX 1050 (`docs/ai/models.md`) |

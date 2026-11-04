@@ -267,7 +267,9 @@ Bug fixes only. First the flaky join check (HANDOFF). Then, before Access goes (
   23:14 VN = 12:14 ET after kickoff (confirm acceptable), no copied code. X post draft for after submission (user posts).
 
 ## P8 Last (right before submitting; user, 2026-11-04: "Remove Access right before submitting")
-Order: remove `/api/chatlog`, its client call and KV rows; lower `CLIENT_DAILY_USD`; deploy. Then the user makes
+Order: remove `/api/chatlog`, its client call and KV rows; lower `CLIENT_DAILY_USD`; drop the `pets.uryto.dev` route
+from `worker/wrangler.toml` (the game lives at `mindworld.uryto.dev` since 2026-11-04; the old hostname can stay in the
+Access app or go, the user's call); deploy. Then the user makes
 GitHub and the 4 HF repos public and removes Access. Leave at least an hour between Access going and the submit
 button: until then nobody outside this home network has ever joined. **Join check on the public URL** right after Access goes: a phone on mobile data and a second machine join at
 the same time, plus a 30-bot burst for 2 minutes; watch errors and `/api/spend`. User submits.

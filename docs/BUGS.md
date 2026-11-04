@@ -43,6 +43,12 @@ Play-test #1 (2026-11-04) bugs 53-60 are all fixed on live (worker c25d5953), wa
 - Fixed, waiting for review: 57 (play-test #1: while a shout is open the command box lists 1 GO! 2 GUARD! 3 RUN! 4 BE NICE! 5 FRIENDS! with the shouts left, the called one lit; a tap on one calls it, for phones; `battle.test.ts`). 56 (play-test #1: Codex redrew `stripes` as tabby stripes above the eyes and across the back, `nubs` as two clear nubs, `floppy` as ears hanging along the head; 90 files, every build, size and view). 48 (a wild pet pressed into a wall or tree kept pushing at an unreachable target; now it re-picks a reachable one after 0.8 s, and one inside a wall goes home; 120 s sim: none still). 32 (head light is a crescent along the round head, `proof/pet/heads-round.png`, `proof/pet/head-live.png`). 33 (spots removed; old spots genes show plain).
 
 ## Network
+62 (found by Claude, join check 2026-11-04, 2 of 7 runs): **a late joiner sometimes misses who is talking.** The talk
+   started (`talking` came back) but the late joiner's welcome had `talks: []`. Talks live only in the room's memory
+   (`room.ts` `talks`, no storage) and end only on leave, a 45 s quiet timeout or a rebuild, so the likely cause is the
+   Durable Object waking from hibernation between the two (peers come back from socket attachments, talks do not).
+   Small: the chat mark shows on the next renewal (15 s). Left in the freeze; after the event keep talks in the socket
+   attachment or storage. Not proven.
 Found by the P3 join check (`scripts/join-check.mjs`, live `check` room, run 1, 2026-11-04 00:25 VN; `proof/network/join-live.md`):
 49. **A refresh lost its plot to a newcomer.** With all 12 plots held, a player who refreshed while someone new joined in those
     seconds came back a guest, and the newcomer had their plot. Fix: a ground left under 60 s ago (`REFRESH_HOLD_MS`) is kept for

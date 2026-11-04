@@ -4,7 +4,7 @@ const MAX_BOTS = 120, MAX_SECONDS = 90;
 const bots = Math.min(MAX_BOTS, Number(process.argv[2] ?? 10));
 const seconds = Math.min(MAX_SECONDS, Number(process.argv[3] ?? 20));
 const mode = process.argv[4] ?? "spread";
-const url = process.argv[5] ?? "wss://pets.uryto.dev/api/room";
+const url = process.argv[5] ?? "wss://mindworld.uryto.dev/api/room";
 const STEP_MS = 200;
 
 const stats = [];
