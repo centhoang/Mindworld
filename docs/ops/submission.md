@@ -14,10 +14,10 @@ Best Agentic Use-Case ($5k, rivals that plan, rehearse and adapt). Name them in 
 | 2 | Team Members | list (the user is already in) | Solo: nothing to add |
 | 3 | Which track? (required) | Indie Developer / Startups | **Indie Developer Track** |
 | 4 | Which problem statement? (required) | Build for Your World / Push the Frontier | **Build for Your World** |
-| 5 | Most Viral: X post link | text | **[USER]** the post's link, after the user posts (draft: P7) |
+| 5 | Most Viral: X post link | text | `https://x.com/urytocent/status/2118075780181991721` (posted 2026-11-05) |
 | 6 | Project Description | long text | Draft A below |
-| 7 | Public GitHub Repository | text | `https://github.com/centhoang/MetaGlobalAIDeveloperHackathonProject_PetMind` (public at P8) |
-| 8 | 3-Minute Demo Video | text (YouTube) | **[USER]** after upload |
+| 7 | Public GitHub Repository | text | `https://github.com/centhoang/Mindworld` once the user renames it (old name redirects), public; pushed 2026-11-05 `07f5093` |
+| 8 | 3-Minute Demo Video | text (YouTube) | `https://youtu.be/jvC3sT4ItdI` (public) |
 | 9 | Describe your use of Meta products | long text | Draft B below |
 | 10 | Why are Meta's models important to your solution? | long text | Draft C below |
 | 11 | Feedback on partner technologies (Fireworks, Modal, Baseten) | text | Draft D below |

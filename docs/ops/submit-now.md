@@ -11,23 +11,23 @@ public, Access, terms, the Submit button). **[CLAUDE]** = Claude. Form answers: 
   X teaser `mindworld-x.mp4` (64 s, captions burned in, hook line).
 
 ## 1. GitHub (the repo is far behind: do this first)
-- [ ] **[CLAUDE, needs your OK]** GitHub `origin/main` is 246 commits behind this machine (local `main` is 134 ahead
+- [x] **[CLAUDE]** pushed `main` = `07f5093` (2026-11-05 03:45 VN, secrets scan of all 247 commits clean). Was: GitHub `origin/main` is 246 commits behind this machine (local `main` is 134 ahead
   of it, `rework/fresh-look` 112 more). Fast-forward `main` to `rework/fresh-look` and push `main`. GitHub has almost
   none of the game yet.
-- [ ] **[YOU]** github.com/centhoang/MetaGlobalAIDeveloperHackathonProject_PetMind > Settings > General > Danger Zone >
+- [ ] **[YOU]** rename to `Mindworld` (Settings > General > Repository name; old links redirect), then Settings > General > Danger Zone >
   Change visibility > Public. Then open the repo logged out: README shows, default branch is `main`.
 
 ## 2. Hugging Face: 4 model repos to public **[YOU]**
 Each: huggingface.co/kysupo/<repo> > Settings > Change model visibility > Public.
-- [ ] `Llama-3.2-1B-Mindworld-q4f16_1-MLC`  - [ ] `Llama-3.2-1B-Mindworld-q4f32_1-MLC`
-- [ ] `Llama-3.2-1B-Mindworld-GGUF`  - [ ] `Llama-3.2-3B-Mindworld-GGUF`
+- [x] `Llama-3.2-1B-Mindworld-q4f16_1-MLC`  - [x] `Llama-3.2-1B-Mindworld-q4f32_1-MLC`
+- [x] `Llama-3.2-1B-Mindworld-GGUF`  - [x] `Llama-3.2-3B-Mindworld-GGUF`
 (Claude can flip them with the `.env` token if you say "make the HF repos public".)
 
 ## 3. Remove Access **[YOU]**
-- [ ] Cloudflare dashboard > Zero Trust > Access > Applications > the Mindworld app (mindworld.uryto.dev) > Delete.
-- [ ] Phone on **mobile data**: open https://mindworld.uryto.dev, walk, talk to a villager. (It was "Forbidden" from
+- [x] Cloudflare dashboard > Zero Trust > Access > Applications > the Mindworld app (mindworld.uryto.dev) > Delete.
+- [x] Phone on **mobile data**: open https://mindworld.uryto.dev, walk, talk to a villager. (It was "Forbidden" from
   mobile data before; it must work now.)
-- [ ] **[CLAUDE]** right after: outside join check (`node scripts/room-probe.mjs check`, a 30-bot burst for 2 minutes)
+- [x] **[CLAUDE]** 03:45 VN: probe peers 0; 30 bots 90 s: 30/30 connected, 0 failed, gap p50 203 ms p95 213; spend $0.71/$30. Outside join check (`node scripts/room-probe.mjs check`, a 30-bot burst for 2 minutes)
   and `/api/spend`. Say "Access is off" and Claude runs it.
 
 ## 4. YouTube **[YOU]** (signed in in the TEMP Chrome)
@@ -62,7 +62,7 @@ Each: huggingface.co/kysupo/<repo> > Settings > Change model visibility > Public
    `.scratch\video\mindworld.srt` > Publish. Language English.
 7. **Visibility: Public** (Unlisted also works for the form, but Public can pick up views and votes). Publish.
 8. Wait until it says HD is processed (a few minutes), open the link in a private window, play 10 s with sound.
-- [ ] YouTube link: ____________ (goes in form field 8 and the X thread)
+- [x] YouTube link: https://youtu.be/jvC3sT4ItdI (goes in form field 8 and the X thread)
 
 ## 5. X post for Most Viral ($20k: most likes, reposts and comments by Nov 8 11:59 PM ET) **[YOU]**
 Post now, before submitting: the form needs the post's link. Native video, not a YouTube link (X plays native video
@@ -103,7 +103,7 @@ Getting engagement (fair play only, never bought likes or bots, which can disqua
   with the X post as the link.
 - [ ] Nov 6 or 7: quote-post the hand-over moment (the minds moving to the next tab) as a second short clip to
   resurface the thread. Claude can cut it on request.
-- [ ] X post link: ____________ (form field 5)
+- [x] X post link: https://x.com/urytocent/status/2118075780181991721 (form field 5)
 
 ## 6. The form **[YOU]** (cerebralvalley.ai/e/meta-ai-developer-hackathon/hackathon/submit)
 - [ ] Text answers: `submission.md` Drafts A-D (Claude can type them in if you ask; never the Submit button).

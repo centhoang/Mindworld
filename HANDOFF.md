@@ -37,6 +37,13 @@
 - The video's opening line ("built Oct 27 - Nov 4 / already existed: open-source libraries, a licensed pixel-art pack
   (Sunnyside World), Meta's models"): the user confirms when watching the cut.
 
+## 2026-11-05 03:50 VN: everything done except the user's rename + public + Submit
+- Pushed `main` to GitHub (secrets scan of all 247 commits clean). HF 4 repos public (checked anonymously), Access off,
+  YouTube https://youtu.be/jvC3sT4ItdI (public), X https://x.com/urytocent/status/2118075780181991721.
+- Outside join check on live: probe peers 0; 30 bots 90 s, 30/30, 0 failed; spend $0.71/$30.
+- Left (user): rename the repo to `Mindworld` (old URLs redirect), make it public, fill the form, Submit. After the
+  rename: `git remote set-url origin https://github.com/centhoang/Mindworld.git`.
+
 ## Session 2026-11-05 03:00 VN: SUBMIT NOW. Checklist: `docs/ops/submit-now.md` (user: no play-test)
 - P8 deployed with game-styled postcards (worker `13dd4574`, client `main-CpuGb6wS`, commit `25e81c8`): chatlog 404,
   pets route gone; `/api/postcard` sends game frames (`worker/src/postcard-refs.ts`, made from `.scratch/video/pcref/`)
