@@ -1,7 +1,7 @@
-# HANDOFF: Mindworld final stretch (2026-11-04, ~19:50 VN = 12:50 UTC)
+# HANDOFF: Mindworld final stretch (2026-11-04, ~21:30 VN = 14:30 UTC; deadline Nov 5 09:00 VN = 02:00 UTC)
 
-**Starting prompt:** "Read HANDOFF.md, then do Next actions in order: the domain move once the user confirms Access,
-scope-check every scope on live, the user's last play-test, then P8. Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then do Next actions in order: scope-check every scope on live at
+mindworld.uryto.dev, the user's last play-test, then P7 leftovers and P8. Follow CLAUDE.md."
 
 ## State
 - **The plan:** `docs/plan/final-plan.md` (Status at the top is current). Deadline Nov 4, 9 PM ET = Nov 5, 09:00 VN.
@@ -12,7 +12,9 @@ scope-check every scope on live, the user's last play-test, then P8. Follow CLAU
   cleared by the room's 90 s reaper. New `scripts/room-probe.mjs` shows who is in a room. Rule in `docs/ops/tooling.md`.
 - **P7 drafts done:** `docs/ops/submission.md` (every form field, read from the user's signed-in Chrome; draft
   answers A-D; X post draft), `docs/ops/demo.md` (script for this build), README rewritten by Codex and reviewed.
-- Tests: client 710, worker 288, tsc clean both. Commits on `rework/fresh-look`: e408276, 0852852 (local, not pushed).
+- **Live at `https://mindworld.uryto.dev`** (worker 0b90b603; pets.uryto.dev still routed until P8), same Access app.
+  Join check there: 16/19 (bug 62 + home-link misses; `proof/network/llm-lockdown-live.md`).
+- Tests: client 710, worker 288, tsc clean both. Commits on `rework/fresh-look` up to 8962ed8 (local, not pushed).
 - Spend this session: ~$0.025 (proof calls). Read `/api/spend` in the test Chrome for the day's number.
 
 ## Decisions (standing)
@@ -21,7 +23,8 @@ scope-check every scope on live, the user's last play-test, then P8. Follow CLAU
 - **Domain (user, 2026-11-04): move to `mindworld.uryto.dev`.** Code hard-codes nothing; only `worker/wrangler.toml`
   `routes`, the default URLs in `scripts/{join-check,net-bots,net-check,room-probe}.mjs`, and docs name the host.
   Saves, postcards and the cached model are per origin: everyone starts fresh on the new host.
-- Bug 61 left in the freeze (Claude): the cloud mind stand-in truncates at 400 tokens; fixing it risks the shared cap.
+- Bugs 61 and 62 left in the freeze (Claude): 61 cloud mind stand-in truncates at 400 tokens (fixing it risks the
+  shared cap); 62 a late joiner sometimes misses who is talking (talks not kept over a DO rebuild, likely).
 - NPCs are the star: the sim reasons; the model picks among valid options and speaks. Rivals: Muse Spark proposes, the sim rehearses.
 - The game must still work free after the event. Local prompts are frozen at af455c4 (a text change needs a retrain).
   The `/api/llm` policy copies those frozen prompts exactly, so any change there must change both (client test guards it).
@@ -38,7 +41,7 @@ scope-check every scope on live, the user's last play-test, then P8. Follow CLAU
 1. **Domain move done** (worker 0b90b603, 2026-11-04 ~20:10 VN): the Access app "pets" (read in the TEMP profile)
    lists `pets.uryto.dev` and `mindworld.uryto.dev` under the policy "Owner home only"; `wrangler.toml` routes both
    (pets kept until P8; at P8 drop the pets route); scripts and docs default to mindworld. From home both answer 200 with
-   the same build. Left: the user's phone check (Pending), the join check result on the new host (`.scratch/p6/join-mindworld.txt`).
+   the same build. Join check on the new host 16/19 (bug 62, link). Left: the user's phone check (Pending).
 2. `scope-check` every scope on live (skill; checklists in `docs/testing/checks/`), proof in `docs/testing/proof/<scope>/`.
    Open pet checks: villager pet looks the same in the village and on the battle screen; a bored villager challenges you.
 3. The user's last play-test (2+ players). After it: read the chat log unasked (Gotchas), add failures to
