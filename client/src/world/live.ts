@@ -293,6 +293,9 @@ export function dispatch(raw: unknown, h: LiveHandlers): void {
 export const SEND_INTERVAL_MS = 100; // <= 10 Hz
 const MOVE_EPS = 0.05;
 const RETRY_MAX_MS = 30_000; // a lost room is retried forever, at most this far apart
+// A socket with no welcome this long after it was opened is stuck (a stalled handshake on a slow link: join check
+// 2026-11-04, opens took 1-2.5 s and now and then never came): close it and try again, as for a lost room.
+export const WELCOME_WAIT_MS = 10_000;
 export const ROOM_SPILL = 9; // a full room sends you on to the next: main, main-2 ... main-9 (worker room.ts)
 
 // The url of spill room n (1 = the url as given). `?room=check` spills to check-2, and so on.
@@ -315,7 +318,6 @@ export class LiveLink {
   private moving = false; // told `full`: the next spill room on close
   /** Which spill room we are in (1 = the main village). */
   roomNo = 1;
-  private ping: ReturnType<typeof setInterval> | null = null;
   status: LiveStatus = "offline";
   myId: string | null = null; // our id in the room, from the welcome
 
@@ -341,19 +343,36 @@ export class LiveLink {
       return this.retry();
     }
     this.ws = ws;
+    let welcomed = false;
+    let ping: ReturnType<typeof setInterval> | undefined; // this socket's keepalive
+    // Stuck: let this socket go at once (its close handshake may stall too) and try again; its late close is ignored.
+    const watch = setTimeout(() => {
+      if (this.ws !== ws || welcomed) return;
+      clearInterval(ping);
+      this.ws = null;
+      try {
+        ws.close();
+      } catch {
+        /* already gone */
+      }
+      this.set("offline");
+      this.retry();
+    }, WELCOME_WAIT_MS);
     ws.onopen = () => {
-      this.retries = 0;
       const hi = this.hello();
       ws.send(JSON.stringify({ t: "hello", ...hi }));
       this.last = { x: hi.x, z: hi.z, px: hi.px, pz: hi.pz };
       this.set("online");
-      this.ping = setInterval(() => ws.readyState === 1 && ws.send("ping"), 30_000);
+      ping = setInterval(() => ws.readyState === 1 && ws.send("ping"), 30_000);
     };
     ws.onmessage = (ev) => {
       if (ev.data === "pong") return;
       dispatch(ev.data, {
         ...this.h,
         welcome: (id, ...rest) => {
+          welcomed = true;
+          clearTimeout(watch);
+          this.retries = 0;
           this.myId = id;
           this.h.welcome(id, ...rest);
         },
@@ -365,8 +384,8 @@ export class LiveLink {
       });
     };
     ws.onclose = () => {
-      if (this.ping) clearInterval(this.ping);
-      this.ping = null;
+      clearTimeout(watch);
+      clearInterval(ping);
       if (this.ws !== ws) return;
       this.ws = null;
       if (this.full) return;

@@ -12,6 +12,8 @@ Lab: `/lab/net`. Second player: `?p=2`.
 - [x] [proof](../proof/network/5b-numbers.md) Traffic per player stays flat as players are added far away.
 - [x] [proof](../proof/network/join-live.md) 100 players held at once on live (the old 89 was this machine's link with no retry).
 - [x] [proof](../proof/network/5b-numbers.md) A dropped connection reconnects with no duplicates.
+- [x] unit test only (`live.test.ts`) A connect that stalls (no welcome in 10 s) is dropped and tried again by itself, so
+  nobody is left on "connecting" by a slow link (2026-11-04).
 
 Many players join live without issue (user, 2026-11-03; plan P3). Proof: [join-live.md](../proof/network/join-live.md);
 the bot part is one command, `node scripts/join-check.mjs` (run it after every deploy):

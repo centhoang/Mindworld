@@ -25,7 +25,7 @@ const BARS = ["redbar_00", "redbar_06", "greenbar_00", "greenbar_06", "bluebar_0
 const HOUSES = ["home-small-open", ...ROOFS.map((r) => `home-small-${r}`)];
 const SINGLES = ["tiles", "spr_deco_charactershadow", "spr_deco_shadow", "spr_deco_well", "spr_deco_campfire", "expression_chat", ...HOUSES,
   "f-bed", "f-rug", "f-table", "f-stool", "f-shelf", "f-vase", "f-sunflower", "f-picture", ...BARS];
-const STAMPS = ["house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "jar", "crates", "crate", "soil", "bench"];
+const STAMPS = ["house-red", "house-green", "house-redsmall", "house-bluesmall", "stall-red", "pine", "bush", "bush-berry", "rock-big", "sign", "stump", "jar", "crates", "crate", "soil", "bench", "statue"];
 export const CROPS_ART = ["wheat", "carrot", "radish"] as const;
 
 export const sunnyReady = (): boolean => images.has("tiles");

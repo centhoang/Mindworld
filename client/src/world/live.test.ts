@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { dispatch, LiveLink, parsePeer, roomQuery, roomUrl, ROOM_SPILL, spillUrl, type LiveHandlers } from "./live";
+import { dispatch, LiveLink, parsePeer, roomQuery, roomUrl, ROOM_SPILL, spillUrl, WELCOME_WAIT_MS, type LiveHandlers } from "./live";
 
 function handlers() {
   const log: unknown[][] = [];
@@ -123,13 +123,17 @@ describe("LiveLink", () => {
 
   it("retries a lost room forever, backing off to 30 s, and stays in its spill room", () => {
     vi.useFakeTimers();
+    vi.setSystemTime(0);
     const { h } = handlers();
     const urls: string[] = [];
+    const at: number[] = [];
     const sockets: ReturnType<typeof fakeSocket>[] = [];
     const link = new LiveLink("wss://h/api/room", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, (u) => {
       urls.push(u);
+      at.push(Date.now());
       const s = fakeSocket();
       sockets.push(s);
+      if (sockets.length > 2) setTimeout(() => s.onclose?.({}), 0); // the room stays lost: every try fails at once
       return s;
     });
     link.connect();
@@ -137,14 +141,64 @@ describe("LiveLink", () => {
     sockets[0]!.onclose!({});
     sockets[1]!.readyState = 1;
     sockets[1]!.onopen!({});
+    sockets[1]!.onmessage!({ data: JSON.stringify({ t: "welcome", id: "me", corner: 0, peers: [], aways: [] }) });
     sockets[1]!.onclose!({});
     expect(link.status).toBe("offline");
-    for (let i = 0; i < 12; i++) {
-      vi.advanceTimersByTime(30_000);
-      sockets.at(-1)!.onclose!({});
-    }
-    expect(sockets.length).toBe(14);
+    vi.advanceTimersByTime(360_000);
+    const gaps = at.slice(2).map((t, i) => Math.round((t - at[i + 1]!) / 1000) * 1000); // each failed try takes a timer tick
+    expect(gaps.slice(0, 4)).toEqual([2000, 4000, 8000, 16_000]);
+    expect(new Set(gaps.slice(4))).toEqual(new Set([30_000]));
     expect(new Set(urls.slice(1))).toEqual(new Set(["wss://h/api/room?room=main-2"]));
+    vi.useRealTimers();
+  });
+});
+
+describe("live link: a stuck connect", () => {
+  it("lets a socket with no welcome go after WELCOME_WAIT_MS and tries again; its late close changes nothing", () => {
+    vi.useFakeTimers();
+    const { h, log } = handlers();
+    const sockets: ReturnType<typeof fakeSocket>[] = [];
+    const link = new LiveLink("wss://h/api/room", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, () => {
+      const s = fakeSocket();
+      sockets.push(s);
+      return s;
+    });
+    link.connect();
+    vi.advanceTimersByTime(WELCOME_WAIT_MS - 1);
+    expect(sockets[0]!.close).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(sockets[0]!.close).toHaveBeenCalled();
+    expect(link.status).toBe("offline");
+    vi.advanceTimersByTime(2000); // the first retry
+    expect(sockets).toHaveLength(2);
+    sockets[1]!.readyState = 1;
+    sockets[1]!.onopen!({});
+    sockets[1]!.onmessage!({ data: JSON.stringify({ t: "welcome", id: "me", corner: 0, peers: [], aways: [] }) });
+    sockets[0]!.onclose!({}); // the stuck one's close arrives late
+    expect(link.status).toBe("online");
+    vi.advanceTimersByTime(60_000); // welcomed: no watchdog, and the keepalive still runs
+    expect(sockets).toHaveLength(2);
+    expect(sockets[1]!.sent.filter((m) => m === "ping")).toHaveLength(2);
+    expect(log.filter((l) => l[0] === "welcome")).toHaveLength(1);
+    vi.useRealTimers();
+  });
+
+  it("an open socket that never gets its welcome is let go too", () => {
+    vi.useFakeTimers();
+    const { h } = handlers();
+    const sockets: ReturnType<typeof fakeSocket>[] = [];
+    const link = new LiveLink("wss://h/api/room", () => ({ name: "Me", genes: {}, x: 0, z: 0, px: 0, pz: 0 }), h, () => {
+      const s = fakeSocket();
+      sockets.push(s);
+      return s;
+    });
+    link.connect();
+    sockets[0]!.readyState = 1;
+    sockets[0]!.onopen!({});
+    vi.advanceTimersByTime(WELCOME_WAIT_MS);
+    expect(sockets[0]!.close).toHaveBeenCalled();
+    vi.advanceTimersByTime(2000);
+    expect(sockets).toHaveLength(2);
     vi.useRealTimers();
   });
 });
@@ -184,6 +238,7 @@ describe("live chat + duel messages", () => {
     link.connect();
     ws.readyState = 1;
     ws.onopen!({});
+    ws.onmessage!({ data: JSON.stringify({ t: "welcome", id: "me", corner: 0, peers: [], aways: [] }) });
     const said = () => ws.sent.map((m) => JSON.parse(m)).filter((m) => m.t === "mind" && m.say).map((m) => m.say);
     link.mind({ who: "mo", say: "one" });
     link.mind({ who: "mo", say: "two" });

@@ -7,6 +7,9 @@ const base = arg("url", "wss://pets.uryto.dev/api/room");
 const room = arg("room", "check");
 const big = Math.min(ROOM_MAX, Number(arg("big", ROOM_MAX)));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// From this home link a socket takes 1-2.5 s to open and now and then stalls (2026-11-04). A try with no welcome
+// this long is dropped and tried again, as the game does after WELCOME_WAIT_MS (client world/live.ts).
+const TRY_MS = 6000, JOIN_MS = 15_000;
 const until = async (ok, ms) => { const end = Date.now() + ms; while (!ok() && Date.now() < end) await wait(50); return ok(); };
 const limit = setTimeout(() => { console.log("FAIL  time limit"); process.exit(2); }, MAX_SECONDS * 1000);
 
@@ -16,16 +19,31 @@ const check = (what, ok, note = "") => { rows.push(`${ok ? "pass" : "FAIL"}  ${w
 
 let opened = 0;
 const bots = [];
+const t0All = performance.now();
+// What each try of a bot did: start (ms into the run), ms to open (0 = never), close code, ms to close.
+const tries = (b) => b.log.map((t) => `#${t.try}@${t.at} open ${t.open || "-"} close ${t.code || "-"}/${t.ms || "-"}`).join("; ");
 // A bot is a player's socket: hello, then it keeps the room's list of who is in (welcome + join - leave).
 function bot(name, { seed, x = 0, z = 0, slot, r = room } = {}) {
-  const b = { name, seed, x, z, r, id: "", corner: undefined, view: new Map(), dupJoins: 0, got: [], bytes: 0, tries: 0, t0: performance.now(), tWelcome: 0, closed: null, full: false, quit: false, hosts: {}, lastN: 0, backwards: 0 };
+  const b = { name, seed, x, z, r, id: "", corner: undefined, view: new Map(), dupJoins: 0, got: [], bytes: 0, tries: 0, t0: performance.now(), tWelcome: 0, closed: null, full: false, quit: false, hosts: {}, lastN: 0, backwards: 0, log: [] };
   const open = () => {
+    if (b.quit) return; // a retry timer that fires after the bot left must not bring it back
     if (opened >= MAX_SOCKETS) return void (b.closed = "socket limit");
     opened++;
     b.tries++;
     const ws = new WebSocket(`${base}?room=${r}`);
     b.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ t: "hello", name, x, z, px: x - 1, pz: z, genes: { hue: (seed % 10) / 10 }, groundSeed: seed, ...(slot !== undefined ? { slot } : {}) }));
+    const t = { try: b.tries, at: Math.round(performance.now() - t0All), open: 0, code: 0, ms: 0 };
+    b.log.push(t);
+    const tTry = performance.now();
+    const stuck = setTimeout(() => {
+      if (b.id || b.ws !== ws) return;
+      t.code = "stuck";
+      ws.onclose = null;
+      try { ws.close(); } catch { /* gone */ }
+      if (!b.quit && b.tries < 4) setTimeout(open, 1000);
+      else b.closed ??= "stuck";
+    }, TRY_MS);
+    ws.onopen = () => (t.open = Math.round(performance.now() - tTry), ws.send(JSON.stringify({ t: "hello", name, x, z, px: x - 1, pz: z, genes: { hue: (seed % 10) / 10 }, groundSeed: seed, ...(slot !== undefined ? { slot } : {}) })));
     ws.onmessage = (e) => {
       const text = String(e.data);
       b.bytes += text.length;
@@ -35,6 +53,9 @@ function bot(name, { seed, x = 0, z = 0, slot, r = room } = {}) {
     };
     ws.onerror = () => {};
     ws.onclose = (e) => {
+      clearTimeout(stuck);
+      t.code = e.code;
+      t.ms = Math.round(performance.now() - tTry);
       // A handshake that failed: try again a little later, as the game does.
       if (!b.id && !b.full && !b.quit && b.tries < 4) return void setTimeout(open, 1000 * b.tries);
       b.closed ??= `${e.code}`;
@@ -48,6 +69,7 @@ function hear(b, m) {
   b.got.push(m);
   if (m.t === "welcome") {
     b.id = m.id;
+    b.lastN = Math.max(b.lastN, m.ball?.n ?? 0);
     b.corner = m.corner;
     b.tWelcome = performance.now() - b.t0;
     b.welcome = m;
@@ -91,6 +113,7 @@ const missing = everyone.map((b) => everyone.filter((o) => o !== b && !b.view.ha
 check("everyone sees everyone (none lost)", missing.every((n) => n === 0), `most missing ${Math.max(...missing)}`);
 check("nobody is seen twice", everyone.every((b) => b.dupJoins === 0) && everyone.every((b) => new Set(b.view.keys()).size === b.view.size));
 check("no socket stuck", burst.every((b) => b.id || b.full), `${burst.filter((b) => !b.id).length} without a welcome`);
+for (const b of [...burst].sort((x, y) => (y.id ? y.tWelcome : 1e9) - (x.id ? x.tWelcome : 1e9)).slice(0, 3)) console.log(`      slow ${b.name}: welcome ${b.id ? Math.round(b.tWelcome) : "none"} ms; ${tries(b)}`);
 const corners = everyone.map((b) => b.corner).filter((c) => c !== null);
 // A plot left under a minute ago is kept for its owner's refresh (room.ts REFRESH_HOLD_MS): a fast rerun meets the last one's.
 const ours = new Set(everyone.map((b) => b.seed));
@@ -104,17 +127,18 @@ const a = inBurst.find((b) => b.corner !== null && b !== probe);
 quit(a);
 await wait(400);
 const a2 = bot(a.name, { seed: a.seed, x: a.x, z: a.z });
-await until(() => a2.id, 8000);
+await until(() => a2.id, JOIN_MS);
 check("a refresh gets the same plot back", a2.corner === a.corner, `had ${a.corner}, got ${a2.corner}`);
 const b = inBurst.find((o) => o.corner !== null && o !== a && o !== probe);
 quit(b);
 await wait(150);
 const newcomer = bot("Newcomer", { seed: 2000, x: 30, z: 30 });
-await until(() => newcomer.id, 8000);
+await until(() => newcomer.id, JOIN_MS);
 const b2 = bot(b.name, { seed: b.seed, x: b.x, z: b.z, slot: b.corner });
-await until(() => b2.id, 8000);
+await until(() => b2.id, JOIN_MS);
 check("a refresh keeps its plot when someone joins meanwhile", b2.corner === b.corner && newcomer.corner === null,
   `had ${b.corner}, got ${b2.corner}; newcomer got ${newcomer.corner}`);
+for (const o of [a2, newcomer, b2]) if (!o.id) console.log(`      no welcome ${o.name}: ${tries(o)}`);
 
 // 3. Someone who joins late sees things as they are now.
 const [kicker, farmer] = [a2, b2];
@@ -126,7 +150,7 @@ send(farmer, { t: "farm", plots: [["wheat", 3], ["", 0]] });
 send(talkA, { t: "talk", with: talkB.id });
 await wait(800);
 const late = bot("Late", { seed: 2100, x: farmer.x, z: farmer.z });
-await until(() => late.id, 8000);
+await until(() => late.id, JOIN_MS);
 await wait(1200);
 check("a late joiner gets the ball's last kick", !!late.welcome?.ball && late.welcome.ball.n === kicker.lastN, `kick ${kicker.lastN}, welcome ${late.welcome?.ball?.n}`);
 check("a late joiner sees a nearby farm without anyone resending it",
@@ -142,9 +166,14 @@ for (let t = 0; t < 3000; t += 150) {
   kickers.forEach((k, i) => send(k, { t: "kick", x: 20 + i * 0.1, z: 2 + t / 3000, vx: Math.cos(t + i) * 5, vz: Math.sin(t + i) * 5, by: k.id }));
   await wait(150);
 }
-await wait(1000);
+const tSettle = performance.now();
+await until(() => new Set(live().map((o) => o.lastN)).size === 1, 4000);
 const ends = new Set(live().map((o) => o.lastN));
-check("a kick burst ends on the same kick for everyone", ends.size === 1, `${ends.size} different last kicks over ${live().length} players`);
+if (ends.size > 1) {
+  const top = Math.max(...ends);
+  for (const o of live().filter((o) => o.lastN !== top)) console.log(`      behind ${o.name}${kickers.includes(o) ? " (kicker)" : ""}: last ${o.lastN} vs ${top}, ${top - o.lastN} ms; ${tries(o)}`);
+}
+check("a kick burst ends on the same kick for everyone", ends.size === 1, `${ends.size} different last kicks over ${live().length} players, settled in ${Math.round(performance.now() - tSettle)} ms`);
 check("kicks never arrive out of order", live().every((o) => o.backwards === 0), `${live().reduce((n, o) => n + o.backwards, 0)} backwards`);
 check("nobody is thrown out for kicking", kickers.every((k) => k.closed === null));
 
@@ -179,10 +208,11 @@ if (big > 0) {
   console.log(`      traffic while ${at.size} walk: p50 ${pct(per, 0.5)} B/s per player, max ${pct(per, 1)} B/s`);
   if (held >= ROOM_MAX) {
     const extra = bot("Extra", { seed: 4000 });
-    await until(() => extra.full || extra.id, 8000);
+    await until(() => extra.full || extra.id, JOIN_MS);
     const next = bot("Extra", { seed: 4000, r: `${room}-2` });
-    await until(() => next.id, 8000);
+    await until(() => next.id, JOIN_MS);
     check("the 101st is told the room is full, and the next room lets them in", extra.full && !!next.id, `full ${extra.full}, next room ${next.id ? "in" : "no"}`);
+    if (!extra.full || !next.id) console.log(`      extra: ${tries(extra)}; next: ${tries(next)}; live ${live().length}`);
   }
 }
 
@@ -190,8 +220,9 @@ if (big > 0) {
 bots.forEach(quit);
 await wait(3000);
 const after = bot("After", { seed: 901 });
-await until(() => after.id, 8000);
+await until(() => after.id, JOIN_MS);
 check("after everyone leaves, the room is empty", after.view.size === 0, `${after.view.size} left behind`);
+if (after.view.size) console.log(`      left behind: ${[...after.view.values()].join(", ")}`);
 quit(after);
 await wait(1500);
 console.log(`${fails ? "FAILED" : "CLEAN"}: ${rows.length - fails}/${rows.length} pass, ${opened} sockets opened`);

@@ -61,3 +61,20 @@ another save (another player), `?room=check` joins the bots' room.
   talker got (`talking` / `talkNo`) and how many talks the late joiner's welcome holds.
 - Runs after: `--big 0` 18/18 (`-56.txt`); full 19/20 once (one burst socket retried past the 12 s window, 100-player
   fill 13 s: network); full again **20/20** (`-56c.txt`, talker got `talking`, welcome talks 1, 100 in 4 s).
+
+## 2026-11-04 ~16:30 VN: the flaky join check (worker 0b4d6bf9, client `main-czFxq799`)
+- Before: four runs straight after the P5d/P5e deploys went 16, 20, 17, 19 of 20, each failing a different socket check
+  (`.scratch/p5/join-check-p5{d,d-2,e,e-2}.txt`). P5 changed no room code.
+- Found: each bot try now logs when it started, how long it took to open and how it closed. From this home link a
+  socket takes 1-2.5 s just to open under a 20-socket burst (before any room code runs); the room's welcome comes
+  0.3-0.9 s after that. Three runs with no deploy in between: 20, 20, 19 (a newcomer with no welcome in 8 s: the link).
+  Every bad run of the day had come right after a deploy, when the Durable Objects restart.
+- Fixed in the script: a try with no welcome in 6 s is dropped and retried; single joins wait 15 s; a retry timer no
+  longer brings back a bot that already left (the "2 left behind" of `p5d`); the kick burst waits up to 4 s for
+  everyone to agree and prints how long it took. Rule in `docs/ops/tooling.md`: run it a minute after `/` serves the new build.
+- Fixed in the game (`client/src/world/live.ts`, `WELCOME_WAIT_MS`): a connect with no welcome in 10 s is let go and
+  retried with the usual back-off, so a stalled handshake no longer leaves a player on "connecting" until the browser
+  gives up; each socket has its own keepalive (unit tests in `live.test.ts`).
+- After, no deploy: 20/20 x3 (`.scratch/p6/join-check-r{4,5,6}.txt`). After the deploy, a minute after `/` served
+  `main-czFxq799`: **20/20 x3 in a row** (`join-check-deploy-{1,2,3}.txt`): burst welcome max 1.2 / 1.1 / 1.6 s, no
+  retries; kick burst settled in 184 / 177 / 182 ms; 100 held in 8 / 3 / 9 s.

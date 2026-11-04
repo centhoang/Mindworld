@@ -14,6 +14,14 @@ Windmills, cliffs detail, beaches, sea life, clouds, terraces, streams. Each is 
 the same small house (roof colour by slot: blue, red, green, orange, purple), a 2x3 tilled field and a front fence of the
 pack's rail tiles (tileset row 2: col 38 west end, 39 middle, 42 east end) with a 3-tile gate at the door, whether anyone
 holds it or not. A run of one tile is left out (it would show a rail to nowhere).
+**P4 leftovers (2026-11-04):** trees gather in dense clumps toward the coast (north-west, north, north-east, the east
+shore past the pitch, the west shore), two tiles apart so the canopies touch, as in the demo; a few small groups stay
+inland (the green, the playground's corner) so villagers still chop near the square. Stumps (`stump`) and the pack's
+berry bush (`bush-berry`, legend `B`, kind `bush-big`) stand at the clumps' edges and by the houses. The square has the
+pack's statue (`statue.png`) north of the dance floor, between the stall and the board (`STATUE` in `village-map.ts`,
+blocking its plinth only), and three of its corners rounded into grass; the north-east corner meets the pond lane and
+stays dirt (a cut there leaves a one-tile grass sliver between two roads). Roads draw a tile wider than their `=` tiles,
+so nothing small goes on the tiles next to a road.
 
 ## Look options
 **Decided (user, 2026-11-03):** compact Sunnyside. It loads about 60 of the 141 art files and draws no clouds, sea life or farm animals. Compare: `../testing/proof/visual/looks-compare.jpg`. The mosaic stays in the code, set aside, at `?look=mosaic`; labs still use it.

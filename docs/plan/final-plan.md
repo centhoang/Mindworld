@@ -63,6 +63,13 @@
   Meta Model API ($0.01 an image, checked on dev.meta.ai first) paints a keepsake of your pet and who was there after a
   win, a new friend or a campfire story, from real state (genes, watcher, storyteller); album on C / the Album chip.
   $2/day cap. Proof `p5-live.md` e. **P5 complete. Next: the P4 visual leftovers, then P6** (user: no need to follow the timeline; Access goes right before submitting, P8).
+- **Flaky join check fixed** (live worker 0b4d6bf9, client `main-czFxq799`): the link, not the room (opens take 1-2.5 s
+  from home, the bad runs all came straight after deploys). Script: per-try 6 s retry, 15 s single joins, kick settle
+  wait, no bot back after quitting, a minute's wait after a deploy. Game: `WELCOME_WAIT_MS` 10 s connect watchdog.
+  20/20 x3 after the deploy. Proof `proof/network/join-live.md` (2026-11-04 ~16:30).
+- **P4 visual leftovers done** (same deploy): tree clumps toward the coast, stumps, berry bushes, the pack's statue on
+  the square and three of its corners rounded (`docs/visual/visual.md`). Proof `proof/visual/p4-*-live.png`.
+  **Next: P6** (`/api/llm` lock-down first).
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

@@ -10,7 +10,7 @@ describe("the village", () => {
 
   it("is a rectangle of known tiles", () => {
     for (const row of VILLAGE_ROWS) expect(row).toHaveLength(VILLAGE_ROWS[0].length);
-    expect(/^[~."*=o#Tbr]+$/.test(VILLAGE_ROWS.join(""))).toBe(true);
+    expect(/^[~."*=o#TbBsr]+$/.test(VILLAGE_ROWS.join(""))).toBe(true);
   });
 
   it("gives the same map to every client, whatever order players came in", () => {

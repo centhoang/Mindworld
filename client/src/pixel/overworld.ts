@@ -16,7 +16,7 @@ import { CLOUD_CHAT, CLOUD_LIVELY } from "../game/test-mode";
 import { fetchBanter } from "../game/banter-api";
 import { BUILDS, drawMonster } from "./monster";
 import { buildTileMap, hash2, T, TILE, tileAt, tileWalkable, type TileMap } from "../world/tilemap";
-import { CAMPFIRE, DANCE_FLOOR, NPC_HOMES, PEN, PLOT_AT, PLOT_COUNT, plotFences, plotHouse, QUARRY, ROOFS, type Roof } from "../world/village-map";
+import { CAMPFIRE, DANCE_FLOOR, NPC_HOMES, PEN, PLOT_AT, PLOT_COUNT, plotFences, plotHouse, QUARRY, ROOFS, STATUE, type Roof } from "../world/village-map";
 import { buildSunny, stampSize, stand, type SunnyWorld } from "./sunny";
 import { ACTIVITY, type Pose } from "../life/activities";
 import type { Scene, SceneBed, SceneBubble, SceneInspector, ScenePanel, ScenePerson, ScenePet, SceneProp, View } from "../game/ports";
@@ -42,7 +42,9 @@ import { NpcVillage } from "../mind/npcs";
 import { cleanScene, petScene, sharedScene, type Seen } from "../mind/scene";
 import { HUMAN_RUN_SPEED, HUMAN_WALK_SPEED, humanLook, newHumanMotion, NPC_LOOKS, stepHumanMotion, type HumanLook, type HumanMotion } from "./humans";
 
-const LANDMARK_PROP: Record<string, string> = { spr_deco_well: "well" };
+const LANDMARK_PROP: Record<string, string> = { spr_deco_well: "well", statue: "statue" };
+// Half width and depth in tiles where the picture's own size says too much: the statue blocks its plinth, not its figure.
+const FOOTPRINT: Record<string, [number, number]> = { statue: [1, 1.4] };
 const CLUMP = 6; // tiles: trees gather in cells of this size
 const SHORE: readonly (readonly [number, number])[] = [[-2, 0], [2, 0], [-1, 0], [1, 0], [0, -2], [-2, 1], [2, 1], [0, 1], [0, 2], [0, 3], [-2, 3], [2, 3]];
 // The mouth of each house's chimney, in pixels from the stamp's top left. Houses not listed have none.
@@ -52,7 +54,7 @@ export const CHIMNEY: Record<string, [number, number]> = { "house-blue": [63, 11
   ...Object.fromEntries(ROOFS.map((r) => [houseArt(r), HOME_CHIMNEY])) };
 const READ_CHARS = 12; // a bubble stays long enough to read at this many characters a second
 const xz = (v: Vec) => ({ x: v.x, z: v.z });
-const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", "fence-v": "a fence", jar: "a clay jar", bush: "a bush", "bush-big": "a big bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", rail: "a fence", lights: "party lights" };
+const DECOR_NAME: Record<DecorPiece["kind"], string> = { crates: "some crates", "crop-carrot": "a carrot patch", "crop-wheat": "a wheat patch", flowers: "some flowers", grass: "some tall grass", windmill: "a windmill", stump: "a tree stump", "fence-v": "a fence", jar: "a clay jar", bush: "a bush", "bush-big": "a berry bush", rock: "a rock", "rock-big": "a big rock", fence: "a fence", rail: "a fence", lights: "party lights" };
 const SPOT_NAME: Partial<Record<keyof Spots, string>> = { bed: "a bed", lawn: "the lawn", playground: "the playground slide and goal", picnic: "the picnic blanket", pond: "the fishing pond", plaza: "the village square" };
 
 export const OVERWORLD_MON = 20; // px: monsters in the overworld
@@ -187,7 +189,7 @@ export class Overworld {
     this.stall = { x: plaza.x - 7, z: plaza.z - 3 };
     const npcIsle = this.world.platforms.find((p) => p.kind === "npc");
     if (npcIsle) this.elder = { pos: this.elder?.pos ?? { x: npcIsle.x, z: npcIsle.z - 1 }, sprite: this.elder?.sprite ?? drawMonster(petLook(randomGenes(77)), 24, "front", BUILDS.turtle) };
-    this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, ...Object.values(NPC_HOMES)];
+    this.landmarks = [{ art: "spr_deco_well", x: plaza.x + 7, z: plaza.z + 3 }, ...(this.world.things ? [{ art: "statue", ...STATUE }] : []), ...Object.values(NPC_HOMES)];
     this.critters = [];
     for (const p of this.world.platforms) {
       if (p.kind === "plaza" || p.kind === "islet") continue;
@@ -949,6 +951,7 @@ export class Overworld {
   }
 
   private footprint(art: string): [number, number] {
+    if (FOOTPRINT[art]) return FOOTPRINT[art];
     const [w, h] = stampSize(art);
     return [w / 32, h / 32 + 0.6]; // half width, depth in tiles (the roof leans back over open ground)
   }
