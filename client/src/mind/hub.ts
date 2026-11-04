@@ -34,6 +34,8 @@ export interface HubOut {
 }
 
 const TALK_GAP = 90; // sim seconds between two talks of the same mind
+const CLOUD_TYPE_MS = 1400; // a cloud talk's "typing" pause before each line
+const CLOUD_LINE_MS = 2200; // and the line's time alone (both together pass the room's 3 s per speaker)
 const TALK_DIST = 2.6;
 const TOP_CHOICES = 5;
 const EMOTE_TEXT: Record<Emote, string> = { wave: "*waves*", heart: "<3", dance: "*dances*", laugh: "haha!" };
@@ -44,6 +46,8 @@ export class MindHub {
   // What a mind sees right now (scene.ts), set by the overworld; `with` = the one it talks to. Null = no scene.
   sceneOf: ((id: string, withPos?: { x: number; z: number }) => string) | null = null;
   placesOf: (() => MapPlace[]) | null = null; // everywhere and everyone a villager can point the way to
+  // A whole talk between two minds from the cloud (the villagers' hub sets it, mind/npcs.ts); null = line by line here.
+  cloudTalk: ((a: Mind, b: Mind, turns: number) => Promise<{ lines: { who: string; text: string }[]; by: string } | null>) | null = null;
 
   constructor(
     private readonly v: Village,
@@ -221,7 +225,20 @@ export class MindHub {
     const turns = 2 + (this.v.nextId % 3);
     const aff = this.v.rel.get(pairKey(a.id, b.id)) ?? 0;
     try {
-      for (let k = 0; k < turns; k++) {
+      const cloud = this.cloudTalk ? await this.cloudTalk(ma, mb, turns) : null;
+      if (cloud) {
+        // The cloud wrote the whole talk: each line shows after a short "typing" pause, at the room's pace.
+        for (const l of cloud.lines) {
+          const [sp, ls] = l.who === mb.persona.id ? [mb, ma] : [ma, mb];
+          this.out.say(sp.persona.id, "...", ls.persona.name);
+          await new Promise((r) => setTimeout(r, CLOUD_TYPE_MS));
+          sp.source = cloud.by;
+          said.push(`${sp.persona.name}: ${l.text}`);
+          this.out.say(sp.persona.id, humanize(l.text, sp.persona), ls.persona.name);
+          await new Promise((r) => setTimeout(r, CLOUD_LINE_MS));
+        }
+      }
+      for (let k = cloud ? turns : 0; k < turns; k++) {
         const [sp, ls] = k % 2 ? [mb, ma] : [ma, mb];
         if (this.hasModel()) this.out.say(sp.persona.id, "...", ls.persona.name); // typing while the model thinks
         const ans = this.hasModel()
@@ -233,8 +250,11 @@ export class MindHub {
         if (!this.hasModel()) await new Promise((r) => setTimeout(r, 2200));
       }
       const now = this.now();
-      remember(ma.mem, now.day, now.time, `talked with ${mb.persona.name} about ${topic}`);
-      remember(mb.mem, now.day, now.time, `talked with ${ma.persona.name} about ${topic}`);
+      // What the other said stays with each of them (a cloud talk has no topic of its own).
+      const heard = (from: Mind) => said.find((l) => l.startsWith(`${from.persona.name}: `))?.slice(from.persona.name.length + 2, from.persona.name.length + 62);
+      const about = (from: Mind) => (cloud && heard(from) ? `talked with ${from.persona.name}: "${heard(from)}"` : `talked with ${from.persona.name} about ${topic}`);
+      remember(ma.mem, now.day, now.time, about(mb));
+      remember(mb.mem, now.day, now.time, about(ma));
       bump(this.v.rel, a.id, b.id, 2);
       this.gossip(ma, mb);
       this.gossip(mb, ma);

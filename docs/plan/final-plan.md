@@ -54,6 +54,11 @@
   fight (Muse Spark Open, prefetched, remembered); the inspector names the service of each mind's last line. Design
   `docs/ai/npc.md` "Village Gazette"; proof `docs/testing/proof/game/p5-live.md`. **Next: P5d** (campfire stories /
   NPC-to-NPC talk from the cloud with memories), then P5e postcards if time, then P6 at 18:00 VN.
+- **P5d done** (live worker d82cfc08, build `main-C2rhNIcQ`, 2026-11-04 ~11:40 VN by the local clock): villagers talk
+  to each other and tell evening campfire stories from the cloud with their memories (`/api/banter`, Muse Spark Open,
+  one call per talk, only while a player is within 14 tiles, 1 per 40 s per machine, $1/day); rules story and the old
+  local/scripted path as fallback. Design `docs/ai/npc.md` "Villagers talk to each other"; proof `p5-live.md` d.
+  **Next: P5e** postcards if time (verify Muse Image first), then P6 at 18:00 VN.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

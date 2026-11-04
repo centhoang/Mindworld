@@ -226,3 +226,20 @@ one failure, bug 60. **The user will play once more, last, when everything is do
 User's words on the battle screen: redesign the layout as Claude sees fit (Codex makes art only, never layout); one pixel
 size for everything, **the player's pixel size is the baseline**; rework the battle background and the pet art at that
 size, asking Codex specifically for the art. All 8 are fixed on live now (above).
+
+## 2026-11-04 session (P5 a-c, moved from HANDOFF at ~11:50 VN)
+### Done this session (P5 a-c) (all on live; proof `docs/testing/proof/game/p5-live.md`, design `docs/ai/npc.md` "Village Gazette")
+- Join check "a late joiner sees who is talking": the script's fault, not the room's. Talkers were burst slots 2 and 3,
+  but the refresh steps quit whichever bots got plots first (plots go by arrival), so a talker could be a closed socket.
+  Now any two bots still in the room; the note says what the talker got (commit c7a8ba4). 20/20 twice.
+- **P5a Village Gazette**: `/api/gazette` (worker `gazette.ts`), first real use of the Meta Model API (`muse-spark-1.3`,
+  provider `meta`; default provider if no Meta key). Host client sends notable villager memories (`mind/gazette.ts`
+  `gazetteNotes`, via `npcs.gazetteNotes(day)`, which falls back to the latest lived day) + prices; three headlines,
+  cached per room and game day; a reader with no notes waits for the host's paper; rules headlines otherwise. Town board
+  rows (`main.ts boardRows`, footer names the writer), toast once per day. Soccer goals are now villager memories
+  (`npcs.noteGoal`). `__px.gazette`, `__px.openBoard()` for tests.
+- **P5b watching villager**: `/api/cheer` (worker `cheer.ts`, Muse Spark Open): one call at fight start writes the
+  watcher's line for win/loss/friends; `fight-flow.ts cheer()` says it at the end (wild, rival, live duel) and the
+  villager remembers it. Watcher = `Overworld.watcher()` (16 tiles, awake, outdoors, not the rival's owner).
+- **P5c**: the mind inspector (I) shows `LAST LINE: <service>` (`pixel/inspector.ts serviceLabel`).
+- `docs/ops/demo.md` lists the two new Meta model uses; `checks/game.md` has three new ticked lines.

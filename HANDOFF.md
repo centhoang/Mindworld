@@ -1,47 +1,42 @@
-# HANDOFF: Mindworld final plan (2026-11-04, ~12:25 VN)
+# HANDOFF: Mindworld final plan (2026-11-04, ~11:55 VN = 04:55 UTC)
 
-**Starting prompt:** "Read HANDOFF.md, then do P5d from docs/plan/final-plan.md (Next actions 1). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then do P5e from docs/plan/final-plan.md (Next actions 1). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
-  Status section at the top. Keep that Status current every session. P5 window 13:00-17:00 (ahead), freeze (P6) 18:00 VN.
-- Live worker 051d8ab7, build `main-BOsI1_9N`. Local commits on `rework/fresh-look` (last cfa6a77 + docs), not pushed.
-- Tests: client 686, worker 232, tsc clean both. **Join check on live: CLEAN 20/20** after the last deploy.
-- Spend 2026-11-04 (ledger day): $0.07 of the $30 day cap. Baseten total $1.24 of $50, Meta $0.012 of $100 (credit
-  $149.91), Modal untouched.
+  Status section at the top. Keep that Status current every session. P5 window 13:00-17:00 (we are ahead), freeze (P6)
+  18:00 VN. Earlier HANDOFF times said ~12:25 VN for the last session; the real clock was ~11:20 VN then.
+- Live worker d82cfc08, build `main-C2rhNIcQ`. Local commits on `rework/fresh-look`, not pushed.
+- Tests: client 697, worker 237, tsc clean both. Join check after this deploy: run 1 16/20 (one bot got
+  no welcome for 11.5 s, which also broke the "room full" and "room empty" counts), run 2 **CLEAN 20/20**. Watch for it.
+- Spend: P5d used ~6 Muse Spark Open calls (~$0.03). Before it: day $0.07 of $30, Baseten $1.24 of $50, Meta $0.012
+  of $100 (credit $149.91), Modal untouched. Read `/api/spend` in the test Chrome for the day's number.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-04 session" or "2026-11-03 session").
 
-## Done this session (all on live; proof `docs/testing/proof/game/p5-live.md`, design `docs/ai/npc.md` "Village Gazette")
-- Join check "a late joiner sees who is talking": the script's fault, not the room's. Talkers were burst slots 2 and 3,
-  but the refresh steps quit whichever bots got plots first (plots go by arrival), so a talker could be a closed socket.
-  Now any two bots still in the room; the note says what the talker got (commit c7a8ba4). 20/20 twice.
-- **P5a Village Gazette**: `/api/gazette` (worker `gazette.ts`), first real use of the Meta Model API (`muse-spark-1.3`,
-  provider `meta`; default provider if no Meta key). Host client sends notable villager memories (`mind/gazette.ts`
-  `gazetteNotes`, via `npcs.gazetteNotes(day)`, which falls back to the latest lived day) + prices; three headlines,
-  cached per room and game day; a reader with no notes waits for the host's paper; rules headlines otherwise. Town board
-  rows (`main.ts boardRows`, footer names the writer), toast once per day. Soccer goals are now villager memories
-  (`npcs.noteGoal`). `__px.gazette`, `__px.openBoard()` for tests.
-- **P5b watching villager**: `/api/cheer` (worker `cheer.ts`, Muse Spark Open): one call at fight start writes the
-  watcher's line for win/loss/friends; `fight-flow.ts cheer()` says it at the end (wild, rival, live duel) and the
-  villager remembers it. Watcher = `Overworld.watcher()` (16 tiles, awake, outdoors, not the rival's owner).
-- **P5c**: the mind inspector (I) shows `LAST LINE: <service>` (`pixel/inspector.ts serviceLabel`).
-- `docs/ops/demo.md` lists the two new Meta model uses; `checks/game.md` has three new ticked lines.
+## Done this session (on live; proof `docs/testing/proof/game/p5-live.md` d, design `docs/ai/npc.md` "Villagers talk")
+- **P5d villagers talk to each other and tell campfire stories from the cloud** (`/api/banter`, worker `banter.ts`,
+  client `game/banter-api.ts`, `NpcVillage.banter` behind `CLOUD_LIVELY`). One Muse Spark Open call writes a whole
+  talk from both villagers' notes (`NpcVillage.notesOf`: doing, feelings, facts, notable then latest memories, prices
+  as coins, no small talk). Paths: two villagers I host (`MindHub.talk` -> `cloudTalk`), a villager on another machine
+  (`speak` -> `mateLine`, one line each), evening campfire with a player within 8 tiles (`campfire()`, once a game day
+  per machine; test hook `__px.world.npcs.storyNow()`). Only while a player is within 14 tiles, one per 40 s per
+  machine, $1/day, quota `banter`. Fallback: old local/scripted path; `rulesStory` for a story. Memories written both
+  ways (the story's memory showed up in the next talk live). ~$0.005 and ~4 s a call.
+- Checks: two new ticked lines in `checks/game.md`; `docs/ops/demo.md` lists the new Meta model use.
 
 ## Next actions
-1. **P5d** (`docs/plan/final-plan.md` P5): evening campfire stories / NPC-to-NPC talk from the cloud with memories.
-   Look at `game/chatter.ts` and `mind/hub.ts` (NPC-to-NPC talk, `speak()` in `mind/npcs.ts` ~line 274 uses the local
-   model or `scriptedLine`; `CloudMind` in `game/voices.ts` is the Muse Spark mind backend). Behind `CLOUD_LIVELY`,
-   through the worker ledger with a cap and quota, mocked in tests, rules fallback. Deploy, join check, proof.
-2. P5e surprise, cut first if late: Postcards (`muse-image-1.0`): verify the API and price on dev.meta.ai docs first,
-   hard cap $2/day, skip if unavailable.
-3. P6 freeze 18:00 VN: bug fixes only, `scope-check` every scope on live, then the user's last play-test (2+ players).
+1. **P5e** surprise, cut first if late: Postcards (`muse-image-1.0`): verify the API and price on dev.meta.ai docs
+   first, hard cap $2/day, skip if unavailable. Same shape as `banter.ts`/`cheer.ts` (worker route, ledger, cap,
+   quota, mocked tests, client fetch behind `CLOUD_LIVELY`, free fallback).
+2. P6 freeze 18:00 VN: bug fixes only, `scope-check` every scope on live, then the user's last play-test (2+ players).
    Ask before P6: remove Access at the freeze instead of Nov 5 morning (Open, below).
-4. P4 leftovers only if time: tree clumps toward the coast, stumps, berry bushes, the plaza's bare dirt (pack `statue.png`).
-5. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
+3. P4 leftovers only if time: tree clumps toward the coast, stumps, berry bushes, the plaza's bare dirt (pack `statue.png`).
+4. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
    villager walks up and challenges you.
-6. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
-   GHOSTS --prefix "chat:<ms prefix>" --remote`, then `kv key get` each; rows are `{t, npc, player, line, reply, source}`),
-   add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`. If the user says "sleep", Director mode.
+5. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
+   GHOSTS --prefix "chat:<ms prefix>" --remote`, then `kv key get` each; rows are `{t, npc, player, line, reply, source}`;
+   campfire story lines log with `line: "(campfire story)"`), add failures to `docs/testing/checks/npc.md`, bugs to
+   `docs/BUGS.md`. If the user says "sleep", Director mode.
 
 ## Open
 - Gazette weak spot: plain `remember()` notes live only in the host's tab, so a reload or host hand-over mid-day
@@ -55,6 +50,8 @@
   proof `proof/network/5c5d-live.md` covers hand-over with bonds intact).
 - A player's own dance pose reaches a late joiner only on their next move (8 s dance); villagers' dances show at once.
 - Rival plan latency: 13-15 s for a new memo; say so in the demo script (P7).
+- P5d not run live: two villagers hosted on different machines talking (unit test only). The campfire is lit only in
+  the evening or while a gathering runs; `storyNow()` with forced sitters shows an unlit fire.
 
 ## Decisions (standing)
 - NPCs are the star: a player cannot tell them from a human. The sim reasons; the model picks among valid options and speaks.
@@ -70,6 +67,8 @@
 ## Gotchas
 - **Resource timing is full** in game tabs (1000+ assets): `performance.getEntriesByType` misses API calls. Read
   `__px.gazette.paper` or hook `fetch` instead.
+- Banter by hand (test Chrome, room `check`): drivers `.scratch/p5/live-banter-{api,chat,story,story-read}.js` (hook
+  `npcs.banter` and `npcs.out.line`, reset `npcs.cloudAt = -1e9`, `npcs.hub.talk(a, b)` or `npcs.storyNow()`).
 - Gazette by hand: `__px.gazette.paper`; a new paper needs a reload or the next game day (12 min). Cheer: put
   `__px.world.player` beside a villager, `__px.fight(__px.world.wilds[0])`, drive `battleView` (driver
   `.scratch/p5/live-cheer.js`: on a menu whose first label is not Fight press escape then enter).

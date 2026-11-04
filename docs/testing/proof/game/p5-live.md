@@ -25,6 +25,31 @@
 - Mind inspector (I): `LAST LINE: from the cloud (Muse Spark Open)` / `thought on your computer (Llama 3.2 1B, tuned)` /
   `the village rules (no model)` (`pixel/inspector.test.ts`). Battle lines carry the tag; the Gazette names its writer.
 
+## d. Villagers talk to each other and tell campfire stories (Muse Spark Open, Baseten)
+Worker d82cfc08, build `main-C2rhNIcQ`, room `check`, test Chrome (2026-11-04 ~11:35 VN local clock).
+- API, real-shaped notes: a chat (Elder and Mo at the pond, 4 lines) "Saw Bolt best that Brute near noon, Kai must be
+  proud." / "I heard about it, strong little Bolt has true heart." / ... ($0.0050); a story (Elder telling, Mo
+  reacting, Pip on another machine so silent) "I remember watching Kai and brave Bolt chase off that wild Brute
+  together." / ... / Mo: "Steady heart like that, calm water wins." ($0.0049). One call per talk.
+- Real tab, all four villagers hosted here, player beside the Elder: one cloud call (4.2 s) wrote the whole talk from
+  both minds' notes; lines 2.5-3.5 s apart, each villager's `source` "Muse Spark Open"; both remember the other's
+  line (`talked with Mo: "Yes, sold fish and finally saved enough"`). Elder: "Heard you bought a better fishing rod
+  today"; Mo: "Yes, sold fish and finally saved enough" (Mo's real purchase that day).
+- Real tab, Elder, Mo and Ama at the campfire, player 2 tiles away, `storyNow()`: one call (3.9 s), the Elder tells,
+  Mo and Ama react; the Elder remembers `told Sleepy Nori a campfire story: "..."` (imp 4, Gazette news), the others
+  `heard Elder's campfire story with Sleepy Nori` (`campfire-story-live.png`). Fixed after this run: the notes carried
+  the villager's own clipped lines to players ("I said to ...") and "18c" (read as cents); now events only, "18 coins".
+- Re-run on the fixed build: Ama and Pip's talk opened with "Could not sleep after Elder story by campfire" (the
+  story's memory), Pip's notes read "sold 2 wood at the market for 10 coins".
+- Not live: two villagers hosted on different machines (each host asks for its own villager's next line, the talk so
+  far attached): unit test `mind/banter.test.ts`. Cloud off, failing, nobody within 14 tiles, or within 40 s of the
+  last cloud talk on that machine: the local mind or scripted lines (tests). Story with the cloud off: the opener,
+  "Today I watched Kai's pet Bolt beat a wild Brute.", the others' reactions (tests).
+
+- Join check after the P5d deploy: run 1 16/20 (one bot without a welcome for 11.5 s, so "no socket stuck", "20
+  within 10 s", "101st told full" and "room empty" failed; `.scratch/p5/join-check-p5d.txt`), run 2 CLEAN 20/20
+  (`.scratch/p5/join-check-p5d-2.txt`). P5d adds no room code.
+
 ## After the deploy
 - `node scripts/join-check.mjs`: CLEAN 20/20 (`.scratch/p5/join-check-p5.txt`).
 - `/api/spend`: day $0.0695 of $30; totals baseten $1.244, meta $0.0123.

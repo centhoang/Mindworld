@@ -27,6 +27,7 @@ import { addCommitment, answerLine, type Invite, decidePrompt, dueNow, extractPr
 import { bump, pairKey } from "../life/relations";
 import { acceptLine, afterLine, challengeLine, duelAsked, duelMemory, duelRefusal, DUELS_A_DAY, refusalLine, rivalOf, type DuelEnd } from "../sim/rivals";
 import { PRIO, type MindScheduler } from "./scheduler";
+import type { BanterAsk, BanterFn, BanterLine } from "../game/banter-api";
 
 export interface NpcOut {
   line(l: MindLine & { mem?: string }): void; // to the room (only for NPCs I host)
@@ -67,6 +68,19 @@ const DUEL_PITCH = 0.35; // how often a bored villager with a pet asks a passing
 const GOAL_SEEN = 14; // tiles: a villager this near the ball saw the goal
 const DUEL_FUN = 50; // below this fun need, a villager feels like a duel
 const INVITE_HINT = /\b(party|birthday|danc|soccer|football|fish|picnic|lunch)/i; // only these lines cost a model call
+const HEAR_DIST = 14; // tiles: a player this close hears villagers talk (the room's HEAR_DIST); only then the cloud writes it
+const CLOUD_TALK_GAP = 40; // sim seconds between two cloud-written villager talks on this machine
+const STORY_DIST = 8; // tiles: a player this close to the fire is sitting with the villagers
+const STORY_HOLD = 80; // game minutes a storyteller and its listeners keep sitting
+const STORY_TYPE_MS = 1400;
+const STORY_LINE_MS = 3200;
+const NOTES_MAX = 600; // the Worker's NOTE_MAX
+// Where a villager is, for the cloud: the place of what it is doing.
+const PLACE_NAME: Record<string, string> = { campfire: "the campfire", dancefloor: "the dance floor", pond: "the pond", plaza: "the market square", stall: "the market stall", playground: "the pitch", picnic: "the picnic spot", woods: "the woods", quarry: "the quarry", pen: "the animal yard", swim: "the swimming spot", lawn: "the village green" };
+// The free campfire story (cloud off or failing): an opener, then what really happened today, then the others react.
+const STORY_OPEN: Record<Npc, string> = { elder: "Gather close, everyone. Let me tell you about today.", mo: "Quiet now. Here is one from today.", ama: "Ooh, sit, sit! Have I got a story for you!", pip: "okay okay, listen to THIS one!" };
+const STORY_OLD: Record<Npc, string> = { elder: "Long ago a tiny pet learned one good rule and beat a giant.", mo: "Once a fish pulled so hard I nearly went swimming.", ama: "Once a pet ate a whole pot of my soup and asked for more.", pip: "once I kicked a ball so high it never came down!" };
+const STORY_REACT: Record<Npc, string> = { elder: "A fine tale. Every day leaves one.", mo: "Huh. Good one.", ama: "Oh, I love that one!", pip: "whoa! tell another!" };
 
 // A pet the NPCs can see (mine, at home or following me, or an online player's). `busy` = walking or doing
 // something, so it isn't spoken to.
@@ -107,13 +121,16 @@ export class NpcVillage {
   people: () => Person[] = () => []; // players around (me + online peers), for greetings
   onChat: ((e: { npc: string; player: string; line: string; reply: string; source: string }) => void) | null = null; // every line said to a player, for the chat log
   cloud: CloudTalk | null = null; // free talk, tier 2 (game/npc-chat.ts); null keeps every line local
+  banter: BanterFn | null = null; // villagers' talks and campfire stories from the cloud (game/banter-api.ts); null = local
+  private cloudAt = -1e9; // sim time of the last cloud-written talk here
+  private storyDay = -1; // the last game day a campfire story was told here
   private readonly talks = new Map<string, string[]>(); // "npc:player" -> the talk so far, for the cloud tier
   private readonly greeted = new Map<string, number>(); // "npc:player" -> sim time of the greeting
   pets: () => PetSeen[] = () => []; // pets around, for a passing word
   dancing: () => number = () => 0; // players dancing by the dance floor
   private readonly petted = new Map<string, number>(); // "npc:pet" (and "npc" for its last pet line) -> sim time
   private readonly lastChat = new Map<Npc, number>(); // sim time of the NPC's last NPC chat
-  private readonly chats = new Map<Npc, { with: Npc; said: string[]; turns: number }>(); // NPC chats over the room
+  private readonly chats = new Map<Npc, { with: Npc; said: string[]; turns: number; cloud?: boolean }>(); // NPC chats over the room
   private readonly busy = new Set<Npc>(); // a line is being made
   private readonly leaving = new Set<string>(); // promises the NPC already set off for
   private readonly arrived = new Set<string>(); // promises the NPC turned up for
@@ -147,6 +164,7 @@ export class NpcVillage {
     this.out = { ...out, line: (l) => (l.say && this.follow(l.who as Npc, l.say), out.line(l)) };
     for (const p of VILLAGERS) addAgent(this.v, p.id, p.name, "human", homes[p.id as Npc] ?? { x: 0, z: 0 });
     this.hub = new MindHub(this.v, sched, { say: (id, text, to) => this.said(id as Npc, text, to) }, hasModel, new Set(Object.keys(spots) as (keyof Spots)[]));
+    this.hub.cloudTalk = (a, b, turns) => this.cloudChat(a.persona.id as Npc, b.persona.id as Npc, turns);
     this.env = { spots, canWalk, route, rng, doorOf: (a) => npcDoor(a.id), bias: (a, act) => this.hub.bias(a, act) + (this.dueAct(a.id) === act ? PROMISE_PULL : 0) + (this.duty(a).work && personaOf(a.id)?.job?.act === act ? JOB_PULL : 0) + (act === "farm" ? this.farmPull(a.id) : 0) + (act === "dance" ? Math.min(DANCE_PULL_MAX, DANCE_PULL * this.dancing()) : 0), jobOf: (a) => personaOf(a.id)?.job?.act ?? null, chooser: (a, cs, v) => this.choose(a.id as Npc, a, cs, v) };
     for (const n of NPCS) this.setHost(n, null);
   }
@@ -273,7 +291,7 @@ export class NpcVillage {
   }
 
   // The NPC says one line to someone (a player or another NPC), from its own mind when a model is here.
-  private async speak(npc: Npc, other: Persona, to: string, c: { said: string[]; turns: number }): Promise<void> {
+  private async speak(npc: Npc, other: Persona, to: string, c: { said: string[]; turns: number; cloud?: boolean }): Promise<void> {
     const m = this.hub.minds.get(npc);
     if (!m || this.busy.has(npc)) return;
     this.busy.add(npc);
@@ -286,7 +304,8 @@ export class NpcVillage {
       const human = !NPCS.includes(other.id as Npc);
       const key = `${npc}:${other.name}`;
       const cloud = human && this.cloud ? await this.cloud(npc, "", this.hub.sceneOf?.(npc) ?? "", this.cloudMind(npc, m, other.name, "", this.talks.get(key) ?? [])) : null;
-      const ans = cloud ? { value: cloud.text, source: cloud.source } : this.hasModel()
+      const mate = human ? null : await this.mateLine(npc, other.id as Npc, c);
+      const ans = cloud ? { value: cloud.text, source: cloud.source } : mate ? { value: mate.text, source: mate.by } : this.hasModel()
         ? await this.sched.ask({ prio: PRIO.talk, timeoutMs: 20000, req: linePrompt(m.persona, m.mem, other, aff, topic, c.said, this.hub.sceneOf?.(npc) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedLine(m.persona, other, c.said.length, this.v.nextId) })
         : (await new Promise((r) => setTimeout(r, SCRIPT_GAP_MS)), { value: scriptedLine(m.persona, other, c.said.length, this.v.nextId), source: "rules" });
       if (!this.hosting(npc)) return; // moved to another host meanwhile
@@ -378,6 +397,161 @@ export class NpcVillage {
     } finally {
       this.busy.delete(npc);
     }
+  }
+
+  // --- villagers' talks and campfire stories from the cloud (P5d) ------------------------------------------
+  private agentOf(npc: Npc): Agent | undefined {
+    return this.v.agents.find((x) => x.id === npc);
+  }
+
+  // Players close enough to a villager, by name.
+  private listeners(npc: Npc, d: number): string[] {
+    const a = this.agentOf(npc);
+    return a ? [...new Set(this.people().filter((p) => Math.hypot(p.pos.x - a.pos.x, p.pos.z - a.pos.z) < d).map((p) => p.name))].slice(0, 4) : [];
+  }
+
+  // The cloud writes a talk only while a player can hear it, and not more often than CLOUD_TALK_GAP.
+  private mayBanter(listeners: readonly string[]): boolean {
+    if (!this.banter || !listeners.length || this.v.t - this.cloudAt < CLOUD_TALK_GAP) return false;
+    this.cloudAt = this.v.t;
+    return true;
+  }
+
+  private placeOf(npc: Npc): string {
+    const a = this.agentOf(npc);
+    const def = a?.act ? ACTIVITY.get(a.act) : undefined;
+    return (def && PLACE_NAME[def.place]) || "out and about in the village";
+  }
+
+  private timeText(): string {
+    const g = gameTime(this.v.t);
+    return `${clockLabel(g.hour)}, ${g.phase}`;
+  }
+
+  // What the cloud knows of a villager: for one I host, its feelings and latest memories (the notable ones first);
+  // for one hosted elsewhere, what it is doing and the memory the room handed me, if any.
+  notesOf(npc: Npc, about?: Npc): string {
+    const m = this.hub.minds.get(npc);
+    const a = this.agentOf(npc);
+    const label = a?.act && a.act !== "wander" ? ACTIVITY.get(a.act)?.label : null;
+    const doing = label ? `Now ${label}.` : "";
+    const mem = m?.mem ?? this.mems.get(npc);
+    if (!mem) return doing;
+    const feelings = Object.entries(mem.bonds).filter(([, b]) => feelWord(b) !== "neutral about").slice(0, 3).map(([who, b]) => `${feelWord(b)} ${who}`);
+    const mate = about ? this.v.rel.get(pairKey(npc, about)) ?? 0 : 0;
+    if (about && Math.abs(mate) >= 10) feelings.push(`${mate > 0 ? "fond of" : "cool toward"} ${personaOf(about)?.name ?? about}`);
+    // Things that happened, not the villager's own small talk (its lines to players, hellos to pets).
+    const log = mem.log.filter((e) => !e.text.includes("|") && !/^(planned|I said to|said hello to)\b/.test(e.text) && e.text.length > 3);
+    const notable = log.filter((e) => (e.imp ?? 3) >= 4).slice(-3);
+    const latest = log.filter((e) => !notable.includes(e)).slice(-4);
+    const facts = mem.facts.filter((f) => f !== NEIGHBOURS).slice(-2);
+    const coins = (t: string) => t.replace(/\b(\d+)c\b/g, "$1 coins"); // "for 18c" read as cents otherwise
+    const remembers = () => `Remembers: ${[...notable, ...latest].map((e) => `${e.time} ${coins(e.text)}`).join("; ")}.`;
+    const parts = [doing, feelings.length ? `Feels ${feelings.join(", ")}.` : "", facts.length ? `Knows: ${facts.join("; ")}.` : ""];
+    const join = () => [...parts, notable.length + latest.length ? remembers() : ""].filter(Boolean).join(" ");
+    let text = join();
+    while (text.length > NOTES_MAX && latest.length) {
+      latest.shift();
+      text = join();
+    }
+    return text.slice(0, NOTES_MAX);
+  }
+
+  // Two villagers I both host meet (mind/hub.ts talk): the whole talk in one cloud call, or null (the hub goes line by line).
+  private cloudChat(a: Npc, b: Npc, turns: number): Promise<{ lines: BanterLine[]; by: string } | null> {
+    const listeners = this.listeners(a, HEAR_DIST);
+    if (!this.mayBanter(listeners)) return Promise.resolve(null);
+    const ask: BanterAsk = { kind: "chat", who: [a, b], speak: [a, b], notes: { [a]: this.notesOf(a, b), [b]: this.notesOf(b, a) }, listeners, place: this.placeOf(a), time: this.timeText(), said: [], lines: turns };
+    this.out.say(a, "...", personaOf(b)?.name); // typing while the cloud writes the talk
+    return this.banter!(ask);
+  }
+
+  // A villager I host chats with one hosted on another machine: my villager's next line from the cloud, if this
+  // talk started on the cloud (decided at its first line here); else null and the local mind answers.
+  private async mateLine(npc: Npc, mate: Npc, c: { said: string[]; cloud?: boolean }): Promise<{ text: string; by: string } | null> {
+    const listeners = this.listeners(npc, HEAR_DIST);
+    c.cloud ??= this.mayBanter(listeners);
+    if (!c.cloud || !this.banter) return null;
+    const got = await this.banter({ kind: "chat", who: [npc, mate], speak: [npc], notes: { [npc]: this.notesOf(npc, mate), [mate]: this.notesOf(mate) }, listeners, place: this.placeOf(npc), time: this.timeText(), said: c.said.slice(-6), lines: 1 });
+    const line = got?.lines.find((l) => l.who === npc);
+    return line ? { text: line.text, by: got!.by } : null;
+  }
+
+  // Evening: a villager I host sits at the campfire and a player sits with it: it tells a story, once a game day here.
+  private campfire(): void {
+    const g = gameTime(this.v.t);
+    if (g.phase !== "evening" || this.storyDay >= g.day) return;
+    if (this.storyNow()) this.storyDay = g.day;
+  }
+
+  // The storyteller: the villager I host at the fire with the most to tell today (the Elder first on a tie).
+  // False = nobody here to tell or nobody to listen. Also the test hook (__px.world.npcs.storyNow()).
+  storyNow(): boolean {
+    const day = gameTime(this.v.t).day;
+    const sitting = this.v.agents.filter((a) => a.act === "campfire" && a.state === "do");
+    const free = sitting.filter((a) => this.hosting(a.id as Npc) && !this.busy.has(a.id as Npc) && !this.hub.minds.get(a.id)?.talking);
+    const weight = (id: string) => Math.max(0, ...(this.hub.minds.get(id)?.mem.log.filter((e) => e.day === day).map((e) => e.imp ?? 3) ?? []));
+    const teller = [...free].sort((x, y) => weight(y.id) - weight(x.id))[0];
+    if (!teller) return false;
+    const players = this.listeners(teller.id as Npc, STORY_DIST);
+    if (!players.length) return false;
+    void this.tellStory(teller.id as Npc, sitting.filter((a) => a !== teller).map((a) => a.id as Npc), players);
+    return true;
+  }
+
+  private async tellStory(teller: Npc, others: Npc[], players: string[]): Promise<void> {
+    const speak = [teller, ...others.filter((o) => this.hosting(o) && !this.busy.has(o) && !this.hub.minds.get(o)?.talking)].slice(0, 3);
+    for (const n of speak) {
+      this.busy.add(n);
+      const a = this.agentOf(n);
+      if (a) a.left = Math.max(a.left, STORY_HOLD);
+    }
+    try {
+      const who = [teller, ...others];
+      const ask: BanterAsk = { kind: "story", who, speak, notes: Object.fromEntries(who.map((n) => [n, this.notesOf(n)])), listeners: players, place: "the campfire", time: this.timeText(), said: [], lines: Math.min(4, 2 + speak.length - 1) };
+      this.out.say(teller, "...");
+      if (this.banter) this.cloudAt = this.v.t;
+      const got = this.banter ? await this.banter(ask) : null;
+      const tale = got?.lines.length ? got.lines : this.rulesStory(teller, speak);
+      const by = got?.lines.length ? got.by : "rules";
+      const told: string[] = [];
+      for (const [i, l] of tale.entries()) {
+        if (!this.hosting(l.who)) continue; // handed to another host meanwhile
+        const m = this.hub.minds.get(l.who);
+        if (i > 0) {
+          this.out.say(l.who, "...");
+          await new Promise((r) => setTimeout(r, STORY_TYPE_MS));
+        }
+        if (m) m.source = by;
+        const say = m ? humanize(l.text, m.persona) : l.text;
+        this.said(l.who, say);
+        if (l.who === teller) told.push(say);
+        for (const p of players) this.onChat?.({ npc: l.who, player: p, line: "(campfire story)", reply: say, source: by });
+        await new Promise((r) => setTimeout(r, STORY_LINE_MS));
+      }
+      const g = gameTime(this.v.t);
+      const tm = this.hub.minds.get(teller);
+      const gist = told.slice(1).join(" ") || told[0] || "";
+      if (tm && gist) remember(tm.mem, g.day, clockLabel(g.hour), `told ${players.join(" and ")} a campfire story: "${gist.slice(0, 50)}"`, 4);
+      for (const n of speak.slice(1)) {
+        const m = this.hub.minds.get(n);
+        if (m) remember(m.mem, g.day, clockLabel(g.hour), `heard ${personaOf(teller)!.name}'s campfire story with ${players.join(" and ")}`);
+      }
+    } finally {
+      for (const n of speak) this.busy.delete(n);
+    }
+  }
+
+  // The free story: what the teller noted today (the notable things first), else an old tale; the others react.
+  rulesStory(teller: Npc, speak: readonly Npc[]): BanterLine[] {
+    const m = this.hub.minds.get(teller);
+    const name = personaOf(teller)!.name;
+    const day = gameTime(this.v.t).day;
+    const note = m ? (gazetteNotes([{ name, log: m.mem.log }], day)[0] ?? gazetteNotes([{ name, log: m.mem.log }], day - 1)[0]) : undefined;
+    const raw = note?.slice(name.length + 2);
+    const text = raw && /^[a-z]/.test(raw) && !raw.startsWith("my ") ? `I ${raw}` : raw;
+    const tale = text ? `Today ${text.length > 66 ? `${text.slice(0, 63).replace(/\s+\S*$/, "")}...` : text}.` : STORY_OLD[teller];
+    return [{ who: teller, text: STORY_OPEN[teller] }, { who: teller, text: tale }, ...speak.slice(1).map((n) => ({ who: n, text: STORY_REACT[n] }))];
   }
 
   private choose(npc: Npc, a: Agent, cs: Choice[], v: Village): string | null | undefined {
@@ -1083,6 +1257,7 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
     this.keepPromises();
     this.pursueGoals();
     this.social();
+    this.campfire();
     for (const e of ev) if (e.kind === "start" && this.hosting(e.who as Npc)) this.out.line({ who: e.who, act: e.act });
     for (const e of ev) if (e.kind === "start" || e.kind === "done") this.earn(e);
     // New memories of the NPCs I host go to the room, so the next host remembers them.

@@ -71,6 +71,8 @@ memories move to B.
 - **Muse Spark 1.3** (Meta Model API): "Learn from my fights" review.
 - **Muse Spark 1.3** (Meta Model API): the Village Gazette on the town board (`/api/gazette`, one paper per room and game day).
 - **Muse Spark Open** (Baseten): a watching villager's line at the end of a fight (`/api/cheer`).
+- **Muse Spark Open** (Baseten): villagers talking to each other, and evening campfire stories, from their memories
+  (`/api/banter`, one call per talk, only while a player is close enough to hear).
 - **Muse Voice Transcribe** (Meta Model API): teaching by voice.
 - **Llama 3.2 1B, fine-tuned** (LoRA on Modal, distilled from Muse Spark Open): free coach and minds in the tab; browser
   bench (N4, GTX 1050): 97.0% valid across 300 held-out decisions, Teach +18.9 pts held-out lift.

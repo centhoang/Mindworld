@@ -71,3 +71,25 @@ Design backlog and research sources: `archive/NPC-PLAN.md`.
   loss and friends; said at the end, waiting 1.5 s at most; a draw and every failure use the villager's own lines.
   The villager remembers "watched <player>'s pet <pet> beat <foe>" (Gazette news). Cap $1/UTC day, quota `cheer`.
 - The inspector (I) names what answered a mind's last line (`serviceLabel`, plain words first).
+
+## Villagers talk to each other and tell campfire stories (P5d, 2026-11-04)
+- Worker `banter.ts`, `/api/banter`; client `game/banter-api.ts`, set as `NpcVillage.banter` when `CLOUD_LIVELY`.
+  One Muse Spark Open call writes a whole talk: `{kind: chat|story, who, speak, notes, listeners, place, time, said,
+  lines}`. `speak` = the villagers this machine hosts: only they get lines. Short third-person cards per villager live
+  on the worker (`CARD`); the client sends each villager's notes (`NpcVillage.notesOf`, 600 chars): what it is doing,
+  feelings (bonds, fondness toward the other), facts, notable memories (imp >= 4) then the latest, prices as coins,
+  without its own small talk ("I said to", "said hello to") or plan lines. A villager hosted elsewhere is known only
+  by what it does and any memory handed over earlier.
+- When: two villagers I both host meet (`MindHub.talk` asks `cloudTalk` for the whole talk first, then plays it with
+  a "..." pause, 3.6 s a line, the room's 3 s per speaker); a villager on another machine talks to mine (`speak` ->
+  `mateLine`: my villager's next line, `lines: 1`, the talk so far; decided once per talk); evening at the campfire
+  with a player within 8 tiles (`campfire()`/`storyNow()`, once a game day per machine): the hosted sitter with the
+  most notable memory today tells (Elder first on a tie), hosted sitters react, all keep sitting (`left` 80).
+- Cost guard: only while a player is within 14 tiles (the room's hearing distance), at most one cloud talk per 40 s
+  per machine, $1/UTC day (KV `banter:spend:<day>`), ledger, quota `banter` (150 per client, 3000 a day). Live
+  ~$0.005 a call, 3.8-4.2 s.
+- Fallbacks: no cloud, a failure, nobody near: the hub's old path (local model line by line when loaded, else
+  scripted). A story without the cloud: `rulesStory` (the teller's opener, "Today <its top note today>.", else an old
+  tale; a canned reaction each). No new local prompt (local prompts are frozen).
+- Memory: each talker remembers the other's line (`talked with Mo: "..."`); the teller remembers `told <players> a
+  campfire story: "..."` (imp 4, so the Gazette can report it), listeners `heard <teller>'s campfire story with ...`.

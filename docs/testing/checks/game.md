@@ -17,3 +17,5 @@ Run on `/` only when every other list is clear. Two or more players, deployed bu
 - [x] Every morning the town board has a Gazette: three headlines about what really happened in the village lately, the same for everyone in the room, and it says who wrote it (Muse Spark 1.3, or the villagers' notes when the cloud is off). (proof: ../proof/game/p5-live.md)
 - [x] A villager who sees your fight start calls out once when it ends, in their own voice, and remembers it. (proof: ../proof/game/p5-live.md)
 - [x] Looking inside a mind (I) says what answered its last line, in plain words. (proof: ../proof/game/p5-live.md)
+- [x] Two villagers who meet while you are near talk about real things from their day (what they did, sold, saw you do), and remember it. (proof: ../proof/game/p5-live.md)
+- [x] In the evening, sit by the campfire with villagers and one tells a story about something that really happened; the others react, and they remember telling it. With the cloud off, a simpler story still comes from their notes. (proof: ../proof/game/p5-live.md)
