@@ -62,7 +62,7 @@
 - **P5e done** (live worker ebecde8f, build `main-p-yOsRi0`, 2026-11-04 ~12:50 VN): Postcards. Muse Image 1.0 on the
   Meta Model API ($0.01 an image, checked on dev.meta.ai first) paints a keepsake of your pet and who was there after a
   win, a new friend or a campfire story, from real state (genes, watcher, storyteller); album on C / the Album chip.
-  $2/day cap. Proof `p5-live.md` e. **P5 complete. Next: P6 now** (user: no need to follow the timeline; Access goes right before submitting, P8).
+  $2/day cap. Proof `p5-live.md` e. **P5 complete. Next: the P4 visual leftovers, then P6** (user: no need to follow the timeline; Access goes right before submitting, P8).
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted
@@ -219,7 +219,7 @@ Spread across the services, each with a cap and a free fallback:
   price on dev.meta.ai docs; hard cap $2/day; skip if unavailable.
 - Brain panel names which service answered each line (bug 36 wording).
 
-## P6 Freeze (starts now: user, 2026-11-04 ~13:20 VN, "no need to follow the timeline")
+## P6 Freeze (starts once the P4 visual leftovers are done: user, 2026-11-04, "no need to follow the timeline")
 Ahead of time is good: the submission form has questions to fill in, and the demo and the video need preparing.
 Bug fixes only. First the flaky join check (HANDOFF). Then, before Access goes (see P8):
 - `/api/llm` is a general model proxy: any prompt, the provider picked by the client (kinds memo, teach, dialogue,

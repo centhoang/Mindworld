@@ -1,12 +1,12 @@
 # HANDOFF: Mindworld final plan (2026-11-04, ~13:10 VN = 06:10 UTC)
 
-**Starting prompt:** "Read HANDOFF.md, then do Next actions in order: the flaky join check, then P6 and the rest of the plan (no need to wait for the timeline). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then do Next actions in order: the flaky join check, the P4 visual leftovers, then P6 and the rest of the plan (no need to wait for the timeline). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
-  Status section at the top. Keep that Status current every session. **User, 2026-11-04 ~13:20 VN: continue P6 and
-  the rest now, no need to follow the timeline** (time ahead goes to the submission form's questions, the demo and the
-  video). Access stays until right before submitting (P8).
+  Status section at the top. Keep that Status current every session. **User, 2026-11-04 ~13:20 VN: go on now with the P4
+  visual leftovers, then P6 and the rest, no need to follow the timeline** (time ahead goes to the submission form's
+  questions, the demo and the video). Access stays until right before submitting (P8).
 - **P5 is complete.** Live worker ebecde8f, build `main-p-yOsRi0`. Local commits on `rework/fresh-look`, not pushed.
 - Tests: client 702, worker 242, tsc clean both. **Join check is flaky today:** four runs after the P5d/P5e
   deploys went 16, 20, 17, 19 of 20, each failing a different socket check (bots with no welcome, the spill room not
@@ -43,14 +43,17 @@
    the network. Rerun 3 times first (`node scripts/join-check.mjs`, test Chrome closed; ~2 min each, background it),
    read the failing rows in `.scratch/p5/join-check-p5{d,d-2,e,e-2}.txt`, then `worker/src/room-do.ts` and
    `scripts/join-check.mjs`. Fix, deploy, prove 20/20 three times in a row.
-2. **P6 now** (bug fixes only from here): before Access goes, lock down `/api/llm` (a general model proxy: any
+2. **P4 visual leftovers, before P6** (user, 2026-11-04): tree clumps toward the coast, stumps, berry bushes, and
+   the plaza's bare dirt (the pack's `statue.png` is exported but not loaded). Read `docs/visual/visual.md`, then
+   `layers.md`, before changing anything; everything in BuiltDemo is in the pack, so search the tileset and Room1
+   before calling art missing; Codex only for art the pack truly lacks (`docs/visual/style.md`). Reference sheet
+   `.scratch/p4/demo-all.png`. Deploy, join check, a live screenshot proof per item, tick `checks/visual.md`.
+3. **P6** (bug fixes only from here; starts right after step 2): before Access goes, lock down `/api/llm` (a general model proxy: any
    prompt, client-picked provider) and plan to lower `CLIENT_DAILY_USD` from "10" (~$2) after the user's play-test;
    details in `docs/plan/final-plan.md` P6. Then `scope-check` every scope on live, then the user's last play-test (2+
    players), then P7 (demo script, README, numbers; the submission form's questions) and P8 (order written there).
-3. **The mission** (`docs/game/mission.md`) is vision only, for the submission text and after the event: no new build
+4. **The mission** (`docs/game/mission.md`) is vision only, for the submission text and after the event: no new build
    before the deadline (user). It now also holds the original island world idea and the host spreading rule.
-4. P4 leftovers (tree clumps, stumps, berry bushes, the plaza's dirt) are out: P6 started early and is bug fixes only.
-   Only if the user asks.
 5. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
    villager walks up and challenges you.
 6. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
