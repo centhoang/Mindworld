@@ -44,6 +44,10 @@
   berry bushes, the plaza's bare dirt (pack `statue.png` exported, not loaded).
   **User play-test #1 done** (2026-11-04): bugs 53-60 in `docs/BUGS.md` (campfire pose and flames, house interior art, pet
   marks, shout keys, battle layout and one pixel size). **Next: fix 53-60**, then P5. The user plays once more, last.
+- **Play-test #1 bugs 53-60 fixed** (live worker c25d5953, build `main-Aj3mXOIh`, commits dcfbe7c, 413b5a2, 2026-11-04
+  ~10:50 VN): campfire pose and flame, the house room (Codex), pet marks (Codex, 90 files), the battle screen redone (one
+  pixel size via a half-size scene canvas, Codex backdrop/ground/pads, panels in a top bar, shout box). Proof
+  `docs/testing/proof/pet/playtest1-fixes-live.md`. **Next: P5.**
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

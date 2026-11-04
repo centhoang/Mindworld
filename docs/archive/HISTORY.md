@@ -172,3 +172,27 @@ docs/{TILE-RULES,NPC-PLAN,V3-PLAN,FINETUNE,EVENT,DEPLOY,DEMO,STYLE}.md · modal/
   (`npc.ts elect`, `room-flow.ts beat`); frame-throttled views step the world (`pixel/main.ts`); phone-size windows keep
   360 art columns (`pixel/low-size.ts`).
 - Proof: `docs/testing/proof/network/join-live.md`, `docs/testing/proof/game/activities.md` "P2 live watch".
+
+## 2026-11-04 session (P4, play-test #1), moved from HANDOFF
+- **Bug 46:** every plot, taken or not, has the same small house (`village-map.ts plotHouse`: foot px+2.5, pz+4; roof
+  colour by slot from `ROOFS`). Art: Codex drew `client/public/art/gen/home-small-roof.png` + `home-small-open.png`
+  (80x64, one outline, brief `.scratch/brief-home-small.md`, its checks `.scratch/home-small-result.md`);
+  `python scripts/art-home-small.py` recolours the roof from the tileset's matching house blocks (128 px apart) into
+  `art/sunny/home-small-<roof>.png`. Inside: `game/house.ts` floor plan (picture pixels), `interior.ts` draws the open
+  picture, fades my own roof (`InteriorHost.roof`), crate square east of the door lane (GX/GY), no placed furniture.
+- **Plots:** a 2x3 tilled field (`bedsAt` rect: px+6..7, pz+2..4; free plots draw tilled beds via `freeBeds`), a front
+  fence of pack rail tiles (tileset row 2 cols 38/39/42, decor kind `rail`, `plotFences`) with a 3-tile gate at the door,
+  the name sign just inside, east of the gate. West coast moved out one tile so west houses do not stand on the shore.
+- **Touch controls:** `pixel/touch.ts` (stick: walk, rim = run; E / X / T buttons send real key events), on coarse
+  pointers only; proven in the pane at 375x812. Not yet tried on a real phone.
+- Proof: `docs/testing/proof/visual/house-46-live.png`, `house-46-inside-live.png`. Checks added to `checks/visual.md`.
+- Still open from the BuiltDemo sheet (`.scratch/p4/demo-all.png`): tree clumps toward the coast, stumps, berry bushes,
+  the plaza's bare dirt (pack `statue.png` is exported, not loaded). Do after play-test #1 if time.
+
+## Play-test #1 (user, 2026-11-04, live worker 14537484)
+The user played and reported 8 problems, now bugs 53-60 in `docs/BUGS.md` (screenshots `.scratch/bugs/53-*` to `57-59-*`),
+each with a line in `docs/testing/checks/{npc,pet,visual}.md`. The chat log was read (8 lines, `.scratch/p4/chat-rows.txt`):
+one failure, bug 60. **The user will play once more, last, when everything is done** (that is P6's whole-game play-test).
+User's words on the battle screen: redesign the layout as Claude sees fit (Codex makes art only, never layout); one pixel
+size for everything, **the player's pixel size is the baseline**; rework the battle background and the pet art at that
+size, asking Codex specifically for the art.
