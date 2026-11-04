@@ -19,5 +19,5 @@ Each doc has one job, no size limit (user, 2026-11-03). Old detail lives in `arc
 | `network/network.md` | Sync, AOI, capacity |
 | `testing/testing.md` | Labs, checklists and the review loop |
 | `testing/checks/*.md` | One short checklist per scope |
-| `ops/` | Event rules, deploy, credits, demo script, drafts, Director mode, test tooling |
+| `ops/` | Event rules, deploy, credits, demo script, drafts, Director mode, test tooling; **submit-now.md** = the submission checklist |
 | `archive/` | Superseded plans and full history |

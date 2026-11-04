@@ -37,6 +37,13 @@
 - The video's opening line ("built Oct 27 - Nov 4 / already existed: open-source libraries, a licensed pixel-art pack
   (Sunnyside World), Meta's models"): the user confirms when watching the cut.
 
+## Session 2026-11-05 03:00 VN: SUBMIT NOW. Checklist: `docs/ops/submit-now.md` (user: no play-test)
+- P8 deployed with game-styled postcards (worker `13dd4574`, client `main-CpuGb6wS`, commit `25e81c8`): chatlog 404,
+  pets route gone; `/api/postcard` sends game frames (`worker/src/postcard-refs.ts`, made from `.scratch/video/pcref/`)
+  on the Responses API, text-only fallback; live card 30 s. Spend: 3 Muse Image calls (~$0.05).
+- Waiting on the user: OK to fast-forward `main` and push (GitHub is 246 commits behind); then repo + 4 HF public,
+  Access off ("Access is off" = Claude runs the outside join check), YouTube, X post (teaser `mindworld-x.mp4`), form.
+
 ## Session 2026-11-05 00:45 VN: demo cut v1 delivered (details `docs/ops/demo.md` "Cut v1 done")
 - `.scratch/video/mindworld-demo.mp4` 179.3 s, sent to the user with the preview and `mindworld.srt`. Waiting on the
   user's watch/listen. Stack closed (dev servers, test Chrome). Spend this session: 1 Muse Image call (~$0.01).
