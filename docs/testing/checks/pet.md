@@ -24,3 +24,7 @@ Lab: `/lab/pet`. It reads your save and never writes it. Proof so far: `proof/pe
 - [x] The light on a pet's head follows the round head: no square edges, on every build, front and back. [close-up](../proof/pet/heads-round.png)
 - [x] No small marks on a pet's body, front or back. Old pets that had spots still load and show plain. [unit tests](../../../client/src/game/genes.test.ts)
 - [x] On a new save the egg line stays readable through the hatch; the Brain line waits. [live](../proof/game/sunny-hatch-line.jpg)
+- [ ] Every pet part reads clearly at pet size, every build: no marks that look like tears or dirt (play-test #1, bug 56).
+- [ ] While I can shout, the screen shows which key 1-5 is which move (bug 57).
+- [ ] The battle screen is laid out so each panel clearly belongs to its pet without crowding it (bug 58).
+- [ ] Everything on the battle screen has one pixel size, the player's: background, trainers, both pets (bug 59).

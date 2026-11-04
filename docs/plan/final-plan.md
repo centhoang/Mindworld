@@ -41,7 +41,9 @@
   (`pixel/touch.ts`). Proof `docs/testing/proof/visual/house-46-live.png`, `house-46-inside-live.png`; join-check clean.
   BuiltDemo sheet: `.scratch/p4/demo-all.png`. Changed from the plan: houses stand on free plots too (the streets were empty
   grass); furniture placing inside is gone (the house comes furnished). Not done: tree clumps toward the coast, stumps,
-  berry bushes, the plaza's bare dirt (pack `statue.png` exported, not loaded). **Next: user play-test #1.**
+  berry bushes, the plaza's bare dirt (pack `statue.png` exported, not loaded).
+  **User play-test #1 done** (2026-11-04): bugs 53-60 in `docs/BUGS.md` (campfire pose and flames, house interior art, pet
+  marks, shout keys, battle layout and one pixel size). **Next: fix 53-60**, then P5. The user plays once more, last.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

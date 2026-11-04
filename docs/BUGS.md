@@ -3,7 +3,18 @@
 Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove when proven fixed. Fixed lines wait for the user's review.
 
 ## Visual
-(none open)
+Found in user play-test #1 (2026-11-04, live worker 14537484). The user plays once more at the end, when all is done.
+54. **Campfire flames sit off the stone ring** (up and left of it). `.scratch/bugs/53-54-campfire-fishing.png`.
+    Likely: `pixel/pixel-view.ts` ~208 draws `spr_deco_fire_01_strip4` at `cx + dx - 2`, a left edge, not centred on the ring.
+55. **Inside the small house: the table at the top right is cut off, and a dark window tile stands on the floor** between
+    the shelf and the table. `.scratch/bugs/55-interior-table-window.png`. Codex art (`client/public/art/gen/home-small-open.png`):
+    a rework brief (window on the back wall's inner face, every piece whole), then `python scripts/art-home-small.py`,
+    and check `game/house.ts` FLOORS/BUILT_IN still match.
+58. **Battle layout: each HP panel sits right against a pet**, which reads oddly. The user leaves the redesign to Claude
+    ("re-design the layout to your liking"; Codex only makes art, never layout). `.scratch/bugs/57-59-battle-layout-res.png`.
+59. **Battle pixel sizes do not match**: the background, the player, my pet and the foe are drawn at different pixel
+    scales. Keep one: **the player's pixel size is the baseline** (user). Rework the battle background and the pet art at
+    that scale; ask Codex specifically for the art (user). `.scratch/bugs/57-59-battle-layout-res.png`.
 
 ### Fixed, waiting for review
 46 (P4, deployed 2026-11-04, worker 3a555c50): every plot has the same small house (Codex art in pack style, roof recoloured into the pack's five colours by slot, `scripts/art-home-small.py`) with a small room inside; the old home wing is gone (`game/house.ts`, `interior.ts`, `village-map.ts plotHouse`). Seen in the dev pane; not yet on live by the user.
@@ -27,11 +38,19 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 - Fixed (found in P2): map rocks drew nothing yet blocked the way (their "rock-small" picture was never loaded); they use the pack's rock stamp now.
 
 ## NPC
+53. **Villagers "sitting by the campfire" are drawn fishing** (rod and line, no water near). The campfire pose `warm` in
+    `pixel/humans.ts` (line ~45) plays `waiting`, which is the pack's fishing-wait strip. `.scratch/bugs/53-54-campfire-fishing.png`.
+60. **"what you guys up to?" at the campfire, at night, got the rules line "Not much. Enjoying the day."** (chat log
+    09:36 VN): `mind/directions.ts doingAnswer` falls back when the label is missing, and says "day" at any hour.
 11. **Free talk is weak on the 1B.** Cloud free talk now fixes this during the event (`proof/npc/5a-transcript.md`). Local fallback alone is still weak.
 - Fixed, waiting for review: 42, 43 (per-client chat cap gone, day's USD cap stays; greetings and free talk answered by Muse Spark on live
   with the time and what the villager is doing; replay and the chat-log failures in `proof/npc/chatlog-2026-11-03.md`). 28 (hurt villagers stay cool in small talk until sorry, `proof/npc/5f-free-talk.md`). 29 (feed dropped, clean stays player-only). 24 (asking for goods is buying; "how much?" means that good, unit test only). 12 (memory cut off invitations, unit test only). 10. Conversation continues: yes, no, later and "where?" act on offers.
 
 ## Pet
+56. **Pet parts hard to read as pixel art**: two blue lines under the eyes look like tears (the blue ear dots and the blue
+    tail read fine). Re-check every pet part, every build, for anything unclear at pet size. `.scratch/bugs/56-pet-blue-lines.png`.
+57. **Battle: nothing says what keys 1-5 do** while a shout is open. Show the five moves next to their keys (or on the
+    command panel) whenever the player can shout. `.scratch/bugs/57-59-battle-layout-res.png`.
 - Fixed, waiting for review: 48 (a wild pet pressed into a wall or tree kept pushing at an unreachable target; now it re-picks a reachable one after 0.8 s, and one inside a wall goes home; 120 s sim: none still). 32 (head light is a crescent along the round head, `proof/pet/heads-round.png`, `proof/pet/head-live.png`). 33 (spots removed; old spots genes show plain).
 
 ## Network

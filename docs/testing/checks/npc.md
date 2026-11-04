@@ -44,5 +44,9 @@ From the chat log, 2026-11-02 play (proof: `proof/npc/chatlog-2026-11-03.md`):
 24. "I want to sell you a fish for 3 coins": it answers as a buyer, not "I have no fish to sell".
 25. Small talk ("nice day" at night) gets a person's answer, not a correction.
 26. Each chat line I type gets a Muse Spark answer on live (unless the sim knows the one true answer).
+27. "What are you up to?" gets what the villager is really doing, in words that fit the hour; never "enjoying the day" at
+    night (play-test #1, bug 60).
+28. A villager's drawing matches their status line: "sits by the campfire" shows someone sitting or warming their hands,
+    never a fishing rod (play-test #1, bug 53).
 
 Real play is logged to KV, `chat:` keys, development only. After each play-test, read it and add failures here.

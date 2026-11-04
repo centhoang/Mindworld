@@ -1,6 +1,6 @@
 # HANDOFF: Mindworld final plan (2026-11-04, ~03:00 VN)
 
-**Starting prompt:** "Read HANDOFF.md, then continue docs/plan/final-plan.md from its Status section (P4 mostly done; user play-test #1 next). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then fix the play-test #1 bugs (53-60 in docs/BUGS.md), then continue docs/plan/final-plan.md from its Status section. Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
@@ -26,15 +26,29 @@
 - Still open from the BuiltDemo sheet (`.scratch/p4/demo-all.png`): tree clumps toward the coast, stumps, berry bushes,
   the plaza's bare dirt (pack `statue.png` is exported, not loaded). Do after play-test #1 if time.
 
+## Play-test #1 (user, 2026-11-04, live worker 14537484)
+The user played and reported 8 problems, now bugs 53-60 in `docs/BUGS.md` (screenshots `.scratch/bugs/53-*` to `57-59-*`),
+each with a line in `docs/testing/checks/{npc,pet,visual}.md`. The chat log was read (8 lines, `.scratch/p4/chat-rows.txt`):
+one failure, bug 60. **The user will play once more, last, when everything is done** (that is P6's whole-game play-test).
+User's words on the battle screen: redesign the layout as Claude sees fit (Codex makes art only, never layout); one pixel
+size for everything, **the player's pixel size is the baseline**; rework the battle background and the pet art at that
+size, asking Codex specifically for the art.
+
 ## Next actions
-1. **User play-test #1** (asked at the end of the P4 session). After it: read the chat log unasked, add failures to
-   `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md` with screenshots in `.scratch/bugs/`, fix, deploy, join-check.
-2. Then P4 leftovers (tree clumps, decor, plaza) if time, then **P5** (liveliness + surprise, behind `CLOUD_LIVELY`).
-   Touch controls are in: say in the demo script that phones work.
-3. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
+1. **Bugs 53-60**, quick ones first: 53 (campfire pose `warm` plays the fishing `waiting` strip: use idle, maybe doing),
+   54 (centre the flames on the ring), 60 (`doingAnswer`: real label, words for the hour), 57 (keys 1-5 legend while a
+   shout is open), 56 (pet parts: remove or redraw the under-eye lines; review all parts at pet size), 55 (Codex rework
+   brief for `home-small-open.png`, then `scripts/art-home-small.py`, re-check `game/house.ts`), then 58 + 59 together:
+   measure the pixel scale of every battle layer first (background, trainers, pets: pets are drawn from genes, so the
+   fix is likely the pet part art plus the draw scale), decide the layout, then Codex briefs for the background and
+   pet parts at the player's pixel size. Deploy, `node scripts/join-check.mjs`, proof per bug.
+2. P4 leftovers if time (tree clumps toward the coast, stumps, berry bushes, the plaza's bare dirt, pack `statue.png`).
+3. **P5** (liveliness + surprise, behind `CLOUD_LIVELY`), then P6 freeze and the user's last play-test.
+4. Open pet checks to prove on live with the pane visible: villager pet looks the same in the village and on the battle
    screen; a bored villager walks up and challenges you. Optional P1 leftover: pack expression icons over pets.
-4. After any user play-test: read the chat log unasked, add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`.
-   If the user says "sleep", Director mode (`docs/ops/director.md`) with the plan as the queue.
+5. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
+   GHOSTS --prefix "chat:<ms prefix>" --remote`, then `kv key get` each; rows are `{t, npc, player, line, reply, source}`),
+   add failures to `docs/testing/checks/npc.md`, bugs to `docs/BUGS.md`. If the user says "sleep", Director mode.
 
 ## Open
 - User's call, asked and not yet answered: remove Access at the freeze (Nov 4 ~18:00 VN) instead of Nov 5 morning, so
