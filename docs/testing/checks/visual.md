@@ -24,11 +24,12 @@ Run on `/`, Sunnyside (decided). `/lab/visual` is still the mosaic. Live proof: 
 - [x] No land a tile wide, so no loose cliff piece on the coast. Unit test: `village-look.test.ts`.
 - [x] A farm is the pack's field: light dirt with an edge all round, one tilled mound per bed, each crop growing out of its mound at every stage; the field stays inside its plot and off the road's edge (bug 41). [live](../proof/visual/farm-41-live.png)
 - [x] Every generated art file is top-down, front side only, never at an angle. [audit](../proof/visual/gen-art-audit.md)
-- [ ] Every player has the same small house (only the roof colour differs), on every plot, whoever holds it; going in lifts
+- [x] [all plots](../proof/visual/plots-all-live.png) [inside](../proof/visual/house-inside-pet-live.png) Every player has the same small house (only the roof colour differs), on every plot, whoever holds it; going in lifts
   the roof in place and shows a small room (bed, shelf, table, stool, the crate by the door) you and your pet walk in (bug 46).
-  Unit tests: `house.test.ts`, `village-map.test.ts`. Dev pane only so far.
+  Unit tests: `house.test.ts`, `village-map.test.ts`. Live 2026-11-04: 12 plots, one house shape, five roof colours; inside: bed, shelf, table, window on the back wall, crate by the door, the pet walks in.
 - [x] [village](../proof/visual/p4-village-live.png) [north-west](../proof/visual/p4-clump-nw-live.png) [east](../proof/visual/p4-clump-east-live.png) Trees grow in clumps toward the coast, not one by one across the middle; stumps and berry bushes stand among them (P4).
 - [x] [square](../proof/visual/p4-square-live.png) The square has the pack's statue, and it is not one bare slab of dirt (P4).
-- [ ] Every plot has a tilled 2x3 field beside its house and a front fence of the pack's rails with a gate at the door. Dev pane only so far.
+- [x] [all plots](../proof/visual/plots-all-live.png) [one plot](../proof/visual/plot-gate-live.png) Every plot has a tilled 2x3 field beside its house and a front fence of the pack's rails with a gate at the door (the 3-tile gap, `visual.md`).
 - [x] [proof](../proof/visual/campfire-53-54-live.png) The campfire's flames burn inside its stone ring (bug 54).
 - [x] [proof](../proof/visual/house-55-inside-live.png) Inside the small house every piece of furniture is whole and the windows are on the walls, none on the floor (bug 55).
+- [x] [live](../proof/visual/table-63-live.png) The table in the small room has both side edges, outlined and rounded like its right side (bug 63).

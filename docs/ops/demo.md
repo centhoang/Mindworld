@@ -85,5 +85,9 @@ window A. Within ~15 s Mo is hosted by B and still remembers Kai.
 - [ ] **[USER]** Confirm the opening line and the motivation lines.
 - [ ] Every beat run once on live the same day (Claude, `scope-check`), so the takes are known to work.
 - [ ] A has the model loaded and hosts the villagers in the shot; B has none.
-- [ ] Re-check the numbers above against `ai/npc.md`, `ai/pet.md` and the inspector's labels on camera.
+- [x] Re-check the numbers above against `ai/npc.md`, `ai/pet.md` and the inspector's labels on camera (2026-11-04,
+  live): 97.0% / 300 cases (`ai/npc.md`, `ai/models.md`, README) and +29.0 pts (`ai/pet.md`, README) match. Labels on
+  screen, for the voice-over: inspector "Last line: thought on your computer (Llama 3.2 1B, tuned)" and "Runs on: this
+  computer, for all"; Teach "Memo updated by the Muse Spark (open weights)" (3-5 s); banter, cheer and stories say
+  "Muse Spark Open"; the Gazette says Muse Spark 1.3. Proof shot: `.scratch/chk7/inspector.png` (not kept).
 - [ ] After Access goes (P8): record or re-check the join from outside so the URL in the close works for a stranger.

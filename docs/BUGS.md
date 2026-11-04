@@ -5,6 +5,10 @@ Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove
 ## Visual
 Play-test #1 (2026-11-04) bugs 53-60 are all fixed on live (worker c25d5953), waiting for the user's last play-test.
 ### Fixed, waiting for review
+63 (user, 2026-11-04): **the room's table (top right) had no left edge**, so it looked cut off; it should look whole,
+like its right side. Fixed: the right edge (outline at x=74, rim at x=73, rounded corners) mirrored onto the left
+(x=56-57) in `art/gen/home-small-open.png` and its copy `art/sunny/home-small-open.png` (`.scratch/chk7/fix-table.py`).
+Shot before: `.scratch/bugs/63-table-left-edge-before.png`. Live (worker b10caae4): `proof/visual/table-63-live.png`.
 55 (play-test #1): Codex redrew the room (take 3 of 3; the first two layouts could not fit): window on the back wall, bed, shelf, the table whole, no stool; `game/house.ts` floor plan from its measured plan. Live: `proof/visual/house-55-inside-live.png`. All of 53-60: `proof/pet/playtest1-fixes-live.md`.
 54 (play-test #1): the campfire burns one pack `spr_deco_fire_02` flame footed in the ring's pit, where the pack's own Room1 puts it, not three small `fire_01` flames at its top left (`pixel-view.ts`). 58, 59 (play-test #1): the battle scene (Codex backdrop, ground and pads in `art/gen/battle/`, trainers, both pets at 32 px) is drawn on a half-size canvas and doubled, so it has one pixel size, the trainer's; both HP panels sit in a bar along the top, mine left, the foe's right, clear of both pets (`battle.ts battleLayout`, tested at 5 screen sizes); the text box shows the pet's head at the same pixel size. Panels and text stay at the game's UI size.
 46 (P4, deployed 2026-11-04, worker 3a555c50): every plot has the same small house (Codex art in pack style, roof recoloured into the pack's five colours by slot, `scripts/art-home-small.py`) with a small room inside; the old home wing is gone (`game/house.ts`, `interior.ts`, `village-map.ts plotHouse`). Seen in the dev pane; not yet on live by the user.
@@ -43,6 +47,10 @@ Play-test #1 (2026-11-04) bugs 53-60 are all fixed on live (worker c25d5953), wa
 - Fixed, waiting for review: 57 (play-test #1: while a shout is open the command box lists 1 GO! 2 GUARD! 3 RUN! 4 BE NICE! 5 FRIENDS! with the shouts left, the called one lit; a tap on one calls it, for phones; `battle.test.ts`). 56 (play-test #1: Codex redrew `stripes` as tabby stripes above the eyes and across the back, `nubs` as two clear nubs, `floppy` as ears hanging along the head; 90 files, every build, size and view). 48 (a wild pet pressed into a wall or tree kept pushing at an unreachable target; now it re-picks a reachable one after 0.8 s, and one inside a wall goes home; 120 s sim: none still). 32 (head light is a crescent along the round head, `proof/pet/heads-round.png`, `proof/pet/head-live.png`). 33 (spots removed; old spots genes show plain).
 
 ## Network
+64 (found by Claude, scope check 2026-11-04): **villagers stood still for everyone while their host was on the Teach screen**,
+and the day jumped when it closed (villagers who went to bed then slept on through noon). Bug 51 covered fights,
+indoors and background tabs; Teach was missed (`main.ts` stepped the village only outside Teach, and `away` did not
+count it). Fix: the village steps behind the Teach screen with no keys; a wild pet bumping into you waits. Proven on live (worker 48d95812): `proof/network/bug64-teach-live.md`.
 62 (found by Claude, join check 2026-11-04, 2 of 7 runs): **a late joiner sometimes misses who is talking.** The talk
    started (`talking` came back) but the late joiner's welcome had `talks: []`. Talks live only in the room's memory
    (`room.ts` `talks`, no storage) and end only on leave, a 45 s quiet timeout or a rebuild, so the likely cause is the

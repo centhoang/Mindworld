@@ -38,3 +38,4 @@ the bot part is one command, `node scripts/join-check.mjs` (run it after every d
 - [x] [proof](../proof/network/llm-lockdown-live.md) After the move to mindworld.uryto.dev: the new address is blocked from outside (Forbidden on mobile data) until P8, and the game
   from home.
 - [ ] After the game goes public: a phone on mobile data and a second machine join at the same time.
+- [x] [proof](../proof/network/bug64-teach-live.md) While a host is on the Teach screen, the villagers it hosts keep walking for everyone, and the day does not jump when it closes (bug 64).

@@ -85,7 +85,7 @@ not used."
 ## X post (Most Viral, field 5): draft for the user
 The form wants the post's link, so the user posts it after Access goes and before pressing Submit (engagement counts
 through Nov 8). Attach a 20-40 s clip: the birthday promise or the hand-over. **[USER]** posts; Claude never does.
-Check the event's required tags or hashtag first (not in `event.md`; `sync-event` can read #announcements).
+No tag, hashtag or handle is required (details page, #faqs and #announcements read 2026-11-04): post the demo on X, submit the link; likes, reposts and comments count until Nov 8 EOD. Tagging @AIatMeta is optional, the user's call.
 > I built Mindworld for the Meta Global AI Developer Hackathon: a free browser village where the villagers think for themselves,
 > on a Llama we fine-tuned, running in the players' own tabs. Invite Pip to your birthday and Pip skips work to come.
 > Don't show up, and the whole village hears about it. Play free, no install: mindworld.uryto.dev
@@ -93,3 +93,6 @@ Check the event's required tags or hashtag first (not in `event.md`; `sync-event
 ## Before submitting (P8 order is in `plan/final-plan.md`)
 - Links work from outside: game (`mindworld.uryto.dev`), repo public, HF repos public, video public or unlisted.
 - The video opens with what pre-existed vs what was built (rules).
+- Repo dates (checked 2026-11-04): first commit `202921d` Oct 26 12:14 ET, 14 min after the noon kickoff, only rules
+  and notes (CLAUDE.md, HANDOFF.md, event notes, .gitignore); the first code commit `586e96a` is Oct 27 11:47 ET, inside
+  the building period. Fine as is: nothing before kickoff, no code before Oct 27.

@@ -29,7 +29,7 @@ Stage 1 pass/fail: fits theme and reasonably uses Meta Model API and/or open wei
 
 ## Prizes
 - Indie Developer track: $150k / 100k / 75k / 50k / 25k. Startup track: $250k / 150k / 75k / 50k / 25k.
-- Bonus: Most Viral $20k (X post, engagement through Nov 8), Best Build on Meta Open Weight Models $10k (Glimmer or Spark Open on own hardware/partner inference; partner verifies), Community Vote $10k, Best Agentic Use-Case $5k, Best Creative Build $5k (Muse Image or Muse Wonder).
+- Bonus: Most Viral $20k (X post, engagement through Nov 8; no required tag or hashtag, checked 2026-11-04), Best Build on Meta Open Weight Models $10k (Glimmer or Spark Open on own hardware/partner inference; partner verifies), Community Vote $10k, Best Agentic Use-Case $5k, Best Creative Build $5k (Muse Image or Muse Wonder).
 
 ## Credits (user must claim; each person individually)
 - Meta Model API: $150, via CV claim form (ask in Discord #questions); needs a credit card; pre-auth charge is released later; set a Spend Limit notification, it doesn't auto-stop billing.

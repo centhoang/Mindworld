@@ -756,6 +756,11 @@ setInterval(() => {
 function update(dt: number, t: number): void {
   if (!pixelLook) world.chips = chips();
   if (teach.open) {
+    // The village lives on behind the Teach screen (bug 64): the villagers I host keep moving for everyone, and the
+    // day does not jump when I close it. No keys, and a wild pet bumping into me waits until I am back.
+    world.update(dt, new Set<string>());
+    live.tick(performance.now(), world.me);
+    shareState(performance.now());
     if (pixelLook) teach.draw(g, low.width, low.height, t);
     else {
       world.panels = [teach.panel(t)];
