@@ -35,6 +35,6 @@ the bot part is one command, `node scripts/join-check.mjs` (run it after every d
   everyone's list within about 90 s (the room's reaper), so the room never fills with ghosts (2026-11-04).
 - [x] [proof](../proof/network/llm-lockdown-live.md) The cloud model behind the game answers only the game's own four
   kinds of request; any other prompt is refused (2026-11-04).
-- [ ] After the move to mindworld.uryto.dev: the new address shows the Access login from outside until P8, and the game
+- [x] [proof](../proof/network/llm-lockdown-live.md) After the move to mindworld.uryto.dev: the new address is blocked from outside (Forbidden on mobile data) until P8, and the game
   from home.
 - [ ] After the game goes public: a phone on mobile data and a second machine join at the same time.

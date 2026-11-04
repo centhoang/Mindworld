@@ -34,7 +34,7 @@ mindworld.uryto.dev, the user's last play-test, then P7 leftovers and P8. Follow
 - Test bots never join `main`: use `check`.
 
 ## Pending decisions (user)
-- The user checks `https://mindworld.uryto.dev` on a phone on mobile data (Wi-Fi off): it must show the Access login.
+- Done: a phone on mobile data gets "Forbidden" at mindworld.uryto.dev (Access holds); home Wi-Fi opens it.
 - Submission form fields marked **[USER]** in `docs/ops/submission.md` (team name, opinions, consent box, X link, video link).
 
 ## Next actions

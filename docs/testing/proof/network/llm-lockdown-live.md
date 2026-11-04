@@ -41,4 +41,5 @@ Access app "pets" lists pets.uryto.dev and mindworld.uryto.dev (policy "Owner ho
 From home: `https://mindworld.uryto.dev/` 200 with `main-czFxq799`, `/api/spend` 200, pets.uryto.dev still 200.
 Join check on the new host from an empty room (probe 0): **16/19**. Misses: "who is talking" (welcome talks 0 though
 the talk started: bug 62), "100 held" (99 in 27 s, retries 9: the home link), "room empty" (2 left behind: Bot8, Big45;
-a probe 100 s later: 0). The phone check from outside (Access login) is the user's.
+a probe 100 s later: 0). **Outside check (user, 2026-11-04 ~21:40 VN): a phone on mobile data gets "Forbidden" (Access
+blocks it); the same phone on home Wi-Fi opens the game.**
