@@ -1,6 +1,6 @@
-# HANDOFF: Mindworld final plan (2026-11-04, ~12:55 VN = 05:55 UTC)
+# HANDOFF: Mindworld final plan (2026-11-04, ~13:10 VN = 06:10 UTC)
 
-**Starting prompt:** "Read HANDOFF.md, then start P6 from docs/plan/final-plan.md (Next actions 1). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then do Next actions 1 and 2 (the flaky join check, then the goal check in docs/game/mission.md). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
@@ -30,22 +30,34 @@
   per kind per game day; $2/day cap, quota `postcard`. Live: campfire and win cards (`postcard-*-live.png`). Fixed
   live: a refused call (per-minute limit) used up the day's slot; now a retry after 20 s and the slot comes back.
 - Checks: three new ticked lines in `checks/game.md`; `docs/ops/demo.md` lists both new Meta model uses.
+- **The mission** (user's words) and the comparison with Atelico's three posts: `docs/game/mission.md` (pointer in
+  `CLAUDE.md`). Stand-outs: the browser, one shared world with AOI, inference shared across players, hosting hands on,
+  any hardware plays, local first with a capped cloud. Atelico is ahead on agents per machine and as a toolkit.
 
 ## Next actions
-1. **P6 freeze 18:00 VN** (it is ~13:00 VN now: P6 may start early, bug fixes only from then on). First look into
-   the flaky join check (above): rerun 3 times; if failures keep moving, check the room DO's welcome path under a
-   20-socket burst and the kick relay before blaming the network. Then ask the user:
-   remove Access at the freeze instead of Nov 5 morning (Open, below). Then `scope-check` every scope on live, then
-   the user's last play-test (2+ players).
-2. P4 leftovers only if time before the freeze: tree clumps toward the coast, stumps, berry bushes, the plaza's bare
+1. **The flaky join check** (user's pick for next session). Four runs after the P5d/P5e deploys: 16, 20, 17, 19 of 20,
+   each failing a different socket check: bots with no welcome (one waited 11.5 s), the spill room not opening, two
+   bots ending a kick burst on different kicks. Before today it was 20/20 twice. P5 adds no room code, so suspect
+   load or timing in the room DO (welcome path under a 20-socket burst, kick relay) or the script's own timing before
+   the network. Rerun 3 times first (`node scripts/join-check.mjs`, test Chrome closed; ~2 min each, background it),
+   read the failing rows in `.scratch/p5/join-check-p5{d,d-2,e,e-2}.txt`, then `worker/src/room-do.ts` and
+   `scripts/join-check.mjs`. Fix, deploy, prove 20/20 three times in a row.
+2. **Goal check** (user's pick): `docs/game/mission.md` holds the user's mission in their words, a table of what is
+   built, partly built and not yet built, and the comparison with Atelico. Talk it through with the user; the main gap
+   is the local-server tier (a tab offering a local `llama-server` with a bigger GGUF as host power; the room's
+   tokens/s ranking, hand-over and memory relay already exist). Whether to build any of it before the deadline is the
+   user's call (scope: ask first; the freeze is 18:00 VN).
+3. **P6 freeze 18:00 VN**: bug fixes only from then. Ask the user first: remove Access at the freeze instead of Nov 5
+   morning (Open, below). Then `scope-check` every scope on live, then the user's last play-test (2+ players).
+4. P4 leftovers only if time before the freeze: tree clumps toward the coast, stumps, berry bushes, the plaza's bare
    dirt (pack `statue.png`).
-3. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
+5. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
    villager walks up and challenges you.
-4. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
+6. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
    GHOSTS --prefix "chat:<ms prefix>" --remote`, then `kv key get` each; rows are `{t, npc, player, line, reply, source}`;
    campfire story lines log with `line: "(campfire story)"`), add failures to `docs/testing/checks/npc.md`, bugs to
    `docs/BUGS.md`. If the user says "sleep", Director mode.
-5. P7 demo script: show a campfire story and its postcard, and a win card (both need a player near a villager).
+7. P7 demo script: lead with `mission.md` points 1-5; show a campfire story and its postcard, and a win card.
 
 ## Open
 - Gazette weak spot: plain `remember()` notes live only in the host's tab, so a reload or host hand-over mid-day

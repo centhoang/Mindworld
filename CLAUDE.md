@@ -1,6 +1,7 @@
 # Meta Global AI Developer Hackathon: project rules
 
 Goal: win as much prize money as possible. Solo Indie Developer entry (user decides, Claude builds).
+Mission (user, 2026-11-04): a free browser village where players share local AI power, hosting hands on, and local servers add bigger models. Words, goal check, Atelico comparison: `docs/game/mission.md`.
 Deadline: **Nov 4, 9 PM ET** (CV platform). Event facts: `docs/ops/event.md`. Live state: `HANDOFF.md`. Doc index: `docs/README.md`.
 
 ## Session start

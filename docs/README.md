@@ -8,6 +8,7 @@ Each doc has one job, no size limit (user, 2026-11-03). Old detail lives in `arc
 | `plan/final-input.md` | The user's input for the final plan (2026-11-03): demo target and specific asks |
 | `RESTRUCTURE.md` | The plan for this rework: scopes, order, open decisions |
 | `BUGS.md` | Open bugs, by scope |
+| `game/mission.md` | The mission (user's words), what of it is built, how we differ from Atelico |
 | `game/design.md` | What the game is: pitch, loop, systems, what is in or out |
 | `game/implementation.md` | How the game is built: modules, data, rules. No visuals |
 | `ai/npc.md` | Villager minds and chat |
