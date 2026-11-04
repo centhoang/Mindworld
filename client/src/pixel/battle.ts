@@ -4,7 +4,7 @@
 
 import { CHARGE_MAX } from "../sim/battle";
 import { ACTIONS, type Action, type EnemyAct, type Outcome, type TurnFx } from "../sim/types";
-import { drawProp, PAL, TREE } from "./art";
+import { PAL } from "./art";
 import { drawDialogue, drawFrame, drawText, GLYPH } from "./text";
 import { MENU_H, MENU_W as CELL_MENU_W } from "../view/mosaic/battle";
 import { wrap } from "../view/glyph/atlas";
@@ -55,8 +55,7 @@ interface Step {
 const ease = (p: number) => 1 - (1 - p) ** 2;
 const TRAINER_FRAME = 0.1; // seconds per strip frame
 const GLINT_SECONDS = 0.7;
-const GLINT_SPOTS: readonly [number, number][] = [[-18, -14], [16, -6], [-6, 14]]; // around the pet's middle
-const TRAINER_SCALE = 2; // a trainer stands about half its pet's height
+const GLINT_SPOTS: readonly [number, number][] = [[-9, -7], [8, -3], [-3, 7]]; // around the pet's middle, scene pixels
 
 // What a trainer is doing: a strip played once (then idle again), or looped.
 interface TrainerPose { action: HumanAction; t: number; loop: boolean }
@@ -353,7 +352,7 @@ export class BattleView {
     const tr = this.trainers[side];
     const n = HUMAN_ACTIONS[tr.action];
     const f = Math.floor(tr.t / TRAINER_FRAME);
-    humanSprites.drawAction(g, look, tr.action, tr.loop ? f % n : Math.min(n - 1, f), x, y, flip, TRAINER_SCALE);
+    humanSprites.drawAction(g, look, tr.action, tr.loop ? f % n : Math.min(n - 1, f), x, y, flip);
   }
 
   // Click / key: finish the current text line at once (and skip its hold).
@@ -409,76 +408,32 @@ export class BattleView {
   }
 
   draw(g: CanvasRenderingContext2D, sw: number, sh: number, t: number): void {
-    const sx = Math.round((Math.random() - 0.5) * 2 * this.shake);
-    const sy = Math.round((Math.random() - 0.5) * 2 * this.shake);
+    const L = battleLayout(sw, sh);
+    // The whole scene on a half-size canvas, then doubled: one pixel size for everything in it (bug 59).
+    const h = sceneCanvas(L.hw, L.hh);
+    if (h) this.drawScene(h, L, t);
+    const sx = SCENE * Math.round((Math.random() - 0.5) * this.shake);
+    const sy = SCENE * Math.round((Math.random() - 0.5) * this.shake);
     g.save();
-    g.translate(sx, sy);
-    // Pale sky, soft hill bands and a meadow floor (STYLE.md battle mockup).
-    const horizon = 48;
-    g.fillStyle = PAL.foam;
-    g.fillRect(-4, -4, sw + 8, sh + 8);
-    hills(g, sw, horizon, PAL.grassL, 0, 10);
-    drawProp(g, TREE, 8, horizon + 22);
-    drawProp(g, TREE, sw - 8, horizon + 18);
-    hills(g, sw, horizon + 16, PAL.grassM, 1.7, 6);
-    hills(g, sw, horizon + 36, PAL.grass, 3.1, 4);
-    g.fillStyle = PAL.panel;
-    for (let i = 0; i < 6; i++) g.fillRect(((i * 97 + 40) % (sw - 40)) + 20, horizon + 60 + ((i * 41) % 50), 1, 1);
-
-    const foeBase = { x: Math.round(sw * 0.7), y: 100 };
-    const myBase = { x: Math.round(sw * 0.27), y: 146 };
-    platform(g, foeBase.x, foeBase.y, 48, 9);
-    platform(g, myBase.x, myBase.y, 56, 10);
-
-    const slide = 1 - this.intro;
-    // Trainers first, so their pets stand in front of them.
-    if (this.foe?.trainer) this.trainer(g, "foe", this.foe.trainer, foeBase.x + 44 + Math.round(slide * sw * 0.5), foeBase.y - 4, true);
-    if (this.mine?.trainer) this.trainer(g, "me", this.mine.trainer, myBase.x - 40 - Math.round(slide * sw * 0.5), myBase.y + 2, false);
-    if (this.foe) {
-      const s = this.foe.sprite;
-      const bob = Math.round(Math.sin(t * 3) * 1);
-      const x = foeBase.x - s.width / 2 + Math.round(slide * sw * 0.5) + Math.round(this.foeDx);
-      const y = foeBase.y - s.height + 4 + bob + Math.round(this.foeGone * 24);
-      sprite(g, s, x, y, this.foeFlash, this.foeGone);
-      if (this.foeShield) shield(g, x + s.width / 2, y + s.height / 2, s.width * 0.55);
-      hpBox(g, 16, 14, 132, this.foe, this.foeHpShown, false);
-    }
-    if (this.mine) {
-      const s = this.mine.sprite;
-      const bob = Math.round(Math.sin(t * 3 + 1) * 1);
-      const x = myBase.x - s.width / 2 - Math.round(slide * sw * 0.5) + Math.round(this.myDx);
-      const y = myBase.y - s.height + 6 + bob + Math.round(this.myGone * 20);
-      sprite(g, s, x, y, this.myFlash, this.myGone);
-      if (this.myShield) shield(g, x + s.width / 2, y + s.height / 2, s.width * 0.6);
-      if (this.hearts > 0) hearts(g, x + s.width / 2, y, this.hearts);
-      hpBox(g, sw - 154, 108, 146, this.mine, this.myHpShown, true);
-      chargePips(g, sw - 146, 136, this.charge);
-    }
-    // Three pack glints pop in turn around the pet, at 2x.
-    for (const s of this.glints) {
-      const base = s.side === "foe" ? foeBase : myBase;
-      const h = s.side === "foe" ? (this.foe?.sprite.height ?? 64) : (this.mine?.sprite.height ?? 48);
-      GLINT_SPOTS.forEach(([dx, dy], i) => {
-        const f = Math.floor((s.t - i * 0.12) / 0.06);
-        if (f < 0 || f >= 6) return;
-        g.save();
-        g.translate(base.x + dx - 7, base.y - h / 2 + dy - 7);
-        g.scale(2, 2);
-        strip(g, "spr_deco_glint_01_strip6", 0, 0, f);
-        g.restore();
-      });
-    }
+    g.imageSmoothingEnabled = false;
+    if (h) g.drawImage(h.canvas, sx, sy, L.hw * SCENE, L.hh * SCENE);
     for (const p of this.pops) {
-      const base = p.side === "foe" ? foeBase : myBase;
+      const base = p.side === "foe" ? L.foe : L.mine;
       const w = p.text.length * GLYPH;
-      drawText(g, p.text, base.x - Math.round(w / 2), base.y - 56 - Math.round(p.t * 18), p.ink);
+      drawText(g, p.text, base.x * SCENE - Math.round(w / 2) + sx, (base.y - 32) * SCENE - Math.round(p.t * 18) + sy, p.ink);
     }
     g.restore();
-    const face = this.mine?.portrait;
+    // The panels: a bar along the top, mine on my side (left), the foe's on its side (right), clear of both pets (bug 58).
+    if (this.mine) {
+      hpBox(g, L.myPanel.x, L.myPanel.y, L.myPanel.w, this.mine, this.myHpShown, true);
+      chargePips(g, L.myPanel.x + 8, L.myPanel.y + 28, this.charge);
+    }
+    if (this.foe) hpBox(g, L.foePanel.x, L.foePanel.y, L.foePanel.w, this.foe, this.foeHpShown, false);
+    const face = this.mine?.portrait ? headOf(this.mine.portrait) : undefined;
+    const mx = sw - MENU_W - 8;
+    const my = sh - 56;
     if (this.cmd) {
       drawDialogue(g, sw, sh, this.text, undefined, this.cmd.face ? face : undefined, sw - 16 - MENU_W - 8);
-      const mx = sw - MENU_W - 8;
-      const my = sh - 56;
       drawFrame(g, mx, my, MENU_W, 48);
       this.cmd.labels.forEach((label, i) => {
         const cx = mx + 10 + (i % 2) * 66;
@@ -490,6 +445,19 @@ export class BattleView {
         }
         drawText(g, label.toUpperCase(), cx + 5, cy);
       });
+    } else if (this.shoutsLeft > 0) {
+      // While a shout is open, the command box shows what keys 1-5 call (bug 57); a tap on one calls it too.
+      drawDialogue(g, sw, sh, this.text.slice(0, this.typed), undefined, face, sw - 16 - MENU_W - 8);
+      drawFrame(g, mx, my, MENU_W, 48);
+      drawText(g, `SHOUTS: ${this.shoutsLeft}`, mx + 8, my + 8, PAL.wood);
+      ACTIONS.forEach((a, i) => {
+        const [cx, cy] = shoutCell(mx, my, i);
+        if (this.shoutNext === a) {
+          g.fillStyle = PAL.grassM;
+          g.fillRect(cx - 3, cy - 2, 64, 11);
+        }
+        drawText(g, `${i + 1} ${SHOUT_KEY[a]}`, cx, cy);
+      });
     } else if (this.text) {
       drawDialogue(g, sw, sh, this.text.slice(0, this.typed), undefined, face);
       if (this.tag && this.typed >= this.text.length) {
@@ -499,6 +467,163 @@ export class BattleView {
       }
     }
   }
+
+  // A tap on the shout box (phones have no 1-5 keys): true when it hit the box.
+  shoutAt(x: number, y: number, sw: number, sh: number): boolean {
+    if (this.cmd || this.shoutsLeft <= 0) return false;
+    const mx = sw - MENU_W - 8;
+    const my = sh - 56;
+    if (x < mx || y < my || x > mx + MENU_W || y > my + 48) return false;
+    const i = ACTIONS.findIndex((_, k) => {
+      const [cx, cy] = shoutCell(mx, my, k);
+      return x >= cx - 4 && x < cx + 64 && y >= cy - 4 && y < cy + 10;
+    });
+    if (i >= 0) this.shoutKey(String(i + 1));
+    return true;
+  }
+
+  // Background, pads, trainers and pets, in scene pixels (one art pixel each).
+  private drawScene(h: CanvasRenderingContext2D, L: BattleLayout, t: number): void {
+    h.imageSmoothingEnabled = false;
+    const back = battleArt("backdrop"), ground = battleArt("ground");
+    if (back && ground) {
+      const top = L.horizon - back.height;
+      if (top > 0) for (let x = 0; x < L.hw; x += back.width) h.drawImage(back, 0, 0, back.width, 1, x, 0, back.width, top); // the sky's own colour
+      for (let x = 0; x < L.hw; x += back.width) h.drawImage(back, x, top);
+      for (let y = L.horizon; y < L.hh; y += ground.height) for (let x = 0; x < L.hw; x += ground.width) h.drawImage(ground, x, y);
+    } else {
+      h.fillStyle = PAL.foam;
+      h.fillRect(0, 0, L.hw, L.hh);
+      hills(h, L.hw, L.horizon - 8, PAL.grassL, 0, 5);
+      hills(h, L.hw, L.horizon, PAL.grassM, 1.7, 3);
+      hills(h, L.hw, L.horizon + 10, PAL.grass, 3.1, 2);
+    }
+    const slide = 1 - this.intro;
+    const foeX = L.foe.x + Math.round(slide * L.hw * 0.5), myX = L.mine.x - Math.round(slide * L.hw * 0.5);
+    pad(h, "pad-far", L.foe.x, L.foe.y, 24, 5);
+    pad(h, "pad-near", L.mine.x, L.mine.y, 30, 6);
+    // Trainers first, so their pets stand in front of them.
+    if (this.foe?.trainer) this.trainer(h, "foe", this.foe.trainer, foeX + 24, L.foe.y - 1, true);
+    if (this.mine?.trainer) this.trainer(h, "me", this.mine.trainer, myX - 24, L.mine.y + 1, false);
+    if (this.foe) {
+      const s = this.foe.sprite;
+      const bob = Math.round(Math.sin(t * 3) * 0.6);
+      const x = foeX - Math.round(s.width / 2) + Math.round(this.foeDx / SCENE);
+      const y = L.foe.y - s.height + 2 + bob + Math.round(this.foeGone * 12);
+      sprite(h, s, x, y, this.foeFlash, this.foeGone);
+      if (this.foeShield) shield(h, x + s.width / 2, y + s.height / 2 + 2, s.width * 0.5);
+    }
+    if (this.mine) {
+      const s = this.mine.sprite;
+      const bob = Math.round(Math.sin(t * 3 + 1) * 0.6);
+      const x = myX - Math.round(s.width / 2) + Math.round(this.myDx / SCENE);
+      const y = L.mine.y - s.height + 2 + bob + Math.round(this.myGone * 10);
+      sprite(h, s, x, y, this.myFlash, this.myGone);
+      if (this.myShield) shield(h, x + s.width / 2, y + s.height / 2 + 2, s.width * 0.55);
+      if (this.hearts > 0) hearts(h, x + s.width / 2, y + 6, this.hearts);
+    }
+    // Three pack glints pop in turn around the pet.
+    for (const s of this.glints) {
+      const base = s.side === "foe" ? L.foe : L.mine;
+      const ph = (s.side === "foe" ? this.foe?.sprite.height : this.mine?.sprite.height) ?? 32;
+      GLINT_SPOTS.forEach(([dx, dy], i) => {
+        const f = Math.floor((s.t - i * 0.12) / 0.06);
+        if (f < 0 || f >= 6) return;
+        strip(h, "spr_deco_glint_01_strip6", base.x + dx - 3, base.y - Math.round(ph / 2) + dy - 3, f);
+      });
+    }
+  }
+}
+
+// Scene pixels per screen pixel: the trainers' pixel, which the pets and the background share (bug 59).
+const SCENE = 2;
+// The top bar's panels, in screen pixels.
+const PANEL_Y = 4;
+const MY_PANEL_W = 146;
+const FOE_PANEL_W = 132;
+const MY_PANEL_H = 40;
+
+export interface BattleLayout {
+  hw: number; // the scene canvas, in scene pixels
+  hh: number;
+  horizon: number;
+  foe: { x: number; y: number }; // where each pet's feet stand (scene pixels)
+  mine: { x: number; y: number };
+  myPanel: { x: number; y: number; w: number; h: number }; // screen pixels
+  foePanel: { x: number; y: number; w: number; h: number };
+}
+
+// Where everything goes on a screen sw x sh (low-res pixels). Pure, so the layout is tested without a canvas.
+export function battleLayout(sw: number, sh: number): BattleLayout {
+  const hw = Math.ceil(sw / SCENE), hh = Math.ceil(sh / SCENE);
+  const top = Math.ceil((PANEL_Y + MY_PANEL_H) / SCENE); // below the panels
+  const bottom = Math.floor((sh - 56) / SCENE); // the text box's top
+  const mine = { x: Math.round(hw * 0.3), y: bottom - 4 };
+  // The foe stands a little further back; on a tall screen no further than 36 scene pixels behind my pet.
+  const foe = { x: Math.round(hw * 0.7), y: Math.max(Math.round(top + (mine.y - top) * 0.55), mine.y - 36) };
+  return {
+    hw, hh, horizon: foe.y - 18, foe, mine,
+    myPanel: { x: 8, y: PANEL_Y, w: MY_PANEL_W, h: MY_PANEL_H },
+    foePanel: { x: sw - 8 - FOE_PANEL_W, y: PANEL_Y, w: FOE_PANEL_W, h: 32 },
+  };
+}
+
+// The shout box's five cells after its title: two columns, the title in the first cell.
+const shoutCell = (mx: number, my: number, i: number): [number, number] => [mx + 8 + ((i + 1) % 2) * 68, my + 8 + Math.floor((i + 1) / 2) * 12];
+const SHOUT_KEY: Record<Action, string> = { attack: "GO!", guard: "GUARD!", flee: "RUN!", emote: "BE NICE!", befriend: "FRIENDS!" };
+
+let scene: CanvasRenderingContext2D | null = null;
+function sceneCanvas(w: number, h: number): CanvasRenderingContext2D | null {
+  if (typeof document === "undefined") return null;
+  if (!scene) scene = document.createElement("canvas").getContext("2d");
+  if (!scene) return null;
+  if (scene.canvas.width !== w || scene.canvas.height !== h) {
+    scene.canvas.width = w;
+    scene.canvas.height = h;
+  }
+  scene.clearRect(0, 0, w, h);
+  return scene;
+}
+
+// The battle art (Codex, P4 bug 59): backdrop, ground and the two pads, in public/art/gen/battle/.
+const battleImages = new Map<string, HTMLImageElement>();
+function battleArt(name: string): HTMLImageElement | null {
+  if (typeof Image === "undefined") return null;
+  let i = battleImages.get(name);
+  if (!i) {
+    const img = (i = new Image());
+    img.onerror = () => setTimeout(() => battleImages.get(name) === img && battleImages.delete(name), 2000); // asked for again later
+    img.src = `/art/gen/battle/${name}.png`;
+    battleImages.set(name, img);
+  }
+  return i.complete && i.naturalWidth ? i : null;
+}
+
+function pad(h: CanvasRenderingContext2D, name: string, cx: number, cy: number, rx: number, ry: number): void {
+  const i = battleArt(name);
+  if (i) h.drawImage(i, cx - Math.floor(i.width / 2), cy - Math.floor(i.height / 2));
+  else platform(h, cx, cy, rx, ry);
+}
+
+// The portrait in the text box: the pet's head, 16 x 16 of its 32 px front art, shown doubled like the scene.
+let head: CanvasRenderingContext2D | null = null;
+function headOf(p: HTMLCanvasElement): HTMLCanvasElement | undefined {
+  if (!head) head = document.createElement("canvas").getContext("2d");
+  const pg = p.getContext("2d", { willReadFrequently: true });
+  if (!head || !pg) return undefined;
+  head.canvas.width = head.canvas.height = 16;
+  const { data } = pg.getImageData(0, 0, p.width, p.height);
+  let top = -1, x0 = p.width, x1 = 0;
+  for (let y = 0; y < p.height; y++) for (let x = 0; x < p.width; x++) if (data[(y * p.width + x) * 4 + 3]) {
+    if (top < 0) top = y;
+    x0 = Math.min(x0, x);
+    x1 = Math.max(x1, x);
+  }
+  if (top < 0) return undefined;
+  const sx = Math.max(0, Math.min(p.width - 16, Math.round((x0 + x1) / 2) - 8)), sy = Math.max(0, Math.min(p.height - 16, top + 2));
+  head.clearRect(0, 0, 16, 16);
+  head.drawImage(p, sx, sy, 16, 16, 0, 0, 16, 16);
+  return head.canvas;
 }
 
 // The signature charge under my HP: one pip per blocked hit, all lit = the next attack is the signature move.
@@ -513,9 +638,9 @@ function chargePips(g: CanvasRenderingContext2D, x: number, y: number, charge: n
 // A soft rolling band: a sine outline filled to the bottom of the screen.
 function hills(g: CanvasRenderingContext2D, sw: number, y0: number, col: string, phase: number, amp: number): void {
   g.fillStyle = col;
-  for (let x = -4; x < sw + 4; x += 2) {
-    const y = Math.round(y0 - amp * (0.5 + 0.5 * Math.sin(x / 37 + phase)) - 2 * Math.sin(x / 13 + phase * 2));
-    g.fillRect(x, y, 2, 300);
+  for (let x = -2; x < sw + 2; x++) {
+    const y = Math.round(y0 - amp * (0.5 + 0.5 * Math.sin(x / 18 + phase)) - Math.sin(x / 6.5 + phase * 2));
+    g.fillRect(x, y, 1, 300);
   }
 }
 
@@ -555,17 +680,18 @@ function shield(g: CanvasRenderingContext2D, cx: number, cy: number, r: number):
   for (let a = 0; a < 24; a++) {
     if (a % 3 === 2) continue;
     const ang = (a / 24) * Math.PI * 2;
-    g.fillRect(Math.round(cx + Math.cos(ang) * r), Math.round(cy + Math.sin(ang) * r * 0.9), 2, 2);
+    g.fillRect(Math.round(cx + Math.cos(ang) * r), Math.round(cy + Math.sin(ang) * r * 0.9), 1, 1);
   }
 }
 
 function hearts(g: CanvasRenderingContext2D, cx: number, top: number, p: number): void {
+  // In scene pixels: a 5 x 4 heart.
   const heart = (x: number, y: number) => {
     g.fillStyle = PAL.flowerP;
-    g.fillRect(x - 3, y - 2, 2, 2); g.fillRect(x + 1, y - 2, 2, 2);
-    g.fillRect(x - 3, y, 6, 2); g.fillRect(x - 2, y + 2, 4, 1); g.fillRect(x - 1, y + 3, 2, 1);
+    g.fillRect(x - 2, y, 2, 1); g.fillRect(x + 1, y, 2, 1);
+    g.fillRect(x - 2, y + 1, 5, 1); g.fillRect(x - 1, y + 2, 3, 1); g.fillRect(x, y + 3, 1, 1);
   };
-  for (let i = 0; i < 3; i++) heart(Math.round(cx + (i - 1) * 12), Math.round(top - 4 - p * 16 - i * 3));
+  for (let i = 0; i < 3; i++) heart(Math.round(cx + (i - 1) * 6), Math.round(top - 2 - p * 8 - i * 2));
 }
 
 // Name + level on one row, then HP: a 3 px bar plus the number (STYLE.md: never color alone).

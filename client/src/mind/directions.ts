@@ -1,6 +1,8 @@
 // "Where is the pond?" has one true answer, so the sim gives it from the real map. The model cannot know the map,
 // and a wrong direction hurts more than a plain line. "Where is it?" follows the place the talk was last about.
 
+import type { Phase } from "../life/clock";
+
 export interface Place {
   name: string; // "the pond", "Mo"
   words: readonly string[]; // lower case, as a player would type them
@@ -65,10 +67,16 @@ export function farAnswer(line: string, way: string): string {
   return `${steps < 15 ? "No, it is close" : steps < 40 ? "Not too far" : "Yes, quite a walk"}, about ${steps} steps.`;
 }
 
-export function doingAnswer(line: string, label: string | null | undefined, walking: boolean): string | null {
+// The words for the hour (bug 60: "Enjoying the day" came at night).
+const WHEN: Record<Phase, string> = { morning: "this morning", noon: "today", evening: "this evening", night: "tonight" };
+const ASKS_GROUP = /\b(?:you guys|you all|y'?all|you two|you lot|everyone|everybody)\b/i;
+
+// What this villager is doing, from the sim; "we" when asked as a group and others share the activity.
+export function doingAnswer(line: string, label: string | null | undefined, walking: boolean, phase: Phase = "noon", mates = 0): string | null {
   if (!ASKS_DOING.test(line)) return null;
-  if (!label) return "Not much. Enjoying the day.";
-  return walking ? `Off to ${firstPerson(label)}.` : `Right now? I ${firstPerson(label)}.`;
+  if (!label) return walking ? `Just out for a walk ${WHEN[phase]}.` : `Not much. Just taking it easy ${WHEN[phase]}.`;
+  if (walking) return `Off to ${firstPerson(label)}.`;
+  return mates > 0 && ASKS_GROUP.test(line) ? `Right now? We ${firstPerson(label)}.` : `Right now? I ${firstPerson(label)}.`;
 }
 
 // What the talk itself already holds: the time, who is speaking, what was just said.

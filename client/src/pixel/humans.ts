@@ -42,7 +42,7 @@ const WORK: Partial<Record<Pose, readonly (readonly [Action, number])[]>> = {
   carry: [["doing", 2]], // unloading at the stall
   hammer: [["hamering", 1], ["idle", 1]],
   mine: [["mining", 2], ["idle", 1]],
-  warm: [["idle", 3], ["waiting", 1]], // hands to the fire
+  warm: [["idle", 3], ["doing", 1]], // stands by the fire, now and then tends it (never the fishing strips: bug 53)
   feed: [["doing", 2], ["idle", 1]],
   swim: [["swimming", 1]],
 };

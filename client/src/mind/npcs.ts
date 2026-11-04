@@ -431,7 +431,8 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
     const spot = this.meeting.get(npc);
     const place = askedPlace(line, [...(this.hub.placesOf?.() ?? []), ...(spot ? [spot] : [])], this.topics.get(npc) ?? null);
     if (place) return farAnswer(line, directions(a.pos, place, personaOf(npc)?.name));
-    return whoAnswer(line, VILLAGERS.map((p) => ({ name: p.name, title: p.job?.title })), personaOf(npc)?.name ?? "") ?? doingAnswer(line, a.act && a.act !== "wander" ? ACTIVITY.get(a.act)?.label : null, a.state === "walk");
+    return whoAnswer(line, VILLAGERS.map((p) => ({ name: p.name, title: p.job?.title })), personaOf(npc)?.name ?? "") ?? doingAnswer(line, a.act && a.act !== "wander" ? ACTIVITY.get(a.act)?.label : null, a.state === "walk", gameTime(this.v.t).phase,
+      a.gather !== null ? this.v.agents.filter((o) => o !== a && o.gather === a.gather && o.state === "do").length : 0);
   }
 
   // A player is talking to this NPC: between activities it waits instead of leaving, on the way it stops.

@@ -17,7 +17,7 @@ const animOf = new Map<number, number[]>();
 const STRIPS: Record<string, { frames: number }> = {
   spr_deco_tree_01_strip4: { frames: 4 }, spr_deco_tree_02_strip4: { frames: 4 }, spr_deco_glint_01_strip6: { frames: 6 }, spr_deco_glint_02_strip4: { frames: 4 }, chimneysmoke_01_strip30: { frames: 30 },
   // P2: the campfire's flames and the animals in the Elder's yard (no duck: it would also bring back the sea life, which the look leaves out).
-  spr_deco_fire_01_strip4: { frames: 4 }, spr_deco_chicken_01_strip4: { frames: 4 }, spr_deco_sheep_01_strip4: { frames: 4 },
+  spr_deco_fire_02_strip4: { frames: 4 }, spr_deco_chicken_01_strip4: { frames: 4 }, spr_deco_sheep_01_strip4: { frames: 4 },
   spr_deco_pig_01_strip4: { frames: 4 }, spr_deco_cow_strip4: { frames: 4 },
 };
 const BARS = ["redbar_00", "redbar_06", "greenbar_00", "greenbar_06", "bluebar_00", "bluebar_05"];

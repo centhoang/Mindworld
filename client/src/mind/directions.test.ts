@@ -46,6 +46,14 @@ describe("directions from the real map", () => {
     expect(doingAnswer("what are you up to", "has a picnic", true)).toBe("Off to have a picnic.");
     expect(doingAnswer("nice weather", "fishes", false)).toBeNull();
   });
+
+  it("says the hour's words when idle, and 'we' for a group (bug 60)", () => {
+    expect(doingAnswer("what you guys up to?", null, false, "night")).toBe("Not much. Just taking it easy tonight.");
+    expect(doingAnswer("what you guys up to?", null, false, "evening")).not.toMatch(/\bday\b/);
+    expect(doingAnswer("what are you up to", null, true, "morning")).toBe("Just out for a walk this morning.");
+    expect(doingAnswer("what you guys up to?", "sits by the campfire", false, "evening", 2)).toBe("Right now? We sit by the campfire.");
+    expect(doingAnswer("what are you doing?", "sits by the campfire", false, "evening", 2)).toBe("Right now? I sit by the campfire.");
+  });
 });
 
 describe("farAnswer", () => {

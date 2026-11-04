@@ -205,7 +205,8 @@ export class PixelView implements View {
       const burning = lit === "evening" || !!o.npcs?.v.gatherings.some((gt) => gt.act === "campfire" && gt.started);
       items.push({ z: CAMPFIRE.z, draw: () => {
         stand(g, "spr_deco_campfire", cx, cy + 4);
-        if (burning) for (const dx of [-4, 0, 4]) strip(g, "spr_deco_fire_01_strip4", cx + dx - 2, cy - 12 + Math.abs(dx) / 2, Math.floor(t * 8) + dx);
+        // As the pack's Room1 lays it (bug 54): one fire_02 flame (8 x 12, origin 4,12) footed at the ring's pit, (10, 6) from its top-left.
+        if (burning) strip(g, "spr_deco_fire_02_strip4", Math.round(cx - 11.5) + 6, Math.round(cy - 16) - 6, Math.floor(t * 10));
       } });
       // The farm animals amble about their yard (the same on every screen: they follow the shared clock).
       ANIMALS.forEach((art, k) => {

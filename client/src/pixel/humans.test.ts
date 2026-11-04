@@ -112,6 +112,13 @@ describe("human loading and drawing", () => {
     expect(used.size).toBeGreaterThan(50);
   });
 
+  it("plays the fishing strips (rod and line) only while fishing (bug 53: the campfire drew a rod)", () => {
+    const fishing = new Set(["casting", "waiting", "reeling", "caught"]);
+    const poses: Pose[] = ["stand", "sleep", "eat", "dance", "kick", "squat", "sit", "sweep", "wiggle", "cook", "chop", "water", "dig", "serve", "carry", "hammer", "mine", "warm", "feed", "swim"];
+    for (const pose of poses) for (let clock = 0; clock < 30; clock += 0.05)
+      expect(fishing.has(humanLayers(NPC_LOOKS.elder, pose, false, false, clock).action), pose).toBe(false);
+  });
+
   it("draws synchronized unscaled layers at root (48,39), snapped and mirrored together", () => {
     const { images, g, ctx, sprites } = setup();
     const m = newHumanMotion({ x: 0, z: 0 });

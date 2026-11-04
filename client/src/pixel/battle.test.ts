@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BattleView, SHOUTS_PER_FIGHT, signatureName } from "./battle";
+import { BattleView, battleLayout, SHOUTS_PER_FIGHT, signatureName } from "./battle";
 
 const side = (name: string) => ({ name, sprite: {} as HTMLCanvasElement, maxHp: 30 });
 
@@ -118,5 +118,38 @@ describe("battle depth on screen", () => {
     await runUntil(v, v.open(side("Foe"), side("Mochi")), 10);
     await runUntil(v, v.playTurn("attack", "", "", "strike", 9, 0, 30, 0), 20);
     expect(lines.some((l) => l.includes("strikes"))).toBe(false);
+  });
+});
+
+describe("battle layout (bugs 57-59)", () => {
+  // A pet is 32 scene pixels square, feet near its bottom; scene pixels are 2 screen pixels.
+  const box = (feet: { x: number; y: number }) => ({ x0: (feet.x - 16) * 2, x1: (feet.x + 16) * 2, y0: (feet.y - 30) * 2, y1: (feet.y + 2) * 2 });
+  const apart = (a: { x0: number; x1: number; y0: number; y1: number }, b: { x: number; y: number; w: number; h: number }, gap: number) =>
+    a.x1 + gap <= b.x || b.x + b.w + gap <= a.x0 || a.y1 + gap <= b.y || b.y + b.h + gap <= a.y0;
+  for (const [sw, sh] of [[360, 216], [384, 216], [480, 243], [400, 270], [640, 270]] as const) {
+    it(`keeps each HP panel clear of both pets and the text box at ${sw}x${sh}`, () => {
+      const L = battleLayout(sw, sh);
+      for (const pet of [L.foe, L.mine]) for (const panel of [L.myPanel, L.foePanel]) expect(apart(box(pet), panel, 8)).toBe(true);
+      expect(L.myPanel.x + L.myPanel.w).toBeLessThan(L.foePanel.x); // side by side, never overlapping
+      expect(box(L.mine).y1).toBeLessThanOrEqual(sh - 56); // my pet stands above the text box
+      expect(L.mine.x).toBeLessThan(L.foe.x);
+      expect(L.mine.y).toBeGreaterThan(L.foe.y); // mine is nearer the camera
+      expect(L.horizon).toBeLessThan(L.foe.y);
+      expect(L.hw * 2).toBeGreaterThanOrEqual(sw);
+    });
+  }
+
+  it("a tap on the shout box calls that move, and only while a shout is open", () => {
+    const v = new BattleView();
+    void v.open(side("Foe"), side("Mochi"));
+    const [sw, sh] = [360, 216];
+    const mx = sw - 144 - 8, my = sh - 56;
+    expect(v.shoutAt(mx + 80, my + 9, sw, sh)).toBe(false); // no shouts this fight
+    v.allowShouts();
+    expect(v.shoutAt(10, 10, sw, sh)).toBe(false); // outside the box
+    expect(v.shoutAt(mx + 80, my + 9, sw, sh)).toBe(true); // "1 GO!" sits right of the title
+    expect(v.takeShout()).toBe("attack");
+    expect(v.shoutAt(mx + 12, my + 33, sw, sh)).toBe(true); // "4 BE NICE!", bottom left
+    expect(v.takeShout()).toBe("emote");
   });
 });

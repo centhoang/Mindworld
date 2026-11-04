@@ -444,7 +444,7 @@ out.addEventListener("pointerdown", (e) => {
     return hit?.button.click();
   }
   if (mode !== "battle") return;
-  if (!(pixelLook ? battleView.cmdAt(x, y, low.width, low.height) : battleView.cmdAtCells(x, y, low.width, low.height))) battleView.skip();
+  if (!(pixelLook ? battleView.cmdAt(x, y, low.width, low.height) || battleView.shoutAt(x, y, low.width, low.height) : battleView.cmdAtCells(x, y, low.width, low.height))) battleView.skip();
 });
 resize();
 touchControls();
@@ -503,7 +503,7 @@ function menuKey(k: string): void {
 
 function side(m: Member): Side {
   const build = m.arch ? BUILDS[m.arch] : undefined;
-  return { name: m.name, genes: m.genes, sprite: drawMonster(petLook(m.genes), 48, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3, trainer: world.myLook };
+  return { name: m.name, genes: m.genes, sprite: drawMonster(petLook(m.genes), 32, "back", build), portrait: drawMonster(petLook(m.genes), 32, "front", build), maxHp: pet.maxHp, level: 3, trainer: world.myLook };
 }
 
 // ---- pet brain: rules only by default; B switches to our tuned Llama 3.2 1B in the browser (WebGPU).
