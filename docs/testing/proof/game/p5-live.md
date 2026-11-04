@@ -50,6 +50,26 @@ Worker d82cfc08, build `main-C2rhNIcQ`, room `check`, test Chrome (2026-11-04 ~1
   within 10 s", "101st told full" and "room empty" failed; `.scratch/p5/join-check-p5d.txt`), run 2 CLEAN 20/20
   (`.scratch/p5/join-check-p5d-2.txt`). P5d adds no room code.
 
+## e. Postcards (Muse Image 1.0, Meta Model API)
+Checked first (dev.meta.ai docs and pricing page, 2026-11-04): `POST https://api.meta.ai/v1/images/generations`,
+`{model: "muse-image-1.0", prompt, n, size}` (OpenAI Images shape), answers `data[0].b64_json`; $0.01 per generated
+image, billed only when one comes back; 150 RPM. Worker ebecde8f, build `main-p-yOsRi0`, room `check`, test Chrome.
+- API from the live tab (campfire ask): `source: model`, 22.2 s, webp 1920x1280 (530 KB, 707 KB as base64), $0.01.
+  Shrunk in the tab to 480x320 webp, about 65-72 KB a card.
+- Campfire story with the Elder and Mo, player 2 tiles away: the story's talk call, then the postcard 27 s later,
+  31 s in all; card "Elder's campfire story" (`postcard-album-live.png`: the Elder telling, the pet from its genes,
+  the trainer, Mo with a fishing rod).
+- A real wild fight next to the Elder: "Pal fainted. Mochi wins!", the Elder's cheer, then card "Mochi beat a wild
+  Pal, Elder cheering" (`postcard-win-live.png`). C opens the album, left/right flip; the Album chip does the same.
+- Found live: the first story's postcard never came, and that day's campfire slot was used up. The worker's ledger
+  allows 10 calls a minute per client and the story's talk call comes just before (the reply was not captured; the
+  retry run went through). Now one more try after 20 s on `rate_limit`, and a moment with no card gives the day's
+  slot back (`game/postcard-api.test.ts`).
+- Join check after the P5e deploy: 17/20 (2 bots without a welcome, spill room not opening), then 19/20 (a kick
+  burst ended on 2 different kicks); with P5d's 16/20 and 20/20, failures move between runs. Open for P6.
+- Not live: a new friend's card ("friends", same path as a win; unit tests on the worker prompt and the album). Cloud
+  off: no call, no card (tests).
+
 ## After the deploy
 - `node scripts/join-check.mjs`: CLEAN 20/20 (`.scratch/p5/join-check-p5.txt`).
 - `/api/spend`: day $0.0695 of $30; totals baseten $1.244, meta $0.0123.

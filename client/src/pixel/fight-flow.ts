@@ -16,7 +16,7 @@ import { GHOST_ARCHETYPE, ghostPet, type Genes } from "../sim/ghost";
 import { coachReview } from "../sim/review";
 import { duelEnd, rehearse, rivalDef, rivalLabel, rivalOf, whyLost, type DuelEnd, type RivalOwner } from "../sim/rivals";
 import { withTactics, type WildMemos } from "../sim/tactics";
-import type { DEFAULT_PET, Intent, Outcome, Replay } from "../sim/types";
+import type { ArchetypeId, DEFAULT_PET, Intent, Outcome, Replay } from "../sim/types";
 import { liveName } from "../world/live";
 import type { BattleView, Side } from "./battle";
 import { humanLook, NPC_LOOKS } from "./humans";
@@ -59,6 +59,8 @@ export interface FightDeps {
   // A villager who sees the fight start (null if none near); `exclude` = the rival's owner, who is fighting.
   watch: (foe: string, duel: boolean, exclude?: string) => Watch | null;
   watched: (w: Watch, end: CheerEnd) => void;
+  // A win or a new friend: maybe a postcard (game/postcard-api.ts). `foeName` as the caption says it.
+  postcard?: (p: { scene: "win" | "friends"; foe: { arch?: ArchetypeId; owner?: string }; foeName: string; friend?: { name: string; genes: Genes; arch: ArchetypeId }; watcher: Watch | null }) => void;
 }
 
 export function makeFightFlow(d: FightDeps) {
@@ -84,6 +86,7 @@ export function makeFightFlow(d: FightDeps) {
       await battleView.say(`+${earned} coins.`);
     }
     await cheer(watch, v.result);
+    if (v.result === "win") d.postcard?.({ scene: "win", foe: { owner: them.name.slice(0, 12) }, foeName: `${them.name.slice(0, 12)}'s pet`, watcher: watch });
     save(state);
     d.setMode("world");
   }
@@ -162,6 +165,8 @@ export function makeFightFlow(d: FightDeps) {
       }
       await battleView.say(msg);
       await cheer(watch, replay.how === "befriended" ? "friends" : "win");
+      const made = replay.how === "befriended" ? state.party?.at(-1) : undefined;
+      d.postcard?.(made ? { scene: "friends", foe: { arch }, foeName: `a wild ${foeName}`, friend: { name: made.name, genes: w.genes, arch }, watcher: watch } : { scene: "win", foe: { arch }, foeName: `a wild ${foeName}`, watcher: watch });
       await review(replay, foeName, () => withTactics(ENEMIES[arch], d.wildMemos()[arch]));
       world.removeWild(w.id);
       const meadow = world.world.platforms.find((p) => Math.hypot(p.x - w.home.x, p.z - w.home.z) <= p.r);
@@ -242,6 +247,7 @@ export function makeFightFlow(d: FightDeps) {
       await battleView.say(`+${earned} coins.`);
     }
     await cheer(watch, end);
+    if (end === "win") d.postcard?.({ scene: "win", foe: { owner: base.ownerName }, foeName: `${base.ownerName}'s ${base.name}`, watcher: watch });
     if (end === "loss" || end === "draw") {
       const w = whyLost(replay, log, rv, state.memo);
       await battleView.say(w.why);

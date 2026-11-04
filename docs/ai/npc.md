@@ -91,5 +91,20 @@ Design backlog and research sources: `archive/NPC-PLAN.md`.
 - Fallbacks: no cloud, a failure, nobody near: the hub's old path (local model line by line when loaded, else
   scripted). A story without the cloud: `rulesStory` (the teller's opener, "Today <its top note today>.", else an old
   tale; a canned reaction each). No new local prompt (local prompts are frozen).
+- Campfire stories also call `NpcVillage.onStory` (main.ts `storyCard`): a postcard for a player who sat by the fire.
 - Memory: each talker remembers the other's line (`talked with Mo: "..."`); the teller remembers `told <players> a
   campfire story: "..."` (imp 4, so the Gazette can report it), listeners `heard <teller>'s campfire story with ...`.
+
+## Postcards (P5e, 2026-11-04)
+- Worker `postcard.ts`, `/api/postcard`; client `game/postcard-api.ts` (`Album`), `pixel/album.ts` (`AlbumView`),
+  wired in `main.ts`. Moments: a win or a new friend (`FightDeps.postcard`, all three fight kinds; the watcher is in
+  the picture), and a campfire story a player sat through (`onStory`, on the storyteller's host only).
+- The client sends only game values: scene (`win|friends|campfire`), names, the pet's genes as `petLook` gives them
+  (hue, accent hue, ears, tail, horns, pattern, kind for a tamed pet), the foe (wild kind or owner), the villagers
+  there. The worker checks them against its own lists and writes the whole prompt (cozy pixel-art keepsake, front
+  view, "no text" since image text is unreliable); the caption is drawn by the game under the picture.
+- Muse Image 1.0, $0.01 an image, size 1536x1024 (3:2). Caps: $2/UTC day (KV `postcard:spend:<day>`), the ledger's
+  Meta total, quota `postcard` (8 per client, 200 a day). An upstream error is not booked (not billed); a timeout books
+  $0.01. One card per kind of moment per game day per device; no card = the slot comes back; `rate_limit` = one more
+  try after 20 s. Album: `localStorage["petmind.album.v1"]`, last 12, shrunk to 480 px webp, oldest dropped if full.
+- Not shared with the room and not stored on the server: the album lives on the player's device.

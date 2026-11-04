@@ -59,6 +59,10 @@
   one call per talk, only while a player is within 14 tiles, 1 per 40 s per machine, $1/day); rules story and the old
   local/scripted path as fallback. Design `docs/ai/npc.md` "Villagers talk to each other"; proof `p5-live.md` d.
   **Next: P5e** postcards if time (verify Muse Image first), then P6 at 18:00 VN.
+- **P5e done** (live worker ebecde8f, build `main-p-yOsRi0`, 2026-11-04 ~12:50 VN): Postcards. Muse Image 1.0 on the
+  Meta Model API ($0.01 an image, checked on dev.meta.ai first) paints a keepsake of your pet and who was there after a
+  win, a new friend or a campfire story, from real state (genes, watcher, storyteller); album on C / the Album chip.
+  $2/day cap. Proof `p5-live.md` e. **P5 complete. Next: P6 freeze at 18:00 VN** (ask about Access first).
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

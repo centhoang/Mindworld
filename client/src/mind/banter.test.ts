@@ -104,6 +104,8 @@ describe("villagers' talks and campfire stories from the cloud", () => {
 
   it("evening at the campfire with a player sitting by: the villager with the most to tell tells a story, the others react", async () => {
     const { nv, lines, asks, sit } = make(STORY);
+    const stories: unknown[] = [];
+    nv.onStory = (st) => void stories.push(st);
     sit("elder", "mo");
     remember(nv.hub.minds.get("elder")!.mem, 0, "18:00", "watched Kai's pet Bolt beat a wild Brute", 6);
     expect(nv.storyNow()).toBe(true);
@@ -114,6 +116,7 @@ describe("villagers' talks and campfire stories from the cloud", () => {
     expect(nv.hub.minds.get("elder")!.mem.log.at(-1)!.text).toBe(`told Kai a campfire story: "Today Kai's pet Bolt beat a wild Brute!"`);
     expect(nv.hub.minds.get("mo")!.mem.log.at(-1)!.text).toBe("heard Elder's campfire story with Kai");
     expect(nv.hub.minds.get("mo")!.source).toBe("Muse Spark Open");
+    expect(stories).toEqual([{ teller: "elder", others: ["mo"], players: ["Kai"] }]); // the postcard hook
   });
 
   it("no player by the fire: no story; cloud off: the free story tells what really happened today", async () => {

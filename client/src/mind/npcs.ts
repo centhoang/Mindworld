@@ -122,6 +122,7 @@ export class NpcVillage {
   onChat: ((e: { npc: string; player: string; line: string; reply: string; source: string }) => void) | null = null; // every line said to a player, for the chat log
   cloud: CloudTalk | null = null; // free talk, tier 2 (game/npc-chat.ts); null keeps every line local
   banter: BanterFn | null = null; // villagers' talks and campfire stories from the cloud (game/banter-api.ts); null = local
+  onStory: ((s: { teller: Npc; others: Npc[]; players: string[] }) => void) | null = null; // a campfire story was told (a postcard)
   private cloudAt = -1e9; // sim time of the last cloud-written talk here
   private storyDay = -1; // the last game day a campfire story was told here
   private readonly talks = new Map<string, string[]>(); // "npc:player" -> the talk so far, for the cloud tier
@@ -530,6 +531,7 @@ export class NpcVillage {
         await new Promise((r) => setTimeout(r, STORY_LINE_MS));
       }
       const g = gameTime(this.v.t);
+      if (told.length) this.onStory?.({ teller, others, players });
       const tm = this.hub.minds.get(teller);
       const gist = told.slice(1).join(" ") || told[0] || "";
       if (tm && gist) remember(tm.mem, g.day, clockLabel(g.hour), `told ${players.join(" and ")} a campfire story: "${gist.slice(0, 50)}"`, 4);

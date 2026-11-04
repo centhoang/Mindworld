@@ -1,19 +1,20 @@
-# HANDOFF: Mindworld final plan (2026-11-04, ~11:55 VN = 04:55 UTC)
+# HANDOFF: Mindworld final plan (2026-11-04, ~12:55 VN = 05:55 UTC)
 
-**Starting prompt:** "Read HANDOFF.md, then do P5e from docs/plan/final-plan.md (Next actions 1). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then start P6 from docs/plan/final-plan.md (Next actions 1). Follow CLAUDE.md."
 
 ## Where things stand
 - **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
   Status section at the top. Keep that Status current every session. P5 window 13:00-17:00 (we are ahead), freeze (P6)
   18:00 VN. Earlier HANDOFF times said ~12:25 VN for the last session; the real clock was ~11:20 VN then.
-- Live worker d82cfc08, build `main-C2rhNIcQ`. Local commits on `rework/fresh-look`, not pushed.
-- Tests: client 697, worker 237, tsc clean both. Join check after this deploy: run 1 16/20 (one bot got
-  no welcome for 11.5 s, which also broke the "room full" and "room empty" counts), run 2 **CLEAN 20/20**. Watch for it.
-- Spend: P5d used ~6 Muse Spark Open calls (~$0.03). Before it: day $0.07 of $30, Baseten $1.24 of $50, Meta $0.012
+- **P5 is complete.** Live worker ebecde8f, build `main-p-yOsRi0`. Local commits on `rework/fresh-look`, not pushed.
+- Tests: client 702, worker 242, tsc clean both. **Join check is flaky today:** four runs after the P5d/P5e
+  deploys went 16, 20, 17, 19 of 20, each failing a different socket check (bots with no welcome, the spill room not
+  opening, two bots ending a kick burst on different kicks). P5 adds no room code. Files `.scratch/p5/join-check-p5{d,d-2,e,e-2}.txt`.
+- Spend: P5d ~8 Muse Spark Open calls (~$0.04), P5e 3 Muse Image images ($0.03). Before it: day $0.07 of $30, Baseten $1.24 of $50, Meta $0.012
   of $100 (credit $149.91), Modal untouched. Read `/api/spend` in the test Chrome for the day's number.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-04 session" or "2026-11-03 session").
 
-## Done this session (on live; proof `docs/testing/proof/game/p5-live.md` d, design `docs/ai/npc.md` "Villagers talk")
+## Done this session (on live; proof `docs/testing/proof/game/p5-live.md` d and e, design `docs/ai/npc.md`)
 - **P5d villagers talk to each other and tell campfire stories from the cloud** (`/api/banter`, worker `banter.ts`,
   client `game/banter-api.ts`, `NpcVillage.banter` behind `CLOUD_LIVELY`). One Muse Spark Open call writes a whole
   talk from both villagers' notes (`NpcVillage.notesOf`: doing, feelings, facts, notable then latest memories, prices
@@ -22,21 +23,29 @@
   per machine; test hook `__px.world.npcs.storyNow()`). Only while a player is within 14 tiles, one per 40 s per
   machine, $1/day, quota `banter`. Fallback: old local/scripted path; `rulesStory` for a story. Memories written both
   ways (the story's memory showed up in the next talk live). ~$0.005 and ~4 s a call.
-- Checks: two new ticked lines in `checks/game.md`; `docs/ops/demo.md` lists the new Meta model use.
+- **P5e Postcards** (`/api/postcard`, worker `postcard.ts`, client `game/postcard-api.ts` `Album`, `pixel/album.ts`).
+  Checked on dev.meta.ai first: Muse Image 1.0, `POST api.meta.ai/v1/images/generations`, base64 back, $0.01 an image.
+  After a win, a new friend, or a campfire story you sat through, the worker paints a keepsake from game values only
+  (genes, foe, villagers there; it writes the prompt). Album on C or the Album chip, last 12, on this device. One card
+  per kind per game day; $2/day cap, quota `postcard`. Live: campfire and win cards (`postcard-*-live.png`). Fixed
+  live: a refused call (per-minute limit) used up the day's slot; now a retry after 20 s and the slot comes back.
+- Checks: three new ticked lines in `checks/game.md`; `docs/ops/demo.md` lists both new Meta model uses.
 
 ## Next actions
-1. **P5e** surprise, cut first if late: Postcards (`muse-image-1.0`): verify the API and price on dev.meta.ai docs
-   first, hard cap $2/day, skip if unavailable. Same shape as `banter.ts`/`cheer.ts` (worker route, ledger, cap,
-   quota, mocked tests, client fetch behind `CLOUD_LIVELY`, free fallback).
-2. P6 freeze 18:00 VN: bug fixes only, `scope-check` every scope on live, then the user's last play-test (2+ players).
-   Ask before P6: remove Access at the freeze instead of Nov 5 morning (Open, below).
-3. P4 leftovers only if time: tree clumps toward the coast, stumps, berry bushes, the plaza's bare dirt (pack `statue.png`).
-4. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
+1. **P6 freeze 18:00 VN** (it is ~13:00 VN now: P6 may start early, bug fixes only from then on). First look into
+   the flaky join check (above): rerun 3 times; if failures keep moving, check the room DO's welcome path under a
+   20-socket burst and the kick relay before blaming the network. Then ask the user:
+   remove Access at the freeze instead of Nov 5 morning (Open, below). Then `scope-check` every scope on live, then
+   the user's last play-test (2+ players).
+2. P4 leftovers only if time before the freeze: tree clumps toward the coast, stumps, berry bushes, the plaza's bare
+   dirt (pack `statue.png`).
+3. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
    villager walks up and challenges you.
-5. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
+4. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
    GHOSTS --prefix "chat:<ms prefix>" --remote`, then `kv key get` each; rows are `{t, npc, player, line, reply, source}`;
    campfire story lines log with `line: "(campfire story)"`), add failures to `docs/testing/checks/npc.md`, bugs to
    `docs/BUGS.md`. If the user says "sleep", Director mode.
+5. P7 demo script: show a campfire story and its postcard, and a win card (both need a player near a villager).
 
 ## Open
 - Gazette weak spot: plain `remember()` notes live only in the host's tab, so a reload or host hand-over mid-day
@@ -50,6 +59,8 @@
   proof `proof/network/5c5d-live.md` covers hand-over with bonds intact).
 - A player's own dance pose reaches a late joiner only on their next move (8 s dance); villagers' dances show at once.
 - Rival plan latency: 13-15 s for a new memo; say so in the demo script (P7).
+- P5e: a campfire postcard comes only on the storyteller's host machine (a guest at the fire on another machine gets
+  none); the "friends" card is unit-tested only. Postcards stay on the device (not in the room, not on the server).
 - P5d not run live: two villagers hosted on different machines talking (unit test only). The campfire is lit only in
   the evening or while a gathering runs; `storyNow()` with forced sitters shows an unlit fire.
 
@@ -69,6 +80,8 @@
   `__px.gazette.paper` or hook `fetch` instead.
 - Banter by hand (test Chrome, room `check`): drivers `.scratch/p5/live-banter-{api,chat,story,story-read}.js` (hook
   `npcs.banter` and `npcs.out.line`, reset `npcs.cloudAt = -1e9`, `npcs.hub.talk(a, b)` or `npcs.storyNow()`).
+- Postcards by hand: `__px.album.cards`, `__px.albumView.toggle()`; drivers `.scratch/p5/live-postcard-{api,story,fight}.js`
+  (clear `localStorage["petmind.album.v1"]` first: one card per kind a game day). Each real image costs $0.01.
 - Gazette by hand: `__px.gazette.paper`; a new paper needs a reload or the next game day (12 min). Cheer: put
   `__px.world.player` beside a villager, `__px.fight(__px.world.wilds[0])`, drive `battleView` (driver
   `.scratch/p5/live-cheer.js`: on a menu whose first label is not Fight press escape then enter).

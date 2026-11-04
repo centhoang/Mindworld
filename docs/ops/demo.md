@@ -73,6 +73,8 @@ memories move to B.
 - **Muse Spark Open** (Baseten): a watching villager's line at the end of a fight (`/api/cheer`).
 - **Muse Spark Open** (Baseten): villagers talking to each other, and evening campfire stories, from their memories
   (`/api/banter`, one call per talk, only while a player is close enough to hear).
+- **Muse Image 1.0** (Meta Model API): postcards of your pet and friends after a win or a campfire story, painted
+  from the pet's genes and who was there (`/api/postcard`, $0.01 each, album on C).
 - **Muse Voice Transcribe** (Meta Model API): teaching by voice.
 - **Llama 3.2 1B, fine-tuned** (LoRA on Modal, distilled from Muse Spark Open): free coach and minds in the tab; browser
   bench (N4, GTX 1050): 97.0% valid across 300 held-out decisions, Teach +18.9 pts held-out lift.

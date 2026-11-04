@@ -18,4 +18,5 @@ Run on `/` only when every other list is clear. Two or more players, deployed bu
 - [x] A villager who sees your fight start calls out once when it ends, in their own voice, and remembers it. (proof: ../proof/game/p5-live.md)
 - [x] Looking inside a mind (I) says what answered its last line, in plain words. (proof: ../proof/game/p5-live.md)
 - [x] Two villagers who meet while you are near talk about real things from their day (what they did, sold, saw you do), and remember it. (proof: ../proof/game/p5-live.md)
+- [x] Win a fight, or sit through a campfire story, and a painted postcard of your own pet and who was there comes to your album (C), at most one of each a game day; with the cloud off nothing breaks. (proof: ../proof/game/p5-live.md)
 - [x] In the evening, sit by the campfire with villagers and one tells a story about something that really happened; the others react, and they remember telling it. With the cloud off, a simpler story still comes from their notes. (proof: ../proof/game/p5-live.md)

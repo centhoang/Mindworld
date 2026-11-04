@@ -14,6 +14,9 @@ import { habits } from "../sim/rivals";
 import { rivalPlanFor } from "../game/rival-api";
 import { Gazette, paperRows } from "../game/gazette-api";
 import { startWatch, watchMemory } from "../game/cheer-api";
+import { Album, petAsk, type Card } from "../game/postcard-api";
+import { AlbumView } from "./album";
+import { VILLAGERS } from "../mind/persona";
 import { gameTime, worldSeconds } from "../life/clock";
 import { DEFAULT_PET } from "../sim/types";
 import { BattleView, type Side } from "./battle";
@@ -310,6 +313,7 @@ document.getElementById("ui")!.addEventListener("click", (e) => {
   if (!b) return;
   b.blur();
   if (b.dataset.ui === "rename") return void (mode === "world" && !chat.target() && openChat("name"));
+  if (b.dataset.ui === "album") return void (mode === "world" && !chat.target() && albumView.toggle());
   if (b.dataset.dev) return fakeIsle(b.dataset.dev === "add");
   const name = b.dataset.ui!;
   state.hide = { ...state.hide, [name]: !hidden(name) };
@@ -394,6 +398,11 @@ window.addEventListener("keydown", (e) => {
   if (chat.target()) {
     if (k === "escape") closeChat();
     return; // typing in the chat box
+  }
+  if (albumView.key(k)) return void e.preventDefault();
+  if (k === "c" && !e.repeat && mode === "world" && !menu && !crate && !board && !peerMenu && !duelIn) {
+    keys.clear();
+    return void albumView.toggle();
   }
   if (k === "b" && !e.repeat && mode === "world" && !menu) void switchBrain();
   if (k === "i" && !e.repeat && mode === "world" && !menu && !crate) world.toggleInspect();
@@ -595,6 +604,20 @@ const room = makeRoomFlow({
 });
 const live = room.live;
 const { fakeIsle, shareState } = room;
+// Postcards (P5e): a win, a new friend or a campfire story may bring one, painted by Muse Image; C opens the album.
+const album = new Album();
+const albumView = new AlbumView(() => album.cards);
+function postcardArrived(c: Card): void {
+  const line: Line = { text: `A postcard came: ${c.caption}. C: album`, who: "Postcard", t: 6 };
+  if (!toast) toast = line;
+  else hintQueue.push(line);
+}
+function storyCard(s: { teller: Npc; others: Npc[]; players: string[] }): void {
+  if (!s.players.includes(myName())) return;
+  const m = activeMember();
+  const teller = VILLAGERS.find((p) => p.id === s.teller)?.name ?? s.teller;
+  album.maybe({ scene: "campfire", player: myName(), pet: petAsk(m.name, m.genes, m.arch), with: [s.teller, ...s.others].slice(0, 3) }, `${teller}'s campfire story`, gameTime(worldSeconds()).day, postcardArrived);
+}
 // The Village Gazette: today's paper about yesterday, on the town board and once as a toast.
 const gazette = new Gazette({
   room: () => live.roomName(),
@@ -685,6 +708,11 @@ const fights = makeFightFlow({
   },
   watch: (foe, duel, exclude) => startWatch(world.watcher(exclude), { player: myName(), pet: activeMember().name, foe, duel }),
   watched: (w, end) => world.npcs?.watched(w.npc, watchMemory(w, end)),
+  postcard: (p) => {
+    const m = activeMember();
+    const caption = p.scene === "friends" && p.friend ? `${m.name} made friends with ${p.friend.name}` : `${m.name} beat ${p.foeName}${p.watcher ? `, ${p.watcher.name} cheering` : ""}`;
+    album.maybe({ scene: p.scene, player: myName(), pet: petAsk(m.name, m.genes, m.arch), foe: p.foe, ...(p.friend ? { friend: petAsk(p.friend.name, p.friend.genes, p.friend.arch) } : {}), with: p.watcher ? [p.watcher.npc] : [] }, caption, gameTime(worldSeconds()).day, postcardArrived);
+  },
 });
 const fight = fights.fight;
 
@@ -747,6 +775,7 @@ function update(dt: number, t: number): void {
       }
     }
     if (world.npcs) gazette.update(gameTime(worldSeconds()).day, Date.now());
+    if (world.npcs && !world.npcs.onStory) world.npcs.onStory = storyCard;
     world.underBubbles = () => (!menu && !crate && !board && !peerMenu && !duelIn ? drawGoals() : undefined);
     world.panels = nextPanels;
     nextPanels = [];
@@ -800,5 +829,5 @@ void Promise.all([loadArt(), loadSunny(), setup]).catch((e: unknown) => console.
 
 // Dev hook: drive frames by hand when the tab is hidden (rAF stalls there).
 (window as unknown as { __px: unknown }).__px = { world, battleView, interior, update, keys, setCrt, state, fight, live, mindSched, webBrain, fakeIsle,
-  gazette, openBoard: () => void (board = { cursor: 0 }),
-  blocked: () => ({ mode, door: !!door, menu: !!menu, crate: !!crate, board: !!board, peerMenu: !!peerMenu, duelIn: !!duelIn, teach: teach.open, chat: chat.target() }) };
+  gazette, openBoard: () => void (board = { cursor: 0 }), album, albumView,
+  blocked: () => ({ mode, door: !!door, menu: !!menu, crate: !!crate, board: !!board, peerMenu: !!peerMenu, duelIn: !!duelIn, teach: teach.open, chat: chat.target(), album: albumView.open }) };

@@ -20,6 +20,7 @@ import { parseRivalAsk, rivalPlan } from "./rival";
 import { gazettePaper, parseGazetteAsk } from "./gazette";
 import { cheerLines, parseCheerAsk } from "./cheer";
 import { banterLines, parseBanterAsk } from "./banter";
+import { paintPostcard, parsePostcardAsk } from "./postcard";
 import { handleMlc, type MlcDeps } from "./mlc";
 import { MAX_CLIP_MS, MAX_WAV_BYTES, parseWav, transcribeCostUsd, transcribeMeta } from "./transcribe";
 
@@ -116,6 +117,7 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     if (path === "/api/gazette" && method === "POST") return handleGazette(request, deps);
     if (path === "/api/cheer" && method === "POST") return handleCheer(request, deps);
     if (path === "/api/banter" && method === "POST") return handleBanter(request, deps);
+    if (path === "/api/postcard" && method === "POST") return handlePostcard(request, deps);
     if (path === "/api/chatlog" && method === "POST") return handleChatLog(request, deps);
     if (path === "/api/transcribe" && method === "POST") return handleTranscribe(request, deps);
     if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);
@@ -381,6 +383,14 @@ async function handleBanter(request: Request, deps: Deps): Promise<Response> {
   if (!ask) return fail(400, "bad_request");
   const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
   return json(await banterLines(ask, deps, clientKey));
+}
+
+// A keepsake postcard painted by Muse Image (worker/src/postcard.ts). Always 200 unless the ask is bad.
+async function handlePostcard(request: Request, deps: Deps): Promise<Response> {
+  const ask = parsePostcardAsk(await readJson(request, 2000));
+  if (!ask) return fail(400, "bad_request");
+  const clientKey = await deps.hashClient(request.headers.get("cf-connecting-ip") ?? "local");
+  return json(await paintPostcard(ask, deps, clientKey));
 }
 
 // ---------- voice teaching ----------
