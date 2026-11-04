@@ -268,3 +268,8 @@ Done that session (on live; proof `docs/testing/proof/game/p5-live.md` d and e, 
 
 ## 2026-11-04 session (~16:40 VN): flaky join check fixed, P4 visual leftovers
 See HANDOFF of commit after b0ec50d, `docs/testing/proof/network/join-live.md` (2026-11-04 ~16:30) and `docs/plan/final-plan.md` Status.
+
+## 2026-11-04 session (~19:50 VN): /api/llm lock-down, P7 drafts
+Lock-down live (worker 950958dc), proof `docs/testing/proof/network/llm-lockdown-live.md`; bug 61 found; P7 drafts
+(`docs/ops/submission.md`, `docs/ops/demo.md`, README); domain move to mindworld.uryto.dev decided, waiting on Access.
+Commits e408276, 0852852. Codex now also takes non-visual tasks (CLAUDE.md).
