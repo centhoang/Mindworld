@@ -26,6 +26,8 @@ export function serviceLabel(source: string): string {
 }
 
 type Ctx = CanvasRenderingContext2D;
+// A spoken line first (a reply to you, a greeting); a pet that only decides shows its last decision (bug 65).
+export const lastLineSource = (m: Pick<Mind, "source" | "lineSource">): string => m.lineSource ?? m.source;
 export const SHOW_NEEDS = ["hunger", "energy", "fun", "social"] as const;
 const SHORT: Record<string, string> = { morning: "AM", noon: "NOON", evening: "PM" };
 
@@ -35,7 +37,8 @@ export function inspectorLines(m: Mind, a: Agent, rel: Map<string, number>, name
   const add = (s: string, col: string = PAL.ink) => wrapLine(s).forEach((l) => lines.push([l, col]));
   const p = m.persona;
   add(`${p.name}  (${p.kind === "pet" ? "PET" : "VILLAGER"})`, PAL.coral);
-  add(`LAST LINE: ${serviceLabel(m.source)}${m.source === "rules" ? " (B: load Llama)" : ""}`, PAL.teal);
+  const said = lastLineSource(m);
+  add(`LAST LINE: ${serviceLabel(said)}${said === "rules" ? " (B: load Llama)" : ""}`, PAL.teal);
   add(`RUNS ON: ${where}`, PAL.teal);
   add(`IS: ${p.traits.join(", ")}`);
   add(`LIKES: ${p.hobbies.join(", ")}`);

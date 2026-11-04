@@ -30,3 +30,16 @@ mine ama@494, pip@521, elder@619 · haul ama@577, elder@710 · dance mo, ama, pi
 farm elder@1068 · feed elder@1118 · swim pip@1240, elder@1296 · repair elder@1350.
 Not in this watch: chop (Pip's noon job; Pip mined and played soccer instead; chop was seen unforced on live before,
 `sunny-live.md`). Odd but harmless: Ama sold at the stall at night (04:19).
+
+## No GPU (line 16) and bug 65
+Player 2 alone in the room (player 1 closed), hosting all four villagers, `requestAdapter()` = null:
+- First visit: no download box, straight into the village (`setup.ts`: no adapter = open).
+- "hi! what are you up to today?" to Elder: "Not much. Just taking it easy tonight." in 0.1 s, source `rules`.
+- "what is your favourite memory of this village?" to Elder: "That dance we spoke of, warm by firelight..." in 6.3 s,
+  source `model` (Muse Spark Open on Baseten); to Mo, after the bug 65 fix: "Chatting with Elder about dancing by the
+  campfire this evening, that was really nice." in 2.6 s, `model`.
+- Teach on this player: memo updated by Muse Spark in 5.3 s.
+- Inspector before the fix: "Last line: the village rules (no model) (B: load Llama)" right after the cloud reply
+  (bug 65). After (worker 24fb26ae): Mo's `lineSource` = cloud; Ama: "Last line: from the cloud (Muse Spark Open)",
+  `inspector-65-nogpu-live.png`.
+- Also seen: a host on the Teach screen froze its villagers for everyone (bug 64, fixed, `../network/bug64-teach-live.md`).

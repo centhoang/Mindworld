@@ -21,6 +21,7 @@ export interface Mind {
   persona: Persona;
   mem: MindMemory;
   source: string; // who answered the last decision: a model label or "rules"
+  lineSource?: string; // who answered the last spoken line (bug 65: the inspector shows this first)
   thinking: string; // "" or what it is deciding right now
   pending: { key: string; value?: string | null } | null;
   lastTalk: number; // sim seconds

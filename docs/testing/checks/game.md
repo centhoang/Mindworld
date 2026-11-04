@@ -13,10 +13,11 @@ Run on `/` only when every other list is clear. Two or more players, deployed bu
 - [x] No fishing without water, no walking through solid things. (proof: ../proof/game/sunny-live.md, ../proof/game/2-players.md)
 - [x] Holding one direction, walking or running, your character moves smoothly and never jumps back, also in the first hold after a teleport. (proof: ../proof/game/walk-steady.md, ../proof/game/sunny-live.md)
 - [x] Two players in the village see the same day. (proof: ../proof/game/sunny-live.md)
-- [ ] Runs with no GPU: rules and cached lines, and it says so. (waits for step 7: `LOCAL_ONLY` shows no scripted lines; `?gpu=skip` works in dev only, so live needs a machine with no GPU)
+- [x] Runs with no GPU: rules and cached lines, and it says so. (live 2026-11-04, a Chrome with WebGPU off hosting all villagers: rules answer at once, free talk and Teach go to Muse Spark, the inspector names which: ../proof/game/scope-check-live-2026-11-04.md)
 - [x] Every morning the town board has a Gazette: three headlines about what really happened in the village lately, the same for everyone in the room, and it says who wrote it (Muse Spark 1.3, or the villagers' notes when the cloud is off). (proof: ../proof/game/p5-live.md)
 - [x] A villager who sees your fight start calls out once when it ends, in their own voice, and remembers it. (proof: ../proof/game/p5-live.md)
 - [x] Looking inside a mind (I) says what answered its last line, in plain words. (proof: ../proof/game/p5-live.md)
+- [x] [proof](../proof/game/inspector-65-nogpu-live.png) After a villager answers you, I names who answered that reply, also on a host with no model (bug 65).
 - [x] Two villagers who meet while you are near talk about real things from their day (what they did, sold, saw you do), and remember it. (proof: ../proof/game/p5-live.md)
 - [x] Win a fight, or sit through a campfire story, and a painted postcard of your own pet and who was there comes to your album (C), at most one of each a game day; with the cloud off nothing breaks. (proof: ../proof/game/p5-live.md)
 - [x] In the evening, sit by the campfire with villagers and one tells a story about something that really happened; the others react, and they remember telling it. With the cloud off, a simpler story still comes from their notes. (proof: ../proof/game/p5-live.md)

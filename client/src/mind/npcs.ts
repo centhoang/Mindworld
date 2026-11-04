@@ -311,7 +311,7 @@ export class NpcVillage {
         : (await new Promise((r) => setTimeout(r, SCRIPT_GAP_MS)), { value: scriptedLine(m.persona, other, c.said.length, this.v.nextId), source: "rules" });
       if (!this.hosting(npc)) return; // moved to another host meanwhile
       c.said.push(`${m.persona.name}: ${ans.value}`);
-      m.source = ans.source;
+      m.source = m.lineSource = ans.source;
       const say = humanize(cleanReply(ans.value, true), m.persona);
       // A line to another player is theirs alone: their machine shows it, the host's does not.
       if (!to || to === this.me || NPCS.includes(to as Npc)) this.out.say(npc, say, other.name);
@@ -390,7 +390,7 @@ export class NpcVillage {
         ? await this.sched.ask({ prio: PRIO.emote, timeoutMs: 15000, req: petLinePrompt(m.persona, m.mem, pet.name, this.hub.sceneOf?.(npc, pet.pos) ?? ""), parse: (t) => parseLine(t, m.persona.name), fallback: () => scriptedPetLine(m.persona, pet.name, k) })
         : { value: scriptedPetLine(m.persona, pet.name, k), source: "rules" };
       if (!this.hosting(npc)) return;
-      m.source = ans.source;
+      m.source = m.lineSource = ans.source;
       this.out.say(npc, ans.value, pet.name);
       this.out.line({ who: npc, say: ans.value });
       const g = gameTime(this.v.t);
@@ -523,7 +523,7 @@ export class NpcVillage {
           this.out.say(l.who, "...");
           await new Promise((r) => setTimeout(r, STORY_TYPE_MS));
         }
-        if (m) m.source = by;
+        if (m) m.source = m.lineSource = by;
         const say = m ? humanize(l.text, m.persona) : l.text;
         this.said(l.who, say);
         if (l.who === teller) told.push(say);
@@ -648,6 +648,7 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
     const ans = answer ? { value: answer as string | null, source: "rules" } : free ? { value: free.text as string | null, source: free.source }
       : await this.sched.ask({ prio: PRIO.talk, timeoutMs: 25000, req: replyPrompt(m.persona, m.mem, player, line, seen), parse: (t) => parseLine(t, m.persona.name), fallback: () => null as string | null });
     if (!ans.value) return null;
+    m.lineSource = ans.source; // the reply to a player's own line (bug 65)
     const g = gameTime(this.v.t);
     remember(m.mem, g.day, clockLabel(g.hour), `${player} asked "${line.slice(0, 40)}", I said "${ans.value.slice(0, 40)}"`);
     const wait = this.quiet.get(key) ?? 0;

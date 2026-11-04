@@ -28,6 +28,11 @@ Shot before: `.scratch/bugs/63-table-left-edge-before.png`. Live (worker b10caae
 - Fixed, waiting for review: 47 (leaving the house put you on a blocked tile: the door column sits on the farm plot's edge; now the nearest open spot, `village-walk.test.ts`). 25 (own character jumped back while holding a direction; `proof/game/walk-steady.md`).
 
 ## Game
+65 (found by Claude, scope check 2026-11-04): **the inspector (I) said "the village rules" right after Muse Spark answered
+you.** The reply to a player's own line never recorded who answered it, and each activity choice overwrote the label.
+Fix: a mind keeps `lineSource` for its last spoken line (`hub.ts`, `npcs.ts`); the inspector shows it first, a pet that
+only decides shows its last decision (`inspector.ts` `lastLineSource`, `inspector.test.ts`). Proven on live (worker
+24fb26ae, no-GPU host): `proof/game/inspector-65-nogpu-live.png`.
 - Fixed, waiting for review: 37 (dance never started, Pip waited alone for soccer). Dance and soccer are open now: one may start, others join; dance has its own floor and an evening party pull; a dancing player pulls villagers (headless watch: dance 30, soccer 7 in 8 game days, `proof/game/activities.md` P2). Not yet seen in a live watch.
 - Fixed (found in P2): map rocks drew nothing yet blocked the way (their "rock-small" picture was never loaded); they use the pack's rock stamp now.
 
