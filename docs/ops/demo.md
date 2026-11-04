@@ -70,11 +70,20 @@ join+0.3, n03 life+0.2, n04 inspect+0.8, n05 invite+9.0, n06 leave+2.0, n07 forg
 sorry+3.5, n10 duel2+0.3, n11 coach+0.4, n12 gazette+0.2 (runs over campfire and postcard), n13 handover+0.4,
 n14 close+0.6.
 
-**Left to do:** peek 17-22 and fix; re-peek 4, 12, 16; render all 22; music (an original chiptune loop made in
-Python/numpy, plus a soft blip per bubble; no downloaded music); the edit in ffmpeg (concat with short fades,
-narration at the planned starts, -16 LUFS, ASS captions of the narration at the bottom, total <= 180 s); review a
-contact sheet and listen check (optionally faster-whisper on the mix to confirm words); SendUserFile the mp4; the
-user uploads it and pastes the link into the form.
+**Cut v1 done (2026-11-05 00:40 VN):** `.scratch/video/mindworld-demo.mp4` (179.3 s, 1080p30, -14.2 LUFS, -1.4
+dBTP, skill `check.py --platform youtube` 0 failed) + `mindworld-demo-preview.mp4` (27 MB, phone) + `mindworld.srt`
+(narration subtitles for YouTube's caption upload; not burned in, because in-game cards sit at the bottom).
+Pipeline, all in `.scratch/video/`: `render-all.sh` (clips) -> `edit.json` (order, tail trims, mood, narration starts)
+-> `python -I mix.py` (original seeded chiptune per mood section, cuts land on shot changes; blips from the shots'
+say/think/emote cues; Kokoro narration; music ducked 6 dB under speech) -> skill `loudness.py -I -14 --tp -1.5`
+-> `python final.py` (skill cut.py `--accurate`, join, audio `--replace mix-14.wav`, check). Lossless cuts overshoot 2
+frames per clip; always `--accurate`. Skill scripts run without `-I` (they import `_common`).
+Postcard (user, 2026-11-05: "the image doesn't relate to the game"): `assets/card-fire.png` is now Muse Image 1.0
+painted from two campfire frames of the game (`cardref/ref-wide.png`, `ref-close.png`) via `muse-card.py` (Responses
+API `input_image`, cap 4 calls, 1 used); old card in `cardref/card-fire-old.png`. The game's own `/api/postcard` still
+sends text only: same idea for the game = a later user decision.
+**Not verified:** nobody has listened to the mix (no ear here; faster-whisper not installed). **[USER]** watch and
+listen; confirm the opening line; upload the full-quality mp4.
 
 ## Setup
 - Record https://mindworld.uryto.dev at 1080p, 1x.

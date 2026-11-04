@@ -92,7 +92,7 @@ All Worker calls below also pass through the shared spend ledger described under
 | Muse Spark Open | Teacher data for the coach and village fine-tunes | Modal, offline training tools | USD/call limits and recorded calls; invalid training rows rejected. |
 | Muse Spark 1.3 | Review recent fights and propose a revised memo (`/api/llm`, memo; T then Tab) | Meta Model API, through Worker | Shared ledger caps; local/scripted coach. Revisions must pass practice fights. |
 | Muse Spark 1.3 | Village Gazette (`/api/gazette`) | Meta Model API; Baseten Muse Spark Open if Meta is unconfigured | $1/UTC day and quota; room/day cache, then headlines from rules. |
-| Muse Image 1.0 | Postcards from pet genes and the people present (`/api/postcard`) | Meta Model API, through Worker | $2/UTC day and quota; no new card on failure. |
+| Muse Image 1.0 | Postcards from pet genes and the people present, painted from frames of the game itself as reference pictures so a card looks like the village (`/api/postcard`; text-only if references are refused) | Meta Model API, through Worker | $2/UTC day and quota; no new card on failure. |
 | Muse Voice Transcribe 1.0 | Speak a lesson in Teach (`/api/transcribe`) | Meta Model API, through Worker | Shared ledger caps, server clip limit 30 seconds; type the lesson instead. |
 
 Browser weights: [q4f16_1](https://huggingface.co/kysupo/Llama-3.2-1B-Mindworld-q4f16_1-MLC) /
@@ -121,7 +121,7 @@ guard heavy hits, befriend a hurt foe, emote at a guarding foe. It compares agai
 - **AOI:** 16-tile cells, a 3×3 view, position batching and fewer far updates in a crowd.
   Joins, hosting and some shared events still go to the whole room.
 - **Cost safety:** current defaults in [worker/wrangler.toml](worker/wrangler.toml) cap cloud use at **$30/day**
-  overall, **$10/day per client** and **120 calls/minute per client**, plus provider total limits and feature quotas.
+  overall, **$2/day per client** and **120 calls/minute per client**, plus provider total limits and feature quotas.
   Client limits use a hashed IP. The ledger reserves the worst-case charge before a paid call; local models,
   rules and scripted replies provide free gameplay fallbacks. Optional images can simply be absent.
 

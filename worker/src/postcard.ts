@@ -1,16 +1,21 @@
 import type { Deps } from "./app";
+import { POSTCARD_REFS } from "./postcard-refs";
 import { UpstreamError } from "./providers";
 
 // Postcards (P5e, the surprise): after a win, a new friend, or a campfire story with the villagers, Muse Image on the
 // Meta Model API paints a keepsake postcard of the player's pet and the friends who were there, from real game state:
 // the pet's genes (colour, ears, tail, horns, pattern), who watched or told the story, what happened. The client sends
 // only those values (checked against the game's own lists here) and names; the prompt is written here, so the key
-// paints nothing else. $0.01 an image (dev.meta.ai pricing, 2026-11-04), capped per UTC day (KV) and by the global
-// ledger and quota. Any failure answers 200 with no image: the album simply gets no card that time.
+// paints nothing else. Muse Image gets frames of the game itself as reference pictures (postcard-refs.ts, user
+// 2026-11-05: cards must look like this village), on the Responses API; if that is refused, the plain text-only
+// generation paints the card. Booked at $0.02 a card (dev.meta.ai lists $0.01 an image; the frames add input tokens),
+// capped per UTC day (KV) and by the global ledger and quota. Any failure answers 200 with no image: the album simply
+// gets no card that time.
 
-export const POSTCARD_URL = "https://api.meta.ai/v1/images/generations";
+export const POSTCARD_URL = "https://api.meta.ai/v1/responses"; // Muse Image with the game's frames as references
+export const POSTCARD_TEXT_URL = "https://api.meta.ai/v1/images/generations"; // fallback: text only
 export const POSTCARD_MODEL = "muse-image-1.0";
-export const POSTCARD_USD = 0.01; // flat per generated image; billed only when one comes back
+export const POSTCARD_USD = 0.02; // booked per generated image; billed only when one comes back
 export const POSTCARD_DAILY_USD = 2; // hard cap for this feature, per UTC day
 export const POSTCARD_QUOTA = { pool: "postcard", perClient: 8, total: 200 };
 export const POSTCARD_SIZE = "1536x1024"; // the server keeps the ratio: a 3:2 postcard
@@ -112,7 +117,11 @@ export function petText(p: PetAsk): string {
 
 const list = (xs: readonly string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
-export function postcardPrompt(a: PostcardAsk): string {
+const STYLE_TEXT = "A keepsake postcard illustration in cozy pixel-art style, like a little village game: chunky pixels, soft outlines, warm sunny palette, front view.";
+const STYLE_REFS =
+  "The pictures are frames from this game. Paint a keepsake postcard of the moment below in exactly the game's own art style: crisp retro pixel art with hard square pixels, the same bright limited palette, the same top-down three-quarter view, the same small chibi villagers and round pet creatures, the same grass, flowers, round trees, houses and props. Frame it closer than the frames, centred on the moment, with a little more pixel detail. Wide 3:2 landscape.";
+
+export function postcardPrompt(a: PostcardAsk, refs = false): string {
   const pet = petText(a.pet);
   const folk = a.with.map((v) => VILLAGER_LOOK[v]);
   const foe = a.foe?.arch ? `a ${KIND[a.foe.arch]} wild ${a.foe.arch}` : `${a.foe?.owner ?? "a friend"}'s pet`;
@@ -123,7 +132,7 @@ export function postcardPrompt(a: PostcardAsk): string {
         ? `In a sunny meadow, ${pet} has just made a new friend: ${petText(a.friend!)}. The two pets play together while trainer ${a.player} smiles${folk.length ? ` and ${list(folk)} looks on` : ""}.`
         : `In a sunny meadow, ${pet} has just won a friendly pet match against ${foe} and jumps for joy beside trainer ${a.player}${folk.length ? `, while ${list(folk)} cheers` : ""}. Nobody is hurt; everyone is smiling.`;
   return [
-    "A keepsake postcard illustration in cozy pixel-art style, like a little village game: chunky pixels, soft outlines, warm sunny palette, front view.",
+    refs ? STYLE_REFS : STYLE_TEXT,
     scene,
     "Cute and gentle, for all ages. No text, letters, words, numbers or logos anywhere in the picture.",
   ].join("\n");
@@ -140,6 +149,32 @@ export interface PostcardReply {
   why?: string;
   costUsd?: number;
 }
+
+type Call = (a: PostcardAsk, deps: Deps, signal: AbortSignal) => Promise<string>;
+const post = (deps: Deps, url: string, body: unknown, signal: AbortSignal) =>
+  deps.fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${deps.cfg.providers.meta.apiKey ?? ""}`, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+// The game's own frames as references (Responses API: input_image parts in a user message).
+const withRefs: Call = async (a, deps, signal) => {
+  const content = [{ type: "input_text", text: postcardPrompt(a, true) }, ...POSTCARD_REFS[a.scene].map((image_url) => ({ type: "input_image", image_url }))];
+  const res = await post(deps, POSTCARD_URL, { model: POSTCARD_MODEL, input: [{ role: "user", content }] }, signal);
+  if (!res.ok) throw new UpstreamError(`upstream status ${res.status}`, res.status);
+  const body = (await res.json()) as { output?: { type?: unknown; result?: unknown }[] };
+  const item = body.output?.find((o) => o.type === "image_generation_call" && typeof o.result === "string");
+  return typeof item?.result === "string" ? item.result : "";
+};
+
+const textOnly: Call = async (a, deps, signal) => {
+  const res = await post(deps, POSTCARD_TEXT_URL, { model: POSTCARD_MODEL, prompt: postcardPrompt(a), n: 1, size: POSTCARD_SIZE }, signal);
+  if (!res.ok) throw new UpstreamError(`upstream status ${res.status}`, res.status);
+  const body = (await res.json()) as { data?: { b64_json?: unknown }[] };
+  return typeof body.data?.[0]?.b64_json === "string" ? body.data[0].b64_json : "";
+};
 
 export async function paintPostcard(a: PostcardAsk, deps: Deps, clientKey: string): Promise<PostcardReply> {
   const none = (why: string, costUsd = 0): PostcardReply => ({ source: "none", why, ...(costUsd ? { costUsd } : {}) });
@@ -162,15 +197,12 @@ export async function paintPostcard(a: PostcardAsk, deps: Deps, clientKey: strin
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   let b64 = "";
   try {
-    const res = await deps.fetch(POSTCARD_URL, {
-      method: "POST",
-      headers: { authorization: `Bearer ${cfg.providers.meta.apiKey ?? ""}`, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ model: POSTCARD_MODEL, prompt: postcardPrompt(a), n: 1, size: POSTCARD_SIZE }),
-      signal: ctl.signal,
-    });
-    if (!res.ok) throw new UpstreamError(`upstream status ${res.status}`, res.status);
-    const body = (await res.json()) as { data?: { b64_json?: unknown }[] };
-    b64 = typeof body.data?.[0]?.b64_json === "string" ? body.data[0].b64_json : "";
+    try {
+      b64 = await withRefs(a, deps, ctl.signal);
+    } catch (e) {
+      if (!(e instanceof UpstreamError)) throw e;
+      b64 = await textOnly(a, deps, ctl.signal); // refused (not billed): the plain text card instead
+    }
   } catch (e) {
     if (e instanceof UpstreamError) {
       // Not billed: only images that come back cost anything.

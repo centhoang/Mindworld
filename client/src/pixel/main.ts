@@ -568,7 +568,6 @@ world.attachMinds(mindSched, () => localBrain() !== null || (!LOCAL_ONLY && clou
   }
 })());
 // The NPC's host logs every line said to a player, so a play-test can be read afterwards.
-world.npcs!.onChat = (e) => void fetch("/api/chatlog", { method: "POST", body: JSON.stringify(e) }).catch(() => {});
 const saveMinds = () => {
   try {
     if (world.minds) localStorage.setItem(MINDS_KEY, JSON.stringify(world.minds.snapshot()));

@@ -37,6 +37,24 @@
 - The video's opening line ("built Oct 27 - Nov 4 / already existed: open-source libraries, a licensed pixel-art pack
   (Sunnyside World), Meta's models"): the user confirms when watching the cut.
 
+## Session 2026-11-05 00:45 VN: demo cut v1 delivered (details `docs/ops/demo.md` "Cut v1 done")
+- `.scratch/video/mindworld-demo.mp4` 179.3 s, sent to the user with the preview and `mindworld.srt`. Waiting on the
+  user's watch/listen. Stack closed (dev servers, test Chrome). Spend this session: 1 Muse Image call (~$0.01).
+- P8 not started: asked the user whether the 2+ player play-test comes first (P8 ends chat logging and deletes rows).
+
+## Earlier in this session (kept for reference)
+- All 22 shots peeked OK (fixes: campfire firelit pool, dance 320x180 spread, handover emotes per half + labels,
+  KAI sign, held story memories in the 3 inspectors). Narration re-voiced 1.05 (n03 shortened).
+- `render-all.sh` renders all clips to `clips/` (log `render.log`). Final cut plan `edit.json` (179.3 s, tail trims,
+  narration starts). `mix.py` -> `mix.wav` (original chiptune by mood, blips, ducked narration) -> `mix-16.wav`
+  (-16 LUFS, skill loudness.py). `mindworld.srt` = subtitles for YouTube upload (not burned: in-game cards at bottom).
+- ffmpeg skill: `.claude/skills/ffmpeg-skill` (user OK'd; git-excluded via .git/info/exclude). Run without `-I`.
+- User asked (00:20): postcard should look like the game. `muse-card.py out "prompt" ref.png...` (Responses API
+  with game frames as `input_image`, hard cap 4 calls, ledger `muse-calls.json`). Replace `assets/card-fire.png`,
+  `node shoot.mjs load`, re-render postcard only. Later maybe the same in the game's /api/postcard (user decides).
+- Left: card, re-render postcard, cut (skill cut/join, audio --replace mix-16.wav), check youtube, look sheet,
+  SendUserFile. P8: ask user first (play-test not done; P8 ends chat logging, deletes rows).
+
 ## Next actions
 1. **Finish the demo video** (`docs/ops/demo.md` "Video build", "Left to do"): start the stack (worker-mock,
    client-dev-room, test Chrome, `node shoot.mjs load`), peek shots 17-22 and fix, re-peek 4/12/16, re-voice at 1.05

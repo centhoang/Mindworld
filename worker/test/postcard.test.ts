@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { colourName, parsePostcardAsk, petText, POSTCARD_DAILY_USD, POSTCARD_MODEL, POSTCARD_URL, postcardPrompt } from "../src/postcard";
+import { colourName, parsePostcardAsk, petText, POSTCARD_DAILY_USD, POSTCARD_MODEL, POSTCARD_TEXT_URL, POSTCARD_URL, POSTCARD_USD, postcardPrompt } from "../src/postcard";
 import { harness, postJson } from "./helpers";
 
 const PET = { name: "Bolt<b>", hue: 0.3, accent: 0.62, ears: "bunny", tail: "curl", horns: "nubs", pattern: "stripes" };
 const WIN = { scene: "win", player: "Kai", pet: PET, foe: { arch: "brute" }, with: ["ama", "rival", "ama"] };
 const day = new Date(1_700_000_000_000).toISOString().slice(0, 10);
-const imageReply = (b64 = "UklGRiQAAABXRUJQVlA4") => new Response(JSON.stringify({ data: [{ b64_json: b64 }], usage: {} }), { status: 200, headers: { "content-type": "application/json" } });
+const json = (v: unknown) => new Response(JSON.stringify(v), { status: 200, headers: { "content-type": "application/json" } });
+const imageReply = (b64 = "UklGRiQAAABXRUJQVlA4") => json({ output: [{ type: "reasoning" }, { type: "image_generation_call", result: b64 }], usage: {} });
+const textReply = (b64 = "iVBORw0KGgo") => json({ data: [{ b64_json: b64 }], usage: {} });
 
 describe("/api/postcard", () => {
   it("takes only the game's own values: a scene, gene words, villagers; names cleaned", () => {
@@ -32,16 +34,33 @@ describe("/api/postcard", () => {
     expect(fire).toContain("beside Mo, a calm young fisher");
   });
 
-  it("paints one image on the Meta Model API, books $0.01, and answers with a data URL", async () => {
+  it("paints one image from the game's own frames on the Meta Model API, books it, and answers with a data URL", async () => {
     const h = harness();
     h.upstream.respond = async () => imageReply();
     const r = (await (await h.call("/api/postcard", postJson(WIN))).json()) as { source: string; image: string; model: string; costUsd: number };
-    expect(r).toMatchObject({ source: "model", model: POSTCARD_MODEL, costUsd: 0.01 });
+    expect(r).toMatchObject({ source: "model", model: POSTCARD_MODEL, costUsd: POSTCARD_USD });
     expect(r.image.startsWith("data:image/webp;base64,UklGR")).toBe(true);
+    expect(h.upstream.calls).toHaveLength(1);
     const call = h.upstream.calls[0]!;
     expect(call.url).toBe(POSTCARD_URL);
-    expect(JSON.parse(String(call.init.body))).toMatchObject({ model: "muse-image-1.0", n: 1, size: "1536x1024" });
-    expect((await h.ledger.snapshot()).dailySpentUsd).toBeCloseTo(0.01);
+    const body = JSON.parse(String(call.init.body)) as { model: string; input: { role: string; content: { type: string; text?: string; image_url?: string }[] }[] };
+    expect(body.model).toBe("muse-image-1.0");
+    const parts = body.input[0]!.content;
+    expect(parts[0]).toMatchObject({ type: "input_text" });
+    expect(parts[0]!.text).toContain("frames from this game");
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts.slice(1).every((p) => p.type === "input_image" && p.image_url!.startsWith("data:image/png;base64,iVBOR"))).toBe(true);
+    expect((await h.ledger.snapshot()).dailySpentUsd).toBeCloseTo(POSTCARD_USD);
+  });
+
+  it("if the reference call is refused, the text-only card is painted instead", async () => {
+    const h = harness();
+    h.upstream.respond = async (url: unknown) => (String(url) === POSTCARD_URL ? new Response("bad request", { status: 400 }) : textReply());
+    const r = (await (await h.call("/api/postcard", postJson({ ...WIN, scene: "campfire", with: ["elder"] }))).json()) as { source: string; image: string };
+    expect(r).toMatchObject({ source: "model" });
+    expect(r.image.startsWith("data:image/png;base64,iVBOR")).toBe(true);
+    expect(h.upstream.calls.map((c) => c.url)).toEqual([POSTCARD_URL, POSTCARD_TEXT_URL]);
+    expect(JSON.parse(String(h.upstream.calls[1]!.init.body))).toMatchObject({ model: "muse-image-1.0", n: 1, size: "1536x1024" });
   });
 
   it("an upstream error costs nothing; over the day's cap no call; a bad ask is a 400", async () => {

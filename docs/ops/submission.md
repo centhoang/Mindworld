@@ -64,7 +64,8 @@ what the world forbids.
 - **Muse Spark 1.3** (Meta Model API): the Village Gazette, one paper per room and game day from the day's real events;
   the coach review ("learn from my fights") that writes a revised memo.
 - **Muse Image 1.0** (Meta Model API): postcards of your pet and the friends who were there, painted from the pet's
-  genes and the real moment (a win, a new friend, a campfire story).
+  genes and the real moment (a win, a new friend, a campfire story), with frames of the game itself as reference
+  pictures so every card looks like the village.
 - **Muse Voice Transcribe** (Meta Model API): teaching your pet by voice.
 Every cloud call goes through our Cloudflare Worker with per-player and per-day USD caps and a free fallback.
 

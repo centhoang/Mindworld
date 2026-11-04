@@ -117,7 +117,6 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
     if (path === "/api/cheer" && method === "POST") return handleCheer(request, deps);
     if (path === "/api/banter" && method === "POST") return handleBanter(request, deps);
     if (path === "/api/postcard" && method === "POST") return handlePostcard(request, deps);
-    if (path === "/api/chatlog" && method === "POST") return handleChatLog(request, deps);
     if (path === "/api/transcribe" && method === "POST") return handleTranscribe(request, deps);
     if (path === "/api/ghosts" && method === "POST") return handleGhostCreate(request, deps);
     if (path === "/api/ghosts/random" && method === "GET") return handleGhostGet(await randomGhost(deps.ghosts, deps.random));
@@ -133,23 +132,6 @@ export async function handleRequest(request: Request, deps: Deps): Promise<Respo
   // The pixel build used to live at /pixel.html; it is the main page now.
   if (path === "/pixel.html" || path === "/pixel") return Response.redirect(new URL("/", request.url).toString(), 301);
   return deps.assets ? deps.assets.fetch(request) : fail(404, "not_found");
-}
-
-// ---------- chat log ----------
-
-// What players and villagers said, so a play-test can be read afterwards. Write-only here: reading goes through
-// `wrangler kv`, so the log stays private once Access is gone. Records expire.
-const CHATLOG_PREFIX = "chat:";
-const CHATLOG_TTL_SECONDS = 14 * 24 * 3600;
-const CHATLOG_MAX_CHARS = 1000;
-
-async function handleChatLog(request: Request, deps: Deps): Promise<Response> {
-  const b = await readJson(request, CHATLOG_MAX_CHARS) as Record<string, unknown> | undefined;
-  const text = (k: string, n: number) => (typeof b?.[k] === "string" ? (b[k] as string).slice(0, n) : "");
-  if (!text("npc", 16) || !text("reply", 300)) return fail(400, "bad_request");
-  const row = { t: deps.now(), npc: text("npc", 16), player: text("player", 24), line: text("line", 300), reply: text("reply", 300), source: text("source", 16) };
-  await deps.ghosts.put(`${CHATLOG_PREFIX}${row.t}:${deps.newId().slice(0, 8)}`, JSON.stringify(row), { expirationTtl: CHATLOG_TTL_SECONDS });
-  return json({ ok: true });
 }
 
 // ---------- LLM proxy ----------

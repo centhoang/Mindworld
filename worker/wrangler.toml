@@ -8,7 +8,6 @@ compatibility_date = "2026-10-01"
 # the user 2026-11-04, after its hostname joined the Access app). pets stays until P8, then only mindworld is used.
 routes = [
   { pattern = "mindworld.uryto.dev", custom_domain = true },
-  { pattern = "pets.uryto.dev", custom_domain = true },
 ]
 
 [triggers]
@@ -53,7 +52,7 @@ MAX_TOTAL_USD_BASETEN = "50"
 MAX_TOTAL_USD_META = "100"
 MAX_TOTAL_USD_MODAL = "20"
 MAX_TOTAL_USD_GLIMMER = "30"
-CLIENT_DAILY_USD = "10"
+CLIENT_DAILY_USD = "2"
 CLIENT_PER_MINUTE = "120"
 BASETEN_BASE_URL = "https://inference.baseten.co/v1"
 BASETEN_MODEL = "meta-models/muse-spark-open-1026"

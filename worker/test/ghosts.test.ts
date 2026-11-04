@@ -118,17 +118,8 @@ describe("ghost sanitizing", () => {
 });
 
 describe("chat log", () => {
-  it("keeps a capped line with a TTL and has no public way to read it", async () => {
+  it("is gone after the play-tests (P8)", async () => {
     const h = harness();
-    const keys: [string, string, number | undefined][] = [];
-    const put = h.ghosts.put;
-    h.ghosts.put = async (k, v, o) => (keys.push([k, v, o?.expirationTtl]), put(k, v, o));
-    const r = await h.call("/api/chatlog", postJson({ npc: "pip", player: "Kai", line: "x".repeat(400), reply: "Hi", source: "rules" }));
-    expect(r.status).toBe(200);
-    expect(keys[0]![0]).toMatch(/^chat:/);
-    expect(JSON.parse(keys[0]![1]).line).toHaveLength(300);
-    expect(keys[0]![2]).toBeGreaterThan(0);
-    expect((await h.call("/api/chatlog")).status).toBe(404);
-    expect((await h.call("/api/chatlog", postJson({ npc: "pip" }))).status).toBe(400);
+    expect((await h.call("/api/chatlog", postJson({ npc: "pip", reply: "Hi" }))).status).toBe(404);
   });
 });
