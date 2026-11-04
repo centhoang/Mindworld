@@ -31,4 +31,10 @@ the bot part is one command, `node scripts/join-check.mjs` (run it after every d
 - [x] Players with no GPU, a phone-size window or a slow connection can join and play. (A phone has no touch controls yet:
   it can join and watch.) Touch controls since P4 (`pixel/touch.ts`: stick, E / X / T), proven in the dev pane at 375x812;
   not yet on a real phone.
+- [x] [proof](../proof/network/llm-lockdown-live.md) A player whose connection dies without a goodbye is gone from
+  everyone's list within about 90 s (the room's reaper), so the room never fills with ghosts (2026-11-04).
+- [x] [proof](../proof/network/llm-lockdown-live.md) The cloud model behind the game answers only the game's own four
+  kinds of request; any other prompt is refused (2026-11-04).
+- [ ] After the move to mindworld.uryto.dev: the new address shows the Access login from outside until P8, and the game
+  from home.
 - [ ] After the game goes public: a phone on mobile data and a second machine join at the same time.
