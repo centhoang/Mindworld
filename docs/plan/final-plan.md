@@ -232,6 +232,20 @@ Bug fixes only. First the flaky join check (HANDOFF). Then, before Access goes (
 - `/api/llm` is a general model proxy: any prompt, the provider picked by the client (kinds memo, teach, dialogue,
   move). Lock it down: provider fixed per kind, a tight prompt size, and the system prompts on the worker if that is
   small enough to do safely.
+  **Research done (2026-11-04 16:30 VN), build next.** The four callers, each with one fixed system prompt:
+  | kind | caller | provider | maxTokens | system |
+  |---|---|---|---|---|
+  | memo | `sim/cortex.ts` reflect (`LlmCortex`) | meta | 4000 | `SYSTEM_PROMPT` (cortex.ts:23) |
+  | teach | `sim/cortex.ts` teach | baseten | 4000 | `SYSTEM_PROMPT` |
+  | dialogue | `game/voices.ts:111` `CloudMind` | worker default | 400 | `SYSTEM` in `mind/brain.ts:24` (not exported yet) |
+  | move | `game/voices.ts:55` `CloudVoice` (main.ts:547) | modal | 600 | `buildVoicePrompt` in `game/instinct.ts:60`: holds the pet's name, so match by pattern |
+  All send `effort: "low"`. Plan: a pure `worker/src/llm-policy.ts` (no imports, so a client test can import it) with
+  per kind the provider, max tokens, max prompt chars (measure real sizes first: reflect prompt has the memo plus fight
+  summaries) and a system check (exact text for memo/teach/dialogue, a regex with a short name for move). `handleLlm`
+  (`worker/src/app.ts:213`, parser at :169) refuses a system that fails the check, uses the policy's provider whatever
+  the client sends, caps tokens and forces low effort. Tests: worker `app.test.ts` refusals; a client test that the
+  real prompts pass. `finetune/*` scripts send other systems as `teach`: dev only, run them on a local worker. Deploy,
+  join check, then prove on live one coach reflect, one Teach, one cloud villager line and one cloud move still answer.
 - `CLIENT_DAILY_USD` is "10" in `worker/wrangler.toml` (raised so tabs on one home IP could test). Public, three
   strangers could spend the whole $30 day and leave everyone on rules. Keep it for the user's play-test, then lower it
   (~$2) before Access goes. The Meta total cap (`MAX_TOTAL_USD_META` 100 under the $149.91 credit) keeps the card safe.

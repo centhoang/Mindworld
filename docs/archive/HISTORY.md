@@ -243,3 +243,28 @@ size, asking Codex specifically for the art. All 8 are fixed on live now (above)
   villager remembers it. Watcher = `Overworld.watcher()` (16 tiles, awake, outdoors, not the rival's owner).
 - **P5c**: the mind inspector (I) shows `LAST LINE: <service>` (`pixel/inspector.ts serviceLabel`).
 - `docs/ops/demo.md` lists the two new Meta model uses; `checks/game.md` has three new ticked lines.
+
+## 2026-11-04 session (P5d banter and campfire stories, P5e postcards, the mission doc), from HANDOFF
+Done that session (on live; proof `docs/testing/proof/game/p5-live.md` d and e, design `docs/ai/npc.md`)
+- **P5d villagers talk to each other and tell campfire stories from the cloud** (`/api/banter`, worker `banter.ts`,
+  client `game/banter-api.ts`, `NpcVillage.banter` behind `CLOUD_LIVELY`). One Muse Spark Open call writes a whole
+  talk from both villagers' notes (`NpcVillage.notesOf`: doing, feelings, facts, notable then latest memories, prices
+  as coins, no small talk). Paths: two villagers I host (`MindHub.talk` -> `cloudTalk`), a villager on another machine
+  (`speak` -> `mateLine`, one line each), evening campfire with a player within 8 tiles (`campfire()`, once a game day
+  per machine; test hook `__px.world.npcs.storyNow()`). Only while a player is within 14 tiles, one per 40 s per
+  machine, $1/day, quota `banter`. Fallback: old local/scripted path; `rulesStory` for a story. Memories written both
+  ways (the story's memory showed up in the next talk live). ~$0.005 and ~4 s a call.
+- **P5e Postcards** (`/api/postcard`, worker `postcard.ts`, client `game/postcard-api.ts` `Album`, `pixel/album.ts`).
+  Checked on dev.meta.ai first: Muse Image 1.0, `POST api.meta.ai/v1/images/generations`, base64 back, $0.01 an image.
+  After a win, a new friend, or a campfire story you sat through, the worker paints a keepsake from game values only
+  (genes, foe, villagers there; it writes the prompt). Album on C or the Album chip, last 12, on this device. One card
+  per kind per game day; $2/day cap, quota `postcard`. Live: campfire and win cards (`postcard-*-live.png`). Fixed
+  live: a refused call (per-minute limit) used up the day's slot; now a retry after 20 s and the slot comes back.
+- Checks: three new ticked lines in `checks/game.md`; `docs/ops/demo.md` lists both new Meta model uses.
+- **The mission** (user's words) and the comparison with Atelico's three posts: `docs/game/mission.md` (pointer in
+  `CLAUDE.md`). Stand-outs: the browser, one shared world with AOI, inference shared across players, hosting hands on,
+  any hardware plays, local first with a capped cloud. Atelico is ahead on agents per machine and as a toolkit.
+
+
+## 2026-11-04 session (~16:40 VN): flaky join check fixed, P4 visual leftovers
+See HANDOFF of commit after b0ec50d, `docs/testing/proof/network/join-live.md` (2026-11-04 ~16:30) and `docs/plan/final-plan.md` Status.

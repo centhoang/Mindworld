@@ -1,66 +1,49 @@
-# HANDOFF: Mindworld final plan (2026-11-04, ~13:10 VN = 06:10 UTC)
+# HANDOFF: Mindworld final plan (2026-11-04, ~16:40 VN = 09:40 UTC)
 
-**Starting prompt:** "Read HANDOFF.md, then do Next actions in order: the flaky join check, the P4 visual leftovers, then P6 and the rest of the plan (no need to wait for the timeline). Follow CLAUDE.md."
+**Starting prompt:** "Read HANDOFF.md, then do Next actions in order: the /api/llm lock-down (P6), then the rest of P6, P7 and P8. Follow CLAUDE.md."
 
 ## Where things stand
-- **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, VN timeline, cut lines, and a
-  Status section at the top. Keep that Status current every session. **User, 2026-11-04 ~13:20 VN: go on now with the P4
-  visual leftovers, then P6 and the rest, no need to follow the timeline** (time ahead goes to the submission form's
-  questions, the demo and the video). Access stays until right before submitting (P8).
-- **P5 is complete.** Live worker ebecde8f, build `main-p-yOsRi0`. Local commits on `rework/fresh-look`, not pushed.
-- Tests: client 702, worker 242, tsc clean both. **Join check is flaky today:** four runs after the P5d/P5e
-  deploys went 16, 20, 17, 19 of 20, each failing a different socket check (bots with no welcome, the spill room not
-  opening, two bots ending a kick burst on different kicks). P5 adds no room code. Files `.scratch/p5/join-check-p5{d,d-2,e,e-2}.txt`.
-- Spend: P5d ~8 Muse Spark Open calls (~$0.04), P5e 3 Muse Image images ($0.03). Before it: day $0.07 of $30, Baseten $1.24 of $50, Meta $0.012
-  of $100 (credit $149.91), Modal untouched. Read `/api/spend` in the test Chrome for the day's number.
+- **The plan:** `docs/plan/final-plan.md` (approved 2026-11-03 16:20 VN). Phases P0-P8, cut lines, and a Status section
+  at the top. Keep that Status current every session. User, 2026-11-04 ~13:20 VN: no need to follow the timeline
+  (time ahead goes to the submission form's questions, the demo and the video). Access stays until right before submitting (P8).
+- **P5 complete; the flaky join check and the P4 visual leftovers are done.** Live worker 0b4d6bf9, build
+  `main-czFxq799`. Local commits on `rework/fresh-look` (last `b0ec50d`), not pushed.
+- Tests: client 704, worker 242, tsc clean both. Join check 20/20 x3 after the deploy.
+- Spend this session: none (no model calls). Before it: day ~$0.14 of $30, Baseten ~$1.28 of $50, Meta $0.012 of
+  $100 (credit $149.91), Modal untouched. Read `/api/spend` in the test Chrome for the day's number.
 - Earlier sessions' done lists: `docs/archive/HISTORY.md` (grep "2026-11-04 session" or "2026-11-03 session").
 
-## Done this session (on live; proof `docs/testing/proof/game/p5-live.md` d and e, design `docs/ai/npc.md`)
-- **P5d villagers talk to each other and tell campfire stories from the cloud** (`/api/banter`, worker `banter.ts`,
-  client `game/banter-api.ts`, `NpcVillage.banter` behind `CLOUD_LIVELY`). One Muse Spark Open call writes a whole
-  talk from both villagers' notes (`NpcVillage.notesOf`: doing, feelings, facts, notable then latest memories, prices
-  as coins, no small talk). Paths: two villagers I host (`MindHub.talk` -> `cloudTalk`), a villager on another machine
-  (`speak` -> `mateLine`, one line each), evening campfire with a player within 8 tiles (`campfire()`, once a game day
-  per machine; test hook `__px.world.npcs.storyNow()`). Only while a player is within 14 tiles, one per 40 s per
-  machine, $1/day, quota `banter`. Fallback: old local/scripted path; `rulesStory` for a story. Memories written both
-  ways (the story's memory showed up in the next talk live). ~$0.005 and ~4 s a call.
-- **P5e Postcards** (`/api/postcard`, worker `postcard.ts`, client `game/postcard-api.ts` `Album`, `pixel/album.ts`).
-  Checked on dev.meta.ai first: Muse Image 1.0, `POST api.meta.ai/v1/images/generations`, base64 back, $0.01 an image.
-  After a win, a new friend, or a campfire story you sat through, the worker paints a keepsake from game values only
-  (genes, foe, villagers there; it writes the prompt). Album on C or the Album chip, last 12, on this device. One card
-  per kind per game day; $2/day cap, quota `postcard`. Live: campfire and win cards (`postcard-*-live.png`). Fixed
-  live: a refused call (per-minute limit) used up the day's slot; now a retry after 20 s and the slot comes back.
-- Checks: three new ticked lines in `checks/game.md`; `docs/ops/demo.md` lists both new Meta model uses.
-- **The mission** (user's words) and the comparison with Atelico's three posts: `docs/game/mission.md` (pointer in
-  `CLAUDE.md`). Stand-outs: the browser, one shared world with AOI, inference shared across players, hosting hands on,
-  any hardware plays, local first with a capped cloud. Atelico is ahead on agents per machine and as a toolkit.
+## Done this session (on live)
+- **Join check steady** (proof `docs/testing/proof/network/join-live.md`, 2026-11-04 ~16:30). Cause: the link, not the
+  room. From home a socket takes 1-2.5 s to open under a burst; all the bad runs came straight after deploys (Durable
+  Objects restart). Script (`scripts/join-check.mjs`): each try logs start/open/close; a try with no welcome in 6 s is
+  dropped and retried; single joins wait 15 s; a quit bot's retry timer no longer brings it back; the kick burst waits
+  up to 4 s to settle. Rule (`docs/ops/tooling.md`): run it a minute after `/` serves the new build. Game
+  (`client/src/world/live.ts`): `WELCOME_WAIT_MS` 10 s connect watchdog, per-socket keepalive (tests in `live.test.ts`).
+- **P4 leftovers** (proof `docs/testing/proof/visual/p4-{village,square,clump-nw,clump-east}-live.png`, ticked in
+  `checks/visual.md`; rules in `docs/visual/visual.md`): 52 trees in clumps toward the coast plus small inland groups
+  (villagers still chop near the square), stumps (`s`), berry bushes (`B` = kind `bush-big`, art `bush-berry`), the
+  pack's statue on the square (`STATUE` in `world/village-map.ts`, landmark with a plinth-only footprint), three square
+  corners rounded. Layout scripts: `.scratch/p6/layout.py` (trees/bushes/stumps lists), `.scratch/p6/plaza.py`.
+- **P6 lock-down researched, not built:** the table of callers and the build plan are in `docs/plan/final-plan.md` P6.
 
 ## Next actions
-1. **The flaky join check** (user's pick for next session). Four runs after the P5d/P5e deploys: 16, 20, 17, 19 of 20,
-   each failing a different socket check: bots with no welcome (one waited 11.5 s), the spill room not opening, two
-   bots ending a kick burst on different kicks. Before today it was 20/20 twice. P5 adds no room code, so suspect
-   load or timing in the room DO (welcome path under a 20-socket burst, kick relay) or the script's own timing before
-   the network. Rerun 3 times first (`node scripts/join-check.mjs`, test Chrome closed; ~2 min each, background it),
-   read the failing rows in `.scratch/p5/join-check-p5{d,d-2,e,e-2}.txt`, then `worker/src/room-do.ts` and
-   `scripts/join-check.mjs`. Fix, deploy, prove 20/20 three times in a row.
-2. **P4 visual leftovers, before P6** (user, 2026-11-04): tree clumps toward the coast, stumps, berry bushes, and
-   the plaza's bare dirt (the pack's `statue.png` is exported but not loaded). Read `docs/visual/visual.md`, then
-   `layers.md`, before changing anything; everything in BuiltDemo is in the pack, so search the tileset and Room1
-   before calling art missing; Codex only for art the pack truly lacks (`docs/visual/style.md`). Reference sheet
-   `.scratch/p4/demo-all.png`. Deploy, join check, a live screenshot proof per item, tick `checks/visual.md`.
-3. **P6** (bug fixes only from here; starts right after step 2): before Access goes, lock down `/api/llm` (a general model proxy: any
-   prompt, client-picked provider) and plan to lower `CLIENT_DAILY_USD` from "10" (~$2) after the user's play-test;
-   details in `docs/plan/final-plan.md` P6. Then `scope-check` every scope on live, then the user's last play-test (2+
-   players), then P7 (demo script, README, numbers; the submission form's questions) and P8 (order written there).
+1. **Lock down `/api/llm`** (P6, before Access goes): follow the plan in `docs/plan/final-plan.md` P6 ("Research
+   done"). Measure real prompt sizes first. Deploy, join check (a minute after `/` shows the new build), then prove on
+   live that one coach reflect, one Teach, one cloud villager line and one cloud move still answer (~$0.02).
+2. Plan to lower `CLIENT_DAILY_USD` from "10" (~$2) after the user's play-test (P6).
+3. `scope-check` every scope on live, then the user's last play-test (2+ players), then P7 (demo script, README,
+   numbers; the submission form's questions) and P8 (order written there).
 4. **The mission** (`docs/game/mission.md`) is vision only, for the submission text and after the event: no new build
-   before the deadline (user). It now also holds the original island world idea and the host spreading rule.
+   before the deadline (user). It also holds the original island world idea and the host spreading rule.
 5. Open pet checks to prove on live: villager pet looks the same in the village and on the battle screen; a bored
    villager walks up and challenges you.
 6. After any user play-test: read the chat log unasked (PowerShell from `worker/`: `npx wrangler kv key list --binding
    GHOSTS --prefix "chat:<ms prefix>" --remote`, then `kv key get` each; rows are `{t, npc, player, line, reply, source}`;
    campfire story lines log with `line: "(campfire story)"`), add failures to `docs/testing/checks/npc.md`, bugs to
    `docs/BUGS.md`. If the user says "sleep", Director mode.
-7. P7 demo script: lead with `mission.md` points 1-5; show a campfire story and its postcard, and a win card.
+7. P7 demo script: lead with `mission.md` points 1-5; show a campfire story and its postcard, and a win card; the new
+   village look (clumps, statue) is a good opening shot.
 
 ## Open
 - Gazette weak spot: plain `remember()` notes live only in the host's tab, so a reload or host hand-over mid-day
@@ -92,6 +75,10 @@
 - Deadline: Nov 4, 9 PM ET = Nov 5, 9 AM Vietnam.
 
 ## Gotchas
+- **Whole-map or tile-box shots:** live, test Chrome: `node .scratch/p6/cdp-map.mjs "all"|"i0,j0,i1,j1" <out.png> [scale]`
+  (daylight, 1 art pixel per pixel). In the dev pane: `world.view.draw(scene, g, sw, sh, t)` on your own canvas with
+  `scene = world.buildScene()` and `scene.cam` on the box centre; the pane's screenshot can lag a frame, take two.
+- Roads draw a tile wider than their `=` tiles (`sunny-terrain.ts` `isRoad`): nothing small goes next to a road.
 - **Resource timing is full** in game tabs (1000+ assets): `performance.getEntriesByType` misses API calls. Read
   `__px.gazette.paper` or hook `fetch` instead.
 - Banter by hand (test Chrome, room `check`): drivers `.scratch/p5/live-banter-{api,chat,story,story-read}.js` (hook
