@@ -5,6 +5,77 @@ about 380 spoken words. Lines marked **[USER]** need the user's words or OK. Sub
 Order of the story (HANDOFF, `game/mission.md`): lead with what is new (browser, shared village, shared local AI,
 hand-over, free on any hardware), then show the villagers being alive, then the pet, then the close.
 
+## Video build (2026-11-04 evening): staged, not recorded (user decision)
+**User (2026-11-04):** no recording on live. Stage every scene with a script on a local build, write our own lines
+(no real AI output), set our own camera, add video-only polish (campfire light etc.), never change the live game.
+Claude builds the whole video; the user uploads it (YouTube) and submits.
+
+**How it works.** All tooling is in `.scratch/video/` (gitignored, not part of the product):
+- `stage.js`: injected before load. `__vt.on` = virtual clock: the game's rAF loop and intervals stop.
+- `director.js`: evaluated in the game tab. Drives the real `Overworld` and its view one frame at a time at 30 fps:
+  villagers are puppets (`D.npc(id, pos, act)` uses the sim's own `a.puppet`, pose from the activity table, re-held
+  every frame), Kai is `D.me(pos)`, Rin is a peer (`D.peer`/`D.peerTo`/`D.peerPose`), lines are the game's own
+  bubbles (`D.say(who, text, secs, to)`, `D.think`), emotes are the pack's UI icons (`D.emote(who, "love"|"stress"|
+  "alerted"|"confused"|"attack"|"working"|"chat")`), clock `D.clock(day, hour)`, `rate()` for time-lapse. The world
+  draws first, then video-only light (`D.ambient`: golden hour, blue dusk, night multiply, house lights, firelight with
+  embers, fireflies, cloud shadows, petals), then bubbles, inspector (real mind state; `D.src` pins "Llama 3.2 1B,
+  tuned"), emotes, cards. `s.custom` shots draw anything (battle view, Teach screen, split screen).
+- `shots/*.js`: one file per act, each shot `{W, H, dur, setup, frame, cam, fx, ui}` (art px; 480x270 = 4x,
+  640x360 = 3x, 960x540 = 2x of 1080p). Cues: `this.q = [[t, fn], ...]` + `D.run(this.q, T)`.
+- `shoot.mjs`: `node shoot.mjs load` (reload tab with stage + director + pack emotes + `assets/*.png` + shots),
+  `peek <shot> t1,t2 out.png` (contact sheet), `render <shot>` (frames to `frames/<shot>/`, then
+  `clips/<shot>.mp4` 1920x1080 nearest-neighbour, crf 16). `shot.mjs` = one screenshot; `cdp.mjs` = CDP client.
+- Narration: Kokoro TTS (offline, Apache-2.0, `pip install kokoro-onnx`, model in `.scratch/video/tts/`):
+  `python -I tts.py narration.json voice af_heart 1.0` writes `voice/<id>.wav` + `durations.json`.
+- Postcards: real Muse Image output cropped from `docs/testing/proof/game/postcard-*-live.png` into
+  `.scratch/video/assets/card-fire.png`, `card-win.png`.
+- Teach proof number is the game's own `prove()` on 1000 held-out fights: empty memo -> "guard when it winds up a
+  heavy hit" = 59% -> 74%, +15.0 pts (shown on the real Teach screen). Do not narrate a different number.
+
+**Stack to run it:** preview_start `worker-mock` (8799, LLM_MOCK) and `client-dev-room` (5181); test Chrome:
+`chrome.exe --user-data-dir=.scratch/mlc/chrome-profile --remote-debugging-port=9333 --disable-backgrounding-occluded-windows --disable-features=CalculateNativeWinOcclusion --disable-renderer-backgrounding --disable-background-timer-throttling --no-first-run --window-position=1920,0 --window-size=1920,1080 "http://localhost:5181/?gpu=skip&room=video"`,
+then `node shoot.mjs load` from `.scratch/video/`. Close any Browser-pane tab on 5181/8799 (it joins the room).
+
+**Shots (order, seconds, state).** Peeked OK unless noted. Cast: Kai (player, curly hair), Mochi (pet), Rin (second
+player), Elder, Mo, Ama, Pip. Day 10 = Thu (party), 11 = Fri.
+| # | shot | s | what | state |
+|---|---|---|---|---|
+| 1 | title | 12.5 | aerial pan, MINDWORLD title, "built Oct 27-Nov 4 / already existed" card | OK |
+| 2 | join | 10.5 | Kai leaves home, "RIN JOINED THE VILLAGE", confetti, greetings | OK |
+| 3 | life | 12 | Ama stall, Pip chops + Elder herbs, Mo fishes (3 cuts with captions) | OK |
+| 4 | inspect | 9 | inspector on Mo: tuned Llama, runs on Kai's computer, plan, goal, why | Kai's spot moved, re-peek |
+| 5 | invite | 15.5 | Kai invites Pip, Pip thinks, says yes, love, inspector PROMISED, bunting | OK |
+| 6 | leave | 10 | "THAT EVENING 17:00", Pip: "Time to go. I promised Kai!", walks to the floor | OK |
+| 7 | wait | 7 | time-lapse 18:00-21:40, dancers leave, Pip waits, confused | OK |
+| 8 | forgot | 4.5 | Kai fishing with Rin at dusk: "third fish tonight!" ("Kai forgot.") | OK |
+| 9 | night | 5 | 22:10, Pip alone: "...Kai never came.", stress, fireflies | OK |
+| 10 | stoodup | 8.6 | "NEXT MORNING", "You stood me up, Kai..." | OK |
+| 11 | refuse | 9.2 | Pip tells Ama; Ama to Kai: "No deals for you today." | OK |
+| 12 | sorry | 12 | apology, love; cut to Ama: made up, inspector THINKS (Pip said) | hold fix + cam -1.0, re-peek |
+| 13 | ask | 5.2 | Mo: "Wanna duel? Ripple has been practicing." | OK |
+| 14 | duel1 | 6 | battle screen, Mochi wins (ends ~4.5 s: trim to 4.6) | OK |
+| 15 | duel2 | 10.5 | rematch, Mo's plan line, counter + crit, loss, Mo's quip | OK |
+| 16 | coach | 10 | coach review card, typed lesson, thinking, memo updated, proof card | re-peek (new memo) |
+| 17 | gazette | 4.4 | town board via game `drawMenu` + `paperRows` | not peeked |
+| 18 | campfire | 6.4 | night fire, Elder's story, Pip's question, love | not peeked |
+| 19 | postcard | 4.2 | 960x540, real Muse Image card rises over the fire | not peeked |
+| 20 | dance | 5 | everyone dances at golden hour, confetti | not peeked |
+| 21 | handover | 12.4 | split screen Kai's tab / Rin's tab, Mo answers, Kai closes tab, minds move | not peeked |
+| 22 | close | 8 | dusk wide, title, mindworld.uryto.dev, models line, fade out | not peeked |
+Sum 186.5 s: trim about 7 s in the edit (title 11.5, life 11, invite 14.5, sorry 11, coach 9, close 7, duel1 4.6).
+
+**Narration** (`.scratch/video/narration.json`, 14 lines, 113.5 s at speed 1.0). Re-voice at speed 1.05 and
+shorten n03 (drop "right in the tab") before the edit. Planned starts (seconds into each shot): n01 title+0.5, n02
+join+0.3, n03 life+0.2, n04 inspect+0.8, n05 invite+9.0, n06 leave+2.0, n07 forgot+2.4, n08 refuse+0.2, n09
+sorry+3.5, n10 duel2+0.3, n11 coach+0.4, n12 gazette+0.2 (runs over campfire and postcard), n13 handover+0.4,
+n14 close+0.6.
+
+**Left to do:** peek 17-22 and fix; re-peek 4, 12, 16; render all 22; music (an original chiptune loop made in
+Python/numpy, plus a soft blip per bubble; no downloaded music); the edit in ffmpeg (concat with short fades,
+narration at the planned starts, -16 LUFS, ASS captions of the narration at the bottom, total <= 180 s); review a
+contact sheet and listen check (optionally faster-whisper on the mix to confirm words); SendUserFile the mp4; the
+user uploads it and pastes the link into the form.
+
 ## Setup
 - Record https://mindworld.uryto.dev at 1080p, 1x.
 - Two windows side by side: **A** = the user's normal profile with the tuned 1B loaded (B key or the setup screen; let
