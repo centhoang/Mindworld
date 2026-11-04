@@ -28,4 +28,10 @@ The dialogue call answered 200 on the right provider, but Muse Spark Open spent 
 
 ## Join check after the deploy
 Run 1: 19/20 ("a late joiner sees who is talking": talker got nothing). Run 2: 19/20 ("after everyone leaves, the room
-is empty": 2 left behind). A different single check each run; the lock-down touches no room code. Run 3: see below.
+is empty": 2 left behind). A different single check each run; the lock-down touches no room code.
+Runs 3 (18/20) and 4 (15/19) started within a minute or two of the previous run and found its leftovers still in
+("starts empty: 2 / 3 already in"), which also broke "everyone sees everyone" and the kick burst. A probe a minute
+after run 4: 0 in the room. **Run 5 from an empty room: 19/20**, only "after everyone leaves, the room is empty (1 left
+behind: Big2)"; a probe 100 s later: 0. So a close lost on this home link in the 100-socket burst leaves a ghost until
+the room's reaper (`SILENT_MS` 90 s, `room-do.ts`) drops it. The room is fine; the check's settle window is shorter
+than the reaper. Rule added to `ops/tooling.md`: wait 2 minutes between runs.
