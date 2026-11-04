@@ -4,24 +4,23 @@
 
 type Rect = readonly [number, number, number, number]; // x0, y0, x1, y1
 
+// Bug 55 (play-test #1): Codex redrew the room with every piece whole and the window on the back wall (rows 4-15);
+// the plan below is its measured floor plan (.scratch/home-room-result.md), the doorway unchanged.
 const FLOORS: readonly Rect[] = [
-  [4, 26, 32, 48], // west of the lane, below the bed
-  [23, 23, 32, 26], // beside the bed's foot
-  [32, 23, 48, 48], // the lane from the door to the back wall
-  [48, 32, 76, 48], // east: the crate's square and room in front of the table
-  [62, 27, 76, 32], // beside the table
+  [4, 28, 76, 48], // wall to wall below the furniture: room left of the lane, the lane, the crate's square
+  [23, 24, 57, 28], // in front of the shelf, up to the table
+  [39, 16, 57, 24], // the lane's top, beside the shelf, up to the back wall
   [32, 48, 48, 58], // the doorway
 ];
 const BUILT_IN: readonly Rect[] = [
-  [5, 21, 22, 26], // bed
-  [25, 17, 39, 23], // shelf
-  [57, 22, 73, 27], // table
-  [49, 29, 61, 32], // stool
+  [4, 22, 23, 28], // bed
+  [23, 18, 39, 24], // shelf
+  [57, 22, 75, 28], // table
 ];
 
 // The same built-ins, to draw on the cell plane (the mosaic look): foot centre, in picture pixels.
 export const BUILT_IN_PIECES: readonly { kind: string; x: number; y: number }[] = [
-  { kind: "bed", x: 13, y: 26 }, { kind: "shelf", x: 32, y: 23 }, { kind: "table", x: 65, y: 27 }, { kind: "chair", x: 55, y: 32 },
+  { kind: "bed", x: 13, y: 27 }, { kind: "shelf", x: 31, y: 23 }, { kind: "table", x: 66, y: 27 },
 ];
 
 const inside = ([x0, y0, x1, y1]: Rect, x: number, y: number) => x >= x0 && x < x1 && y >= y0 && y < y1;

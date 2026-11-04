@@ -3,12 +3,9 @@
 Every bug the user reports goes here, with its image in `.scratch/bugs/`. Remove when proven fixed. Fixed lines wait for the user's review.
 
 ## Visual
-Found in user play-test #1 (2026-11-04, live worker 14537484). The user plays once more at the end, when all is done.
-55. **Inside the small house: the table at the top right is cut off, and a dark window tile stands on the floor** between
-    the shelf and the table. `.scratch/bugs/55-interior-table-window.png`. Codex art (`client/public/art/gen/home-small-open.png`):
-    a rework brief (window on the back wall's inner face, every piece whole), then `python scripts/art-home-small.py`,
-    and check `game/house.ts` FLOORS/BUILT_IN still match.
+Play-test #1 (2026-11-04) bugs 53-60 are all fixed on live (worker c25d5953), waiting for the user's last play-test.
 ### Fixed, waiting for review
+55 (play-test #1): Codex redrew the room (take 3 of 3; the first two layouts could not fit): window on the back wall, bed, shelf, the table whole, no stool; `game/house.ts` floor plan from its measured plan. Live: `proof/visual/house-55-inside-live.png`. All of 53-60: `proof/pet/playtest1-fixes-live.md`.
 54 (play-test #1): the campfire burns one pack `spr_deco_fire_02` flame footed in the ring's pit, where the pack's own Room1 puts it, not three small `fire_01` flames at its top left (`pixel-view.ts`). 58, 59 (play-test #1): the battle scene (Codex backdrop, ground and pads in `art/gen/battle/`, trainers, both pets at 32 px) is drawn on a half-size canvas and doubled, so it has one pixel size, the trainer's; both HP panels sit in a bar along the top, mine left, the foe's right, clear of both pets (`battle.ts battleLayout`, tested at 5 screen sizes); the text box shows the pet's head at the same pixel size. Panels and text stay at the game's UI size.
 46 (P4, deployed 2026-11-04, worker 3a555c50): every plot has the same small house (Codex art in pack style, roof recoloured into the pack's five colours by slot, `scripts/art-home-small.py`) with a small room inside; the old home wing is gone (`game/house.ts`, `interior.ts`, `village-map.ts plotHouse`). Seen in the dev pane; not yet on live by the user.
 34 (user chose "bubble moves aside", 2026-11-03): a bubble that would cover the Goals card steps just below it (`layoutBubbles` keep-out, `bubbles.test.ts`). Not yet seen on live.

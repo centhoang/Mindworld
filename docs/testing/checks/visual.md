@@ -28,5 +28,5 @@ Run on `/`, Sunnyside (decided). `/lab/visual` is still the mosaic. Live proof: 
   the roof in place and shows a small room (bed, shelf, table, stool, the crate by the door) you and your pet walk in (bug 46).
   Unit tests: `house.test.ts`, `village-map.test.ts`. Dev pane only so far.
 - [ ] Every plot has a tilled 2x3 field beside its house and a front fence of the pack's rails with a gate at the door. Dev pane only so far.
-- [ ] The campfire's flames burn inside its stone ring (bug 54).
-- [ ] Inside the small house every piece of furniture is whole and the windows are on the walls, none on the floor (bug 55).
+- [x] [proof](../proof/visual/campfire-53-54-live.png) The campfire's flames burn inside its stone ring (bug 54).
+- [x] [proof](../proof/visual/house-55-inside-live.png) Inside the small house every piece of furniture is whole and the windows are on the walls, none on the floor (bug 55).
