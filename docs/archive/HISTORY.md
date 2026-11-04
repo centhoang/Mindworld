@@ -273,3 +273,14 @@ See HANDOFF of commit after b0ec50d, `docs/testing/proof/network/join-live.md` (
 Lock-down live (worker 950958dc), proof `docs/testing/proof/network/llm-lockdown-live.md`; bug 61 found; P7 drafts
 (`docs/ops/submission.md`, `docs/ops/demo.md`, README); domain move to mindworld.uryto.dev decided, waiting on Access.
 Commits e408276, 0852852. Codex now also takes non-visual tasks (CLAUDE.md).
+
+## 2026-11-04 session (scope checks on live, bugs 63-65), moved from HANDOFF at ~22:50 VN
+- Scope checks on live (mindworld.uryto.dev): pet, visual, game, npc lists clear except lines that need a person or P8.
+  Proof: `docs/testing/proof/{pet,game}/scope-check-live-2026-11-04.md`, visual shots `proof/visual/*-live.png`.
+- Bug 63 (user): the room's table had no left edge; mirrored its right edge in both `home-small-open.png` files.
+- Bug 64: a host on the Teach screen froze its villagers for everyone (main loop skipped the village behind Teach).
+- Bug 65: the inspector said "rules" right after Muse Spark answered (player replies never set the source).
+- P8 prepared as `.scratch/p8/p8.patch` (chatlog gone, CLIENT_DAILY_USD 2, pets route dropped); not applied.
+- First commit Oct 26 12:14 ET (docs only), first code Oct 27; X post needs no tag. Demo numbers and labels match.
+- Deploys: b10caae4 (art), 48d95812 (bug 64; wrangler exited 255 at the triggers step, `wrangler triggers deploy` fixed
+  it), 24fb26ae (bug 65). Commits 5eb48ee, 45427c1 (local).
