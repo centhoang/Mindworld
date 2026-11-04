@@ -17,7 +17,7 @@ describe("Village Gazette notes", () => {
   });
 
   it("fills a quiet day with everyday doings, and nothing from other days", () => {
-    const notes = gazetteNotes([{ name: "Pip", log: [e(4, "saved up and bought a ball", 8), e(5, "played at the pitch"), e(5, "sat by the campfire")] }], 5);
+    const notes = gazetteNotes([{ name: "Pip", log: [e(4, "saved up and bought a ball", 8), e(5, "planned: campfire, feed"), e(5, "played at the pitch"), e(5, "sat by the campfire")] }], 5);
     expect(notes).toEqual(["Pip: sat by the campfire", "Pip: played at the pitch"]);
     expect(gazetteNotes([], 5)).toEqual([]);
   });
@@ -38,8 +38,8 @@ describe("Village Gazette notes", () => {
   it("always gives three headlines from real notes, then the market, then a quiet day", () => {
     expect(rulesHeadlines(["Pip: saved up and bought a ball", "Mo: fished at the pond"], ["fish 4c", "wheat 2c"])).toEqual([
       "Pip saves up and buys a ball at last",
-      "Market today: fish 4c, wheat 2c",
       "From Mo's diary: fished at the pond",
+      "Everyone is welcome at the campfire tonight",
     ]);
     expect(rulesHeadlines([], [])).toEqual(["A quiet day in the village", "Everyone is welcome at the campfire tonight"]);
     for (const h of rulesHeadlines([`Ama: ${"x".repeat(40)}'s ${"y".repeat(30)} was cancelled`], [])) expect(h.length).toBeLessThanOrEqual(70);

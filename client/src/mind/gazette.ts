@@ -18,7 +18,7 @@ export interface NoteSource {
 export function gazetteNotes(minds: readonly NoteSource[], day: number, max = GAZETTE_NOTES): string[] {
   const rows = minds.flatMap((m) =>
     m.log
-      .filter((e) => e.day === day && !e.text.includes("|") && e.text.length > 3)
+      .filter((e) => e.day === day && !e.text.includes("|") && !e.text.startsWith("planned") && e.text.length > 3)
       .map((e, i) => ({ name: m.name, e, i }))
       .sort((a, b) => (b.e.imp ?? 3) - (a.e.imp ?? 3) || b.i - a.i)
       .slice(0, PER_VILLAGER),
@@ -60,15 +60,15 @@ export function noteHeadline(note: string): string | null {
   return null;
 }
 
-// Three headlines without a model: the notes the sim can read, then the market, then a quiet day.
-export function rulesHeadlines(notes: readonly string[], prices: readonly string[]): string[] {
+// Up to three headlines without a model: the notes the sim can read, then a diary line, then a quiet day. The prices
+// are not news here: the board lists them right below.
+export function rulesHeadlines(notes: readonly string[], _prices: readonly string[] = []): string[] {
   const out: string[] = [];
   for (const note of notes) {
     const h = noteHeadline(note);
     if (h && !out.includes(fit(cap(h)))) out.push(fit(cap(h)));
     if (out.length === 3) return out;
   }
-  if (prices.length) out.push(fit(`Market today: ${prices.slice(0, 4).join(", ")}`));
   const plain = notes.find((n) => !noteHeadline(n)); // a note no headline told yet
   if (out.length < 3 && plain) out.push(fit(`From ${plain.replace(": ", "'s diary: ")}`));
   if (out.length < 3 && !notes.length) out.push("A quiet day in the village");

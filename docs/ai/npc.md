@@ -54,3 +54,20 @@ Whichever wins, do D. A short reply (20 tokens, 150 in) takes ~6 s on the 1B and
 Rule: the game must still work free after the event, so turning the cloud tier off must leave the game playable.
 
 Design backlog and research sources: `archive/NPC-PLAN.md`.
+
+## Village Gazette and watching villagers (P5, 2026-11-04)
+- **Gazette** (`mind/gazette.ts`, `game/gazette-api.ts`, worker `gazette.ts`, `/api/gazette`). The client that hosts
+  villagers sends their notable memories (imp >= 4: promises 8, duels 6, gifts 6, deals 5, watched fights 4, goals
+  4-5; everyday doings fill a quiet day; `planned:` and encoded `x|y` lines are skipped), up to 10, plus prices.
+  It uses yesterday's notes, else the latest lived day (the village only lives while someone is online). Muse Spark
+  1.3 on the Meta Model API writes 3 headlines; KV cache `gazette:paper:<room>:<day>` (2 days), a 60 s busy key so
+  one writer at a time, $1/UTC day + ledger + quota `gazette` (12 per client, 300 a day). A non-host sends no notes and
+  only reads; 4 tries 15 s apart, then rules (`rulesHeadlines`, from the same notes). Live cost ~$0.006 a paper.
+- Weak spot: plain `remember()` entries live in the host's tab only (the room keeps the relayed `mem` lines), so a
+  reload or host hand-over mid-day loses that day's everyday notes; promises, duels, trades and bonds are relayed.
+- **Watching villager** (`game/cheer-api.ts`, worker `cheer.ts`, `/api/cheer`). At a fight's start the nearest villager
+  within 16 tiles, awake and not indoors (`Overworld.watcher`, the rival's owner excluded) is the watcher; one Muse
+  Spark Open call (persona from `chat.ts PERSONA`, the villager's feeling about the player) writes its line for win,
+  loss and friends; said at the end, waiting 1.5 s at most; a draw and every failure use the villager's own lines.
+  The villager remembers "watched <player>'s pet <pet> beat <foe>" (Gazette news). Cap $1/UTC day, quota `cheer`.
+- The inspector (I) names what answered a mind's last line (`serviceLabel`, plain words first).

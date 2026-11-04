@@ -61,7 +61,7 @@ export const GAZETTE_SYSTEM =
 
 export function gazettePrompt(a: GazetteAsk): string {
   return [
-    `Yesterday (day ${a.day - 1}) in the village, from the villagers' own notes. Each line is "Villager: what they noted",`,
+    `The latest news in the village (game day ${a.day - 1}), from the villagers' own notes. Each line is "Villager: what they noted",`,
     'in their own words, so "I" and "my" mean that villager:',
     ...a.events.map((e) => `- ${e}`),
     a.prices.length ? `Market prices this morning: ${a.prices.join(", ")}.` : "",

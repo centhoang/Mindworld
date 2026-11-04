@@ -14,3 +14,6 @@ Run on `/` only when every other list is clear. Two or more players, deployed bu
 - [x] Holding one direction, walking or running, your character moves smoothly and never jumps back, also in the first hold after a teleport. (proof: ../proof/game/walk-steady.md, ../proof/game/sunny-live.md)
 - [x] Two players in the village see the same day. (proof: ../proof/game/sunny-live.md)
 - [ ] Runs with no GPU: rules and cached lines, and it says so. (waits for step 7: `LOCAL_ONLY` shows no scripted lines; `?gpu=skip` works in dev only, so live needs a machine with no GPU)
+- [x] Every morning the town board has a Gazette: three headlines about what really happened in the village lately, the same for everyone in the room, and it says who wrote it (Muse Spark 1.3, or the villagers' notes when the cloud is off). (proof: ../proof/game/p5-live.md)
+- [x] A villager who sees your fight start calls out once when it ends, in their own voice, and remembers it. (proof: ../proof/game/p5-live.md)
+- [x] Looking inside a mind (I) says what answered its last line, in plain words. (proof: ../proof/game/p5-live.md)

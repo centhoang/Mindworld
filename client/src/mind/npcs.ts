@@ -578,8 +578,14 @@ ${cloudMindText(m.persona, m.mem, player, line, t)}`;
   hostsAny(): boolean {
     return NPCS.some((n) => this.hosting(n));
   }
+  // The village only lives while someone is online: a day nobody played has no notes, so the latest lived day stands in.
   gazetteNotes(day: number): string[] {
-    return gazetteNotes([...this.hub.minds].filter(([id]) => this.hosting(id as Npc)).map(([, m]) => ({ name: m.persona.name, log: m.mem.log })), day);
+    const minds = [...this.hub.minds].filter(([id]) => this.hosting(id as Npc)).map(([, m]) => ({ name: m.persona.name, log: m.mem.log }));
+    for (const d of [day, day - 1, day - 2, day + 1]) {
+      const notes = gazetteNotes(minds, d);
+      if (notes.length) return notes;
+    }
+    return [];
   }
   // A villager watching the player's fight: how it feels about them, and the memory of what it saw.
   feelFor(npc: Npc, player: string): string {

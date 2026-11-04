@@ -53,7 +53,7 @@ describe("Village Gazette on the client", () => {
     gz.update(10, 5000);
     await tick();
     expect(calls).toBe(0);
-    expect(gz.paper).toEqual({ day: 10, headlines: ["Pip saves up and buys a ball at last", "Market today: fish 4c", "Everyone is welcome at the campfire tonight"], by: RULES_BY });
+    expect(gz.paper).toEqual({ day: 10, headlines: ["Pip saves up and buys a ball at last", "Everyone is welcome at the campfire tonight"], by: RULES_BY });
   });
 
   it("a cap or a bad ask ends the day's asking at once; a new day starts over", async () => {

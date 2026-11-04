@@ -48,6 +48,12 @@
   ~10:50 VN): campfire pose and flame, the house room (Codex), pet marks (Codex, 90 files), the battle screen redone (one
   pixel size via a half-size scene canvas, Codex backdrop/ground/pads, panels in a top bar, shout box). Proof
   `docs/testing/proof/pet/playtest1-fixes-live.md`. **Next: P5.**
+- **P5 a-c done** (live worker 051d8ab7, build `main-BOsI1_9N`, commits c7a8ba4, cfa6a77 + docs, 2026-11-04 ~12:20 VN):
+  join check fixed (the script picked closed sockets as talkers; 20/20); Village Gazette on the town board and as a
+  toast (Muse Spark 1.3, Meta Model API, cached per room and game day, rules fallback); a watching villager's line per
+  fight (Muse Spark Open, prefetched, remembered); the inspector names the service of each mind's last line. Design
+  `docs/ai/npc.md` "Village Gazette"; proof `docs/testing/proof/game/p5-live.md`. **Next: P5d** (campfire stories /
+  NPC-to-NPC talk from the cloud with memories), then P5e postcards if time, then P6 at 18:00 VN.
 
 ## Context
 The user woke on Nov 3 and set the demo target (`docs/plan/final-input.md`): harder, richer pet combat with adapted

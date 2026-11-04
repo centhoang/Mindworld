@@ -69,6 +69,8 @@ memories move to B.
   loaded (capped per player and per day, scripted fallback); Teach (lesson to validated rule memo); teacher for the coach
   fine-tune and the village data set (Modal).
 - **Muse Spark 1.3** (Meta Model API): "Learn from my fights" review.
+- **Muse Spark 1.3** (Meta Model API): the Village Gazette on the town board (`/api/gazette`, one paper per room and game day).
+- **Muse Spark Open** (Baseten): a watching villager's line at the end of a fight (`/api/cheer`).
 - **Muse Voice Transcribe** (Meta Model API): teaching by voice.
 - **Llama 3.2 1B, fine-tuned** (LoRA on Modal, distilled from Muse Spark Open): free coach and minds in the tab; browser
   bench (N4, GTX 1050): 97.0% valid across 300 held-out decisions, Teach +18.9 pts held-out lift.

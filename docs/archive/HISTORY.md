@@ -196,3 +196,33 @@ one failure, bug 60. **The user will play once more, last, when everything is do
 User's words on the battle screen: redesign the layout as Claude sees fit (Codex makes art only, never layout); one pixel
 size for everything, **the player's pixel size is the baseline**; rework the battle background and the pet art at that
 size, asking Codex specifically for the art.
+
+## 2026-11-04 session (play-test #1 bugs 53-60, moved from HANDOFF at ~12:25 VN)
+## Done this session (play-test #1 bugs 53-60, all on live; commits dcfbe7c, 413b5a2)
+Proof table: `docs/testing/proof/pet/playtest1-fixes-live.md`; checks ticked in `checks/{pet,visual,npc}.md`.
+- 53 campfire pose `warm` = idle + `doing` (no fishing strips). 54 one pack `spr_deco_fire_02` flame at the ring's pit
+  (pack Room1 placement; `pixel-view.ts`, `sunny.ts` STRIPS). 60 `doingAnswer` takes the phase and mates: "Not much. Just
+  taking it easy tonight.", "We sit by the campfire." (`mind/directions.ts`, `npcs.ts grounded`).
+- 55 Codex redrew `gen/home-small-open.png` (3 briefs: `.scratch/brief-home-room*.md`; takes 1-2 refused, the room is
+  too small for table + stool + crate square). Now: back wall rows 4-15 with one window, bed, shelf, table, no stool.
+  `game/house.ts` FLOORS/BUILT_IN from Codex's measured plan; `python scripts/art-home-small.py` copied it to `art/sunny/`.
+- 56 Codex redrew `stripes`, `nubs`, `floppy` (90 files; brief `.scratch/brief-pet-marks.md`, preview
+  `.scratch/pet-marks-preview.png`, generator `.scratch/pet-marks-generator.mjs`).
+- 57-59 battle screen (`pixel/battle.ts`): `battleLayout(sw, sh)` (pure, tested at 5 sizes); the whole scene draws on a
+  half-size canvas (`SCENE = 2`) at 1 art px and is doubled, so trainers, pets (now `drawMonster(..., 32, ...)` in
+  `fight-flow.ts` and `main.ts side()`) and the background share the trainer's pixel. Codex art `art/gen/battle/`
+  (backdrop 128x40 tiled at the horizon, ground 32x32, pad-far 56x14, pad-near 72x18; brief `.scratch/brief-battle-bg.md`),
+  code fallback if not loaded (retry on error). HP panels: a top bar, mine left, foe's right. The text box portrait is
+  the pet's head (`headOf`, 16x16 of the 32 px front, doubled). While shouts are open the command box shows
+  `SHOUTS: n` + 1 GO! .. 5 FRIENDS!, the called one lit; `shoutAt` makes them tappable (wired in `main.ts` pointer).
+  Panels and text keep the UI pixel size (say so if the user asks: "one pixel size" applied to the scene art).
+- Codex note: its sandbox has no Python (PIL); it uses Node + pngjs for checks. Briefs that are too strict get refused:
+  give exact coordinates and "move up to 3 px, never stop without writing".
+
+## Play-test #1 (user, 2026-11-04, live worker 14537484)
+The user played and reported 8 problems, now bugs 53-60 in `docs/BUGS.md` (screenshots `.scratch/bugs/53-*` to `57-59-*`),
+each with a line in `docs/testing/checks/{npc,pet,visual}.md`. The chat log was read (8 lines, `.scratch/p4/chat-rows.txt`):
+one failure, bug 60. **The user will play once more, last, when everything is done** (that is P6's whole-game play-test).
+User's words on the battle screen: redesign the layout as Claude sees fit (Codex makes art only, never layout); one pixel
+size for everything, **the player's pixel size is the baseline**; rework the battle background and the pet art at that
+size, asking Codex specifically for the art. All 8 are fixed on live now (above).
